@@ -1,0 +1,37 @@
+---
+import { Picture } from 'astro:assets';
+import type { CollectionEntry } from 'astro:content';
+import type { ImageMetadata } from 'astro';
+import { sessionSlug, formatDate } from '@/lib/sessions';
+
+interface Props {
+  entry: CollectionEntry<'sessions'>;
+  cover: ImageMetadata;
+}
+
+const { entry, cover } = Astro.props;
+const slug = sessionSlug(entry);
+const { title, date, location } = entry.data;
+---
+
+<a href={`/sessions/${slug}`} class="group block no-underline">
+  <div class="overflow-hidden rounded-lg bg-neutral-100 dark:bg-neutral-900">
+    <Picture
+      src={cover}
+      alt={title}
+      widths={[480, 800, 1200]}
+      sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+      formats={['avif', 'webp']}
+      fallbackFormat="jpeg"
+      loading="lazy"
+      class="aspect-[4/3] w-full object-cover transition-opacity duration-300 group-hover:opacity-90"
+    />
+  </div>
+  <div class="mt-3 space-y-1">
+    <h2 class="text-base font-medium">{title}</h2>
+    <p class="text-xs text-neutral-600 dark:text-neutral-400">
+      <time datetime={date}>{formatDate(date)}</time>
+      {location && <span> · {location}</span>}
+    </p>
+  </div>
+</a>

@@ -1,0 +1,49 @@
+---
+import '@/styles/global.css';
+import { siteConfig } from '../../site.config';
+import { themeBootstrap } from '@/lib/theme';
+import Header from '@/components/Header.astro';
+import Footer from '@/components/Footer.astro';
+
+interface Props {
+  title?: string;
+  description?: string;
+  /** Open Graph image URL (absolute). */
+  ogImage?: string;
+}
+
+const { title, description, ogImage } = Astro.props;
+const pageTitle = title ? `${title} — ${siteConfig.siteTitle}` : siteConfig.siteTitle;
+const pageDescription = description ?? siteConfig.siteDescription;
+const canonical = new URL(Astro.url.pathname, Astro.site ?? `https://${siteConfig.domain}`).toString();
+---
+
+<!doctype html>
+<html lang={siteConfig.defaultLocale}>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="generator" content={Astro.generator} />
+    <meta name="author" content={siteConfig.ownerName} />
+    <meta name="description" content={pageDescription} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={pageDescription} />
+    <meta property="og:url" content={canonical} />
+    {ogImage && <meta property="og:image" content={ogImage} />}
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <title>{pageTitle}</title>
+    <script is:inline set:html={themeBootstrap} />
+  </head>
+  <body class="flex min-h-screen flex-col">
+    <Header />
+    <main class="flex-1">
+      <slot />
+    </main>
+    <Footer />
+  </body>
+</html>

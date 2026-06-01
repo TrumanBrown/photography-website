@@ -1,0 +1,107 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Hourly cron — picks up new blobs without any push.
+    - cron: '0 * * * *'
+  workflow_dispatch:
+  repository_dispatch:
+    types: [blob-changed]
+
+# Cancel older runs on the same ref when a new one arrives.
+concurrency:
+  group: build-and-deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+    name: Build and deploy
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+          lfs: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install npm deps
+        run: npm ci
+
+      - name: Cache apt packages (libraw-bin)
+        id: apt-cache
+        uses: actions/cache@v4
+        with:
+          path: /var/cache/apt/archives
+          key: apt-libraw-bin-v1
+
+      - name: Install libraw-bin (for RAW conversion)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libraw-bin
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Restore prebuild cache
+        uses: actions/cache@v4
+        with:
+          path: .cache/prebuild
+          key: prebuild-cache-${{ github.run_id }}
+          restore-keys: |
+            prebuild-cache-
+
+      - name: Run prebuild (sync from Blob)
+        env:
+          AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
+        run: node scripts/prebuild.mjs
+
+      - name: Astro build
+        env:
+          PUBLIC_APPINSIGHTS_CONNECTION_STRING: ${{ secrets.APPINSIGHTS_CONNECTION_STRING }}
+        run: npm run build
+
+      - name: Save prebuild cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .cache/prebuild
+          key: prebuild-cache-${{ github.run_id }}
+
+      - name: Deploy to Azure Static Web Apps
+        id: swa
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: upload
+          app_location: '.'
+          output_location: 'dist'
+          skip_app_build: true
+
+  close_pr:
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    name: Close PR preview
+    steps:
+      - name: Close staging environment
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          action: close

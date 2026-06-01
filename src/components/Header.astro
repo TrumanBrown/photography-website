@@ -1,0 +1,16 @@
+---
+import { siteConfig } from '../../site.config';
+import ThemeToggle from './ThemeToggle.astro';
+---
+
+<header class="border-b border-neutral-200 dark:border-neutral-800">
+  <div class="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
+    <a href="/" class="text-lg font-medium tracking-tight no-underline hover:opacity-80">
+      {siteConfig.siteTitle}
+    </a>
+    <nav class="flex items-center gap-4 text-sm">
+      <a href="/" class="no-underline hover:underline">Sessions</a>
+      <ThemeToggle />
+    </nav>
+  </div>
+</header>

@@ -1,0 +1,14 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": { "value": "westus3" },
+    "environment": { "value": "prod" },
+    "domainName": { "value": "" },
+    "domainContact": { "value": {} },
+    "githubOwner": { "value": "<GITHUB-OWNER>" },
+    "githubRepo": { "value": "photography-website" },
+    "githubBranch": { "value": "main" },
+    "enableDiagnostics": { "value": false }
+  }
+}

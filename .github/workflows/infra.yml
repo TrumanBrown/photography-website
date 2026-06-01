@@ -1,0 +1,80 @@
+name: Infra (Bicep)
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment (prod/dev)'
+        required: true
+        default: 'prod'
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy Bicep (subscription scope)
+        id: deploy
+        uses: azure/arm-deploy@v2
+        with:
+          scope: subscription
+          region: westus3
+          subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          template: ./infra/subscription.bicep
+          parameters: ./infra/main.parameters.json githubOwner=${{ github.repository_owner }} githubRepo=${{ github.event.repository.name }} environment=${{ inputs.environment }}
+          deploymentName: photography-${{ inputs.environment }}-${{ github.run_id }}
+          failOnStdErr: false
+
+      - name: Surface outputs
+        run: |
+          echo "Resource group: ${{ steps.deploy.outputs.resourceGroupName }}"
+          echo "Storage account: ${{ steps.deploy.outputs.storageAccountName }}"
+          echo "Blob endpoint: ${{ steps.deploy.outputs.blobEndpoint }}"
+          echo "SWA hostname: ${{ steps.deploy.outputs.swaDefaultHostname }}"
+          echo "MI client id: ${{ steps.deploy.outputs.managedIdentityClientId }}"
+
+      - name: Fetch SWA deployment token
+        id: swa-token
+        run: |
+          TOKEN=$(az staticwebapp secrets list \
+            --name "${{ steps.deploy.outputs.swaName }}" \
+            --resource-group "${{ steps.deploy.outputs.resourceGroupName }}" \
+            --query "properties.apiKey" -o tsv)
+          if [ -z "$TOKEN" ]; then
+            echo "Failed to fetch SWA deployment token." >&2
+            exit 1
+          fi
+          echo "::add-mask::$TOKEN"
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+
+      - name: Write SWA token into repo secret
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT_FOR_SECRETS }}
+        run: |
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::warning::GH_PAT_FOR_SECRETS not set; cannot auto-update AZURE_STATIC_WEB_APPS_API_TOKEN."
+            echo "Copy this token manually into repo secret AZURE_STATIC_WEB_APPS_API_TOKEN."
+            exit 0
+          fi
+          gh secret set AZURE_STATIC_WEB_APPS_API_TOKEN \
+            --repo "${{ github.repository }}" \
+            --body "${{ steps.swa-token.outputs.token }}"
+          gh secret set AZURE_STORAGE_ACCOUNT \
+            --repo "${{ github.repository }}" \
+            --body "${{ steps.deploy.outputs.storageAccountName }}"
+          gh secret set APPINSIGHTS_CONNECTION_STRING \
+            --repo "${{ github.repository }}" \
+            --body "${{ steps.deploy.outputs.appInsightsConnectionString }}"

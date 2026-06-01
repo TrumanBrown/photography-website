@@ -1,0 +1,74 @@
+---
+/**
+ * Lightbox wrapper. Initializes PhotoSwipe v5 against any element with the
+ * given selector. Place once per page that needs a lightbox.
+ *
+ * The DOM contract: each gallery item must be an <a> with
+ *   href={fullResUrl}
+ *   data-pswp-width={intrinsicWidth}
+ *   data-pswp-height={intrinsicHeight}
+ *   data-pswp-caption={optional caption}
+ * and contain a thumbnail <img> child.
+ */
+interface Props {
+  /** CSS selector for the gallery container. Defaults to `#gallery`. */
+  gallerySelector?: string;
+}
+
+const { gallerySelector = '#gallery' } = Astro.props;
+---
+
+<script>
+  // @ts-ignore - photoswipe ships its own types under subpaths
+  import PhotoSwipeLightbox from 'photoswipe/lightbox';
+  import 'photoswipe/style.css';
+
+  // Read the per-page selector from the marker element below.
+  const marker = document.querySelector<HTMLElement>('[data-lightbox-marker]');
+  const selector = marker?.dataset.gallery ?? '#gallery';
+
+  const lightbox = new PhotoSwipeLightbox({
+    gallery: selector,
+    children: 'a',
+    pswpModule: () => import('photoswipe'),
+    showHideAnimationType: 'fade',
+    bgOpacity: 0.95,
+  });
+
+  lightbox.on('uiRegister', function () {
+    lightbox.pswp?.ui?.registerElement({
+      name: 'caption',
+      order: 9,
+      isButton: false,
+      appendTo: 'root',
+      html: '',
+      onInit: (el, instance) => {
+        instance.on('change', () => {
+          const slideEl = instance.currSlide?.data?.element as HTMLElement | undefined;
+          const caption = slideEl?.dataset?.pswpCaption ?? '';
+          el.innerHTML = caption ? `<span>${caption}</span>` : '';
+        });
+      },
+    });
+  });
+
+  lightbox.init();
+</script>
+
+<span data-lightbox-marker data-gallery={gallerySelector} hidden></span>
+
+<style is:global>
+  .pswp__caption {
+    position: absolute;
+    bottom: 1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    color: #f5f5f5;
+    font-size: 0.875rem;
+    padding: 0.25rem 0.75rem;
+    background: rgba(0, 0, 0, 0.55);
+    border-radius: 0.25rem;
+    max-width: 90vw;
+    pointer-events: none;
+  }
+</style>

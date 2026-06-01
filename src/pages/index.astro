@@ -1,0 +1,54 @@
+---
+import { getCollection } from 'astro:content';
+import type { ImageMetadata } from 'astro';
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import SessionCard from '@/components/SessionCard.astro';
+import { sortSessions, sessionSlug } from '@/lib/sessions';
+
+// Eagerly resolve every image under src/content/sessions/ so we can look up
+// cover image metadata at build time. Astro processes each as an ImageMetadata.
+const images = import.meta.glob<{ default: ImageMetadata }>(
+  '/src/content/sessions/**/images/*.{jpg,jpeg,png,webp,avif,JPG,JPEG,PNG,WEBP,AVIF}',
+  { eager: true },
+);
+
+function resolveCover(slug: string, coverFile: string | undefined, fallbackFile: string): ImageMetadata {
+  const file = coverFile ?? fallbackFile;
+  const key = `/src/content/sessions/${slug}/images/${file}`;
+  const mod = images[key];
+  if (!mod) {
+    throw new Error(
+      `Cover image not found for session "${slug}": expected ${key}. ` +
+        `Check that scripts/prebuild.mjs placed the file or update the session JSON's "cover" field.`,
+    );
+  }
+  return mod.default;
+}
+
+const all = await getCollection('sessions');
+const sessions = sortSessions(all);
+---
+
+<BaseLayout>
+  <section class="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+    {
+      sessions.length === 0 ? (
+        <div class="rounded-lg border border-dashed border-neutral-300 p-10 text-center text-neutral-600 dark:border-neutral-700 dark:text-neutral-400">
+          <p class="text-sm">No sessions yet. Add a folder under <code class="font-mono">originals/</code> in Blob Storage, then trigger a build.</p>
+        </div>
+      ) : (
+        <ul class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {sessions.map((entry) => {
+            const slug = sessionSlug(entry);
+            const cover = resolveCover(slug, entry.data.cover, entry.data.images[0].file);
+            return (
+              <li>
+                <SessionCard entry={entry} cover={cover} />
+              </li>
+            );
+          })}
+        </ul>
+      )
+    }
+  </section>
+</BaseLayout>

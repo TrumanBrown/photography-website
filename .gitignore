@@ -1,0 +1,34 @@
+# Build outputs
+dist/
+.astro/
+node_modules/
+
+# Prebuild artifacts — sessions are populated by scripts/prebuild.mjs from
+# Blob Storage (remote mode) or scripts/generate-fixtures.mjs (local mode).
+# Nothing inside sessions/ should be committed except the .gitkeep marker.
+src/content/sessions/*
+!src/content/sessions/.gitkeep
+
+# Local prebuild cache
+.cache/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Domain registration contact info (contains your real name/address/phone).
+# Used once by `az appservice domain create`.
+contact.json
+contact.*.json
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Logs
+*.log
+npm-debug.log*

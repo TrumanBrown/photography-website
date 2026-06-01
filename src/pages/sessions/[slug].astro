@@ -1,0 +1,97 @@
+---
+import { getCollection, type CollectionEntry } from 'astro:content';
+import { Picture } from 'astro:assets';
+import type { ImageMetadata } from 'astro';
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import Lightbox from '@/components/Lightbox.astro';
+import { sessionSlug, formatDate } from '@/lib/sessions';
+
+export async function getStaticPaths() {
+  const sessions = await getCollection('sessions');
+  return sessions.map((entry) => ({
+    params: { slug: sessionSlug(entry) },
+    props: { entry },
+  }));
+}
+
+interface Props {
+  entry: CollectionEntry<'sessions'>;
+}
+
+const { entry } = Astro.props;
+const slug = sessionSlug(entry);
+const { title, date, location, description, images: imageList } = entry.data;
+
+// Pull processed ImageMetadata for every image in this session.
+const allImages = import.meta.glob<{ default: ImageMetadata }>(
+  '/src/content/sessions/**/images/*.{jpg,jpeg,png,webp,avif,JPG,JPEG,PNG,WEBP,AVIF}',
+  { eager: true },
+);
+
+type Resolved = {
+  src: ImageMetadata;
+  file: string;
+  caption?: string;
+  fullUrl: string;
+};
+
+const resolved: Resolved[] = imageList.map((img) => {
+  const key = `/src/content/sessions/${slug}/images/${img.file}`;
+  const mod = allImages[key];
+  if (!mod) {
+    throw new Error(`Image not found for session "${slug}": expected ${key}.`);
+  }
+  // fullUrl points at the public Blob URL when running off remote prebuild.
+  // In local-only mode the prebuild leaves it empty; fall back to the local
+  // file path so the lightbox still works during development.
+  const fullUrl = img.fullUrl ?? mod.default.src;
+  return { src: mod.default, file: img.file, caption: img.caption, fullUrl };
+});
+---
+
+<BaseLayout title={title} description={description || `${title} — photography session`}>
+  <article class="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+    <header class="mb-8 space-y-2">
+      <a href="/" class="text-xs text-neutral-600 no-underline hover:underline dark:text-neutral-400">← All sessions</a>
+      <h1 class="text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h1>
+      <p class="text-sm text-neutral-600 dark:text-neutral-400">
+        <time datetime={date}>{formatDate(date)}</time>
+        {location && <span> · {location}</span>}
+      </p>
+      {description && <p class="max-w-prose text-sm text-neutral-700 dark:text-neutral-300">{description}</p>}
+    </header>
+
+    <ul
+      id="gallery"
+      class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
+    >
+      {
+        resolved.map((img) => (
+          <li class="break-inside-avoid">
+            <a
+              href={img.fullUrl}
+              data-pswp-width={img.src.width}
+              data-pswp-height={img.src.height}
+              data-pswp-caption={img.caption ?? ''}
+              class="block overflow-hidden rounded-lg bg-neutral-100 no-underline dark:bg-neutral-900"
+              aria-label={img.caption ?? img.file}
+            >
+              <Picture
+                src={img.src}
+                alt={img.caption ?? ''}
+                widths={[480, 800, 1200, 1600]}
+                sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+                formats={['avif', 'webp']}
+                fallbackFormat="jpeg"
+                loading="lazy"
+                class="h-auto w-full"
+              />
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+
+    <Lightbox gallerySelector="#gallery" />
+  </article>
+</BaseLayout>

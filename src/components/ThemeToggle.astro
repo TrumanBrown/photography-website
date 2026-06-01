@@ -1,0 +1,28 @@
+---
+// Pure-client theme toggle. No framework, no hydration cost.
+---
+
+<button
+  id="theme-toggle"
+  type="button"
+  aria-label="Toggle dark mode"
+  class="rounded border border-neutral-300 px-2 py-1 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-900"
+>
+  <span class="hidden dark:inline">Light</span>
+  <span class="inline dark:hidden">Dark</span>
+</button>
+
+<script is:inline>
+  (function () {
+    var btn = document.getElementById('theme-toggle');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      var root = document.documentElement;
+      var nextDark = !root.classList.contains('dark');
+      root.classList.toggle('dark', nextDark);
+      try {
+        localStorage.setItem('theme', nextDark ? 'dark' : 'light');
+      } catch (_) {}
+    });
+  })();
+</script>

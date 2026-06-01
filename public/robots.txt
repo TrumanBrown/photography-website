@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+# Sitemap will be auto-emitted in a future iteration; placeholder URL.
+# Sitemap: https://example.com/sitemap-index.xml
