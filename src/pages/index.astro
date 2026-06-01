@@ -27,6 +27,17 @@ function resolveCover(slug: string, coverFile: string | undefined, fallbackFile:
 
 const all = await getCollection('sessions');
 const sessions = sortSessions(all);
+
+// Group by year for browsability when there are many sessions.
+type Entry = (typeof sessions)[number];
+const byYear = new Map<string, Entry[]>();
+for (const entry of sessions) {
+  const year = entry.data.date.slice(0, 4);
+  const bucket = byYear.get(year) ?? [];
+  bucket.push(entry);
+  byYear.set(year, bucket);
+}
+const years = [...byYear.keys()].sort((a, b) => b.localeCompare(a));
 ---
 
 <BaseLayout>
@@ -37,17 +48,29 @@ const sessions = sortSessions(all);
           <p class="text-sm">No sessions yet. Add a folder under <code class="font-mono">originals/</code> in Blob Storage, then trigger a build.</p>
         </div>
       ) : (
-        <ul class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {sessions.map((entry) => {
-            const slug = sessionSlug(entry);
-            const cover = resolveCover(slug, entry.data.cover, entry.data.images[0].file);
-            return (
-              <li>
-                <SessionCard entry={entry} cover={cover} />
-              </li>
-            );
-          })}
-        </ul>
+        <div class="space-y-12">
+          {years.map((year) => (
+            <section aria-labelledby={`year-${year}`}>
+              <h2
+                id={`year-${year}`}
+                class="mb-4 border-b border-neutral-200 pb-2 text-sm font-semibold uppercase tracking-wider text-neutral-500 dark:border-neutral-800 dark:text-neutral-400"
+              >
+                {year}
+              </h2>
+              <ul class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                {byYear.get(year)!.map((entry) => {
+                  const slug = sessionSlug(entry);
+                  const cover = resolveCover(slug, entry.data.cover, entry.data.images[0].file);
+                  return (
+                    <li>
+                      <SessionCard entry={entry} cover={cover} />
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          ))}
+        </div>
       )
     }
   </section>

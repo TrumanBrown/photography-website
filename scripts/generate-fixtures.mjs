@@ -14,7 +14,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 const SESSIONS_DIR = join(ROOT, 'src', 'content', 'sessions');
 
-const fixtures = [
+const argv = new Set(process.argv.slice(2));
+const MANY = argv.has('--many');
+
+const baseFixtures = [
   {
     slug: 'tidepools-spring-2026',
     data: {
@@ -48,6 +51,52 @@ const fixtures = [
     ],
   },
 ];
+
+// Synthetic "many" set so you can see how the sidebar feels at scale.
+const places = [
+  'Yosemite', 'Big Sur', 'Joshua Tree', 'Death Valley', 'Mt. Rainier',
+  'Olympic NP', 'Glacier NP', 'Banff', 'Iceland Ring Road', 'Norway Fjords',
+  'Tokyo', 'Kyoto', 'Hokkaido', 'Seoul', 'Hong Kong',
+  'Paris', 'Rome', 'Lisbon', 'Barcelona', 'Amsterdam',
+  'NYC Winter', 'Chicago Skyline', 'Seattle Rain', 'PNW Coast', 'Cascades',
+  'Backyard Birds', 'Holiday Lights', 'Studio Portraits', 'Friends Wedding', 'Family Reunion',
+  'Sailing Trip', 'Cherry Blossoms', 'Autumn Leaves', 'Alpine Lakes', 'Volcano Hike',
+  'City at Night', 'Street Market', 'Botanical Garden', 'Tide Pools', 'Storm Clouds',
+];
+const swatches = ['#1f2937', '#7c2d12', '#0e7490', '#4d7c0f', '#92400e', '#b91c1c', '#1e40af', '#7e22ce', '#0f766e', '#a16207'];
+
+function manyFixtures() {
+  const out = [];
+  let i = 0;
+  for (const place of places) {
+    const year = 2020 + (i % 6);
+    const month = String(((i * 3) % 12) + 1).padStart(2, '0');
+    const day = String(((i * 7) % 27) + 1).padStart(2, '0');
+    const slug = place.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + `-${year}`;
+    out.push({
+      slug,
+      data: {
+        title: `${place}, ${year}`,
+        date: `${year}-${month}-${day}`,
+        location: place,
+        description: '',
+      },
+      images: [0, 1, 2].map((k) => {
+        const isPortrait = (i + k) % 3 === 0;
+        return {
+          name: `img-${k + 1}.jpg`,
+          color: swatches[(i + k) % swatches.length],
+          w: isPortrait ? 1067 : 1600,
+          h: isPortrait ? 1600 : 1067,
+        };
+      }),
+    });
+    i++;
+  }
+  return out;
+}
+
+const fixtures = MANY ? manyFixtures() : baseFixtures;
 
 async function exists(p) {
   try {

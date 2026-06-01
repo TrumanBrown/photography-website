@@ -1,104 +1,100 @@
 # photography-website
 
-Personal photography portfolio, hosted on Azure Static Web Apps with images in Azure Blob Storage.
+Personal photography portfolio. Photos live in Azure Blob Storage; the website is a static Astro build hosted on Azure Static Web Apps. Drop a folder of photos into Blob, the site updates itself within an hour.
 
-- **Frontend:** Astro 5 + Tailwind v4 (static build, near-zero JS)
-- **Hosting:** Azure Static Web Apps (Free)
-- **Storage:** Azure Blob Storage (three containers: `originals`, `derivatives`, `metadata`)
-- **Domain + DNS:** Azure App Service Domain + Azure DNS
-- **IaC:** Bicep
-- **CI/CD:** GitHub Actions (OIDC federation; no long-lived secrets)
-- **Cost target:** under $5/month at personal traffic
-
-The full design is in [the plan](#plan). What follows is the runbook.
+**Why each piece exists** — see [docs/architecture.md](docs/architecture.md).
+**New to any of this?** Start with [docs/glossary.md](docs/glossary.md).
 
 ---
 
-## Local development
+## Quick links
 
-Requires Node 22 (`nvm use` picks it up from `.nvmrc`).
+| Topic | Doc |
+|---|---|
+| What is Astro, SWA, Blob, CDN, and why each one | [docs/architecture.md](docs/architecture.md) |
+| What Azure resources exist and what each costs | [docs/azure.md](docs/azure.md) |
+| What Infrastructure-as-Code (Bicep) is and what each `.bicep` file does | [docs/iac-bicep.md](docs/iac-bicep.md) |
+| How the GitHub Actions workflows work and why | [docs/cicd.md](docs/cicd.md) |
+| How a photo travels from your camera to the live site | [docs/image-pipeline.md](docs/image-pipeline.md) |
+| How the site is hardened (CSP, HSTS, etc.) | [docs/security.md](docs/security.md) |
+| Running locally — npm, dev server, fixtures | [docs/local-dev.md](docs/local-dev.md) |
+| Glossary of every term used here | [docs/glossary.md](docs/glossary.md) |
+
+---
+
+## Tech at a glance
+
+- **Frontend:** Astro 5 + Tailwind v4 (static build, near-zero JS) — see [docs/architecture.md](docs/architecture.md)
+- **Hosting:** Azure Static Web Apps (Free tier) — see [docs/azure.md](docs/azure.md)
+- **Storage:** Azure Blob Storage, three containers: `originals`, `derivatives`, `metadata` — see [docs/image-pipeline.md](docs/image-pipeline.md)
+- **Domain + DNS:** Azure App Service Domain + Azure DNS
+- **IaC:** Bicep — see [docs/iac-bicep.md](docs/iac-bicep.md)
+- **CI/CD:** GitHub Actions, OIDC federation (no long-lived secrets) — see [docs/cicd.md](docs/cicd.md)
+- **Cost target:** under $5/month at personal traffic — see [docs/azure.md#cost](docs/azure.md#3-monthly-cost-estimate)
+
+---
+
+## Local development (TL;DR)
+
+Full version in [docs/local-dev.md](docs/local-dev.md).
 
 ```bash
 npm ci
-npm run fixtures      # generate synthetic sessions into src/content/sessions/
-npm run dev           # → http://localhost:4321
-npm run build         # outputs to dist/
+npm run fixtures           # synthetic sessions for local dev
+npm run dev                # → http://localhost:4321
 ```
 
-`npm run fixtures` is safe to re-run; it skips sessions that already exist.
-
-To wipe local sessions and start fresh:
-
-```bash
-rm -rf src/content/sessions/* && touch src/content/sessions/.gitkeep
-```
+`npm run fixtures:many` generates ~40 sessions across 5 years so you can see how the sidebar feels at scale.
 
 ---
 
 ## First-time Azure setup
 
+Full walkthrough with explanations in [docs/azure.md](docs/azure.md) and [docs/cicd.md](docs/cicd.md). The minimal sequence:
+
 ### 0. Prereqs
 
 - Azure CLI (`az`) installed and `az login` done
-- GitHub CLI (`gh`) installed and `gh auth login` done
-- A GitHub repo created (e.g. `<you>/photography-website`) and this code pushed to `main`
+- GitHub CLI (`gh`) installed and `gh auth login` done (logged in as the GitHub account that owns the repo)
+- An empty GitHub repo created and this code pushed to `main`
 - The subscription ID + tenant ID of your Azure subscription
 
 ### 1. Fill in placeholders
 
 Edit [site.config.ts](site.config.ts):
-
-- `ownerName` — your full name
+- `ownerName` — your full name (drives footer + EXIF copyright)
 - `siteTitle`, `siteDescription` — taste
-- `domain` — the apex domain you'll register (e.g. `trumandoe.com`)
+- `domain` — apex domain you'll register (e.g. `trumandoe.com`)
 - `copyrightStartYear` — current year on first deploy
 
 Edit [infra/main.parameters.json](infra/main.parameters.json):
-
 - `githubOwner` — your GitHub username/org
-- `domainName` — leave `""` on first deploy if you want to bring up the stack before registering a domain; fill it in later and re-deploy.
+- `domainName` — leave `""` on first deploy if you want infra up before registering a domain; fill in and re-deploy later
 
-### 2. Create the bootstrap managed identity
-
-This identity is what GitHub Actions assumes to run the infra deploy. It's separate from the per-app identity created inside Bicep.
+### 2. Bootstrap the deploy identity
 
 ```bash
 ./scripts/setup-federated-credential.sh <subscription-id> <github-owner> <github-repo>
 ```
 
-Copy the three values it prints into the repo's secrets:
+It prints three values. Add them as repo secrets (Settings → Secrets and variables → Actions):
+- `AZURE_CLIENT_ID`
+- `AZURE_TENANT_ID`
+- `AZURE_SUBSCRIPTION_ID`
 
-```
-AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID
-```
-
-(Settings → Secrets and variables → Actions → New repository secret)
+What this does and why: [docs/cicd.md](docs/cicd.md#oidc-federation-no-long-lived-secrets).
 
 ### 3. (Optional) Add a PAT for secret auto-write
 
-If you want the `Infra (Bicep)` workflow to write `AZURE_STATIC_WEB_APPS_API_TOKEN` and friends back into the repo's secrets automatically, create a fine-grained PAT with `Secrets: read/write` on this repo and add it as:
+If you want the **Infra (Bicep)** workflow to auto-write `AZURE_STATIC_WEB_APPS_API_TOKEN` etc. back into repo secrets, add a fine-grained PAT with `Secrets: read/write` on this repo as `GH_PAT_FOR_SECRETS`. Otherwise run `./scripts/bootstrap-swa-token.sh` by hand after the first deploy.
 
-```
-GH_PAT_FOR_SECRETS
-```
+### 4. Run the Infra workflow
 
-Without it, you'll run `./scripts/bootstrap-swa-token.sh` once by hand after the first infra deploy.
+GitHub → **Actions** tab → **Infra (Bicep)** → **Run workflow** → environment `prod`.
 
-### 4. Run the infra workflow
+This deploys the whole Azure stack. Everything it creates is enumerated in [docs/iac-bicep.md](docs/iac-bicep.md#what-the-bicep-deploys-resource-by-resource).
 
-Actions tab → **Infra (Bicep)** → Run workflow → environment `prod`.
-
-This deploys the entire stack:
-
-- Resource group `rg-photography-prod`
-- Storage account + three blob containers + CORS
-- Static Web App (Free)
-- User-assigned managed identity + federated credentials + RBAC
-- Application Insights + Log Analytics workspace
-
-It does **not** register the domain on first run (interactive license agreement required).
-
-### 5. Register the domain (once)
+### 5. Register the domain (interactive, one-time)
 
 ```bash
 az appservice domain create \
@@ -108,42 +104,26 @@ az appservice domain create \
   --accept-terms
 ```
 
-`contact.json` is a JSON object documented at <https://learn.microsoft.com/azure/app-service/manage-custom-dns-buy-domain>.
+`contact.json` format: <https://learn.microsoft.com/azure/app-service/manage-custom-dns-buy-domain>. **Gitignored** — never commit it.
 
-After purchase, set `domainName` in [infra/main.parameters.json](infra/main.parameters.json) and re-run the Infra workflow. Then bind the apex/www domains:
+Then set `domainName` in `infra/main.parameters.json` and re-run the Infra workflow, then bind the apex/www domains:
 
 ```bash
 ./scripts/bind-domain.sh rg-photography-prod swa-photography-prod yourdomain.com
 ```
 
-### 6. Wire repo secrets for the build workflow
+### 6. Update `site.config.ts` with the real Blob host
 
-If you skipped step 3, run:
-
-```bash
-./scripts/bootstrap-swa-token.sh rg-photography-prod swa-photography-prod <gh-owner>/photography-website
-```
-
-This sets `AZURE_STATIC_WEB_APPS_API_TOKEN`, `AZURE_STORAGE_ACCOUNT`, and `APPINSIGHTS_CONNECTION_STRING`.
-
-### 7. Update `site.config.ts` with the real Blob host
-
-After the first infra deploy you'll know the storage account name. Set it in [site.config.ts](site.config.ts):
-
-```ts
-blobHost: 'stphotoprod<suffix>.blob.core.windows.net',
-```
-
-Commit and push — the next build picks it up.
+After the first infra deploy, set `blobHost` in [site.config.ts](site.config.ts) to the actual storage account hostname (printed in the deploy output). Commit and push.
 
 ---
 
 ## Adding a session
 
-1. Open Azure Storage Explorer (or use `az storage blob upload-batch`).
-2. Under the `originals` container, create a prefix (`folder`) for the session, e.g. `2026-japan/`.
+1. Open Azure Storage Explorer (free desktop app) or use `az storage blob upload-batch`.
+2. Under the `originals` container, create a prefix for the session, e.g. `2026-japan/`.
 3. Drop your photos in (JPG, HEIC, PNG, TIFF, or Sony `.ARW` / other RAW).
-4. **Optionally** add a `_session.json` at the prefix root:
+4. **Optionally** add `_session.json` at the prefix root:
    ```json
    {
      "title": "Japan, Spring 2026",
@@ -154,39 +134,29 @@ Commit and push — the next build picks it up.
      "order": 5
    }
    ```
-5. The next hourly build (or click **Run workflow** on `Build and Deploy`) will publish it. Latency: ~3 minutes if manual, up to ~1 hour for the scheduled run.
+5. Click **Run workflow** on `Build and Deploy` for ~3 minute publish, or wait for the hourly cron.
 
-### RAW files
-
-Sony `.ARW`, Nikon `.NEF`, Canon `.CR2`/`.CR3`, Adobe `.DNG`, and Fuji `.RAF` are auto-converted to JPEG at build time. The original RAW stays in `originals/` untouched; a 95-quality JPEG is written to `derivatives/<session>/<name>.jpg` and that's what the site shows. RAW conversions are cached by source etag — they only re-run when the RAW file actually changes.
+Full pipeline walkthrough: [docs/image-pipeline.md](docs/image-pipeline.md).
 
 ---
 
-## Architecture, cost, security, future plans
-
-See the design plan in your session notes (`/memories/session/plan.md`).
-
-Quick reference:
+## Repository layout
 
 ```
-GitHub repo ──push/schedule──► GitHub Actions ──OIDC──► Azure Blob (read originals, write derivatives)
-                                       │
-                                       └─► Azure Static Web Apps (deploy dist/)
-                                                       │
-                                                       ▼
-                                              Visitor's browser (HTTPS)
-                                                       ▲
-                                              (lightbox full-res direct from Blob)
+photography-website/
+├── .github/workflows/         # CI/CD — see docs/cicd.md
+├── docs/                      # detailed docs (you are reading the index)
+├── infra/                     # Bicep IaC — see docs/iac-bicep.md
+├── public/                    # static assets copied verbatim to the site root
+├── scripts/                   # prebuild + bootstrap shell scripts
+├── src/
+│   ├── components/            # Astro components (Header, SessionNav, Lightbox, …)
+│   ├── content/               # content collection (sessions populated by prebuild)
+│   ├── layouts/               # page shells
+│   ├── lib/                   # blob URL helper, session sort, theme bootstrap
+│   ├── pages/                 # route definitions
+│   └── styles/                # Tailwind entry
+├── site.config.ts             # display config (committed; not for secrets)
+├── staticwebapp.config.json   # SWA headers + routing — see docs/security.md
+└── README.md                  # this file
 ```
-
----
-
-## Plan
-
-Authored separately — see session memory. Highlights:
-
-- Drop a folder of photos into Blob → site updates itself on the next build
-- No database, no server, no runtime code — static files behind a CDN
-- Sony RAW handled via `dcraw_emu` (`libraw-bin`) → sharp → JPEG
-- Total cost: ~$2–3/month including the `.com` domain
-- Future admin-upload UI fits cleanly on SWA's API functions + managed auth

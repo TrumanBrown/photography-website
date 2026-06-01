@@ -11,6 +11,7 @@
     "prebuild:remote": "node scripts/prebuild.mjs",
     "prebuild:local": "node scripts/prebuild.mjs --local-only",
     "fixtures": "node scripts/generate-fixtures.mjs",
+    "fixtures:many": "node scripts/generate-fixtures.mjs --many",
     "lint": "eslint . --ext .js,.mjs,.ts,.astro",
     "format": "prettier --write \"**/*.{js,mjs,ts,astro,css,json,md}\"",
     "format:check": "prettier --check \"**/*.{js,mjs,ts,astro,css,json,md}\""

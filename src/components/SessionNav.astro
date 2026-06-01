@@ -1,0 +1,169 @@
+---
+import { getCollection } from 'astro:content';
+import { sortSessions, sessionSlug, formatDate } from '@/lib/sessions';
+
+interface Props {
+  /** Slug of the currently displayed session, for highlight. Optional. */
+  activeSlug?: string;
+}
+
+const { activeSlug } = Astro.props;
+
+const all = await getCollection('sessions');
+const sorted = sortSessions(all);
+
+// Group by year for scannability when there are many sessions.
+type Entry = (typeof sorted)[number];
+const byYear = new Map<string, Entry[]>();
+for (const entry of sorted) {
+  const year = entry.data.date.slice(0, 4);
+  const bucket = byYear.get(year) ?? [];
+  bucket.push(entry);
+  byYear.set(year, bucket);
+}
+const years = [...byYear.keys()].sort((a, b) => b.localeCompare(a));
+const totalCount = sorted.length;
+---
+
+<aside
+  id="session-nav"
+  class="fixed inset-y-0 left-0 z-40 w-72 -translate-x-full transform overflow-y-auto border-r border-neutral-200 bg-white transition-transform duration-200 dark:border-neutral-800 dark:bg-neutral-950 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0"
+  aria-label="Sessions navigation"
+>
+  <div class="flex h-full flex-col">
+    <div class="border-b border-neutral-200 p-4 dark:border-neutral-800">
+      <div class="flex items-center justify-between gap-2">
+        <h2 class="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+          Sessions <span class="font-normal normal-case text-neutral-400">({totalCount})</span>
+        </h2>
+        <button
+          id="session-nav-close"
+          type="button"
+          class="rounded p-1 text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-900 lg:hidden"
+          aria-label="Close navigation"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <label class="mt-3 block">
+        <span class="sr-only">Filter sessions</span>
+        <input
+          id="session-filter"
+          type="search"
+          placeholder="Filter…"
+          autocomplete="off"
+          class="w-full rounded border border-neutral-300 bg-white px-2 py-1.5 text-sm placeholder-neutral-400 focus:border-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-950 dark:focus:border-neutral-500"
+        />
+      </label>
+    </div>
+
+    <nav class="flex-1 overflow-y-auto p-2 text-sm">
+      {
+        totalCount === 0 ? (
+          <p class="px-2 py-4 text-xs text-neutral-500">No sessions yet.</p>
+        ) : (
+          years.map((year) => (
+            <div data-year-group={year} class="mb-3">
+              <h3 class="px-2 py-1 text-xs font-semibold text-neutral-500 dark:text-neutral-400">{year}</h3>
+              <ul class="space-y-0.5">
+                {byYear.get(year)!.map((entry) => {
+                  const slug = sessionSlug(entry);
+                  const isActive = slug === activeSlug;
+                  const searchText = `${entry.data.title} ${entry.data.location ?? ''} ${year}`.toLowerCase();
+                  return (
+                    <li data-session-item data-search={searchText}>
+                      <a
+                        href={`/sessions/${slug}`}
+                        class:list={[
+                          'block rounded px-2 py-1.5 no-underline leading-tight',
+                          isActive
+                            ? 'bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900'
+                            : 'hover:bg-neutral-100 dark:hover:bg-neutral-900',
+                        ]}
+                        aria-current={isActive ? 'page' : undefined}
+                      >
+                        <span class="block truncate">{entry.data.title}</span>
+                        <span
+                          class:list={[
+                            'block truncate text-xs',
+                            isActive ? 'text-neutral-300 dark:text-neutral-600' : 'text-neutral-500 dark:text-neutral-500',
+                          ]}
+                        >
+                          <time datetime={entry.data.date}>{formatDate(entry.data.date)}</time>
+                          {entry.data.location && <span> · {entry.data.location}</span>}
+                        </span>
+                      </a>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))
+        )
+      }
+      <p
+        id="session-filter-empty"
+        hidden
+        class="px-2 py-4 text-xs text-neutral-500"
+      >
+        No sessions match.
+      </p>
+    </nav>
+  </div>
+</aside>
+
+<!-- Mobile backdrop -->
+<div
+  id="session-nav-backdrop"
+  hidden
+  class="fixed inset-0 z-30 bg-black/50 lg:hidden"
+  aria-hidden="true"
+></div>
+
+<script>
+  (function () {
+    const nav = document.getElementById('session-nav');
+    const backdrop = document.getElementById('session-nav-backdrop');
+    const openBtn = document.getElementById('session-nav-open');
+    const closeBtn = document.getElementById('session-nav-close');
+    const filter = document.getElementById('session-filter') as HTMLInputElement | null;
+    const empty = document.getElementById('session-filter-empty');
+
+    function setOpen(open: boolean) {
+      if (!nav || !backdrop) return;
+      nav.classList.toggle('-translate-x-full', !open);
+      backdrop.hidden = !open;
+      document.documentElement.style.overflow = open ? 'hidden' : '';
+    }
+
+    openBtn?.addEventListener('click', () => setOpen(true));
+    closeBtn?.addEventListener('click', () => setOpen(false));
+    backdrop?.addEventListener('click', () => setOpen(false));
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') setOpen(false);
+    });
+
+    // Filtering: hide non-matching items + collapse empty year groups.
+    if (filter) {
+      filter.addEventListener('input', () => {
+        const q = filter.value.trim().toLowerCase();
+        const items = document.querySelectorAll<HTMLElement>('[data-session-item]');
+        let visibleTotal = 0;
+        items.forEach((li) => {
+          const hay = li.dataset.search ?? '';
+          const match = !q || hay.includes(q);
+          li.hidden = !match;
+          if (match) visibleTotal++;
+        });
+        // Collapse empty year groups.
+        document.querySelectorAll<HTMLElement>('[data-year-group]').forEach((group) => {
+          const anyVisible = group.querySelector('[data-session-item]:not([hidden])');
+          group.hidden = !anyVisible;
+        });
+        if (empty) empty.hidden = visibleTotal > 0;
+      });
+    }
+  })();
+</script>

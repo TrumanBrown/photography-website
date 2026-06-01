@@ -4,12 +4,25 @@ import ThemeToggle from './ThemeToggle.astro';
 ---
 
 <header class="border-b border-neutral-200 dark:border-neutral-800">
-  <div class="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
-    <a href="/" class="text-lg font-medium tracking-tight no-underline hover:opacity-80">
-      {siteConfig.siteTitle}
-    </a>
+  <div class="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
+    <div class="flex items-center gap-2">
+      <button
+        id="session-nav-open"
+        type="button"
+        class="rounded p-1 text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-900 lg:hidden"
+        aria-label="Open sessions navigation"
+        aria-controls="session-nav"
+      >
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 6h18M3 12h18M3 18h18" />
+        </svg>
+      </button>
+      <a href="/" class="text-lg font-medium tracking-tight no-underline hover:opacity-80">
+        {siteConfig.siteTitle}
+      </a>
+    </div>
     <nav class="flex items-center gap-4 text-sm">
-      <a href="/" class="no-underline hover:underline">Sessions</a>
+      <a href="/" class="hidden no-underline hover:underline sm:inline">Sessions</a>
       <ThemeToggle />
     </nav>
   </div>

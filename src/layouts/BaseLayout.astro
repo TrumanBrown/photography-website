@@ -4,15 +4,18 @@ import { siteConfig } from '../../site.config';
 import { themeBootstrap } from '@/lib/theme';
 import Header from '@/components/Header.astro';
 import Footer from '@/components/Footer.astro';
+import SessionNav from '@/components/SessionNav.astro';
 
 interface Props {
   title?: string;
   description?: string;
   /** Open Graph image URL (absolute). */
   ogImage?: string;
+  /** Slug of the current session, for nav highlight. */
+  activeSlug?: string;
 }
 
-const { title, description, ogImage } = Astro.props;
+const { title, description, ogImage, activeSlug } = Astro.props;
 const pageTitle = title ? `${title} — ${siteConfig.siteTitle}` : siteConfig.siteTitle;
 const pageDescription = description ?? siteConfig.siteDescription;
 const canonical = new URL(Astro.url.pathname, Astro.site ?? `https://${siteConfig.domain}`).toString();
@@ -39,11 +42,16 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? `https://${siteConfi
     <title>{pageTitle}</title>
     <script is:inline set:html={themeBootstrap} />
   </head>
-  <body class="flex min-h-screen flex-col">
-    <Header />
-    <main class="flex-1">
-      <slot />
-    </main>
-    <Footer />
+  <body class="min-h-screen">
+    <div class="flex min-h-screen lg:flex-row">
+      <SessionNav activeSlug={activeSlug} />
+      <div class="flex min-h-screen flex-1 flex-col lg:min-w-0">
+        <Header />
+        <main class="flex-1">
+          <slot />
+        </main>
+        <Footer />
+      </div>
+    </div>
   </body>
 </html>
