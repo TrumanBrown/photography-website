@@ -77,6 +77,12 @@ jobs:
           PUBLIC_APPINSIGHTS_CONNECTION_STRING: ${{ secrets.APPINSIGHTS_CONNECTION_STRING }}
         run: npm run build
 
+      - name: Stage staticwebapp.config.json into dist/
+        # When skip_app_build is true, SWA treats app_location as the deploy
+        # root. Astro doesn't copy non-public configs into dist/, so we put
+        # the config alongside the built site here.
+        run: cp staticwebapp.config.json dist/
+
       - name: Save prebuild cache
         if: always()
         uses: actions/cache/save@v4
@@ -91,8 +97,7 @@ jobs:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: upload
-          app_location: '.'
-          output_location: 'dist'
+          app_location: 'dist'
           skip_app_build: true
 
   close_pr:
