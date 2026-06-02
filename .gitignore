@@ -22,6 +22,12 @@ src/content/sessions/*
 contact.json
 contact.*.json
 
+# Photo staging area — local-only space to drop photos before
+# `./scripts/upload-session.sh <name>` ships them to Blob. The README is
+# kept in git so the folder exists for new clones.
+staging/*
+!staging/README.md
+
 # OS / editor
 .DS_Store
 Thumbs.db
