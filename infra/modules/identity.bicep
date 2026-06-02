@@ -37,6 +37,8 @@ resource fedBranch 'Microsoft.ManagedIdentity/userAssignedIdentities/federatedId
 }
 
 // Allow PR builds from the same repo to also use OIDC (needed for SWA preview deploys).
+// dependsOn fedBranch: Azure rejects concurrent federated-credential writes on
+// the same MI with ConcurrentFederatedIdentityCredentialsWritesForSingleManagedIdentity.
 resource fedPullRequest 'Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials@2023-01-31' = {
   parent: mi
   name: 'github-pull-request'
@@ -45,6 +47,7 @@ resource fedPullRequest 'Microsoft.ManagedIdentity/userAssignedIdentities/federa
     audiences: [ 'api://AzureADTokenExchange' ]
     subject: 'repo:${githubOwner}/${githubRepo}:pull_request'
   }
+  dependsOn: [ fedBranch ]
 }
 
 resource sa 'Microsoft.Storage/storageAccounts@2024-01-01' existing = {
