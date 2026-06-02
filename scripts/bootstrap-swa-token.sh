@@ -34,12 +34,17 @@ echo "Locating storage account in $RG…"
 STORAGE=$(az storage account list --resource-group "$RG" --query "[0].name" -o tsv)
 
 echo "Locating App Insights in $RG…"
-APPI_CONN=$(az monitor app-insights component show --resource-group "$RG" --app "$(az monitor app-insights component show --resource-group "$RG" --query "[0].name" -o tsv 2>/dev/null || echo "")" --query connectionString -o tsv 2>/dev/null || true)
+APPI_NAME=$(az resource list --resource-group "$RG" --resource-type "Microsoft.Insights/components" --query "[0].name" -o tsv)
+APPI_CONN=""
+if [ -n "$APPI_NAME" ]; then
+  # Use az resource show (no extension required, unlike `az monitor app-insights`).
+  APPI_CONN=$(az resource show --resource-group "$RG" --resource-type "Microsoft.Insights/components" --name "$APPI_NAME" --query "properties.ConnectionString" -o tsv)
+fi
 
 echo "Writing GitHub secrets to $REPO…"
 gh secret set AZURE_STATIC_WEB_APPS_API_TOKEN --repo "$REPO" --body "$TOKEN"
 gh secret set AZURE_STORAGE_ACCOUNT --repo "$REPO" --body "$STORAGE"
-if [ -n "${APPI_CONN:-}" ]; then
+if [ -n "$APPI_CONN" ]; then
   gh secret set APPINSIGHTS_CONNECTION_STRING --repo "$REPO" --body "$APPI_CONN"
 fi
 

@@ -5,8 +5,6 @@
  * site title, domain) live here so changes are tracked in git and trigger a
  * redeploy. Secrets (Azure IDs, deploy tokens) do NOT live here — they live
  * in GitHub Actions secrets.
- *
- * TODO before first deploy: fill in the four <PLACEHOLDER> values below.
  */
 export const siteConfig = {
   /** Your full name as it should appear in the footer, <meta author>, and EXIF. */
@@ -42,7 +40,7 @@ export const siteConfig = {
    *
    * Format: '<storage-account>.blob.core.windows.net'
    */
-  blobHost: '<storage-account>.blob.core.windows.net',
+  blobHost: 'stphotoprodnowiur.blob.core.windows.net',
 } as const;
 
 export type SiteConfig = typeof siteConfig;
