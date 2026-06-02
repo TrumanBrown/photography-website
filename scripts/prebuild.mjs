@@ -39,7 +39,12 @@ const SESSIONS_DIR = join(ROOT, 'src', 'content', 'sessions');
 const CACHE_DIR = join(ROOT, '.cache', 'prebuild');
 
 const RAW_EXTS = new Set(['.arw', '.nef', '.cr2', '.cr3', '.dng', '.raf']);
-const STANDARD_IMG_EXTS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.avif', '.heic', '.heif', '.tif', '.tiff']);
+// Formats Astro's sharp service can read but browsers can't display, or that
+// have inconsistent web support. Convert to JPEG sidecar during prebuild.
+const CONVERT_EXTS = new Set(['.heic', '.heif', '.tif', '.tiff']);
+// Formats sharp + browsers handle natively. Passed through unchanged.
+const WEB_EXTS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.avif']);
+const STANDARD_IMG_EXTS = new Set([...WEB_EXTS, ...CONVERT_EXTS]);
 const SESSION_JSON = '_session.json';
 
 const ORIGINALS = 'originals';
@@ -207,7 +212,9 @@ async function processSession({ prefix, originalsClient, derivativesClient, mani
 
   for (const b of blobs) {
     const isRaw = RAW_EXTS.has(b.ext);
-    const targetFile = isRaw ? `${stripExt(b.base)}.jpg` : b.base;
+    const needsConvert = CONVERT_EXTS.has(b.ext);
+    const willConvert = isRaw || needsConvert;
+    const targetFile = willConvert ? `${stripExt(b.base)}.jpg` : b.base;
     const localPath = join(imagesDir, targetFile);
     const cacheKey = `${b.name}@${b.etag}`;
     const manifestEntry = manifest[b.name];
@@ -224,6 +231,16 @@ async function processSession({ prefix, originalsClient, derivativesClient, mani
     if (!useCached) {
       if (isRaw) {
         await processRawBlob({
+          blob: b,
+          originalsClient,
+          derivativesClient,
+          slug,
+          targetFile,
+          localPath,
+          cacheKey,
+        });
+      } else if (needsConvert) {
+        await processConvertBlob({
           blob: b,
           originalsClient,
           derivativesClient,
@@ -265,12 +282,12 @@ async function processSession({ prefix, originalsClient, derivativesClient, mani
       file: targetFile,
       width,
       height,
-      fullUrl: isRaw
+      fullUrl: willConvert
         ? blobPublicUrl(derivativesClient, `${slug}/${targetFile}`)
         : blobPublicUrl(originalsClient, b.name),
     });
 
-    nextManifest.blobs[b.name] = { etag: b.etag, derivative: isRaw ? `${slug}/${targetFile}` : undefined };
+    nextManifest.blobs[b.name] = { etag: b.etag, derivative: willConvert ? `${slug}/${targetFile}` : undefined };
   }
 
   // Sort images by filename for stable ordering (override via sidecar.images if provided).
@@ -355,6 +372,50 @@ async function processRawBlob({ blob, originalsClient, derivativesClient, slug, 
   // Best-effort cleanup.
   await rm(tmpRaw, { force: true }).catch(() => {});
   await rm(generatedTiff, { force: true }).catch(() => {});
+}
+
+async function processConvertBlob({ blob, originalsClient, derivativesClient, slug, targetFile, localPath, cacheKey }) {
+  // Same shape as processRawBlob, but the source is already a format sharp can
+  // read directly (HEIC/HEIF/TIFF). No dcraw step needed.
+  const derivBlobName = `${slug}/${targetFile}`;
+  const derivClient = derivativesClient.getBlobClient(derivBlobName);
+
+  try {
+    const props = await derivClient.getProperties();
+    if (props.metadata && props.metadata.sourceetag === stripQuotes(blob.etag)) {
+      const tmp = join(CACHE_DIR, hashKey(cacheKey));
+      await derivClient.downloadToFile(tmp);
+      await copyFile(tmp, localPath);
+      console.log(`  reuse:    ${derivBlobName} (matching source-etag)`);
+      return;
+    }
+  } catch (e) {
+    if (e.statusCode !== 404) console.warn(`derivative probe failed: ${e.message}`);
+  }
+
+  const srcClient = originalsClient.getBlobClient(blob.name);
+  const tmpSrc = join(tmpdir(), `conv-${Date.now()}-${basename(blob.name)}`);
+  await srcClient.downloadToFile(tmpSrc);
+  console.log(`  convert:  ${blob.name}`);
+
+  const { default: sharp } = await import('sharp');
+  // .rotate() applies EXIF orientation so the JPEG comes out the right way up
+  // (HEIC from iPhones often relies on orientation tags).
+  await sharp(tmpSrc).rotate().jpeg({ quality: 92, mozjpeg: true }).toFile(localPath);
+
+  const upload = derivativesClient.getBlockBlobClient(derivBlobName);
+  const data = await readFile(localPath);
+  await upload.uploadData(data, {
+    blobHTTPHeaders: {
+      blobContentType: 'image/jpeg',
+      blobCacheControl: 'public, max-age=31536000, immutable',
+    },
+    metadata: { sourceetag: stripQuotes(blob.etag) },
+  });
+  console.log(`  upload:   ${derivBlobName}`);
+
+  await copyFile(localPath, join(CACHE_DIR, hashKey(cacheKey)));
+  await rm(tmpSrc, { force: true }).catch(() => {});
 }
 
 function blobPublicUrl(containerClient, blobPath) {
