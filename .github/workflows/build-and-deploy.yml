@@ -85,6 +85,15 @@ jobs:
           PUBLIC_APPINSIGHTS_CONNECTION_STRING: ${{ secrets.APPINSIGHTS_CONNECTION_STRING }}
         run: npm run build
 
+      - name: Sync image variants to Blob (keep SWA payload tiny)
+        # Moves dist/_astro/*.{avif,webp,jpeg,jpg} to the `variants/` blob
+        # container, rewrites HTML refs to the blob URL, and deletes the
+        # variants from local dist. SWA deploy stays under 5 MB regardless
+        # of how many photos are on the site.
+        env:
+          AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
+        run: node scripts/sync-variants.mjs
+
       - name: Stage staticwebapp.config.json into dist/
         # When skip_app_build is true, SWA treats app_location as the deploy
         # root. Astro doesn't copy non-public configs into dist/, so we put

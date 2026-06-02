@@ -83,6 +83,18 @@ resource derivatives 'Microsoft.Storage/storageAccounts/blobServices/containers@
   }
 }
 
+// Variants container: holds Astro's responsive AVIF/WebP/JPEG outputs from
+// dist/_astro/. We sync these to Blob after each build and rewrite HTML
+// references, keeping the SWA app artifact under the Free-tier 250 MB cap
+// regardless of how many photos the site has.
+resource variants 'Microsoft.Storage/storageAccounts/blobServices/containers@2024-01-01' = {
+  parent: blobService
+  name: 'variants'
+  properties: {
+    publicAccess: 'Blob'
+  }
+}
+
 resource metadata 'Microsoft.Storage/storageAccounts/blobServices/containers@2024-01-01' = {
   parent: blobService
   name: 'metadata'
