@@ -113,17 +113,51 @@ if [ "$auto_yes" != true ]; then
 fi
 
 echo "Uploading..."
-az storage blob upload-batch \
-  --account-name "$STORAGE_ACCOUNT" \
-  --auth-mode login \
-  --destination "$CONTAINER" \
-  --destination-path "$session" \
-  --source "$SRC" \
-  --pattern "{*.jpg,*.jpeg,*.png,*.webp,*.avif,*.tif,*.tiff,*.heic,*.heif,*.JPG,*.JPEG,*.PNG,*.WEBP,*.AVIF,*.TIF,*.TIFF,*.HEIC,*.HEIF,*.arw,*.nef,*.cr2,*.cr3,*.dng,*.raf,*.ARW,*.NEF,*.CR2,*.CR3,*.DNG,*.RAF,_session.json}" \
-  --overwrite true \
-  --output none
+# az storage blob upload-batch's --pattern doesn't support brace expansion,
+# so we stage a file list with `find` (extension match is case-insensitive),
+# then upload each. Single connection per file is plenty fast for personal
+# session sizes and gives clear per-file output.
+TMPLIST=$(mktemp)
+trap 'rm -f "$TMPLIST"' EXIT
+find "$SRC" -maxdepth 1 -type f \( \
+  -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.webp" \
+  -o -iname "*.avif" -o -iname "*.tif" -o -iname "*.tiff" \
+  -o -iname "*.heic" -o -iname "*.heif" \
+  -o -iname "*.arw" -o -iname "*.nef" -o -iname "*.cr2" -o -iname "*.cr3" \
+  -o -iname "*.dng" -o -iname "*.raf" \
+  -o -iname "_session.json" \
+\) > "$TMPLIST"
 
-echo "Upload complete."
+uploaded=0
+failed=0
+while IFS= read -r f; do
+  rel="${f#$SRC/}"
+  echo "  → $rel"
+  if az storage blob upload \
+    --account-name "$STORAGE_ACCOUNT" \
+    --auth-mode login \
+    --container-name "$CONTAINER" \
+    --name "$session/$rel" \
+    --file "$f" \
+    --overwrite true \
+    --output none 2>/dev/null; then
+    uploaded=$((uploaded + 1))
+  else
+    echo "    [FAILED] $rel" >&2
+    failed=$((failed + 1))
+  fi
+done < "$TMPLIST"
+
+echo
+echo "Upload summary: $uploaded succeeded, $failed failed"
+if [ "$failed" -gt 0 ]; then
+  echo "Some files did not upload. Fix the errors above and re-run." >&2
+  exit 1
+fi
+if [ "$uploaded" -eq 0 ]; then
+  echo "Nothing was uploaded. Aborting." >&2
+  exit 1
+fi
 
 if [ "$trigger_build" = true ]; then
   if ! command -v gh >/dev/null 2>&1; then
