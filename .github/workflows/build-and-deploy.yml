@@ -40,17 +40,21 @@ jobs:
       - name: Install npm deps
         run: npm ci
 
-      - name: Cache apt packages (libraw-bin)
+      - name: Cache apt packages (libraw-bin, libheif-examples)
         id: apt-cache
         uses: actions/cache@v4
         with:
           path: /var/cache/apt/archives
-          key: apt-libraw-bin-v1
+          key: apt-libraw-libheif-v1
 
-      - name: Install libraw-bin (for RAW conversion)
+      - name: Install image conversion tools (libraw-bin + libheif-examples)
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libraw-bin
+          sudo apt-get install -y --no-install-recommends \
+            libraw-bin \
+            libheif-examples \
+            libheif-plugin-libde265 \
+            libheif-plugin-aomdec
 
       - name: Azure login (OIDC)
         uses: azure/login@v2

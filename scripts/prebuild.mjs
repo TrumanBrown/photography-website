@@ -378,7 +378,9 @@ async function processRawBlob({ blob, originalsClient, derivativesClient, slug, 
 
 async function processConvertBlob({ blob, originalsClient, derivativesClient, slug, targetFile, localPath, cacheKey }) {
   // Same shape as processRawBlob, but the source is already a format sharp can
-  // read directly (HEIC/HEIF/TIFF). No dcraw step needed.
+  // (often) read directly. HEIC/HEIF: sharp on Ubuntu's npm binary lacks the
+  // libheif decoder plugin (no libde265 bundled), so we shell out to
+  // heif-convert (from `libheif-examples` apt package) for those.
   const derivBlobName = `${slug}/${targetFile}`;
   const derivClient = derivativesClient.getBlobClient(derivBlobName);
 
@@ -400,10 +402,22 @@ async function processConvertBlob({ blob, originalsClient, derivativesClient, sl
   await srcClient.downloadToFile(tmpSrc);
   console.log(`  convert:  ${blob.name}`);
 
+  const isHeic = blob.ext === '.heic' || blob.ext === '.heif';
   const { default: sharp } = await import('sharp');
-  // .rotate() applies EXIF orientation so the JPEG comes out the right way up
-  // (HEIC from iPhones often relies on orientation tags).
-  await sharp(tmpSrc).rotate().jpeg({ quality: 92, mozjpeg: true }).toFile(localPath);
+
+  if (isHeic) {
+    // heif-convert <input> <output.jpg> — uses system libheif + plugins.
+    // Output goes to a tmp .jpg first; sharp then applies orientation
+    // (heif-convert already produces a sane orientation, but rotate() is a
+    // safe no-op if EXIF orientation is 1).
+    const tmpJpg = `${tmpSrc}.jpg`;
+    await runCmd('heif-convert', ['-q', '92', tmpSrc, tmpJpg]);
+    await sharp(tmpJpg).rotate().jpeg({ quality: 92, mozjpeg: true }).toFile(localPath);
+    await rm(tmpJpg, { force: true }).catch(() => {});
+  } else {
+    // TIFF and friends: sharp handles natively.
+    await sharp(tmpSrc).rotate().jpeg({ quality: 92, mozjpeg: true }).toFile(localPath);
+  }
 
   const upload = derivativesClient.getBlockBlobClient(derivBlobName);
   const data = await readFile(localPath);
