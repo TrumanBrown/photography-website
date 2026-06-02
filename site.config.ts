@@ -14,7 +14,7 @@ export const siteConfig = {
   copyrightStartYear: 2026,
 
   /** Browser tab title and <h1> on the home page. */
-  siteTitle: 'Truman Brown — Photography',
+  siteTitle: 'Truman Brown Pics and More',
 
   /** <meta description> for SEO and link previews. */
   siteDescription: 'Personal photography by Truman Brown.',

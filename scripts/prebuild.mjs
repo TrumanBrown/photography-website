@@ -216,11 +216,13 @@ async function processSession({ prefix, originalsClient, derivativesClient, mani
     const willConvert = isRaw || needsConvert;
     const targetFile = willConvert ? `${stripExt(b.base)}.jpg` : b.base;
     const localPath = join(imagesDir, targetFile);
-    const cacheKey = `${b.name}@${b.etag}`;
+    // Cache key includes targetFile so a format change (e.g. HEIC→jpg
+    // conversion logic added) invalidates old cached bytes.
+    const cacheKey = `${b.name}@${b.etag}@${targetFile}`;
     const manifestEntry = manifest[b.name];
 
     let useCached = false;
-    if (manifestEntry?.etag === b.etag) {
+    if (manifestEntry?.etag === b.etag && manifestEntry?.target === targetFile) {
       const cached = join(CACHE_DIR, hashKey(cacheKey));
       if (existsSync(cached)) {
         await copyFile(cached, localPath);
@@ -287,7 +289,7 @@ async function processSession({ prefix, originalsClient, derivativesClient, mani
         : blobPublicUrl(originalsClient, b.name),
     });
 
-    nextManifest.blobs[b.name] = { etag: b.etag, derivative: willConvert ? `${slug}/${targetFile}` : undefined };
+    nextManifest.blobs[b.name] = { etag: b.etag, target: targetFile, derivative: willConvert ? `${slug}/${targetFile}` : undefined };
   }
 
   // Sort images by filename for stable ordering (override via sidecar.images if provided).
