@@ -406,20 +406,13 @@ async function processConvertBlob({ blob, originalsClient, derivativesClient, sl
   const { default: sharp } = await import('sharp');
 
   if (isHeic) {
-    // ImageMagick handles HEIC through its libheif delegate. We try `magick`
-    // (v7) and fall back to `convert` (v6) — Ubuntu 24.04 still ships v6 by
-    // default.
+    // iPhone HEIC files with HDR tone-mapping (brands like tmap/MiHE/MiHB)
+    // can't be decoded by Ubuntu's heif-convert or ImageMagick's libheif
+    // delegate. pillow-heif handles them reliably; we shell out to a tiny
+    // Python helper that does the conversion.
     const tmpJpg = `${tmpSrc}.jpg`;
-    const tryCmd = async (cmd) => runCmd(cmd, [tmpSrc, '-auto-orient', '-quality', '92', tmpJpg]);
-    try {
-      await tryCmd('magick');
-    } catch (e) {
-      if (/ENOENT|not found/i.test(String(e?.message))) {
-        await tryCmd('convert');
-      } else {
-        throw e;
-      }
-    }
+    await runCmd('python3', [join(__dirname, 'heic-to-jpeg.py'), tmpSrc, tmpJpg, '92']);
+    // sharp re-encode polishes the JPEG (mozjpeg for ~10% smaller files).
     await sharp(tmpJpg).jpeg({ quality: 92, mozjpeg: true }).toFile(localPath);
     await rm(tmpJpg, { force: true }).catch(() => {});
   } else {
