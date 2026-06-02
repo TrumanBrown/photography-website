@@ -4,10 +4,11 @@ param location string
 @description('Short environment tag.')
 param environment string
 
-@description('Apex domain name; empty to skip domain registration.')
+@description('Apex domain name; empty to skip the DNS-record-adding domain module.')
 param domainName string
 
-@description('App Service Domain contact info.')
+@description('App Service Domain contact info. Reserved; consumed by bootstrap script, not by Bicep directly.')
+#disable-next-line no-unused-params
 param domainContact object
 
 @description('GitHub org/user.')
@@ -63,7 +64,6 @@ module swa 'modules/swa.bicep' = {
     location: location
     name: 'swa-${namePrefix}'
     tags: tags
-    customDomainApex: domainName
   }
 }
 
@@ -84,9 +84,7 @@ module domain 'modules/domain.bicep' = if (!empty(domainName)) {
   name: 'domain'
   params: {
     domainName: domainName
-    contact: domainContact
     swaHostname: swa.outputs.defaultHostname
-    swaCustomDomainValidationToken: swa.outputs.customDomainValidationToken
     tags: tags
   }
 }

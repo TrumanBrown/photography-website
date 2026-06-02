@@ -1,14 +1,11 @@
 @description('Static Web App name.')
 param name string
 
-@description('Region. SWA Free is only available in a few regions; westus2/eastus2/centralus/westeurope/eastasia.')
+@description('Region. SWA Free is only available in a few regions; the module maps your RG region onto a supported one.')
 param location string
 
 @description('Tags.')
 param tags object
-
-@description('Apex domain to bind as a custom domain. Empty to skip.')
-param customDomainApex string
 
 // SWA Free is restricted to a small set of regions. Map likely
 // resource-group regions onto a supported SWA region.
@@ -47,30 +44,19 @@ resource swa 'Microsoft.Web/staticSites@2024-04-01' = {
   }
 }
 
-// Bind apex + www custom domains when a domain name is provided.
-// The DNS records that prove ownership are created in the domain module.
-resource customDomainApexBinding 'Microsoft.Web/staticSites/customDomains@2024-04-01' = if (!empty(customDomainApex)) {
-  parent: swa
-  name: customDomainApex
-  properties: {
-    validationMethod: 'dns-txt-token'
-  }
-}
-
-resource customDomainWwwBinding 'Microsoft.Web/staticSites/customDomains@2024-04-01' = if (!empty(customDomainApex)) {
-  parent: swa
-  name: 'www.${customDomainApex}'
-  properties: {
-    validationMethod: 'cname-delegation'
-  }
-}
+// NOTE: custom-domain bindings (apex + www) are NOT created in Bicep because
+// they require DNS records to already exist for validation, but the DNS
+// records (CNAME + TXT) need the SWA validation token, which only exists
+// after binding creation begins. Chicken-and-egg.
+//
+// Bindings are created post-deploy by scripts/bind-domain.sh, which:
+//   1. starts the apex binding with dns-txt-token validation
+//   2. fetches the resulting validation token
+//   3. writes the TXT record
+//   4. writes the A apex record (alias to SWA)
+//   5. completes validation
+//   6. binds www via cname-delegation (CNAME already in DNS from Bicep)
 
 output name string = swa.name
 output id string = swa.id
 output defaultHostname string = swa.properties.defaultHostname
-
-// The validation token shown to the user in the portal isn't directly
-// exposed by ARM; in practice you fetch it via `az staticwebapp hostname show`
-// after creating the binding. We expose a stable placeholder string here so
-// the domain module can wire DNS once it's known.
-output customDomainValidationToken string = empty(customDomainApex) ? '' : (customDomainApexBinding.?properties.validationToken ?? '')
