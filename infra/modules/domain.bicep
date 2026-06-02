@@ -1,4 +1,4 @@
-@description('Apex domain to register, e.g. trumandoe.com.')
+@description('Apex domain to register, e.g. yourname.com.')
 param domainName string
 
 @description('Contact information. Required for first-time domain registration. Consumed by the bootstrap `az appservice domain create` call, not by Bicep directly; declared here so callers can pass it through main.parameters.json.')

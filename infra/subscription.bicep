@@ -6,13 +6,13 @@ param location string = 'westus3'
 @description('Short environment tag, used in resource names and tags. e.g. prod, dev.')
 param environment string = 'prod'
 
-@description('Apex domain name to register, e.g. trumandoe.com. Leave empty to skip domain registration on first deploy; add it back later.')
+@description('Apex domain name to register, e.g. yourname.com. Leave empty to skip domain registration on first deploy; add it back later.')
 param domainName string = ''
 
 @description('Contact info for the App Service Domain registration. Required if domainName is set on first deploy.')
 param domainContact object = {}
 
-@description('GitHub org/user that owns the repo (e.g. "trumandoe").')
+@description('GitHub org/user that owns the repo (e.g. "yourusername").')
 param githubOwner string
 
 @description('GitHub repository name (e.g. "photography-website").')

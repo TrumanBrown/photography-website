@@ -4,9 +4,9 @@
   "parameters": {
     "location": { "value": "westus3" },
     "environment": { "value": "prod" },
-    "domainName": { "value": "" },
+    "domainName": { "value": "trumanbrown.com" },
     "domainContact": { "value": {} },
-    "githubOwner": { "value": "<GITHUB-OWNER>" },
+    "githubOwner": { "value": "TrumanBrown" },
     "githubRepo": { "value": "photography-website" },
     "githubBranch": { "value": "main" },
     "enableDiagnostics": { "value": false }

@@ -10,19 +10,19 @@
  */
 export const siteConfig = {
   /** Your full name as it should appear in the footer, <meta author>, and EXIF. */
-  ownerName: '<YOUR NAME>',
+  ownerName: 'Truman Brown',
 
   /** First year the site went live. Footer renders e.g. "© 2026–2028 <Owner>". */
   copyrightStartYear: 2026,
 
   /** Browser tab title and <h1> on the home page. */
-  siteTitle: '<YOUR NAME> — Photography',
+  siteTitle: 'Truman Brown — Photography',
 
   /** <meta description> for SEO and link previews. */
-  siteDescription: 'Personal photography by <YOUR NAME>.',
+  siteDescription: 'Personal photography by Truman Brown.',
 
   /** Apex domain (no scheme, no www). www is bound automatically by SWA. */
-  domain: 'example.com',
+  domain: 'trumanbrown.com',
 
   /** BCP-47 locale for <html lang>. */
   defaultLocale: 'en-US',

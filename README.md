@@ -18,6 +18,7 @@ Personal photography portfolio. Photos live in Azure Blob Storage; the website i
 | How a photo travels from your camera to the live site | [docs/image-pipeline.md](docs/image-pipeline.md) |
 | How the site is hardened (CSP, HSTS, etc.) | [docs/security.md](docs/security.md) |
 | Running locally — npm, dev server, fixtures | [docs/local-dev.md](docs/local-dev.md) |
+| **What personal info ends up in the public repo (and what doesn't)** | [docs/privacy.md](docs/privacy.md) |
 | Glossary of every term used here | [docs/glossary.md](docs/glossary.md) |
 
 ---
@@ -30,7 +31,8 @@ Personal photography portfolio. Photos live in Azure Blob Storage; the website i
 - **Domain + DNS:** Azure App Service Domain + Azure DNS
 - **IaC:** Bicep — see [docs/iac-bicep.md](docs/iac-bicep.md)
 - **CI/CD:** GitHub Actions, OIDC federation (no long-lived secrets) — see [docs/cicd.md](docs/cicd.md)
-- **Cost target:** under $5/month at personal traffic — see [docs/azure.md#cost](docs/azure.md#3-monthly-cost-estimate)
+- **Cost target:** ~$2–3/month at personal traffic (incl. `.com` domain) — see [docs/azure.md#monthly-cost](docs/azure.md#monthly-cost)
+- **What about your name/address/etc. in this repo?** — see [docs/privacy.md](docs/privacy.md)
 
 ---
 
@@ -62,14 +64,16 @@ Full walkthrough with explanations in [docs/azure.md](docs/azure.md) and [docs/c
 ### 1. Fill in placeholders
 
 Edit [site.config.ts](site.config.ts):
-- `ownerName` — your full name (drives footer + EXIF copyright)
+- `ownerName` — your full name (drives footer + EXIF copyright; **becomes public when you push**)
 - `siteTitle`, `siteDescription` — taste
-- `domain` — apex domain you'll register (e.g. `trumandoe.com`)
+- `domain` — apex domain you'll register (e.g. `<yourname>.com`)
 - `copyrightStartYear` — current year on first deploy
 
 Edit [infra/main.parameters.json](infra/main.parameters.json):
 - `githubOwner` — your GitHub username/org
 - `domainName` — leave `""` on first deploy if you want infra up before registering a domain; fill in and re-deploy later
+
+> Full inventory of what becomes public and what stays private: [docs/privacy.md](docs/privacy.md).
 
 ### 2. Bootstrap the deploy identity
 
