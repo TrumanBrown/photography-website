@@ -406,13 +406,21 @@ async function processConvertBlob({ blob, originalsClient, derivativesClient, sl
   const { default: sharp } = await import('sharp');
 
   if (isHeic) {
-    // heif-convert <input> <output.jpg> — uses system libheif + plugins.
-    // Output goes to a tmp .jpg first; sharp then applies orientation
-    // (heif-convert already produces a sane orientation, but rotate() is a
-    // safe no-op if EXIF orientation is 1).
+    // ImageMagick handles HEIC through its libheif delegate. We try `magick`
+    // (v7) and fall back to `convert` (v6) — Ubuntu 24.04 still ships v6 by
+    // default.
     const tmpJpg = `${tmpSrc}.jpg`;
-    await runCmd('heif-convert', ['-q', '92', tmpSrc, tmpJpg]);
-    await sharp(tmpJpg).rotate().jpeg({ quality: 92, mozjpeg: true }).toFile(localPath);
+    const tryCmd = async (cmd) => runCmd(cmd, [tmpSrc, '-auto-orient', '-quality', '92', tmpJpg]);
+    try {
+      await tryCmd('magick');
+    } catch (e) {
+      if (/ENOENT|not found/i.test(String(e?.message))) {
+        await tryCmd('convert');
+      } else {
+        throw e;
+      }
+    }
+    await sharp(tmpJpg).jpeg({ quality: 92, mozjpeg: true }).toFile(localPath);
     await rm(tmpJpg, { force: true }).catch(() => {});
   } else {
     // TIFF and friends: sharp handles natively.
