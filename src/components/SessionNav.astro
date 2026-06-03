@@ -84,7 +84,18 @@ const totalCount = sorted.length;
                         ]}
                         aria-current={isActive ? 'page' : undefined}
                       >
-                        <span class="block truncate">{entry.data.title}</span>
+                        <span class="flex items-baseline justify-between gap-2">
+                          <span class="truncate">{entry.data.title}</span>
+                          <span
+                            class:list={[
+                              'shrink-0 text-xs tabular-nums',
+                              isActive ? 'text-neutral-300 dark:text-neutral-600' : 'text-neutral-400 dark:text-neutral-500',
+                            ]}
+                            aria-label={`${entry.data.images.length} photos`}
+                          >
+                            {entry.data.images.length}
+                          </span>
+                        </span>
                         <span
                           class:list={[
                             'block truncate text-xs',
