@@ -107,6 +107,9 @@ jobs:
           path: .cache/prebuild
           key: prebuild-cache-${{ github.run_id }}
 
+      - name: Install API dependencies
+        run: cd api && npm ci
+
       - name: Deploy to Azure Static Web Apps
         id: swa
         uses: Azure/static-web-apps-deploy@v1
@@ -115,6 +118,7 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: upload
           app_location: 'dist'
+          api_location: 'api'
           skip_app_build: true
 
   close_pr:

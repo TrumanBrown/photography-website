@@ -26,7 +26,7 @@ resource sa 'Microsoft.Storage/storageAccounts@2024-01-01' = {
   properties: {
     accessTier: 'Hot'
     allowBlobPublicAccess: true
-    allowSharedKeyAccess: false
+    allowSharedKeyAccess: true // Required: SWA Free tier managed functions cannot use managed identity, so the contact form API authenticates to Table Storage via connection string.
     minimumTlsVersion: 'TLS1_2'
     supportsHttpsTrafficOnly: true
     publicNetworkAccess: 'Enabled'
@@ -101,6 +101,16 @@ resource metadata 'Microsoft.Storage/storageAccounts/blobServices/containers@202
   properties: {
     publicAccess: 'None'
   }
+}
+
+resource tableService 'Microsoft.Storage/storageAccounts/tableServices@2024-01-01' = {
+  parent: sa
+  name: 'default'
+}
+
+resource contactTable 'Microsoft.Storage/storageAccounts/tableServices/tables@2024-01-01' = {
+  parent: tableService
+  name: 'contactmessages'
 }
 
 resource diag 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if (enableDiagnostics) {

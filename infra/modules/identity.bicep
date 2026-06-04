@@ -67,6 +67,19 @@ resource roleAssignmentBlob 'Microsoft.Authorization/roleAssignments@2022-04-01'
   }
 }
 
+// Storage Table Data Contributor — write contact form submissions.
+var tableDataContributorRoleId = '0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3'
+
+resource roleAssignmentTable 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(sa.id, mi.id, tableDataContributorRoleId)
+  scope: sa
+  properties: {
+    principalId: mi.properties.principalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', tableDataContributorRoleId)
+  }
+}
+
 // Reader on the resource group — lets the deploy step look up resource props.
 var readerRoleId = 'acdd72a7-3385-48ef-bd42-f606fba81ae7'
 
