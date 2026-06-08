@@ -3,6 +3,11 @@ const { BlobServiceClient } = require('@azure/storage-blob');
 const CONTAINER = 'originals';
 const SESSION_JSON = '_session.json';
 const MAX_TITLE = 200;
+
+// GitHub usernames allowed to use the admin API (lowercase).
+const ALLOWED_USERS = new Set(
+  (process.env.ADMIN_GITHUB_USERS || 'trumanbrown').toLowerCase().split(',').map(s => s.trim())
+);
 const MAX_LOCATION = 200;
 const MAX_DESCRIPTION = 1000;
 
@@ -143,6 +148,20 @@ async function handlePut(context, req) {
 // ---------------------------------------------------------------------------
 module.exports = async function (context, req) {
   try {
+    // Server-side identity check — only allowed GitHub users can proceed.
+    const header = req.headers['x-ms-client-principal'];
+    let userId = '';
+    if (header) {
+      try {
+        const decoded = JSON.parse(Buffer.from(header, 'base64').toString('utf8'));
+        userId = (decoded.userDetails || '').toLowerCase();
+      } catch (_) {}
+    }
+    if (!ALLOWED_USERS.has(userId)) {
+      context.res = { status: 403, headers: json(), body: { ok: false, error: 'Not authorized.' } };
+      return;
+    }
+
     if (req.method === 'GET') {
       await handleGet(context);
     } else if (req.method === 'PUT') {

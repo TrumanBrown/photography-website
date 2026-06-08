@@ -34,20 +34,28 @@ loadSessions();
 
 async function loadSessions() {
   try {
-    const res = await fetch('/api/admin/sessions', { redirect: 'error' });
-    if (res.status === 401 || res.status === 403 || res.status === 302) {
+    const res = await fetch('/api/admin/sessions');
+    if (res.redirected || res.status === 401 || res.status === 302) {
       window.location.href = '/.auth/login/github?post_login_redirect_uri=/admin';
       return;
     }
-    const data = await res.json();
+    if (res.status === 403) {
+      loadingEl.classList.add('hidden');
+      errorEl.textContent = 'Access denied. Your GitHub account is not authorized for admin.';
+      errorEl.classList.remove('hidden');
+      return;
+    }
+    const text = await res.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      throw new Error(`Unexpected response (HTTP ${res.status}): ${text.slice(0, 200)}`);
+    }
     if (!data.ok) throw new Error(data.error || 'Failed to load sessions.');
     sessions = data.sessions;
     renderList();
   } catch (err: any) {
-    if (err.message?.includes('redirect')) {
-      window.location.href = '/.auth/login/github?post_login_redirect_uri=/admin';
-      return;
-    }
     loadingEl.classList.add('hidden');
     errorEl.textContent = err.message;
     errorEl.classList.remove('hidden');

@@ -24,7 +24,7 @@
     },
     {
       "route": "/api/admin/*",
-      "allowedRoles": ["admin"]
+      "allowedRoles": ["authenticated"]
     },
     {
       "route": "/_astro/*",
