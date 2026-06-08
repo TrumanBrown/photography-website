@@ -34,12 +34,20 @@ loadSessions();
 
 async function loadSessions() {
   try {
-    const res = await fetch('/api/admin/sessions');
+    const res = await fetch('/api/admin/sessions', { redirect: 'error' });
+    if (res.status === 401 || res.status === 403 || res.status === 302) {
+      window.location.href = '/.auth/login/github?post_login_redirect_uri=/admin';
+      return;
+    }
     const data = await res.json();
     if (!data.ok) throw new Error(data.error || 'Failed to load sessions.');
     sessions = data.sessions;
     renderList();
   } catch (err: any) {
+    if (err.message?.includes('redirect')) {
+      window.location.href = '/.auth/login/github?post_login_redirect_uri=/admin';
+      return;
+    }
     loadingEl.classList.add('hidden');
     errorEl.textContent = err.message;
     errorEl.classList.remove('hidden');
