@@ -1,4 +1,5 @@
-const { BlobServiceClient } = require('@azure/storage-blob');
+// Lazy-load to avoid crashing the function at startup if the module has issues.
+let BlobServiceClient;
 
 const CONTAINER = 'originals';
 const SESSION_JSON = '_session.json';
@@ -26,6 +27,9 @@ function extOf(name) {
 function getService() {
   const conn = process.env.AZURE_STORAGE_CONNECTION_STRING;
   if (!conn) return null;
+  if (!BlobServiceClient) {
+    BlobServiceClient = require('@azure/storage-blob').BlobServiceClient;
+  }
   return BlobServiceClient.fromConnectionString(conn);
 }
 
