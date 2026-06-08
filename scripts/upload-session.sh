@@ -85,7 +85,7 @@ fi
 
 # If a tenant is configured, ensure we're using it (handles multi-tenant machines).
 if [ -n "${AZURE_TENANT_ID:-}" ]; then
-  current_tenant=$(az account show --query tenantId -o tsv 2>/dev/null || true)
+  current_tenant=$(az account show --query tenantId -o tsv 2>/dev/null | tr -d '\r' || true)
   if [ "$current_tenant" != "$AZURE_TENANT_ID" ]; then
     echo "Switching to photography tenant ($AZURE_TENANT_ID)..."
     if ! az login --use-device-code --tenant "$AZURE_TENANT_ID" --output none; then
@@ -153,7 +153,7 @@ find "$SRC" -maxdepth 1 -type f \( \
 
 uploaded=0
 failed=0
-while IFS= read -r f; do
+while IFS= read -r f <&3; do
   rel="${f#$SRC/}"
   echo "  → $rel"
   if az storage blob upload \
@@ -169,7 +169,7 @@ while IFS= read -r f; do
     echo "    [FAILED] $rel" >&2
     failed=$((failed + 1))
   fi
-done < "$TMPLIST"
+done 3< "$TMPLIST"
 
 echo
 echo "Upload summary: $uploaded succeeded, $failed failed"
