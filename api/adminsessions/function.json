@@ -5,8 +5,7 @@
       "type": "httpTrigger",
       "direction": "in",
       "name": "req",
-      "methods": ["get", "put"],
-      "route": "admin-sessions"
+      "methods": ["get", "put"]
     },
     {
       "type": "http",

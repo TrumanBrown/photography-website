@@ -23,7 +23,7 @@
       "allowedRoles": ["anonymous", "authenticated"]
     },
     {
-      "route": "/api/admin-sessions",
+      "route": "/api/adminsessions",
       "allowedRoles": ["authenticated"]
     },
     {
