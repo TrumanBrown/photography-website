@@ -15,6 +15,18 @@
   },
   "routes": [
     {
+      "route": "/admin",
+      "allowedRoles": ["admin"]
+    },
+    {
+      "route": "/admin/*",
+      "allowedRoles": ["admin"]
+    },
+    {
+      "route": "/api/admin/*",
+      "allowedRoles": ["admin"]
+    },
+    {
       "route": "/_astro/*",
       "headers": {
         "Cache-Control": "public, max-age=31536000, immutable"
@@ -22,6 +34,9 @@
     }
   ],
   "responseOverrides": {
+    "401": {
+      "redirect": "/.auth/login/github?post_login_redirect_uri=/admin"
+    },
     "404": {
       "rewrite": "/404.html"
     }

@@ -1,0 +1,103 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Admin">
+  <section class="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+    <div class="mb-6 flex items-center justify-between">
+      <h1 class="text-2xl font-semibold tracking-tight">Session Manager</h1>
+      <div class="flex items-center gap-3 text-sm">
+        <span id="admin-user" class="text-neutral-500 dark:text-neutral-400"></span>
+        <a href="/.auth/logout?post_logout_redirect_uri=/" class="text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200">Sign out</a>
+      </div>
+    </div>
+
+    <div id="admin-loading" class="py-20 text-center text-neutral-500 dark:text-neutral-400">
+      Loading sessions…
+    </div>
+
+    <div id="admin-error" class="hidden rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-300"></div>
+
+    <ul id="admin-list" class="hidden space-y-4"></ul>
+
+    <!-- Edit modal -->
+    <div id="edit-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 p-4">
+      <div class="w-full max-w-lg rounded-lg border border-neutral-200 bg-white p-6 shadow-xl dark:border-neutral-700 dark:bg-neutral-900">
+        <h2 class="mb-4 text-lg font-semibold" id="edit-modal-title">Edit Session</h2>
+        <form id="edit-form" class="space-y-4">
+          <input type="hidden" id="edit-slug" />
+
+          <div>
+            <label for="edit-title" class="mb-1 block text-sm font-medium">Title</label>
+            <input
+              id="edit-title"
+              type="text"
+              maxlength="200"
+              class="w-full rounded border border-neutral-300 bg-white px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none dark:border-neutral-600 dark:bg-neutral-800"
+            />
+          </div>
+
+          <div>
+            <label for="edit-location" class="mb-1 block text-sm font-medium">Location</label>
+            <input
+              id="edit-location"
+              type="text"
+              maxlength="200"
+              class="w-full rounded border border-neutral-300 bg-white px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none dark:border-neutral-600 dark:bg-neutral-800"
+            />
+          </div>
+
+          <div>
+            <label for="edit-description" class="mb-1 block text-sm font-medium">Description</label>
+            <textarea
+              id="edit-description"
+              maxlength="1000"
+              rows="2"
+              class="w-full rounded border border-neutral-300 bg-white px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none dark:border-neutral-600 dark:bg-neutral-800"
+            ></textarea>
+          </div>
+
+          <div>
+            <label for="edit-cover" class="mb-1 block text-sm font-medium">Cover / Thumbnail</label>
+            <select
+              id="edit-cover"
+              class="w-full rounded border border-neutral-300 bg-white px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none dark:border-neutral-600 dark:bg-neutral-800"
+            ></select>
+          </div>
+
+          <div>
+            <label for="edit-order" class="mb-1 block text-sm font-medium">Display Order</label>
+            <input
+              id="edit-order"
+              type="number"
+              step="1"
+              placeholder="Auto (by date)"
+              class="w-full rounded border border-neutral-300 bg-white px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none dark:border-neutral-600 dark:bg-neutral-800"
+            />
+            <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">Lower numbers appear first. Leave blank for date-based ordering.</p>
+          </div>
+
+          <div id="edit-error" class="hidden rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-300"></div>
+
+          <div class="flex items-center justify-end gap-3 pt-2">
+            <button
+              type="button"
+              id="edit-cancel"
+              class="rounded px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
+            >Cancel</button>
+            <button
+              type="submit"
+              id="edit-save"
+              class="rounded bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-200"
+            >Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="fixed bottom-6 right-6 z-50 hidden rounded-lg border border-green-300 bg-green-50 px-4 py-3 text-sm text-green-800 shadow-lg dark:border-green-800 dark:bg-green-950 dark:text-green-300"></div>
+  </section>
+
+  <script src="@/lib/admin.ts"></script>
+</BaseLayout>
