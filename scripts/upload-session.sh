@@ -23,6 +23,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 STAGING_DIR="$ROOT/staging"
 
+# Load local env (tenant, subscription, overrides). File is .gitignored.
+if [ -f "$ROOT/.env" ]; then
+  set -a
+  # shellcheck source=/dev/null
+  . "$ROOT/.env"
+  set +a
+fi
+
 # Accepted extensions (lowercase). Anything else gets stripped from the upload.
 ACCEPTED='*.jpg;*.jpeg;*.png;*.webp;*.avif;*.tif;*.tiff;*.heic;*.heif;*.arw;*.nef;*.cr2;*.cr3;*.dng;*.raf;_session.json'
 EXCLUDE='.DS_Store;Thumbs.db;*.tmp;*.lrcat;*.xmp'
@@ -73,6 +81,21 @@ fi
 if ! az account show >/dev/null 2>&1; then
   echo "az not logged in. Run: az login --use-device-code" >&2
   exit 1
+fi
+
+# If a tenant is configured, ensure we're using it (handles multi-tenant machines).
+if [ -n "${AZURE_TENANT_ID:-}" ]; then
+  current_tenant=$(az account show --query tenantId -o tsv 2>/dev/null || true)
+  if [ "$current_tenant" != "$AZURE_TENANT_ID" ]; then
+    echo "Switching to photography tenant ($AZURE_TENANT_ID)..."
+    if ! az login --use-device-code --tenant "$AZURE_TENANT_ID" --output none; then
+      echo "Failed to switch tenant." >&2
+      exit 1
+    fi
+  fi
+fi
+if [ -n "${AZURE_SUBSCRIPTION_ID:-}" ]; then
+  az account set --subscription "$AZURE_SUBSCRIPTION_ID" 2>/dev/null || true
 fi
 
 # Count files that would actually be uploaded (matches ACCEPTED extensions).
