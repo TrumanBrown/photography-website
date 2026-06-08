@@ -81,7 +81,7 @@ const resolved: Resolved[] = imageList.map((img) => {
                 alt={img.caption ?? ''}
                 widths={[480, 800, 1200, 1600]}
                 sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
-                formats={['webp']}
+                formats={['avif', 'webp']}
                 fallbackFormat="jpeg"
                 loading="lazy"
                 class="h-auto w-full"
