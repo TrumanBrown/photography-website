@@ -18,19 +18,25 @@ const toastEl = document.getElementById('toast')!;
 
 let sessions: Session[] = [];
 
-// Show current user
+const signinEl = document.getElementById('admin-signin')!;
+const authedEl = document.getElementById('admin-authed')!;
+
+// Check auth state first, then load sessions
 fetch('/.auth/me')
   .then((r) => r.json())
   .then((d) => {
     const user = d.clientPrincipal;
     if (user) {
       document.getElementById('admin-user')!.textContent = user.userDetails;
+      authedEl.classList.remove('hidden');
+      loadSessions();
+    } else {
+      signinEl.classList.remove('hidden');
     }
   })
-  .catch(() => {});
-
-// Load sessions
-loadSessions();
+  .catch(() => {
+    signinEl.classList.remove('hidden');
+  });
 
 async function loadSessions() {
   try {

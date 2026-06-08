@@ -16,11 +16,11 @@
   "routes": [
     {
       "route": "/admin",
-      "allowedRoles": ["admin"]
+      "allowedRoles": ["anonymous", "authenticated"]
     },
     {
       "route": "/admin/*",
-      "allowedRoles": ["admin"]
+      "allowedRoles": ["anonymous", "authenticated"]
     },
     {
       "route": "/api/admin/*",
