@@ -4,10 +4,11 @@
 
 ## TL;DR
 
-The site has no logins, no forms, no server-side code, and no database. Its **runtime** attack surface is essentially "what bugs exist in Microsoft's CDN," which is Microsoft's problem to fix. What we focus on:
+The site has no public logins and no user database. An `/admin` panel exists but is gated by **SWA built-in auth** (GitHub OAuth + role invitation) — see [docs/admin.md](admin.md). Its **runtime** attack surface is essentially "what bugs exist in Microsoft's CDN," which is Microsoft's problem to fix. What we focus on:
 
 - Lock down the storage account so attackers can't enumerate or modify it.
 - Send strong HTTP security headers so visitors' browsers refuse to be misused.
+- Gate admin routes behind SWA role-based auth (GitHub OAuth, invite-only `admin` role).
 - Use short-lived, narrowly-scoped credentials everywhere (OIDC federation, no long-lived secrets).
 - Be honest about what's worth defending vs. what would just inflate the bill.
 

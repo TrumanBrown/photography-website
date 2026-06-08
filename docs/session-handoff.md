@@ -44,6 +44,20 @@ GitHub-side billing note: the **Actions account budget must be > $0 with stop-us
 10. **Prebuild cache key must include the target filename**, not just source name+etag. When HEIC→jpg conversion was added later, the cache key (source name+etag) was unchanged so the prebuild reused HEIC bytes for a .jpg local file, breaking Astro's image pipeline.
 11. **CSP `script-src` blocks inline scripts** unless you add `'unsafe-inline'` or per-script hashes. Dark mode + theme toggle were inline `<script>` tags being silently blocked. Added SHA-256 hashes to CSP in [staticwebapp.config.json](../staticwebapp.config.json); helper at [scripts/csp-hash.mjs](../scripts/csp-hash.mjs) recomputes if the inline content changes.
 12. **SWA Free has a 250 MB app-size limit** (Standard is 500 MB; both insufficient for many photos). Solution: [scripts/sync-variants.mjs](../scripts/sync-variants.mjs) runs after `astro build`, moves all responsive image variants from `dist/_astro/` to the `variants/` blob container, rewrites HTML refs to point at Blob. dist drops from 539 MB → ~330 KB regardless of photo count.
+13. **`upload-session.sh` only uploaded 1 file** because the `while read` loop fed the file list via stdin, but `az storage blob upload` also reads stdin, consuming remaining entries after the first iteration. Fixed by reading from file descriptor 3 (`read <&3 ... done 3< "$TMPLIST"`).
+14. **Windows `az` CLI under WSL appends `\r`** to query output. The tenant-switching comparison (`$current_tenant != $AZURE_TENANT_ID`) always failed, triggering a login prompt every run. Fixed with `tr -d '\r'`.
+
+## Admin panel
+
+The site has an admin page at `/admin` for editing session metadata (title, cover, location, description, display order) from the browser. See [docs/admin.md](admin.md) for full details.
+
+**Key points:**
+- Protected by **SWA built-in auth** — GitHub OAuth with an invite-only `admin` role.
+- Only users explicitly invited via Azure Portal → SWA → Role Management can access it.
+- Writes a `_session.json` sidecar to Blob Storage; next build picks up the changes.
+- Cannot upload/delete images, delete sessions, or modify code.
+
+**Setup on a new deployment:** Invite your GitHub user with the `admin` role in the Azure Portal (SWA → Role Management). Invitations expire — re-invite when they do.
 
 ## Scripts and when to use each
 
