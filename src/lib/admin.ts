@@ -40,7 +40,7 @@ fetch('/.auth/me')
 
 async function loadSessions() {
   try {
-    const res = await fetch('/api/admin/sessions');
+    const res = await fetch('/api/admin-sessions');
     if (res.redirected || res.status === 401 || res.status === 302) {
       window.location.href = '/.auth/login/github?post_login_redirect_uri=/admin';
       return;
@@ -170,7 +170,7 @@ form.addEventListener('submit', async (e) => {
   };
 
   try {
-    const res = await fetch('/api/admin/sessions', {
+    const res = await fetch('/api/admin-sessions', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
