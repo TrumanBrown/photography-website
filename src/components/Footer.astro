@@ -3,7 +3,13 @@ import { copyrightLine } from '@/lib/sessions';
 ---
 
 <footer class="mt-16 border-t border-neutral-200 py-8 text-sm text-neutral-600 dark:border-neutral-800 dark:text-neutral-400">
-  <div class="mx-auto max-w-6xl px-4 sm:px-6">
+  <div class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 sm:px-6">
     <p>{copyrightLine()}</p>
+    <a
+      href="https://github.com/TrumanBrown/photography-website"
+      target="_blank"
+      rel="noopener noreferrer"
+      class="text-neutral-400 no-underline hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300"
+    >How this site is built</a>
   </div>
 </footer>
