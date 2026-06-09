@@ -246,11 +246,7 @@ function esc(s: string): string {
 const NON_WEB_EXTS = new Set(['.heic', '.heif', '.tif', '.tiff', '.arw', '.nef', '.cr2', '.cr3', '.dng', '.raf']);
 
 function thumbUrl(host: string, slug: string, file: string): string {
-  const ext = file.slice(file.lastIndexOf('.')).toLowerCase();
-  if (NON_WEB_EXTS.has(ext)) {
-    // Prebuild converts these to JPEG in the derivatives container
-    const base = file.slice(0, file.lastIndexOf('.'));
-    return `https://${host}/derivatives/${slug}/${base}.jpg`;
-  }
-  return `https://${host}/originals/${slug}/${file}`;
+  // Use tiny pre-generated thumbnails from variants/thumbs/ (120px wide, ~5KB).
+  const base = file.slice(0, file.lastIndexOf('.'));
+  return `https://${host}/variants/thumbs/${slug}/${base}.jpg`;
 }

@@ -131,7 +131,9 @@ async function handlePut(context, req) {
 
   if (title !== undefined) sidecar.title = title;
   if (cover !== undefined) sidecar.cover = cover;
-  if (order !== undefined) sidecar.order = order;
+  if (order !== undefined) {
+    if (order === null) { delete sidecar.order; } else { sidecar.order = order; }
+  }
   if (location !== undefined) sidecar.location = location;
   if (description !== undefined) sidecar.description = description;
 

@@ -97,6 +97,8 @@ async function main() {
       prefix,
       originalsClient,
       derivativesClient,
+      metadataClient,
+      service,
       manifest,
       nextManifest,
     });
@@ -169,7 +171,7 @@ async function listSessionPrefixes(originalsClient) {
   return prefixes.sort();
 }
 
-async function processSession({ prefix, originalsClient, derivativesClient, manifest, nextManifest }) {
+async function processSession({ prefix, originalsClient, derivativesClient, metadataClient, service, manifest, nextManifest }) {
   const slug = sanitizeSlug(prefix);
   const sessionDir = join(SESSIONS_DIR, slug);
   const imagesDir = join(sessionDir, 'images');
@@ -303,13 +305,20 @@ async function processSession({ prefix, originalsClient, derivativesClient, mani
     location: sidecar.location ?? '',
     description: sidecar.description ?? '',
     ...(sidecar.cover ? { cover: sidecar.cover } : {}),
-    ...(sidecar.order !== undefined ? { order: sidecar.order } : {}),
+    ...(sidecar.order != null ? { order: sidecar.order } : {}),
     images: orderedImages,
   };
 
   const jsonPath = join(SESSIONS_DIR, `${slug}.json`);
   await writeFile(jsonPath, JSON.stringify(sessionRecord, null, 2) + '\n');
   console.log(`session: ${slug} (${orderedImages.length} images)`);
+
+  // Generate tiny admin thumbnails and upload to variants/thumbs/<slug>/.
+  // The variants container is publicly readable so the admin page can fetch them.
+  if (service) {
+    const variantsClient = service.getContainerClient('variants');
+    await generateAdminThumbs({ slug, imagesDir, images: orderedImages, containerClient: variantsClient });
+  }
 }
 
 async function processStandardBlob({ blob, originalsClient, localPath, cacheKey }) {
@@ -433,6 +442,40 @@ async function processConvertBlob({ blob, originalsClient, derivativesClient, sl
 
   await copyFile(localPath, join(CACHE_DIR, hashKey(cacheKey)));
   await rm(tmpSrc, { force: true }).catch(() => {});
+}
+
+function blobPublicUrl(containerClient, blobPath) {
+
+  // Generate tiny thumbnails for the admin panel (120px wide, ~3-8KB each).
+}
+
+async function generateAdminThumbs({ slug, imagesDir, images, containerClient }) {
+  const { default: sharp } = await import('sharp');
+  const THUMB_WIDTH = 120;
+  let uploaded = 0;
+  for (const img of images) {
+    const src = join(imagesDir, img.file);
+    const thumbName = `thumbs/${slug}/${img.file.replace(/\.[^.]+$/, '.jpg')}`;
+    const blobClient = containerClient.getBlockBlobClient(thumbName);
+    // Skip if thumb already exists (cheap HEAD check).
+    try {
+      await blobClient.getProperties();
+      continue;
+    } catch (_) {}
+    try {
+      const buf = await sharp(src)
+        .resize({ width: THUMB_WIDTH, withoutEnlargement: true })
+        .jpeg({ quality: 50, mozjpeg: true })
+        .toBuffer();
+      await blobClient.upload(buf, buf.length, {
+        blobHTTPHeaders: { blobContentType: 'image/jpeg' },
+      });
+      uploaded++;
+    } catch (e) {
+      console.warn(`  thumb skip: ${img.file}: ${e.message}`);
+    }
+  }
+  if (uploaded > 0) console.log(`  thumbs: ${uploaded} new for ${slug}`);
 }
 
 function blobPublicUrl(containerClient, blobPath) {

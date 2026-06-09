@@ -18,7 +18,7 @@ const sessions = defineCollection({
     location: z.string().default(''),
     description: z.string().default(''),
     cover: z.string().optional(),
-    order: z.number().int().optional(),
+    order: z.number().int().nullable().optional(),
     images: z
       .array(
         z.object({
