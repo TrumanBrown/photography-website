@@ -62,7 +62,7 @@ Translation:
 - **`object-src 'none'`** — no `<object>` / `<embed>` / Flash-era nonsense.
 - **`frame-ancestors 'none'`** — modern equivalent of `X-Frame-Options: DENY`.
 - **`base-uri 'self'`** — attackers can't inject a `<base>` tag pointing relative URLs elsewhere.
-- **`form-action 'none'`** — there are no forms; if one ever appears via injection, it can't submit anywhere.
+- **`form-action 'self'`** — forms can only submit to the site's own origin (contact form, admin).
 
 If you ever add inline scripts, switch to per-script hashes rather than `'unsafe-inline'`. Astro can emit hash-based CSPs in a future iteration if needed.
 

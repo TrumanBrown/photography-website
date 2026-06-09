@@ -16,7 +16,7 @@ Static Astro site deployed to **Azure Static Web Apps** (Free tier). Photos in *
 |---|---|---|
 | `originals/` | Blob (anon read of known URLs, no list) | Source-of-truth uploads. JPG/HEIC/RAW. |
 | `derivatives/` | Blob | JPEG sidecars from RAW/HEIC sources, written by prebuild with a `source-etag` metadata tag for cache invalidation. |
-| `variants/` | Blob | Astro responsive AVIF/WebP/JPEG outputs, moved here by [scripts/sync-variants.mjs](../scripts/sync-variants.mjs) after each build. **Critical for staying under SWA Free's 250 MB app cap** — without this, ~50-photo sessions blow the limit. |
+| `variants/` | Blob | Astro responsive WebP/JPEG outputs, moved here by [scripts/sync-variants.mjs](../scripts/sync-variants.mjs) after each build. Also stores admin thumbnails under `thumbs/<slug>/`. **Critical for staying under SWA Free's 250 MB app cap** — without this, ~50-photo sessions blow the limit. |
 | `metadata/` | Private | Prebuild's `manifest.json` (blob name → etag + target). Reserved for future admin app state. |
 
 ## GitHub Actions secrets
@@ -29,6 +29,15 @@ Set in the repo (Settings → Secrets and variables → Actions):
 - `APPINSIGHTS_CONNECTION_STRING` — App Insights ingestion endpoint.
 
 GitHub-side billing note: the **Actions account budget must be > $0 with stop-usage on**. The default $0 budget blocks all Actions runs, even on free public repos. Card-on-file is also required regardless.
+
+## SWA environment variables
+
+Set in Azure Portal → Static Web App → Environment variables:
+
+- `AZURE_STORAGE_ACCOUNT` — storage account name (same as GH Actions secret).
+- `AZURE_STORAGE_CONNECTION_STRING` — storage connection string (used by contact form + admin API).
+- `GITHUB_TOKEN` — fine-grained GitHub PAT with `actions:write` scope. Enables the "Rebuild Site" button in the admin panel. Optional.
+- `ADMIN_GITHUB_USERS` — comma-separated GitHub usernames allowed to use the admin API. Defaults to `trumanbrown`. Optional.
 
 ## Hard-won lessons (in the order they bit us)
 
@@ -61,7 +70,7 @@ The site has an admin page at `/admin` for editing session metadata (title, cove
 - Writes a `_session.json` sidecar to Blob Storage; next build picks up the changes.
 - Cannot upload/delete images, delete sessions, or modify code.
 
-**Setup on a new deployment:** The API defaults to allowing `trumanbrown`. To change, set `ADMIN_GITHUB_USERS` env var on the SWA (comma-separated GitHub usernames).
+**Setup on a new deployment:** The API defaults to allowing `trumanbrown`. To change, set `ADMIN_GITHUB_USERS` env var on the SWA (comma-separated GitHub usernames). Set `GITHUB_TOKEN` (fine-grained PAT, `actions:write` scope) to enable the "Rebuild Site" button.
 
 ## Scripts and when to use each
 
