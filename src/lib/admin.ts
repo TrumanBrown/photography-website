@@ -156,7 +156,7 @@ function openEdit(slug: string) {
   autoBtn.addEventListener('click', () => {
     coverInput.value = '';
     grid.querySelectorAll('button').forEach((b) => {
-      b.className = b.className.replace(/border-neutral-900|dark:border-white/g, 'border-transparent').replace('opacity-60', 'opacity-60');
+      b.className = b.className.replace(/border-neutral-900|dark:border-white/g, 'border-transparent');
     });
     autoBtn.className = autoBtn.className.replace('border-transparent', 'border-neutral-900 dark:border-white').replace('opacity-60', '');
   });
@@ -234,7 +234,7 @@ form.addEventListener('submit', async (e) => {
     // Update local state
     const s = sessions.find((x) => x.slug === slug);
     if (s) {
-      if (body.title) s.title = body.title;
+      if (body.title !== undefined) s.title = body.title;
       if (body.cover !== undefined) s.cover = body.cover;
       if (body.order !== undefined) s.order = body.order;
       if (body.location !== undefined) s.location = body.location;
@@ -242,7 +242,7 @@ form.addEventListener('submit', async (e) => {
     }
     renderList();
     closeEdit();
-    showToast('Saved! Changes will appear after the next build (~2 min if triggered, or ~1 hr cron).');
+    showToast('Saved! Click Rebuild Site to deploy (~5 min) or wait for the next cron.');
   } catch (err: any) {
     errEl.textContent = err.message;
     errEl.classList.remove('hidden');
@@ -263,8 +263,6 @@ function esc(s: string): string {
   d.textContent = s;
   return d.innerHTML;
 }
-
-const NON_WEB_EXTS = new Set(['.heic', '.heif', '.tif', '.tiff', '.arw', '.nef', '.cr2', '.cr3', '.dng', '.raf']);
 
 function thumbUrl(host: string, slug: string, file: string): string {
   // Use tiny pre-generated thumbnails from variants/thumbs/ (120px wide, ~5KB).

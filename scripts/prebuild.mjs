@@ -26,7 +26,7 @@
  *
  * Exit code 0 even when no sessions exist — the site renders an empty state.
  */
-import { mkdir, writeFile, readFile, rm, access } from 'node:fs/promises';
+import { mkdir, writeFile, readFile, rm, access, copyFile as fsCopyFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname, join, basename, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -511,9 +511,8 @@ function hashKey(s) {
 }
 
 async function copyFile(src, dst) {
-  const { copyFile: cp } = await import('node:fs/promises');
   await mkdir(dirname(dst), { recursive: true });
-  await cp(src, dst);
+  await fsCopyFile(src, dst);
 }
 
 async function firstExisting(paths) {

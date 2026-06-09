@@ -93,6 +93,7 @@ async function handlePut(context, req) {
   var errors = [];
   if (!slug || typeof slug !== 'string') errors.push('slug is required.');
   if (title !== undefined && typeof title !== 'string') errors.push('title must be a string.');
+  if (title !== undefined && !title.trim()) errors.push('title cannot be empty.');
   if (title && title.length > MAX_TITLE) errors.push('title too long.');
   if (cover !== undefined && typeof cover !== 'string') errors.push('cover must be a string.');
   if (location !== undefined && typeof location !== 'string') errors.push('location must be a string.');
