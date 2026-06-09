@@ -146,6 +146,49 @@ async function handlePut(context, req) {
   context.res = { status: 200, headers: json(), body: { ok: true, sidecar: sidecar } };
 }
 
+// ---------------------------------------------------------------------------
+// POST /api/sessionmgr — trigger a rebuild via GitHub Actions workflow_dispatch
+// ---------------------------------------------------------------------------
+async function handlePost(context) {
+  var token = process.env.GITHUB_TOKEN;
+  var repo = process.env.GITHUB_REPO || 'TrumanBrown/photography-website';
+  if (!token) {
+    context.res = { status: 501, headers: json(), body: { ok: false, error: 'Rebuild not configured (no GITHUB_TOKEN).' } };
+    return;
+  }
+
+  var https = require('https');
+  var data = JSON.stringify({ ref: 'main' });
+  var result = await new Promise(function (resolve, reject) {
+    var req = https.request({
+      hostname: 'api.github.com',
+      path: '/repos/' + repo + '/actions/workflows/build-and-deploy.yml/dispatches',
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + token,
+        'Accept': 'application/vnd.github+json',
+        'User-Agent': 'photography-admin',
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(data),
+      },
+    }, function (res) {
+      var body = '';
+      res.on('data', function (chunk) { body += chunk; });
+      res.on('end', function () { resolve({ status: res.statusCode, body: body }); });
+    });
+    req.on('error', reject);
+    req.write(data);
+    req.end();
+  });
+
+  if (result.status === 204) {
+    context.res = { status: 200, headers: json(), body: { ok: true, message: 'Build triggered. Site will update in ~5 minutes.' } };
+  } else {
+    context.log.error('GitHub dispatch failed:', result.status, result.body);
+    context.res = { status: 502, headers: json(), body: { ok: false, error: 'Failed to trigger build (HTTP ' + result.status + ').' } };
+  }
+}
+
 module.exports = async function (context, req) {
   try {
     var header = req.headers['x-ms-client-principal'];
@@ -165,6 +208,8 @@ module.exports = async function (context, req) {
       await handleGet(context);
     } else if (req.method === 'PUT') {
       await handlePut(context, req);
+    } else if (req.method === 'POST') {
+      await handlePost(context);
     } else {
       context.res = { status: 405, headers: json(), body: { ok: false, error: 'Method not allowed.' } };
     }

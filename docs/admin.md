@@ -12,16 +12,16 @@ The admin page at `https://trumanbrown.com/admin` lets you edit session metadata
 - **Description** — a short blurb shown on the session page.
 - **Display order** — explicit sort priority (lower numbers first; blank = sort by date).
 
-Changes are written to a `_session.json` sidecar file in `originals/<session>/` in Blob Storage. The next build (hourly cron, or manual trigger) reads this sidecar and applies the metadata to the site.
+Changes are written to a `_session.json` sidecar file in `originals/<session>/` in Blob Storage. Click **Rebuild Site** to deploy changes (~5 min), or wait for the hourly cron.
 
 ## How to use it
 
 1. Go to `https://trumanbrown.com/admin`.
-2. You'll be redirected to GitHub OAuth — sign in with your GitHub account.
+2. Sign in with GitHub when prompted (one-time per browser session).
 3. The page lists all sessions found in Blob Storage.
-4. Click **Edit** on any session → modal opens with current values.
+4. Click **Edit** on any session → modal opens with current values and a visual thumbnail picker.
 5. Change what you want → click **Save**.
-6. A toast confirms the save. Changes go live on the next build (~1 hr cron, or trigger manually from GitHub Actions).
+6. Click **Rebuild Site** at the top → site updates in ~5 minutes.
 
 ## How authentication works
 
@@ -84,7 +84,8 @@ After deploying the SWA infrastructure (Bicep), do these steps once:
 
 1. **Set the `AZURE_STORAGE_CONNECTION_STRING` app setting** on the SWA resource if not already done (needed by both the contact form and admin API).
 2. Optionally set `ADMIN_GITHUB_USERS` to a comma-separated list of GitHub usernames (defaults to `trumanbrown`).
-3. Visit `https://yourdomain.com/admin` — sign in with GitHub and you'll see the session manager.
+3. **Set `GITHUB_TOKEN`** to a fine-grained GitHub PAT with `actions:write` scope on this repo. This enables the "Rebuild Site" button. If omitted, the button shows an error but everything else works.
+4. Visit `https://yourdomain.com/admin` — sign in with GitHub and you'll see the session manager.
 
 ## What the admin panel cannot do
 

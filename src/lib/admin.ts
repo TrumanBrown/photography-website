@@ -39,6 +39,27 @@ fetch('/.auth/me')
     signinEl.classList.remove('hidden');
   });
 
+// Rebuild button
+document.getElementById('rebuild-btn')!.addEventListener('click', async () => {
+  const btn = document.getElementById('rebuild-btn') as HTMLButtonElement;
+  btn.disabled = true;
+  btn.textContent = 'Triggering…';
+  try {
+    const res = await fetch('/api/sessionmgr', { method: 'POST' });
+    const data = await res.json();
+    if (data.ok) {
+      showToast(data.message || 'Build triggered! Site will update in ~5 minutes.');
+    } else {
+      showToast(data.error || 'Failed to trigger build.');
+    }
+  } catch {
+    showToast('Failed to trigger build.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Rebuild Site';
+  }
+});
+
 async function loadSessions() {
   try {
     const res = await fetch('/api/sessionmgr');
