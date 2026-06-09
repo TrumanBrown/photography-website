@@ -1,6 +1,6 @@
 # photography-website
 
-Personal photography portfolio. Photos live in Azure Blob Storage; the website is a static Astro build hosted on Azure Static Web Apps. Drop a folder of photos into Blob, the site updates itself within an hour.
+Personal photography portfolio. Photos live in Azure Blob Storage; the website is a static Astro build hosted on Azure Static Web Apps. Drop a folder of photos into Blob, the site updates itself on the next build.
 
 **Why each piece exists** — see [docs/architecture.md](docs/architecture.md).
 **New to any of this?** Start with [docs/glossary.md](docs/glossary.md).
@@ -16,6 +16,7 @@ Personal photography portfolio. Photos live in Azure Blob Storage; the website i
 | What Infrastructure-as-Code (Bicep) is and what each `.bicep` file does | [docs/iac-bicep.md](docs/iac-bicep.md) |
 | How the GitHub Actions workflows work and why | [docs/cicd.md](docs/cicd.md) |
 | How a photo travels from your camera to the live site | [docs/image-pipeline.md](docs/image-pipeline.md) |
+| Editing session metadata from the browser (`/admin`) | [docs/admin.md](docs/admin.md) |
 | How the site is hardened (CSP, HSTS, etc.) | [docs/security.md](docs/security.md) |
 | Running locally — npm, dev server, fixtures | [docs/local-dev.md](docs/local-dev.md) |
 | **What personal info ends up in the public repo (and what doesn't)** | [docs/privacy.md](docs/privacy.md) |
@@ -27,7 +28,7 @@ Personal photography portfolio. Photos live in Azure Blob Storage; the website i
 
 - **Frontend:** Astro 5 + Tailwind v4 (static build, near-zero JS) — see [docs/architecture.md](docs/architecture.md)
 - **Hosting:** Azure Static Web Apps (Free tier) — see [docs/azure.md](docs/azure.md)
-- **Storage:** Azure Blob Storage, three containers: `originals`, `derivatives`, `metadata` — see [docs/image-pipeline.md](docs/image-pipeline.md)
+- **Storage:** Azure Blob Storage, four containers: `originals`, `derivatives`, `variants`, `metadata` — see [docs/image-pipeline.md](docs/image-pipeline.md)
 - **Domain + DNS:** Azure App Service Domain + Azure DNS
 - **IaC:** Bicep — see [docs/iac-bicep.md](docs/iac-bicep.md)
 - **CI/CD:** GitHub Actions, OIDC federation (no long-lived secrets) — see [docs/cicd.md](docs/cicd.md)
@@ -124,21 +125,43 @@ After the first infra deploy, set `blobHost` in [site.config.ts](site.config.ts)
 
 ## Adding a session
 
-1. Open Azure Storage Explorer (free desktop app) or use `az storage blob upload-batch`.
-2. Under the `originals` container, create a prefix for the session, e.g. `2026-japan/`.
-3. Drop your photos in (JPG, HEIC, PNG, TIFF, or Sony `.ARW` / other RAW).
-4. **Optionally** add `_session.json` at the prefix root:
-   ```json
-   {
-     "title": "Japan, Spring 2026",
-     "date": "2026-03-15",
-     "location": "Tokyo → Kyoto",
-     "description": "Two weeks chasing cherry blossoms.",
-     "cover": "DSC03421.jpg",
-     "order": 5
-   }
-   ```
-5. Click **Run workflow** on `Build and Deploy` for ~3 minute publish, or wait for the hourly cron.
+The easy way — drop photos in `staging/` and run the upload script:
+
+```bash
+# 1. Put your photos in a named folder under staging/
+mkdir -p staging/2026-japan
+cp ~/photos/japan/*.jpg staging/2026-japan/
+
+# 2. Upload to Blob Storage and trigger a build
+./scripts/upload-session.sh 2026-japan --build
+```
+
+The script handles Azure auth (auto-switches tenant via `.env`), filters to
+accepted file types (JPG, HEIC, PNG, TIFF, RAW), uploads to the `originals`
+container, and optionally triggers the build. See [staging/README.md](staging/README.md).
+
+### Setting session metadata
+
+Two options:
+
+- **Admin panel** (no code): visit `/admin`, sign in with GitHub, edit title,
+  cover thumbnail, location, description, and display order in the browser.
+  See [docs/admin.md](docs/admin.md).
+- **`_session.json` sidecar**: add this file at the session's prefix root in Blob
+  Storage (the admin panel writes the same file):
+  ```json
+  {
+    "title": "Japan, Spring 2026",
+    "date": "2026-03-15",
+    "location": "Tokyo → Kyoto",
+    "description": "Two weeks chasing cherry blossoms.",
+    "cover": "DSC03421.jpg",
+    "order": 5
+  }
+  ```
+
+Changes go live on the next build — click **Run workflow** on `Build and Deploy`
+(or **Rebuild Site** in the admin panel) for a ~5 minute publish, or wait for the cron.
 
 Full pipeline walkthrough: [docs/image-pipeline.md](docs/image-pipeline.md).
 
