@@ -147,7 +147,7 @@ function openEdit(slug: string) {
     const isSelected = img === s.cover;
     btn.className = 'relative overflow-hidden rounded border-2 ' +
       (isSelected ? 'border-neutral-900 dark:border-white' : 'border-transparent opacity-60 hover:opacity-100');
-    btn.innerHTML = `<img src="https://${esc(blobHost)}/originals/${esc(s.slug)}/${esc(img)}" alt="${esc(img)}" loading="lazy" class="h-16 w-full object-cover" />`;
+    btn.innerHTML = `<img src="${thumbUrl(blobHost, s.slug, img)}" alt="${esc(img)}" loading="lazy" class="h-16 w-full object-cover" />`;
     btn.title = img;
     btn.addEventListener('click', () => {
       coverInput.value = img;
@@ -241,4 +241,16 @@ function esc(s: string): string {
   const d = document.createElement('div');
   d.textContent = s;
   return d.innerHTML;
+}
+
+const NON_WEB_EXTS = new Set(['.heic', '.heif', '.tif', '.tiff', '.arw', '.nef', '.cr2', '.cr3', '.dng', '.raf']);
+
+function thumbUrl(host: string, slug: string, file: string): string {
+  const ext = file.slice(file.lastIndexOf('.')).toLowerCase();
+  if (NON_WEB_EXTS.has(ext)) {
+    // Prebuild converts these to JPEG in the derivatives container
+    const base = file.slice(0, file.lastIndexOf('.'));
+    return `https://${host}/derivatives/${slug}/${base}.jpg`;
+  }
+  return `https://${host}/originals/${slug}/${file}`;
 }
