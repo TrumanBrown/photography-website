@@ -445,10 +445,12 @@ async function processConvertBlob({ blob, originalsClient, derivativesClient, sl
 }
 
 function blobPublicUrl(containerClient, blobPath) {
-
-  // Generate tiny thumbnails for the admin panel (120px wide, ~3-8KB each).
+  // containerClient.url is like https://acct.blob.core.windows.net/container
+  const base = containerClient.url.replace(/\/$/, '');
+  return `${base}/${blobPath.split('/').map(encodeURIComponent).join('/')}`;
 }
 
+// Generate tiny thumbnails for the admin panel (120px wide, ~3-8KB each).
 async function generateAdminThumbs({ slug, imagesDir, images, containerClient }) {
   const { default: sharp } = await import('sharp');
   const THUMB_WIDTH = 120;
@@ -476,12 +478,6 @@ async function generateAdminThumbs({ slug, imagesDir, images, containerClient })
     }
   }
   if (uploaded > 0) console.log(`  thumbs: ${uploaded} new for ${slug}`);
-}
-
-function blobPublicUrl(containerClient, blobPath) {
-  // containerClient.url is like https://acct.blob.core.windows.net/container
-  const base = containerClient.url.replace(/\/$/, '');
-  return `${base}/${blobPath.split('/').map(encodeURIComponent).join('/')}`;
 }
 
 function sanitizeSlug(prefix) {
