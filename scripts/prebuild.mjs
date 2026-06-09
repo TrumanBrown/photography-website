@@ -97,7 +97,6 @@ async function main() {
       prefix,
       originalsClient,
       derivativesClient,
-      metadataClient,
       service,
       manifest,
       nextManifest,
@@ -171,7 +170,7 @@ async function listSessionPrefixes(originalsClient) {
   return prefixes.sort();
 }
 
-async function processSession({ prefix, originalsClient, derivativesClient, metadataClient, service, manifest, nextManifest }) {
+async function processSession({ prefix, originalsClient, derivativesClient, service, manifest, nextManifest }) {
   const slug = sanitizeSlug(prefix);
   const sessionDir = join(SESSIONS_DIR, slug);
   const imagesDir = join(sessionDir, 'images');

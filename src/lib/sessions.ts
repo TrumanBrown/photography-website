@@ -23,9 +23,9 @@ export function sortSessions(entries: Session[]): Session[] {
   list.sort((a, b) => {
     const ao = a.data.order;
     const bo = b.data.order;
-    if (ao !== undefined && bo !== undefined) return ao - bo;
-    if (ao !== undefined) return -1;
-    if (bo !== undefined) return 1;
+    if (ao != null && bo != null) return ao - bo;
+    if (ao != null) return -1;
+    if (bo != null) return 1;
     return Date.parse(b.data.date) - Date.parse(a.data.date);
   });
   return list;
