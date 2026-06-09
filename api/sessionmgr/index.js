@@ -74,7 +74,11 @@ async function handleGet(context) {
     });
   }
 
-  context.res = { status: 200, headers: json(), body: { ok: true, sessions: sessions } };
+  var blobHost = process.env.AZURE_STORAGE_ACCOUNT
+    ? process.env.AZURE_STORAGE_ACCOUNT + '.blob.core.windows.net'
+    : 'stphotoprodnowiur.blob.core.windows.net';
+
+  context.res = { status: 200, headers: json(), body: { ok: true, sessions: sessions, blobHost: blobHost } };
 }
 
 async function handlePut(context, req) {

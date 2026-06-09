@@ -17,6 +17,7 @@ const form = document.getElementById('edit-form') as HTMLFormElement;
 const toastEl = document.getElementById('toast')!;
 
 let sessions: Session[] = [];
+let blobHost = '';
 
 const signinEl = document.getElementById('admin-signin')!;
 const authedEl = document.getElementById('admin-authed')!;
@@ -60,6 +61,7 @@ async function loadSessions() {
     }
     if (!data.ok) throw new Error(data.error || 'Failed to load sessions.');
     sessions = data.sessions;
+    blobHost = data.blobHost || '';
     renderList();
   } catch (err: any) {
     loadingEl.classList.add('hidden');
@@ -119,16 +121,46 @@ function openEdit(slug: string) {
   const orderEl = document.getElementById('edit-order') as HTMLInputElement;
   orderEl.value = s.order != null ? String(s.order) : '';
 
-  // Populate cover dropdown
-  const coverEl = document.getElementById('edit-cover') as HTMLSelectElement;
-  coverEl.innerHTML = '<option value="">(auto — first image)</option>';
+  // Populate cover thumbnail grid
+  const coverInput = document.getElementById('edit-cover') as HTMLInputElement;
+  const grid = document.getElementById('edit-cover-grid')!;
+  grid.innerHTML = '';
+
+  // "Auto" option
+  const autoBtn = document.createElement('button');
+  autoBtn.type = 'button';
+  autoBtn.className = 'flex h-16 items-center justify-center rounded border-2 text-xs ' +
+    (!s.cover ? 'border-neutral-900 dark:border-white' : 'border-transparent opacity-60 hover:opacity-100');
+  autoBtn.textContent = 'Auto';
+  autoBtn.addEventListener('click', () => {
+    coverInput.value = '';
+    grid.querySelectorAll('button').forEach((b) => {
+      b.className = b.className.replace(/border-neutral-900|dark:border-white/g, 'border-transparent').replace('opacity-60', 'opacity-60');
+    });
+    autoBtn.className = autoBtn.className.replace('border-transparent', 'border-neutral-900 dark:border-white').replace('opacity-60', '');
+  });
+  grid.appendChild(autoBtn);
+
   for (const img of s.images) {
-    const opt = document.createElement('option');
-    opt.value = img;
-    opt.textContent = img;
-    if (img === s.cover) opt.selected = true;
-    coverEl.appendChild(opt);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    const isSelected = img === s.cover;
+    btn.className = 'relative overflow-hidden rounded border-2 ' +
+      (isSelected ? 'border-neutral-900 dark:border-white' : 'border-transparent opacity-60 hover:opacity-100');
+    btn.innerHTML = `<img src="https://${esc(blobHost)}/originals/${esc(s.slug)}/${esc(img)}" alt="${esc(img)}" loading="lazy" class="h-16 w-full object-cover" />`;
+    btn.title = img;
+    btn.addEventListener('click', () => {
+      coverInput.value = img;
+      grid.querySelectorAll('button').forEach((b) => {
+        b.className = b.className.replace(/border-neutral-900|dark:border-white/g, 'border-transparent');
+        if (!b.textContent?.startsWith('Auto')) b.classList.add('opacity-60');
+      });
+      btn.className = btn.className.replace('border-transparent', 'border-neutral-900 dark:border-white').replace('opacity-60', '');
+    });
+    grid.appendChild(btn);
   }
+
+  coverInput.value = s.cover;
 
   document.getElementById('edit-error')!.classList.add('hidden');
   modal.classList.remove('hidden');
@@ -165,7 +197,7 @@ form.addEventListener('submit', async (e) => {
     title: (document.getElementById('edit-title') as HTMLInputElement).value.trim(),
     location: (document.getElementById('edit-location') as HTMLInputElement).value.trim(),
     description: (document.getElementById('edit-description') as HTMLTextAreaElement).value.trim(),
-    cover: (document.getElementById('edit-cover') as HTMLSelectElement).value,
+    cover: (document.getElementById('edit-cover') as HTMLInputElement).value,
     order: orderRaw === '' ? null : parseInt(orderRaw, 10),
   };
 
