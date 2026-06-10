@@ -4,7 +4,9 @@
 
 ## What it does
 
-The admin page at `https://trumanbrown.com/admin` lets you edit session metadata without touching VS Code:
+The admin page at `https://trumanbrown.com/admin` has two tabs:
+
+### Sessions tab — edit session metadata
 
 - **Title** — the display name shown on cards and the session page.
 - **Cover / thumbnail** — which image from the session to use as the card image on the home page.
@@ -13,6 +15,10 @@ The admin page at `https://trumanbrown.com/admin` lets you edit session metadata
 - **Display order** — explicit sort priority (lower numbers first; blank = sort by date).
 
 Changes are written to a `_session.json` sidecar file in `originals/<session>/` in Blob Storage. Click **Rebuild Site** to deploy changes (~5 min), or wait for the hourly cron.
+
+### Messages tab — read contact form submissions
+
+Read-only view of messages submitted through the contact form, newest first. Shows name, email (as a `mailto:` link), message, and timestamp. Useful on mobile since the Azure portal app can't browse Table Storage. No write/delete actions — manage or delete messages via Storage Explorer / the portal.
 
 ## How to use it
 
@@ -70,9 +76,12 @@ Browser ──PUT /api/sessionmgr──▶ SWA Functions ──▶ check x-ms-cl
                                Next build reads
                                _session.json sidecar
                                ──▶ site updated
+
+Browser ──GET /api/sessionmgr?type=messages──▶ SWA Functions ──▶ check principal
+         ──▶ Table Storage (read contactmessages, newest first)
 ```
 
-The API function ([`api/sessionmgr/index.js`](../api/sessionmgr/index.js)) uses the same `AZURE_STORAGE_CONNECTION_STRING` env var as the contact form function to access Blob Storage.
+The API function ([`api/sessionmgr/index.js`](../api/sessionmgr/index.js)) uses the same `AZURE_STORAGE_CONNECTION_STRING` env var as the contact form function. It accesses Blob Storage for sessions and Table Storage (`contactmessages`) for the read-only Messages tab.
 
 ### Thumbnail performance
 

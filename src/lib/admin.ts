@@ -60,6 +60,90 @@ document.getElementById('rebuild-btn')!.addEventListener('click', async () => {
   }
 });
 
+// Tab switching
+const tabSessions = document.getElementById('tab-sessions')!;
+const tabMessages = document.getElementById('tab-messages')!;
+const panelSessions = document.getElementById('panel-sessions')!;
+const panelMessages = document.getElementById('panel-messages')!;
+const activeTabClass = 'border-neutral-900 dark:border-white';
+const inactiveTabClass = 'border-transparent text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200';
+let messagesLoaded = false;
+
+function selectTab(tab: 'sessions' | 'messages') {
+  if (tab === 'sessions') {
+    panelSessions.classList.remove('hidden');
+    panelMessages.classList.add('hidden');
+    tabSessions.className = 'border-b-2 px-4 py-2 text-sm font-medium ' + activeTabClass;
+    tabMessages.className = 'border-b-2 px-4 py-2 text-sm font-medium ' + inactiveTabClass;
+  } else {
+    panelMessages.classList.remove('hidden');
+    panelSessions.classList.add('hidden');
+    tabMessages.className = 'border-b-2 px-4 py-2 text-sm font-medium ' + activeTabClass;
+    tabSessions.className = 'border-b-2 px-4 py-2 text-sm font-medium ' + inactiveTabClass;
+    if (!messagesLoaded) {
+      messagesLoaded = true;
+      loadMessages();
+    }
+  }
+}
+
+tabSessions.addEventListener('click', () => selectTab('sessions'));
+tabMessages.addEventListener('click', () => selectTab('messages'));
+
+interface Message {
+  id: string;
+  name: string;
+  email: string;
+  message: string;
+  submittedAt: string;
+  read: boolean;
+}
+
+async function loadMessages() {
+  const loading = document.getElementById('messages-loading')!;
+  const error = document.getElementById('messages-error')!;
+  const list = document.getElementById('messages-list')!;
+  try {
+    const res = await fetch('/api/sessionmgr?type=messages');
+    if (res.status === 403) {
+      loading.classList.add('hidden');
+      error.textContent = 'Access denied.';
+      error.classList.remove('hidden');
+      return;
+    }
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Failed to load messages.');
+
+    loading.classList.add('hidden');
+    list.classList.remove('hidden');
+    list.innerHTML = '';
+
+    if (!data.messages.length) {
+      list.innerHTML = '<li class="py-10 text-center text-neutral-500 dark:text-neutral-400">No messages yet.</li>';
+      return;
+    }
+
+    for (const m of data.messages as Message[]) {
+      const li = document.createElement('li');
+      li.className = 'rounded-lg border border-neutral-200 p-4 dark:border-neutral-700';
+      const when = m.submittedAt ? new Date(m.submittedAt).toLocaleString() : '';
+      li.innerHTML = `
+        <div class="mb-1 flex flex-wrap items-baseline justify-between gap-2">
+          <span class="font-medium">${esc(m.name)}</span>
+          <span class="text-xs text-neutral-500 dark:text-neutral-400">${esc(when)}</span>
+        </div>
+        <a href="mailto:${esc(m.email)}" class="text-sm text-neutral-600 hover:underline dark:text-neutral-400">${esc(m.email)}</a>
+        <p class="mt-2 whitespace-pre-wrap text-sm text-neutral-800 dark:text-neutral-200">${esc(m.message)}</p>
+      `;
+      list.appendChild(li);
+    }
+  } catch (err: any) {
+    loading.classList.add('hidden');
+    error.textContent = err.message;
+    error.classList.remove('hidden');
+  }
+}
+
 async function loadSessions() {
   try {
     const res = await fetch('/api/sessionmgr');

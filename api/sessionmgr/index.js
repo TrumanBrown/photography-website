@@ -1,7 +1,9 @@
 let BlobServiceClient;
+let TableClient;
 
 const CONTAINER = 'originals';
 const SESSION_JSON = '_session.json';
+const MESSAGES_TABLE = 'contactmessages';
 const MAX_TITLE = 200;
 const MAX_LOCATION = 200;
 const MAX_DESCRIPTION = 1000;
@@ -28,6 +30,54 @@ function getService() {
     BlobServiceClient = require('@azure/storage-blob').BlobServiceClient;
   }
   return BlobServiceClient.fromConnectionString(conn);
+}
+
+function getTableClient() {
+  const conn = process.env.AZURE_STORAGE_CONNECTION_STRING;
+  if (!conn) return null;
+  if (!TableClient) {
+    TableClient = require('@azure/data-tables').TableClient;
+  }
+  return TableClient.fromConnectionString(conn, MESSAGES_TABLE);
+}
+
+// ---------------------------------------------------------------------------
+// GET /api/sessionmgr?type=messages — list contact form submissions (read-only)
+// ---------------------------------------------------------------------------
+async function handleGetMessages(context) {
+  const client = getTableClient();
+  if (!client) {
+    context.res = { status: 500, headers: json(), body: { ok: false, error: 'Storage not configured.' } };
+    return;
+  }
+
+  const messages = [];
+  try {
+    // Row keys are reverse-timestamped, so entities sort newest-first per
+    // partition. We sort the combined list explicitly to be safe.
+    for await (const entity of client.listEntities()) {
+      messages.push({
+        id: (entity.partitionKey || '') + '|' + (entity.rowKey || ''),
+        name: entity.name || '',
+        email: entity.email || '',
+        message: entity.message || '',
+        submittedAt: entity.submittedAt || '',
+        read: entity.read === true,
+      });
+    }
+  } catch (e) {
+    if (e.statusCode === 404) {
+      // Table doesn't exist yet (no messages ever submitted).
+      context.res = { status: 200, headers: json(), body: { ok: true, messages: [] } };
+      return;
+    }
+    context.log.error('listEntities failed:', e.message);
+    context.res = { status: 500, headers: json(), body: { ok: false, error: 'Failed to read messages.' } };
+    return;
+  }
+
+  messages.sort((a, b) => (b.submittedAt || '').localeCompare(a.submittedAt || ''));
+  context.res = { status: 200, headers: json(), body: { ok: true, messages: messages } };
 }
 
 async function handleGet(context) {
@@ -206,7 +256,12 @@ module.exports = async function (context, req) {
     }
 
     if (req.method === 'GET') {
-      await handleGet(context);
+      var type = (req.query && req.query.type) || '';
+      if (type === 'messages') {
+        await handleGetMessages(context);
+      } else {
+        await handleGet(context);
+      }
     } else if (req.method === 'PUT') {
       await handlePut(context, req);
     } else if (req.method === 'POST') {
