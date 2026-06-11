@@ -504,6 +504,7 @@ async function generateAdminThumbs({ slug, imagesDir, images, containerClient })
     } catch (_) {}
     try {
       const buf = await sharp(src)
+        .rotate() // apply EXIF orientation so portrait photos aren't sideways
         .resize({ width: THUMB_WIDTH, withoutEnlargement: true })
         .jpeg({ quality: 50, mozjpeg: true })
         .toBuffer();
