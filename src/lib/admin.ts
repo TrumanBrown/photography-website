@@ -1,5 +1,6 @@
 interface Session {
   slug: string;
+  thumbSlug: string;
   title: string;
   date: string;
   location: string;
@@ -283,7 +284,18 @@ function renderList() {
     return;
   }
 
-  for (const s of sessions) {
+  // Match the public site's "orderThenDateDesc" policy: explicit order first
+  // (ascending), then by date descending (newest first).
+  const ordered = [...sessions].sort((a, b) => {
+    const ao = a.order;
+    const bo = b.order;
+    if (ao != null && bo != null) return ao - bo;
+    if (ao != null) return -1;
+    if (bo != null) return 1;
+    return (b.date || '').localeCompare(a.date || '');
+  });
+
+  for (const s of ordered) {
     const li = document.createElement('li');
     li.className =
       'flex items-center justify-between gap-4 rounded-lg border border-neutral-200 p-4 dark:border-neutral-700';
@@ -349,7 +361,7 @@ function openEdit(slug: string) {
     const isSelected = img === s.cover;
     btn.className = 'relative overflow-hidden rounded border-2 ' +
       (isSelected ? 'border-neutral-900 dark:border-white' : 'border-transparent opacity-60 hover:opacity-100');
-    btn.innerHTML = `<img src="${thumbUrl(blobHost, s.slug, img)}" alt="${esc(img)}" loading="lazy" class="h-16 w-full object-cover" />`;
+    btn.innerHTML = `<img src="${thumbUrl(blobHost, s.thumbSlug, img)}" alt="${esc(img)}" loading="lazy" class="h-16 w-full object-cover" />`;
     btn.title = img;
     btn.addEventListener('click', () => {
       coverInput.value = img;

@@ -5,6 +5,8 @@ const CONTAINER = 'originals';
 const SESSION_JSON = '_session.json';
 const MESSAGES_TABLE = 'contactmessages';
 const PAGEVIEWS_TABLE = 'pageviews';
+const METADATA = 'metadata';
+const ADMIN_INDEX = 'admin-index.json';
 const MAX_TITLE = 200;
 const MAX_LOCATION = 200;
 const MAX_DESCRIPTION = 1000;
@@ -200,6 +202,39 @@ async function handleGet(context) {
     return;
   }
 
+  var blobHost = process.env.AZURE_STORAGE_ACCOUNT
+    ? process.env.AZURE_STORAGE_ACCOUNT + '.blob.core.windows.net'
+    : 'stphotoprodnowiur.blob.core.windows.net';
+
+  // Preferred path: read the consolidated admin index written by prebuild. It
+  // has the SAME resolved metadata as the public site (including EXIF-derived
+  // dates) and is a single fast read. Fall back to scanning originals/ if the
+  // index doesn't exist yet (e.g. before the first build with this feature).
+  try {
+    const metaClient = service.getContainerClient(METADATA);
+    const buf = await metaClient.getBlobClient(ADMIN_INDEX).downloadToBuffer();
+    const index = JSON.parse(buf.toString('utf8'));
+    const sessions = (index.sessions || []).map(function (s) {
+      return {
+        slug: s.prefix || s.slug,
+        thumbSlug: s.slug,
+        title: s.title || '',
+        date: s.date || '',
+        location: s.location || '',
+        description: s.description || '',
+        cover: s.cover || '',
+        order: s.order != null ? s.order : null,
+        images: s.images || [],
+      };
+    });
+    context.res = { status: 200, headers: json(), body: { ok: true, sessions: sessions, blobHost: blobHost } };
+    return;
+  } catch (e) {
+    if (e.statusCode !== 404) {
+      context.log.warn('admin-index read failed, falling back to scan:', e.message);
+    }
+  }
+
   const container = service.getContainerClient(CONTAINER);
   const prefixes = new Set();
   const imagesByPrefix = {};
@@ -227,6 +262,9 @@ async function handleGet(context) {
     const images = (imagesByPrefix[prefix] || []).sort();
     sessions.push({
       slug: prefix,
+      // Sanitized slug matches prebuild's output — used for thumbnail URLs in
+      // variants/thumbs/<thumbSlug>/ and the public /sessions/<thumbSlug> path.
+      thumbSlug: sanitizeSlug(prefix),
       title: sidecar.title || humanize(prefix),
       date: sidecar.date || '',
       location: sidecar.location || '',
@@ -236,10 +274,6 @@ async function handleGet(context) {
       images: images,
     });
   }
-
-  var blobHost = process.env.AZURE_STORAGE_ACCOUNT
-    ? process.env.AZURE_STORAGE_ACCOUNT + '.blob.core.windows.net'
-    : 'stphotoprodnowiur.blob.core.windows.net';
 
   context.res = { status: 200, headers: json(), body: { ok: true, sessions: sessions, blobHost: blobHost } };
 }
@@ -396,4 +430,15 @@ function json() {
 
 function humanize(slug) {
   return slug.replace(/[-_]+/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); });
+}
+
+// Mirrors scripts/prebuild.mjs sanitizeSlug() so thumbnail URLs and public
+// session paths match what prebuild generated (lowercase, dash-separated).
+function sanitizeSlug(prefix) {
+  return prefix
+    .toLowerCase()
+    .replace(/[^a-z0-9-_/]+/g, '-')
+    .replace(/\/+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
 }

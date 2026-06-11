@@ -92,8 +92,9 @@ async function main() {
   const sessionPrefixes = await listSessionPrefixes(originalsClient);
   console.log(`Found ${sessionPrefixes.length} session(s) in originals/`);
 
+  const indexRecords = [];
   for (const prefix of sessionPrefixes) {
-    await processSession({
+    const rec = await processSession({
       prefix,
       originalsClient,
       derivativesClient,
@@ -101,10 +102,35 @@ async function main() {
       manifest,
       nextManifest,
     });
+    if (rec) indexRecords.push(rec);
   }
 
   await saveManifest(metadataClient, nextManifest);
+  await writeAdminIndex(metadataClient, indexRecords);
   console.log('Prebuild complete.');
+}
+
+// Write a consolidated index of resolved session metadata to the (private)
+// metadata container. The admin API reads this single blob so it sees the
+// SAME resolved values as the public site — including EXIF-derived dates that
+// don't live in the _session.json sidecar. Far fewer reads than scanning.
+async function writeAdminIndex(metadataClient, records) {
+  try {
+    const sorted = [...records].sort((a, b) => {
+      if (a.order != null && b.order != null) return a.order - b.order;
+      if (a.order != null) return -1;
+      if (b.order != null) return 1;
+      return (b.date || '').localeCompare(a.date || '');
+    });
+    const data = JSON.stringify({ generatedAt: new Date().toISOString(), sessions: sorted }, null, 2);
+    const blob = metadataClient.getBlockBlobClient('admin-index.json');
+    await blob.upload(data, Buffer.byteLength(data), {
+      blobHTTPHeaders: { blobContentType: 'application/json' },
+    });
+    console.log(`admin-index.json written (${sorted.length} sessions).`);
+  } catch (e) {
+    console.warn('Could not write admin-index.json:', e.message);
+  }
 }
 
 async function runLocalOnly() {
@@ -318,6 +344,19 @@ async function processSession({ prefix, originalsClient, derivativesClient, serv
     const variantsClient = service.getContainerClient('variants');
     await generateAdminThumbs({ slug, imagesDir, images: orderedImages, containerClient: variantsClient });
   }
+
+  // Return a resolved summary for the admin index (see writeAdminIndex).
+  return {
+    prefix, // raw originals/ folder name (used for blob read/write)
+    slug, // sanitized slug (thumbnail URLs + public /sessions path)
+    title: sessionRecord.title,
+    date: sessionRecord.date,
+    location: sessionRecord.location,
+    description: sessionRecord.description,
+    cover: sessionRecord.cover ?? '',
+    order: sessionRecord.order ?? null,
+    images: orderedImages.map((i) => i.file),
+  };
 }
 
 async function processStandardBlob({ blob, originalsClient, localPath, cacheKey }) {

@@ -17,7 +17,7 @@ Static Astro site deployed to **Azure Static Web Apps** (Free tier). Photos in *
 | `originals/` | Blob (anon read of known URLs, no list) | Source-of-truth uploads. JPG/HEIC/RAW. |
 | `derivatives/` | Blob | JPEG sidecars from RAW/HEIC sources, written by prebuild with a `source-etag` metadata tag for cache invalidation. |
 | `variants/` | Blob | Astro responsive WebP/JPEG outputs, moved here by [scripts/sync-variants.mjs](../scripts/sync-variants.mjs) after each build. Also stores admin thumbnails under `thumbs/<slug>/`. **Critical for staying under SWA Free's 250 MB app cap** — without this, ~50-photo sessions blow the limit. |
-| `metadata/` | Private | Prebuild's `manifest.json` (blob name → etag + target). Reserved for future admin app state. |
+| `metadata/` | Private | Prebuild's `manifest.json` (blob name → etag + target) and `admin-index.json` (resolved session metadata the admin panel reads — see lesson 19). |
 
 ## GitHub Actions secrets
 
@@ -60,6 +60,7 @@ Set in Azure Portal → Static Web App → Environment variables:
 16. **SWA permanently caches broken function state.** If a function crashes on first deploy, it stays 404 even after code fixes. The only fix is renaming the function folder to force SWA to re-register it from scratch.
 17. **SWA `responseOverrides` for 401 is global** — applies to API routes too, breaking `fetch()` calls by redirecting to an HTML login page. Fix: don't use route-level auth on API endpoints; do server-side identity checks via the `x-ms-client-principal` header.
 18. **Admin API writing `"order": null` broke the Zod schema.** `z.number().int().optional()` rejects `null` (only allows `undefined` / missing). Prebuild then copies that null into the session JSON, failing the Astro build. Fix: schema accepts `.nullable()`, API deletes the key instead of writing null, prebuild uses `!= null` guard.
+19. **Admin showed broken thumbnails + wrong order for mixed-case folder names.** A session uploaded as `Shanghai-city-...` (mixed case) stored thumbnails under the prebuild-sanitized lowercase slug (`shanghai-city-...`), but the admin built thumbnail URLs from the raw folder name → 404. Also, the admin read dates from the `_session.json` sidecar, which usually has *no* date (dates are EXIF-derived by prebuild and only written to the generated session JSON), so sort order diverged from the public site. Fix: prebuild now writes `metadata/admin-index.json` with fully-resolved metadata (raw `prefix` for blob read/write + sanitized `slug` for thumbnail URLs + EXIF date). The admin API reads that single file (falls back to the originals scan if absent). The admin client uses `thumbSlug` for thumbnail URLs and sorts with the same `orderThenDateDesc` policy as the public site.
 
 ## Admin panel
 
