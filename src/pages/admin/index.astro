@@ -44,6 +44,11 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
           type="button"
           class="border-b-2 border-transparent px-4 py-2 text-sm font-medium text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200"
         >Messages</button>
+        <button
+          id="tab-analytics"
+          type="button"
+          class="border-b-2 border-transparent px-4 py-2 text-sm font-medium text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200"
+        >Analytics</button>
       </div>
 
       <!-- Sessions panel -->
@@ -62,6 +67,41 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
         </div>
         <div id="messages-error" class="hidden rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-300"></div>
         <ul id="messages-list" class="hidden space-y-3"></ul>
+      </div>
+
+      <!-- Analytics panel -->
+      <div id="panel-analytics" class="hidden">
+        <div id="analytics-loading" class="py-20 text-center text-neutral-500 dark:text-neutral-400">
+          Loading analytics…
+        </div>
+        <div id="analytics-error" class="hidden rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-300"></div>
+        <div id="analytics-content" class="hidden space-y-6">
+          <div class="flex items-center justify-end">
+            <label class="text-sm text-neutral-500 dark:text-neutral-400">
+              Range:
+              <select id="analytics-range" class="ml-2 rounded border border-neutral-300 bg-white px-2 py-1 text-sm dark:border-neutral-600 dark:bg-neutral-800">
+                <option value="7">Last 7 days</option>
+                <option value="30" selected>Last 30 days</option>
+                <option value="90">Last 90 days</option>
+              </select>
+            </label>
+          </div>
+          <div id="analytics-cards" class="grid grid-cols-1 gap-3 sm:grid-cols-3"></div>
+          <div>
+            <h3 class="mb-2 text-sm font-semibold text-neutral-500 dark:text-neutral-400">Pageviews per day</h3>
+            <div id="analytics-chart" class="flex h-32 items-end gap-0.5 rounded border border-neutral-200 p-2 dark:border-neutral-700"></div>
+          </div>
+          <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+            <div>
+              <h3 class="mb-2 text-sm font-semibold text-neutral-500 dark:text-neutral-400">Top pages</h3>
+              <ul id="analytics-pages" class="space-y-1 text-sm"></ul>
+            </div>
+            <div>
+              <h3 class="mb-2 text-sm font-semibold text-neutral-500 dark:text-neutral-400">Top referrers</h3>
+              <ul id="analytics-referrers" class="space-y-1 text-sm"></ul>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 

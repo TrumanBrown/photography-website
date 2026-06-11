@@ -10,7 +10,16 @@ The site has no public logins and no user database. An `/admin` panel exists but
 - Send strong HTTP security headers so visitors' browsers refuse to be misused.
 - Gate admin routes behind SWA role-based auth (GitHub OAuth, invite-only `admin` role).
 - Use short-lived, narrowly-scoped credentials everywhere (OIDC federation, no long-lived secrets).
+- Collect analytics **without storing any PII** (no IP, no cookies — see [docs/analytics.md](analytics.md)).
 - Be honest about what's worth defending vs. what would just inflate the bill.
+
+### Analytics endpoint
+
+`/api/track` is an anonymous POST endpoint that records pageviews. It is hardened against abuse and privacy issues:
+- **No PII stored.** Unique visitors are counted via a daily-salted `sha256(ip + ua + date + salt)` hash; the raw IP is never persisted. No cookies or persistent client identifiers.
+- **Input is bounded and sanitized** (path/referrer length caps, duration sanity range, bot-UA filtering). Referrers are reduced to hostname only.
+- **Fails silently** — the function always returns 204 and never surfaces errors to the page, so analytics can't break the site.
+- Worst-case abuse is a flood of fake pageview rows in the `pageviews` table (cosmetic, cheap to clear). No data exposure, no write access to anything else.
 
 ---
 

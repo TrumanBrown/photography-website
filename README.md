@@ -17,6 +17,7 @@ Personal photography portfolio. Photos live in Azure Blob Storage; the website i
 | How the GitHub Actions workflows work and why | [docs/cicd.md](docs/cicd.md) |
 | How a photo travels from your camera to the live site | [docs/image-pipeline.md](docs/image-pipeline.md) |
 | Editing session metadata from the browser (`/admin`) | [docs/admin.md](docs/admin.md) |
+| Privacy-friendly traffic analytics (`/admin` Analytics tab) | [docs/analytics.md](docs/analytics.md) |
 | How the site is hardened (CSP, HSTS, etc.) | [docs/security.md](docs/security.md) |
 | Running locally — npm, dev server, fixtures | [docs/local-dev.md](docs/local-dev.md) |
 | **What personal info ends up in the public repo (and what doesn't)** | [docs/privacy.md](docs/privacy.md) |

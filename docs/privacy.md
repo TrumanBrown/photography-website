@@ -67,7 +67,7 @@ The only true credentials with broad blast radius are:
 | Your domain registration's WHOIS record | Azure's registrar partner (GoDaddy under the hood). Privacy protection on by default → your real address is hidden from public WHOIS lookups but still on file with the registrar. |
 | The bootstrap managed identity's principal ID | Azure RBAC tables. |
 | Your actual photos | The `originals` + `derivatives` containers in Blob Storage. **Anyone who knows the URL can read individual blobs.** The container itself cannot be listed by anonymous users — there's no directory index, so URLs cannot be enumerated. |
-| Site analytics (pageviews) | Application Insights → Log Analytics workspace. App Insights snippet respects `navigator.doNotTrack`. |
+| Site analytics (pageviews) | Custom privacy-friendly pipeline → `pageviews` table in Table Storage. No IP and no cookies stored; unique visitors counted via a daily-rotating salted hash. See [docs/analytics.md](analytics.md). |
 
 ## What is published to **the public website**
 
@@ -79,10 +79,10 @@ The only true credentials with broad blast radius are:
 
 ## Specifically NOT collected, exposed, or stored
 
-- No visitor IP addresses are stored (Azure CDN logs them only briefly for security; not surfaced to you).
-- No visitor cookies.
+- No visitor IP addresses are stored. The analytics endpoint uses the IP only to compute a daily-salted hash for unique-visitor counting, then discards it; the raw IP is never persisted.
+- No visitor cookies (analytics uses an ephemeral `sessionStorage` id only, cleared when the tab closes).
 - No visitor accounts (there are no accounts).
-- No third-party analytics scripts (just Microsoft's own App Insights).
+- No third-party analytics scripts — analytics is self-hosted in your own Azure Table Storage, nothing leaves your tenant.
 - No third-party ad networks.
 - No payment info.
 

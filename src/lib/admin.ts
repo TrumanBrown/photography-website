@@ -63,32 +63,129 @@ document.getElementById('rebuild-btn')!.addEventListener('click', async () => {
 // Tab switching
 const tabSessions = document.getElementById('tab-sessions')!;
 const tabMessages = document.getElementById('tab-messages')!;
+const tabAnalytics = document.getElementById('tab-analytics')!;
 const panelSessions = document.getElementById('panel-sessions')!;
 const panelMessages = document.getElementById('panel-messages')!;
+const panelAnalytics = document.getElementById('panel-analytics')!;
 const activeTabClass = 'border-neutral-900 dark:border-white';
 const inactiveTabClass = 'border-transparent text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200';
 let messagesLoaded = false;
+let analyticsLoaded = false;
 
-function selectTab(tab: 'sessions' | 'messages') {
-  if (tab === 'sessions') {
-    panelSessions.classList.remove('hidden');
-    panelMessages.classList.add('hidden');
-    tabSessions.className = 'border-b-2 px-4 py-2 text-sm font-medium ' + activeTabClass;
-    tabMessages.className = 'border-b-2 px-4 py-2 text-sm font-medium ' + inactiveTabClass;
-  } else {
-    panelMessages.classList.remove('hidden');
-    panelSessions.classList.add('hidden');
-    tabMessages.className = 'border-b-2 px-4 py-2 text-sm font-medium ' + activeTabClass;
-    tabSessions.className = 'border-b-2 px-4 py-2 text-sm font-medium ' + inactiveTabClass;
-    if (!messagesLoaded) {
-      messagesLoaded = true;
-      loadMessages();
-    }
+function selectTab(tab: 'sessions' | 'messages' | 'analytics') {
+  const tabs = [
+    { name: 'sessions', el: tabSessions, panel: panelSessions },
+    { name: 'messages', el: tabMessages, panel: panelMessages },
+    { name: 'analytics', el: tabAnalytics, panel: panelAnalytics },
+  ];
+  for (const t of tabs) {
+    const active = t.name === tab;
+    t.panel.classList.toggle('hidden', !active);
+    t.el.className = 'border-b-2 px-4 py-2 text-sm font-medium ' + (active ? activeTabClass : inactiveTabClass);
+  }
+  if (tab === 'messages' && !messagesLoaded) {
+    messagesLoaded = true;
+    loadMessages();
+  }
+  if (tab === 'analytics' && !analyticsLoaded) {
+    analyticsLoaded = true;
+    loadAnalytics();
   }
 }
 
 tabSessions.addEventListener('click', () => selectTab('sessions'));
 tabMessages.addEventListener('click', () => selectTab('messages'));
+tabAnalytics.addEventListener('click', () => selectTab('analytics'));
+
+document.getElementById('analytics-range')!.addEventListener('change', () => loadAnalytics());
+
+interface AnalyticsData {
+  days: number;
+  totalPageviews: number;
+  uniqueVisitors: number;
+  avgTimeOnPageMs: number;
+  series: { date: string; views: number }[];
+  topPages: { path: string; count: number }[];
+  topReferrers: { ref: string; count: number }[];
+}
+
+function fmtDuration(ms: number): string {
+  if (!ms) return '—';
+  const s = Math.round(ms / 1000);
+  if (s < 60) return s + 's';
+  const m = Math.floor(s / 60);
+  return m + 'm ' + (s % 60) + 's';
+}
+
+async function loadAnalytics() {
+  const loading = document.getElementById('analytics-loading')!;
+  const error = document.getElementById('analytics-error')!;
+  const content = document.getElementById('analytics-content')!;
+  const range = (document.getElementById('analytics-range') as HTMLSelectElement).value;
+  loading.classList.remove('hidden');
+  error.classList.add('hidden');
+  try {
+    const res = await fetch('/api/sessionmgr?type=analytics&days=' + encodeURIComponent(range));
+    if (res.status === 403) {
+      loading.classList.add('hidden');
+      error.textContent = 'Access denied.';
+      error.classList.remove('hidden');
+      return;
+    }
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Failed to load analytics.');
+    renderAnalytics(data.analytics as AnalyticsData);
+    loading.classList.add('hidden');
+    content.classList.remove('hidden');
+  } catch (err: any) {
+    loading.classList.add('hidden');
+    error.textContent = err.message;
+    error.classList.remove('hidden');
+  }
+}
+
+function renderAnalytics(a: AnalyticsData) {
+  const cards = document.getElementById('analytics-cards')!;
+  const card = (label: string, value: string) =>
+    `<div class="rounded-lg border border-neutral-200 p-4 dark:border-neutral-700">
+      <p class="text-2xl font-semibold">${esc(value)}</p>
+      <p class="mt-1 text-sm text-neutral-500 dark:text-neutral-400">${esc(label)}</p>
+    </div>`;
+  cards.innerHTML =
+    card('Pageviews', a.totalPageviews.toLocaleString()) +
+    card('Unique visitors', a.uniqueVisitors.toLocaleString()) +
+    card('Avg. time on page', fmtDuration(a.avgTimeOnPageMs));
+
+  // Bar chart
+  const chart = document.getElementById('analytics-chart')!;
+  const max = Math.max(1, ...a.series.map((d) => d.views));
+  chart.innerHTML = a.series
+    .map((d) => {
+      const h = Math.round((d.views / max) * 100);
+      return `<div class="flex-1 bg-neutral-300 dark:bg-neutral-600" style="height:${Math.max(2, h)}%" title="${esc(d.date)}: ${d.views} views"></div>`;
+    })
+    .join('');
+
+  const pages = document.getElementById('analytics-pages')!;
+  pages.innerHTML = a.topPages.length
+    ? a.topPages
+        .map(
+          (p) =>
+            `<li class="flex justify-between gap-2"><span class="truncate text-neutral-700 dark:text-neutral-300">${esc(p.path)}</span><span class="shrink-0 text-neutral-500">${p.count}</span></li>`,
+        )
+        .join('')
+    : '<li class="text-neutral-500 dark:text-neutral-400">No data yet.</li>';
+
+  const refs = document.getElementById('analytics-referrers')!;
+  refs.innerHTML = a.topReferrers.length
+    ? a.topReferrers
+        .map(
+          (r) =>
+            `<li class="flex justify-between gap-2"><span class="truncate text-neutral-700 dark:text-neutral-300">${esc(r.ref)}</span><span class="shrink-0 text-neutral-500">${r.count}</span></li>`,
+        )
+        .join('')
+    : '<li class="text-neutral-500 dark:text-neutral-400">No referrers (direct visits).</li>';
+}
 
 interface Message {
   id: string;

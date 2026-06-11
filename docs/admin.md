@@ -4,7 +4,7 @@
 
 ## What it does
 
-The admin page at `https://trumanbrown.com/admin` has two tabs:
+The admin page at `https://trumanbrown.com/admin` has three tabs:
 
 ### Sessions tab — edit session metadata
 
@@ -19,6 +19,10 @@ Changes are written to a `_session.json` sidecar file in `originals/<session>/` 
 ### Messages tab — read contact form submissions
 
 Read-only view of messages submitted through the contact form, newest first. Shows name, email (as a `mailto:` link), message, and timestamp. Useful on mobile since the Azure portal app can't browse Table Storage. No write/delete actions — manage or delete messages via Storage Explorer / the portal.
+
+### Analytics tab — privacy-friendly traffic metrics
+
+Read-only view of site traffic: pageviews, unique visitors, average time on page, a pageviews-per-day chart, top pages, and top referrers (last 7/30/90 days). No cookies, no third parties, no IP stored. See [docs/analytics.md](analytics.md) for the full privacy model and how it works.
 
 ## How to use it
 

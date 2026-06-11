@@ -4,6 +4,7 @@ let TableClient;
 const CONTAINER = 'originals';
 const SESSION_JSON = '_session.json';
 const MESSAGES_TABLE = 'contactmessages';
+const PAGEVIEWS_TABLE = 'pageviews';
 const MAX_TITLE = 200;
 const MAX_LOCATION = 200;
 const MAX_DESCRIPTION = 1000;
@@ -39,6 +40,118 @@ function getTableClient() {
     TableClient = require('@azure/data-tables').TableClient;
   }
   return TableClient.fromConnectionString(conn, MESSAGES_TABLE);
+}
+
+function getPageviewsClient() {
+  const conn = process.env.AZURE_STORAGE_CONNECTION_STRING;
+  if (!conn) return null;
+  if (!TableClient) {
+    TableClient = require('@azure/data-tables').TableClient;
+  }
+  return TableClient.fromConnectionString(conn, PAGEVIEWS_TABLE);
+}
+
+// ---------------------------------------------------------------------------
+// GET /api/sessionmgr?type=analytics&days=30 — aggregated traffic metrics
+// ---------------------------------------------------------------------------
+async function handleGetAnalytics(context, req) {
+  const client = getPageviewsClient();
+  if (!client) {
+    context.res = { status: 500, headers: json(), body: { ok: false, error: 'Storage not configured.' } };
+    return;
+  }
+
+  let days = parseInt((req.query && req.query.days) || '30', 10);
+  if (!Number.isFinite(days) || days < 1) days = 30;
+  if (days > 365) days = 365;
+
+  // Build the inclusive set of date-partition keys for the range.
+  const dayKeys = [];
+  for (let i = 0; i < days; i++) {
+    const d = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+    dayKeys.push('pv-' + d);
+  }
+  const minKey = dayKeys[dayKeys.length - 1];
+  const maxKey = dayKeys[0];
+
+  let totalPageviews = 0;
+  const visitors = new Set();
+  const byDay = {};
+  const byPath = {};
+  const byRef = {};
+  let durSum = 0;
+  let durCount = 0;
+
+  try {
+    const filter = `PartitionKey ge '${minKey}' and PartitionKey le '${maxKey}'`;
+    for await (const e of client.listEntities({ queryOptions: { filter } })) {
+      const day = (e.partitionKey || '').replace(/^pv-/, '');
+      if (e.type === 'dur') {
+        if (typeof e.dur === 'number') { durSum += e.dur; durCount++; }
+        continue;
+      }
+      // pageview row
+      totalPageviews++;
+      byDay[day] = (byDay[day] || 0) + 1;
+      if (e.vh) visitors.add(e.vh);
+      const p = e.path || '/';
+      byPath[p] = (byPath[p] || 0) + 1;
+      if (e.ref) byRef[e.ref] = (byRef[e.ref] || 0) + 1;
+    }
+  } catch (e) {
+    if (e.statusCode === 404) {
+      context.res = { status: 200, headers: json(), body: { ok: true, analytics: emptyAnalytics(dayKeys) } };
+      return;
+    }
+    context.log.error('analytics query failed:', e.message);
+    context.res = { status: 500, headers: json(), body: { ok: false, error: 'Failed to read analytics.' } };
+    return;
+  }
+
+  // Time series oldest -> newest.
+  const series = dayKeys
+    .map((k) => k.replace(/^pv-/, ''))
+    .reverse()
+    .map((d) => ({ date: d, views: byDay[d] || 0 }));
+
+  const topPages = Object.entries(byPath)
+    .map(([path, count]) => ({ path, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10);
+
+  const topReferrers = Object.entries(byRef)
+    .map(([ref, count]) => ({ ref, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10);
+
+  context.res = {
+    status: 200,
+    headers: json(),
+    body: {
+      ok: true,
+      analytics: {
+        days,
+        totalPageviews,
+        uniqueVisitors: visitors.size,
+        avgTimeOnPageMs: durCount ? Math.round(durSum / durCount) : 0,
+        series,
+        topPages,
+        topReferrers,
+      },
+    },
+  };
+}
+
+function emptyAnalytics(dayKeys) {
+  return {
+    days: dayKeys.length,
+    totalPageviews: 0,
+    uniqueVisitors: 0,
+    avgTimeOnPageMs: 0,
+    series: dayKeys.map((k) => k.replace(/^pv-/, '')).reverse().map((d) => ({ date: d, views: 0 })),
+    topPages: [],
+    topReferrers: [],
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -259,6 +372,8 @@ module.exports = async function (context, req) {
       var type = (req.query && req.query.type) || '';
       if (type === 'messages') {
         await handleGetMessages(context);
+      } else if (type === 'analytics') {
+        await handleGetAnalytics(context, req);
       } else {
         await handleGet(context);
       }
