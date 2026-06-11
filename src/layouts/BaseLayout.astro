@@ -46,7 +46,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? `https://${siteConfi
   <body class="min-h-screen">
     <div class="flex min-h-screen lg:flex-row">
       <SessionNav activeSlug={activeSlug} />
-      <div class="flex min-h-screen flex-1 flex-col lg:min-w-0">
+      <div class="flex min-h-screen min-w-0 flex-1 flex-col">
         <Header />
         <main class="flex-1">
           <slot />
