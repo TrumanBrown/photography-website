@@ -26,4 +26,11 @@
   img {
     @apply max-w-full;
   }
+
+  /* Visible keyboard-focus ring for accessibility. Only shows for keyboard
+     users (not mouse clicks) via :focus-visible. */
+  :focus-visible {
+    @apply outline-none ring-2 ring-neutral-900 ring-offset-2 ring-offset-white dark:ring-white dark:ring-offset-neutral-950;
+    border-radius: 0.125rem;
+  }
 }
