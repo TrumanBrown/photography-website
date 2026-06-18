@@ -85,7 +85,7 @@ For a photo portfolio with no logins, era 3 is a perfect fit.
 
 **Why Astro specifically:**
 - Ships **near-zero JavaScript** by default. Most modern frameworks (Next.js, etc.) send the entire React engine to the browser even when the page is static. Astro sends only what each page actually needs.
-- Built-in **image optimization pipeline** — when you reference a photo, Astro auto-generates AVIF/WebP/JPEG variants at multiple widths. Browsers pick the smallest one that fits their screen. You write zero code for this.
+- Built-in **image optimization pipeline** — when you reference a photo, Astro generates WebP + JPEG variants at multiple widths and the browser picks the smallest one that fits its screen. You write zero code for this. (AVIF is supported too but deliberately left off here to keep build times down.)
 - **Content collections** — describe your data shape once (sessions with title/date/location), get a type-checked API to read it. Perfect fit for "scan a folder and turn it into pages."
 
 **Alternatives considered:**

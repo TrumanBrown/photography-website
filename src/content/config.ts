@@ -36,6 +36,22 @@ const sessions = defineCollection({
            * fixture mode — the lightbox falls back to the local file URL.
            */
           fullUrl: z.string().url().optional(),
+          /**
+           * Capture settings read from the image's EXIF metadata, pre-formatted
+           * for display. Every field is optional — synthetic fixtures, stripped
+           * images, and most RAW-derived JPEGs won't have them. Shown in the
+           * lightbox beneath the caption.
+           */
+          exif: z
+            .object({
+              camera: z.string().optional(), // e.g. "ILCE-7M4"
+              lens: z.string().optional(), // e.g. "FE 70-200mm F2.8 GM OSS"
+              focalLength: z.string().optional(), // e.g. "135mm"
+              aperture: z.string().optional(), // e.g. "f/2.8"
+              shutter: z.string().optional(), // e.g. "1/500s"
+              iso: z.string().optional(), // e.g. "ISO 200"
+            })
+            .optional(),
         }),
       )
       .min(1),

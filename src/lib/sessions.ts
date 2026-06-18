@@ -47,3 +47,17 @@ export function formatDate(iso: string, locale = siteConfig.defaultLocale): stri
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleDateString(locale, { year: 'numeric', month: 'long', day: 'numeric' });
 }
+
+type ImageExif = NonNullable<Session['data']['images'][number]['exif']>;
+
+/**
+ * Join the present EXIF capture-setting fields into a single line for display,
+ * e.g. "ILCE-7M4 · FE 70-200mm · 135mm · f/2.8 · 1/500s · ISO 200". Returns an
+ * empty string when no fields are present.
+ */
+export function formatExif(exif: ImageExif | undefined): string {
+  if (!exif) return '';
+  return [exif.camera, exif.lens, exif.focalLength, exif.aperture, exif.shutter, exif.iso]
+    .filter((v): v is string => Boolean(v))
+    .join(' · ');
+}

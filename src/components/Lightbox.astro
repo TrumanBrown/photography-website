@@ -36,6 +36,50 @@ const { gallerySelector = '#gallery' } = Astro.props;
   });
 
   lightbox.on('uiRegister', function () {
+    // Download full-resolution button in the top toolbar.
+    lightbox.pswp?.ui?.registerElement({
+      name: 'download-button',
+      order: 8,
+      isButton: true,
+      tagName: 'button',
+      html: '<svg aria-hidden="true" class="pswp__icn" viewBox="0 0 32 32" width="32" height="32"><path fill="currentColor" d="M16 19l-6-6h4V5h4v8h4l-6 6zm-7 4h14v2H9z"/></svg>',
+      onInit: (el, instance) => {
+        el.setAttribute('title', 'Download full-resolution photo');
+        el.setAttribute('aria-label', 'Download full-resolution photo');
+        el.addEventListener('click', async () => {
+          const slideEl = instance.currSlide?.data?.element as HTMLElement | undefined;
+          const url = slideEl?.getAttribute('href');
+          if (!url) return;
+          const name =
+            slideEl?.dataset?.pswpFilename ||
+            url.split('/').pop()?.split('?')[0] ||
+            'photo.jpg';
+          const btn = el as HTMLButtonElement;
+          btn.disabled = true;
+          try {
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const blob = await res.blob();
+            const objUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = objUrl;
+            a.download = name;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(objUrl);
+          } catch {
+            // Cross-origin fetch blocked or failed — open in a new tab so the
+            // viewer can still save the file manually.
+            window.open(url, '_blank', 'noopener');
+          } finally {
+            btn.disabled = false;
+          }
+        });
+      },
+    });
+
+    // Caption + EXIF capture settings beneath the photo.
     lightbox.pswp?.ui?.registerElement({
       name: 'caption',
       order: 9,
@@ -46,7 +90,22 @@ const { gallerySelector = '#gallery' } = Astro.props;
         instance.on('change', () => {
           const slideEl = instance.currSlide?.data?.element as HTMLElement | undefined;
           const caption = slideEl?.dataset?.pswpCaption ?? '';
-          el.innerHTML = caption ? `<span>${caption}</span>` : '';
+          const exif = slideEl?.dataset?.pswpExif ?? '';
+          // Build via textContent (not innerHTML) so caption/EXIF strings can
+          // never inject markup.
+          el.textContent = '';
+          if (caption) {
+            const c = document.createElement('span');
+            c.className = 'pswp__caption-text';
+            c.textContent = caption;
+            el.appendChild(c);
+          }
+          if (exif) {
+            const e = document.createElement('span');
+            e.className = 'pswp__caption-exif';
+            e.textContent = exif;
+            el.appendChild(e);
+          }
         });
       },
     });
@@ -63,12 +122,28 @@ const { gallerySelector = '#gallery' } = Astro.props;
     bottom: 1rem;
     left: 50%;
     transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.15rem;
     color: #f5f5f5;
     font-size: 0.875rem;
-    padding: 0.25rem 0.75rem;
+    padding: 0.3rem 0.75rem;
     background: rgba(0, 0, 0, 0.55);
     border-radius: 0.25rem;
     max-width: 90vw;
+    text-align: center;
     pointer-events: none;
+  }
+
+  .pswp__caption:empty {
+    display: none;
+  }
+
+  .pswp__caption-exif {
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
+    color: #cfcfcf;
   }
 </style>

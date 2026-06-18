@@ -295,10 +295,12 @@ async function processSession({ prefix, originalsClient, derivativesClient, serv
     const height = meta.height ?? 0;
 
     let captureDate;
+    let exifSettings;
     try {
       const { default: exifr } = await import('exifr');
       const exif = await exifr.parse(localPath, { tiff: true, ifd0: true, exif: true });
       captureDate = exif?.DateTimeOriginal || exif?.CreateDate || exif?.ModifyDate;
+      exifSettings = buildExifSettings(exif);
     } catch {
       // ignore — synthetic JPEGs and stripped images may have no EXIF
     }
@@ -311,6 +313,7 @@ async function processSession({ prefix, originalsClient, derivativesClient, serv
       file: targetFile,
       width,
       height,
+      ...(exifSettings ? { exif: exifSettings } : {}),
       fullUrl: willConvert
         ? blobPublicUrl(derivativesClient, `${slug}/${targetFile}`)
         : blobPublicUrl(originalsClient, b.name),
@@ -401,7 +404,7 @@ async function processRawBlob({ blob, originalsClient, derivativesClient, slug, 
   }
 
   const { default: sharp } = await import('sharp');
-  await sharp(generatedTiff).jpeg({ quality: 95, mozjpeg: true }).toFile(localPath);
+  await sharp(generatedTiff).keepExif().jpeg({ quality: 95, mozjpeg: true }).toFile(localPath);
 
   // Upload to derivatives/ with source-etag metadata.
   const upload = derivativesClient.getBlockBlobClient(derivBlobName);
@@ -460,11 +463,11 @@ async function processConvertBlob({ blob, originalsClient, derivativesClient, sl
     const tmpJpg = `${tmpSrc}.jpg`;
     await runCmd('python3', [join(__dirname, 'heic-to-jpeg.py'), tmpSrc, tmpJpg, '92']);
     // sharp re-encode polishes the JPEG (mozjpeg for ~10% smaller files).
-    await sharp(tmpJpg).jpeg({ quality: 92, mozjpeg: true }).toFile(localPath);
+    await sharp(tmpJpg).keepExif().jpeg({ quality: 92, mozjpeg: true }).toFile(localPath);
     await rm(tmpJpg, { force: true }).catch(() => {});
   } else {
     // TIFF and friends: sharp handles natively.
-    await sharp(tmpSrc).rotate().jpeg({ quality: 92, mozjpeg: true }).toFile(localPath);
+    await sharp(tmpSrc).rotate().keepExif().jpeg({ quality: 92, mozjpeg: true }).toFile(localPath);
   }
 
   const upload = derivativesClient.getBlockBlobClient(derivBlobName);
@@ -542,6 +545,38 @@ function stripExt(name) {
 function stripQuotes(s) {
   if (!s) return s;
   return s.replace(/^"+|"+$/g, '');
+}
+
+/**
+ * Build a compact, display-ready EXIF capture-settings object from a parsed
+ * exifr record. Every field is optional; returns undefined when none are
+ * present (synthetic fixtures, stripped images, most RAW-derived JPEGs).
+ */
+function buildExifSettings(exif) {
+  if (!exif) return undefined;
+  const out = {};
+
+  const camera = exif.Model || exif.Make;
+  if (camera) out.camera = String(camera).trim();
+  if (exif.LensModel) out.lens = String(exif.LensModel).trim();
+
+  if (typeof exif.FocalLength === 'number' && exif.FocalLength > 0) {
+    out.focalLength = `${Math.round(exif.FocalLength)}mm`;
+  }
+  if (typeof exif.FNumber === 'number' && exif.FNumber > 0) {
+    out.aperture = `f/${exif.FNumber % 1 === 0 ? exif.FNumber : exif.FNumber.toFixed(1)}`;
+  }
+  if (typeof exif.ExposureTime === 'number' && exif.ExposureTime > 0) {
+    out.shutter =
+      exif.ExposureTime >= 1
+        ? `${Math.round(exif.ExposureTime * 10) / 10}s`
+        : `1/${Math.round(1 / exif.ExposureTime)}s`;
+  }
+  let iso = exif.ISO ?? exif.ISOSpeedRatings ?? exif.PhotographicSensitivity;
+  if (Array.isArray(iso)) iso = iso[0];
+  if (typeof iso === 'number' && iso > 0) out.iso = `ISO ${iso}`;
+
+  return Object.keys(out).length ? out : undefined;
 }
 
 function hashKey(s) {

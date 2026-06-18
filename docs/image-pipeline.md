@@ -28,7 +28,7 @@
 
 Two paths to the visitor:
 - **Thumbnails + responsive variants** ship inside the SWA deploy. Tiny, optimized, multiple sizes.
-- **Full-resolution originals** stay in Blob and load only when the lightbox is opened.
+- **Full-resolution originals** stay in Blob and load only when the lightbox is opened. The lightbox has a **download button** that saves the original file (fetched cross-origin from Blob — allowed by the storage account's CORS rules and the site's `connect-src` CSP).
 
 ---
 
@@ -122,7 +122,7 @@ What happens inside `scripts/prebuild.mjs`:
        - **Yes** → reuse the existing derivative.
        - **No** → download the RAW, convert it (see Step 3 below), upload the JPEG sidecar to `derivatives/`.
      - If it's a standard image → download it.
-   - Read intrinsic width/height with sharp and EXIF date with exifr.
+   - Read intrinsic width/height with sharp and EXIF with exifr. The earliest `DateTimeOriginal` becomes the session date; per-photo capture settings (camera, lens, focal length, aperture, shutter, ISO) are stored on each image and shown beneath it in the lightbox. EXIF survives RAW/HEIC conversion because sharp is told to `keepExif()`; synthetic fixtures and stripped images simply have none.
    - Write `src/content/sessions/<slug>.json` for Astro to consume.
 5. **Save the updated manifest** back to `metadata/manifest.json`.
 
@@ -162,8 +162,8 @@ Once `src/content/sessions/` is populated, Astro's `astro build` does the rest:
 
 - **Content collection** — Astro reads each `<slug>.json` against the Zod schema in `src/content/config.ts`. Schema violations abort the build (good — catches bad sidecars before they reach prod).
 - **Image optimization** — every reference to a session image goes through `<Picture>`, which during build calls sharp to produce:
-  - Multiple widths: 480, 800, 1200, 1600 px (and 2160 on session pages)
-  - Three formats per width: AVIF (smallest, modern browsers), WebP (broadly supported), JPEG (universal fallback)
+  - Multiple widths: 480, 800, 1200 px on cards, plus 1600 px on session pages
+  - Two formats per width: WebP (broadly supported, small) and JPEG (universal fallback). AVIF is intentionally **not** generated — its encoder is several times slower than WebP and would dominate build time for little extra savings.
 - **Static HTML** — every page is pre-rendered to a `.html` file. The `<picture>` tags contain `srcset` listing every variant; the browser picks the right one.
 - **Lightbox URL** — each image's full-res URL (either the original or the RAW-derived sidecar) is baked into the rendered HTML as `data-pswp-*` attributes. The lightbox loads it on click — never on initial page render.
 

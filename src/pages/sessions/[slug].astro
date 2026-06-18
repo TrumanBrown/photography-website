@@ -4,7 +4,7 @@ import { Picture } from 'astro:assets';
 import type { ImageMetadata } from 'astro';
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import Lightbox from '@/components/Lightbox.astro';
-import { sessionSlug, formatDate } from '@/lib/sessions';
+import { sessionSlug, formatDate, formatExif } from '@/lib/sessions';
 
 export async function getStaticPaths() {
   const sessions = await getCollection('sessions');
@@ -32,6 +32,7 @@ type Resolved = {
   src: ImageMetadata;
   file: string;
   caption?: string;
+  exif: string;
   fullUrl: string;
 };
 
@@ -45,7 +46,7 @@ const resolved: Resolved[] = imageList.map((img) => {
   // In local-only mode the prebuild leaves it empty; fall back to the local
   // file path so the lightbox still works during development.
   const fullUrl = img.fullUrl ?? mod.default.src;
-  return { src: mod.default, file: img.file, caption: img.caption, fullUrl };
+  return { src: mod.default, file: img.file, caption: img.caption, exif: formatExif(img.exif), fullUrl };
 });
 
 // Social-share preview image: the session cover (or first image). Prefer the
@@ -79,6 +80,8 @@ const ogImage = coverResolved?.fullUrl;
               data-pswp-width={img.src.width}
               data-pswp-height={img.src.height}
               data-pswp-caption={img.caption ?? ''}
+              data-pswp-exif={img.exif}
+              data-pswp-filename={img.file}
               class="block overflow-hidden rounded-lg bg-neutral-100 no-underline dark:bg-neutral-900"
               aria-label={img.caption ?? img.file}
             >
