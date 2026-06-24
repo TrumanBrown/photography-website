@@ -7,6 +7,9 @@ import { siteConfig } from './site.config';
 export default defineConfig({
   site: `https://${siteConfig.domain}`,
   trailingSlash: 'never',
+  // Keep Astro's build cache (including optimized image variants) outside
+  // node_modules so `npm ci` can't wipe it and CI can persist it between runs.
+  cacheDir: './.cache/astro',
   build: {
     format: 'directory',
     assets: '_astro',

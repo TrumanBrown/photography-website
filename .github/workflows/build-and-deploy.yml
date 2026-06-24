@@ -80,6 +80,17 @@ jobs:
           AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
         run: node scripts/prebuild.mjs
 
+      - name: Restore Astro asset cache
+        # .cache/astro holds Astro's optimized image variants. Persisting it
+        # means only new/changed photos are re-encoded by sharp each build,
+        # instead of regenerating every variant from scratch.
+        uses: actions/cache@v4
+        with:
+          path: .cache/astro
+          key: astro-cache-${{ github.run_id }}
+          restore-keys: |
+            astro-cache-
+
       - name: Astro build
         env:
           PUBLIC_APPINSIGHTS_CONNECTION_STRING: ${{ secrets.APPINSIGHTS_CONNECTION_STRING }}
@@ -106,6 +117,13 @@ jobs:
         with:
           path: .cache/prebuild
           key: prebuild-cache-${{ github.run_id }}
+
+      - name: Save Astro asset cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .cache/astro
+          key: astro-cache-${{ github.run_id }}
 
       - name: Install API dependencies
         run: cd api && npm ci
