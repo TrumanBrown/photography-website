@@ -100,7 +100,7 @@ const hobbies = defineCollection({
      * hobby; null/omitted renders the page without an interactive.
      */
     interactive: z
-      .enum(['aquarium', 'tidepool', 'travel-map', 'wa-fishing', 'pixel-hike', 'repo-explorer'])
+      .enum(['aquarium', 'tidepool', 'fishing', 'travel-map', 'pixel-hike', 'repo-explorer'])
       .nullable()
       .optional(),
     /** Heading for the photo gallery section (e.g. "My tank"). */

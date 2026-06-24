@@ -1,0 +1,15 @@
+{
+  "$comment": "Personal 'fish I've caught' gallery. fishId references fishing-species.ts; the map sprite is shown beside a placeholder until a real photo is added (drop a hobby-media photo URL into `photo` later, like the tide-pool photos).",
+  "catches": [
+    { "fishId": "walleye", "where": "Mille Lacs Lake, MN" },
+    { "fishId": "largemouth-bass", "where": "Lake Minnetonka, MN" },
+    { "fishId": "northern-pike", "where": "Leech Lake, MN" },
+    { "fishId": "muskellunge", "where": "Lake Vermilion, MN" },
+    { "fishId": "black-crappie", "where": "Bde Maka Ska, MN" },
+    { "fishId": "smallmouth-bass", "where": "Mississippi River, MN" },
+    { "fishId": "chinook-salmon", "where": "Columbia River, WA" },
+    { "fishId": "steelhead", "where": "Skagit River, WA" },
+    { "fishId": "cutthroat-trout", "where": "Yakima River, WA" },
+    { "fishId": "rainbow-trout", "where": "Lake Roosevelt, WA" }
+  ]
+}

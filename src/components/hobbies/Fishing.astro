@@ -1,0 +1,143 @@
+---
+/**
+ * Fishing hobby island: two pixel maps (Minnesota + Washington) of where the
+ * author fishes. Both maps render side-by-side on desktop; on mobile a segmented
+ * toggle switches between them. Tap a fish (a named water) to open its species
+ * panel. The bottom "fish I've caught" gallery pairs each fish's map sprite with
+ * a placeholder photo. All behaviour lives in @/lib/hobbies/fishing, bound via
+ * [data-fish-*] hooks; the mounting script is an Astro module so it satisfies the CSP.
+ */
+import catchesJson from '@/lib/hobbies/fishing-catches.json';
+import { FISH_BY_ID } from '@/lib/hobbies/fishing-species';
+
+const catches = catchesJson.catches;
+---
+
+<section data-fishing aria-label="Fishing map" class="not-prose">
+  <div
+    class="mb-3 flex gap-1 rounded-lg bg-neutral-100 p-1 text-sm md:hidden dark:bg-neutral-800"
+    role="tablist"
+    aria-label="Choose a state"
+  >
+    <button type="button" data-fish-tab="mn" class="flex-1 rounded-md bg-white px-3 py-1.5 font-medium shadow-sm dark:bg-neutral-700">Minnesota</button>
+    <button type="button" data-fish-tab="wa" class="flex-1 rounded-md px-3 py-1.5 text-neutral-500">Washington</button>
+  </div>
+
+  <div class="grid gap-4 md:grid-cols-2 md:items-start">
+    <div data-fish-map="mn" class="is-active space-y-3">
+      <div>
+        <div class="mb-1 text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">Minnesota</div>
+        <div class="overflow-hidden rounded-xl border border-neutral-200 bg-[#e9eff0] dark:border-neutral-800">
+          <canvas
+            data-fish-canvas="mn"
+            class="block w-full"
+            style="image-rendering: pixelated"
+            role="img"
+            aria-label="Pixel map of Minnesota fishing waters — tap a fish to see its species"></canvas>
+        </div>
+      </div>
+      <div>
+        <div class="mb-1 text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">Twin Cities metro</div>
+        <div class="overflow-hidden rounded-xl border border-neutral-200 bg-[#e9eff0] dark:border-neutral-800">
+          <canvas
+            data-fish-canvas="metro"
+            class="block w-full"
+            style="image-rendering: pixelated"
+            role="img"
+            aria-label="Zoomed pixel map of the Twin Cities metro lakes"></canvas>
+        </div>
+      </div>
+    </div>
+    <div data-fish-map="wa">
+      <div class="mb-1 text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">Washington</div>
+      <div class="overflow-hidden rounded-xl border border-neutral-200 bg-[#e9eff0] dark:border-neutral-800">
+        <canvas
+          data-fish-canvas="wa"
+          class="block w-full"
+          style="image-rendering: pixelated"
+          role="img"
+          aria-label="Pixel map of Washington fishing waters — tap a fish to see its species"></canvas>
+      </div>
+    </div>
+  </div>
+  <p class="mt-2 text-xs text-neutral-500 dark:text-neutral-500">
+    Each fish marks a real lake or river — tap one to see what swims there. The boxed Twin Cities area gets its
+    own zoomed map, since those metro lakes are tiny at full state scale.
+  </p>
+
+  <!-- species panel -->
+  <div data-fish-panel class="fish-panel fixed inset-0 z-50 items-center justify-center bg-black/50 p-4">
+    <div class="w-full max-w-md rounded-xl border border-neutral-200 bg-white p-5 shadow-xl dark:border-neutral-700 dark:bg-neutral-900">
+      <div class="flex items-start justify-between gap-4">
+        <div class="min-w-0">
+          <h3 data-fish-panel-title class="text-lg font-semibold leading-tight"></h3>
+          <p data-fish-panel-kind class="text-xs text-neutral-500 dark:text-neutral-400"></p>
+        </div>
+        <button
+          type="button"
+          data-fish-panel-close
+          class="shrink-0 rounded-lg border border-neutral-300 px-3 py-1.5 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+        >Close</button>
+      </div>
+      <div data-fish-panel-list class="mt-4 max-h-[60vh] space-y-3 overflow-y-auto"></div>
+    </div>
+  </div>
+
+  <!-- personal catch gallery -->
+  <section class="mt-12" aria-label="Fish I've caught">
+    <h2 class="text-lg font-medium">Fish I've caught</h2>
+    <p class="mt-1 max-w-prose text-sm text-neutral-600 dark:text-neutral-400">
+      The same pixel fish from the maps, beside the real thing. Photos coming soon.
+    </p>
+    <ul class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      {
+        catches.map((c) => {
+          const f = FISH_BY_ID[c.fishId];
+          return (
+            <li class="overflow-hidden rounded-lg border border-neutral-200 dark:border-neutral-800">
+              <div class="flex items-center justify-center bg-sky-50 py-2 dark:bg-neutral-800/60">
+                <canvas
+                  data-fish-sprite={c.fishId}
+                  width="84"
+                  height="48"
+                  style="image-rendering: pixelated; width: 84px; height: 48px"
+                  aria-hidden="true"></canvas>
+              </div>
+              <div class="flex aspect-[4/3] items-center justify-center bg-neutral-100 text-[10px] uppercase tracking-wide text-neutral-400 dark:bg-neutral-900">
+                photo coming soon
+              </div>
+              <div class="p-2">
+                <div class="text-xs font-medium leading-tight">{f?.common ?? c.fishId}</div>
+                <div class="text-[11px] text-neutral-500 dark:text-neutral-400">{c.where}</div>
+              </div>
+            </li>
+          );
+        })
+      }
+    </ul>
+  </section>
+</section>
+
+<style>
+  .fish-panel {
+    display: none;
+  }
+  .fish-panel.is-open {
+    display: flex;
+  }
+  @media (max-width: 767px) {
+    [data-fish-map] {
+      display: none;
+    }
+    [data-fish-map].is-active {
+      display: block;
+    }
+  }
+</style>
+
+<script>
+  import { initFishing } from '@/lib/hobbies/fishing';
+
+  const root = document.querySelector<HTMLElement>('[data-fishing]');
+  if (root) initFishing(root);
+</script>

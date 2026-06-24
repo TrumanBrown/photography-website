@@ -1,0 +1,9 @@
+{
+  "title": "Fishing",
+  "summary": "A pixel map of where I fish — Minnesota and Washington — and what swims there.",
+  "intro": "I grew up fishing Minnesota's lakes and now chase Washington's rivers. Tap a fish on either map to see what you can catch in that water.",
+  "emoji": "🎣",
+  "accent": "#2563eb",
+  "order": 3,
+  "interactive": "fishing"
+}
