@@ -12,7 +12,7 @@ export default defineConfig({
     assets: '_astro',
   },
   image: {
-    // Astro's built-in sharp service. AVIF + WebP + JPEG variants emitted by <Picture>.
+    // Astro's built-in sharp service. WebP + JPEG variants emitted by <Picture>.
     service: { entrypoint: 'astro/assets/services/sharp' },
   },
   integrations: [

@@ -95,7 +95,7 @@ For a photo portfolio with no logins, era 3 is a perfect fit.
 
 Full image-pipeline mechanics: [image-pipeline.md](image-pipeline.md).
 
-### Tailwind CSS v4 — styling
+### Tailwind CSS v3 — styling
 
 **What it is:** instead of writing `.card { padding: 16px }`, you compose utility classes inline: `<div class="p-4">`. At build time Tailwind scans your files, keeps only the utilities you actually used, and produces a tiny CSS file.
 

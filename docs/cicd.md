@@ -60,7 +60,7 @@ A `concurrency` block cancels older runs on the same branch when a new one arriv
 5. **Azure login (OIDC)** — assumes the managed identity created in `infra/`. No password, no token in secrets. Explained below.
 6. **Restore prebuild cache** — `.cache/prebuild/` is a folder of already-downloaded images from previous runs, keyed by blob ETag. Lets incremental builds skip re-downloading unchanged photos.
 7. **Run `scripts/prebuild.mjs`** — scans Blob, downloads new photos, converts RAW, writes Astro content collection. Full mechanics: [image-pipeline.md](image-pipeline.md).
-8. **`npm run build`** — runs `astro build`. Astro processes all images through sharp into AVIF/WebP/JPEG variants and outputs the `dist/` folder.
+8. **`npm run build`** — runs `astro build`. Astro processes all images through sharp into WebP/JPEG variants and outputs the `dist/` folder.
 9. **Save prebuild cache** for next run.
 10. **Deploy to SWA** via `Azure/static-web-apps-deploy@v1` with `skip_app_build: true` (we already built). The action uploads `dist/` to the SWA deployment endpoint using the deploy token.
 
