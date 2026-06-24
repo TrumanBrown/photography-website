@@ -2,6 +2,7 @@
 import { getCollection, type CollectionEntry } from 'astro:content';
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import AquariumTank from '@/components/hobbies/AquariumTank.astro';
+import Lightbox from '@/components/Lightbox.astro';
 import { hobbySlug } from '@/lib/hobbies';
 
 export async function getStaticPaths() {
@@ -17,7 +18,8 @@ interface Props {
 }
 
 const { entry } = Astro.props;
-const { title, summary, intro, interactive } = entry.data;
+const { title, summary, intro, interactive, media, mediaTitle } = entry.data;
+const galleryItems = media?.gallery ?? [];
 ---
 
 <BaseLayout title={title} description={summary} section="hobbies">
@@ -29,5 +31,57 @@ const { title, summary, intro, interactive } = entry.data;
     </header>
 
     {interactive === 'aquarium' && <AquariumTank />}
+
+    {
+      media?.hero && (
+        <section class="mt-12" aria-label={mediaTitle ?? 'Photos'}>
+          <h2 class="mb-4 text-lg font-medium">{mediaTitle ?? 'Photos'}</h2>
+          <div id="hobby-media">
+            <a
+              href={media.hero.src}
+              data-pswp-width={media.hero.width}
+              data-pswp-height={media.hero.height}
+              data-pswp-caption={media.hero.caption ?? ''}
+              class="group block overflow-hidden rounded-xl border border-neutral-200 no-underline dark:border-neutral-800"
+              aria-label={media.hero.caption ?? 'Open full-resolution photo'}
+            >
+              <img
+                src={media.hero.display}
+                alt={media.hero.caption ?? ''}
+                width={media.hero.width}
+                height={media.hero.height}
+                loading="lazy"
+                class="block max-h-[70vh] w-full bg-neutral-100 object-cover transition-opacity duration-300 group-hover:opacity-95 dark:bg-neutral-900"
+              />
+            </a>
+
+            {galleryItems.length > 0 && (
+              <ul class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                {galleryItems.map((it) => (
+                  <li>
+                    <a
+                      href={it.src}
+                      data-pswp-width={it.width}
+                      data-pswp-height={it.height}
+                      data-pswp-caption={it.caption ?? ''}
+                      class="group block overflow-hidden rounded-lg bg-neutral-100 no-underline dark:bg-neutral-900"
+                      aria-label={it.caption ?? 'Open full-resolution photo'}
+                    >
+                      <img
+                        src={it.display}
+                        alt={it.caption ?? ''}
+                        loading="lazy"
+                        class="aspect-square w-full object-cover transition-opacity duration-300 group-hover:opacity-90"
+                      />
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <Lightbox gallerySelector="#hobby-media" />
+        </section>
+      )
+    }
   </article>
 </BaseLayout>

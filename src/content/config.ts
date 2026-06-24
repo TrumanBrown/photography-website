@@ -66,6 +66,19 @@ const sessions = defineCollection({
  *
  * File: src/content/hobbies/<slug>.json
  */
+/** One image in a hobby media gallery: a display-size inline image plus the
+ *  full-resolution original opened in the click-to-zoom lightbox. */
+const hobbyMediaItem = z.object({
+  /** Full-resolution blob URL (opened in the lightbox). */
+  src: z.string().url(),
+  /** Display-size blob URL shown inline. */
+  display: z.string().url(),
+  /** Intrinsic dimensions of the full-res image (PhotoSwipe needs them). */
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+  caption: z.string().optional(),
+});
+
 const hobbies = defineCollection({
   type: 'data',
   schema: z.object({
@@ -89,6 +102,19 @@ const hobbies = defineCollection({
     interactive: z
       .enum(['aquarium', 'travel-map', 'wa-fishing', 'pixel-hike', 'repo-explorer'])
       .nullable()
+      .optional(),
+    /** Heading for the photo gallery section (e.g. "My tank"). */
+    mediaTitle: z.string().optional(),
+    /**
+     * Optional photo gallery, hosted in the `hobby-media` blob container
+     * (never in `originals/`, so it stays out of the photography section).
+     * Populated by scripts/upload-hobby-media.mjs.
+     */
+    media: z
+      .object({
+        hero: hobbyMediaItem.optional(),
+        gallery: z.array(hobbyMediaItem).default([]),
+      })
       .optional(),
   }),
 });

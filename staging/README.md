@@ -49,6 +49,21 @@ After dropping photos in `staging/<session>/`:
 
 The script uploads to the `originals` container under the matching prefix. The site picks it up on the next hourly cron, or immediately if you pass `--build` (or click "Run workflow" in GitHub Actions).
 
+## Hobby media (separate from photography)
+
+Photos for the **Hobbies** section (e.g. the aquarium "My tank" gallery) go in a
+different container so they never become a photography session. Put full-res
+files in a `hobby-<slug>/` folder and use the hobby uploader:
+
+```bash
+# files in staging/hobby-aquarium-keeping/
+AZURE_STORAGE_ACCOUNT=<account> \
+  node scripts/upload-hobby-media.mjs aquarium-keeping --hero DSC1234.jpg
+```
+
+It uploads to the `hobby-media` container and writes the gallery into
+`src/content/hobbies/<slug>.json`. Details: [docs/hobbies.md](../docs/hobbies.md#photo-galleries-hobby-media).
+
 ## After successful upload
 
 You can leave files in `staging/` (they stay gitignored — your call whether to keep a local copy) or delete to reclaim disk:

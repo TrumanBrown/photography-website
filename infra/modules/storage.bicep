@@ -95,6 +95,17 @@ resource variants 'Microsoft.Storage/storageAccounts/blobServices/containers@202
   }
 }
 
+// Hobby media: full-res + display images for the Hobbies section (e.g. the
+// aquarium "My tank" gallery). Deliberately separate from `originals` so the
+// photography prebuild never turns these into a photography session.
+resource hobbyMedia 'Microsoft.Storage/storageAccounts/blobServices/containers@2024-01-01' = {
+  parent: blobService
+  name: 'hobby-media'
+  properties: {
+    publicAccess: 'Blob'
+  }
+}
+
 resource metadata 'Microsoft.Storage/storageAccounts/blobServices/containers@2024-01-01' = {
   parent: blobService
   name: 'metadata'

@@ -83,7 +83,7 @@ A planted-tank **stocking sandbox**. Tap a species to add it, resize the tank, a
 
 **Files**
 
-- [src/components/hobbies/AquariumTank.astro](../src/components/hobbies/AquariumTank.astro) — the markup (canvas + controls), the mounting `<script>`, and the "My tank" photo section.
+- [src/components/hobbies/AquariumTank.astro](../src/components/hobbies/AquariumTank.astro) — the markup (canvas + controls) and the mounting `<script>`.
 - [src/lib/hobbies/aquarium.ts](../src/lib/hobbies/aquarium.ts) — the whole engine: species data, the stocking math, the canvas pixel rendering, and the UI sync. **Zero dependencies.**
 
 **Single source of truth.** The `SPECIES` array in `aquarium.ts` (~35 freshwater species) drives everything. The palette buttons and the stocking list are built from it at runtime, so the markup carries no species data. Each entry stores an approximate adult length (inches), a relative `bioload` weight, a sensible `minGallons`, a swim `zone` (top/mid/bottom), a body `shape`, and two colors.
@@ -121,7 +121,7 @@ Being upfront, because the request was that anyone can learn how this works:
 
 ### How the pixel art is made
 
-Everything you see in the tank — fish, plants, rocks, driftwood, bubbles, light — is **drawn in code** with canvas `fillRect` calls. There are no image files, sprite sheets, stock photos, or AI-generated art anywhere in the scene, so there is nothing to license or attribute. (The only image is the "My tank" placeholder SVG, which you replace with your own photo.)
+Everything you see in the tank — fish, plants, rocks, driftwood, bubbles, light — is **drawn in code** with canvas `fillRect` calls. There are no image files, sprite sheets, stock photos, or AI-generated art anywhere in the scene, so there is nothing to license or attribute. (Real tank photos are separate — see [Photo galleries](#photo-galleries-hobby-media) below.)
 
 - **The pixel look** comes from a fixed block size `PIX` (4 CSS pixels). Every shape snaps to that grid and image smoothing is turned off, which gives the chunky 8-bit feel. Dropping `PIX` makes finer pixels; raising it makes chunkier ones.
 - **Fish are procedural.** Each one is built from its species params: a body drawn as horizontal pixel rows of an ellipse (`fishBody`), a triangular `fishTail`, a lateral stripe or vertical bars, dorsal and pectoral fins, and an eye. A small `shade()` helper mixes the body color toward white for the top rows and toward black for the bottom rows, which fakes a bit of lighting. There are five silhouettes — `fish`, `tall` (gouramis/cichlids), `long` (loaches/plecos), `shrimp`, and `snail` — and fish are drawn back-to-front by depth `zone` for layering.
@@ -145,3 +145,21 @@ Everything you see in the tank — fish, plants, rocks, driftwood, bubbles, ligh
 - Overall stocking feel: `PLANTED_CAPACITY_PER_GALLON`.
 - Starting community shown on load: `STARTER`.
 - The look of anything: the `draw*` / `bake*` functions and the `PIX` constant.
+
+## Photo galleries (`hobby-media`)
+
+Any hobby can show a photo gallery — a hero image up top plus a thumbnail grid, each click opening the full-resolution original in the same PhotoSwipe lightbox the photography pages use. It's driven by the optional `media` field on the hobby (`hero` + `gallery`), with `mediaTitle` setting the heading (e.g. "My tank"). The render lives in [src/pages/hobbies/[slug].astro](../src/pages/hobbies/%5Bslug%5D.astro) and only appears when `media` is present.
+
+**Where the photos live.** A dedicated **`hobby-media`** blob container (public read), separate from `originals/`. This is deliberate: the photography prebuild scans `originals/` and turns every folder there into a photography session, so hobby photos must live elsewhere to stay off the photography side. The container is defined in [infra/modules/storage.bicep](../infra/modules/storage.bicep). The site's CSP already allows blob images, so nothing else needs changing to display them.
+
+**Adding photos to a hobby:**
+
+1. Drop full-res files in `staging/hobby-<slug>/` (e.g. `staging/hobby-aquarium-keeping/`).
+2. Run the uploader:
+   ```bash
+   AZURE_STORAGE_ACCOUNT=<account> node scripts/upload-hobby-media.mjs <slug> [--hero <file>]
+   ```
+   For each photo it uploads a **full-resolution** blob (`full/…`, opened in the lightbox) and a smaller **display** JPEG (`display/…`, shown inline, max 1600px wide), reading orientation and true dimensions with `sharp`. It then writes the `media` block (hero + gallery) into `src/content/hobbies/<slug>.json`.
+3. Optionally add `caption` text in the JSON, then commit + push. The gallery goes live on the next build.
+
+Web-friendly originals (JPG/PNG/WebP) are stored byte-for-byte as the full-res image; HEIC/TIFF are baked to a high-quality JPEG (HEIC needs `libheif` available to `sharp`). The `--hero` flag (or the first file alphabetically) chooses the large image at the top.
