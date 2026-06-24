@@ -76,6 +76,8 @@ const hobbies = defineCollection({
     intro: z.string().default(''),
     /** Emoji used as the card icon (keeps the grid asset-free). */
     emoji: z.string().default('•'),
+    /** Optional icon image (e.g. an SVG under public/); overrides the emoji on the card. */
+    iconSrc: z.string().optional(),
     /** Optional hex accent (e.g. '#0ea5e9') tinting the card icon tile. */
     accent: z.string().optional(),
     /** Explicit ordering on the hobbies landing page (ascending). */

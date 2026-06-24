@@ -1,8 +1,9 @@
 {
   "title": "Aquarium Keeping",
-  "summary": "Planted freshwater tanks, and a little stocking sandbox to play with.",
-  "intro": "I keep planted freshwater tanks. Pick some fish, set the tank size, and the meter shows how stocked you'd be. It's just for fun, so do your own research before buying any fish.",
+  "summary": "Plan your own little planted freshwater aquarium here.",
+  "intro": "I have recently been getting back into aquarium keeping. Focusing more on planted tanks and nano fish. Play around and plan your own little aquatic world.",
   "emoji": "🐠",
+  "iconSrc": "/hobbies/aquarium-icon.svg",
   "accent": "#0ea5e9",
   "order": 1,
   "interactive": "aquarium"

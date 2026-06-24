@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none" role="img" aria-label="Angelfish">
+  <!-- pelvic filaments -->
+  <path d="M26 42 L23 61 M30 43 L28 58" stroke="#5f7c93" stroke-width="2.4" stroke-linecap="round"/>
+  <!-- dorsal fin -->
+  <path d="M30 24 L43 5 L46 27 Z" fill="#6f8aa0"/>
+  <!-- anal fin -->
+  <path d="M30 40 L44 59 L47 39 Z" fill="#6f8aa0"/>
+  <!-- tail -->
+  <path d="M43 26 L60 19 L56 32 L60 45 L43 38 Z" fill="#7c96aa"/>
+  <!-- body -->
+  <path d="M15 32 Q21 17 35 19 Q49 22 47 32 Q49 42 35 45 Q21 47 15 32 Z" fill="#8aa3b7"/>
+  <!-- vertical bars -->
+  <path d="M25 22 Q23 32 25 42" stroke="#2f3e48" stroke-width="3.2" fill="none" stroke-linecap="round"/>
+  <path d="M34 20 Q32 32 34 44" stroke="#2f3e48" stroke-width="3.2" fill="none" stroke-linecap="round"/>
+  <!-- eye -->
+  <circle cx="22" cy="30" r="2.4" fill="#15202a"/>
+</svg>

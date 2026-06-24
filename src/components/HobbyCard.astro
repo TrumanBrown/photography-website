@@ -8,17 +8,23 @@ interface Props {
 
 const { entry } = Astro.props;
 const slug = hobbySlug(entry);
-const { title, summary, emoji, accent } = entry.data;
+const { title, summary, emoji, accent, iconSrc } = entry.data;
 ---
 
 <a href={`/hobbies/${slug}`} class="group block h-full no-underline">
   <div class="flex h-full flex-col gap-4 rounded-lg border border-neutral-200 p-5 transition-colors hover:border-neutral-300 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:border-neutral-700 dark:hover:bg-neutral-900">
     <div
-      class="flex h-14 w-14 items-center justify-center rounded-lg bg-neutral-100 text-3xl dark:bg-neutral-800"
+      class="flex h-14 w-14 items-center justify-center rounded-lg bg-neutral-100 dark:bg-neutral-800"
       style={accent ? `background-color:${accent}1a` : undefined}
       aria-hidden="true"
     >
-      {emoji}
+      {
+        iconSrc ? (
+          <img src={iconSrc} alt="" width="40" height="40" class="h-10 w-10" />
+        ) : (
+          <span class="text-3xl">{emoji}</span>
+        )
+      }
     </div>
     <div class="space-y-1">
       <h2 class="text-base font-medium group-hover:underline">{title}</h2>
