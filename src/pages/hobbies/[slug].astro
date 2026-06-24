@@ -2,6 +2,8 @@
 import { getCollection, type CollectionEntry } from 'astro:content';
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import AquariumTank from '@/components/hobbies/AquariumTank.astro';
+import TidePool from '@/components/hobbies/TidePool.astro';
+import INatObservations from '@/components/hobbies/INatObservations.astro';
 import Lightbox from '@/components/Lightbox.astro';
 import { hobbySlug } from '@/lib/hobbies';
 
@@ -18,7 +20,7 @@ interface Props {
 }
 
 const { entry } = Astro.props;
-const { title, summary, intro, interactive, media, mediaTitle } = entry.data;
+const { title, summary, intro, interactive, media, mediaTitle, inaturalist } = entry.data;
 const galleryItems = media?.gallery ?? [];
 ---
 
@@ -31,6 +33,7 @@ const galleryItems = media?.gallery ?? [];
     </header>
 
     {interactive === 'aquarium' && <AquariumTank />}
+    {interactive === 'tidepool' && <TidePool />}
 
     {
       media?.hero && (
@@ -81,6 +84,20 @@ const galleryItems = media?.gallery ?? [];
           </div>
           <Lightbox gallerySelector="#hobby-media" />
         </section>
+      )
+    }
+
+    {
+      inaturalist && (
+        <INatObservations
+          userId={inaturalist.userId}
+          url={inaturalist.url}
+          heading={inaturalist.heading}
+          blurb={inaturalist.blurb}
+          limit={inaturalist.limit}
+          iconicTaxa={inaturalist.iconicTaxa}
+          taxonId={inaturalist.taxonId}
+        />
       )
     }
   </article>

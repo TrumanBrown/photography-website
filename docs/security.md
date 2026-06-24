@@ -51,22 +51,22 @@ Delivered via [staticwebapp.config.json](../staticwebapp.config.json) `globalHea
 
 ```
 default-src 'self';
-img-src 'self' https://*.blob.core.windows.net data:;
+img-src 'self' https://*.blob.core.windows.net https://static.inaturalist.org https://inaturalist-open-data.s3.amazonaws.com data:;
 script-src 'self' https://js.monitor.azure.com;
-connect-src 'self' https://*.in.applicationinsights.azure.com https://*.livediagnostics.monitor.azure.com;
+connect-src 'self' https://*.blob.core.windows.net https://api.inaturalist.org https://*.in.applicationinsights.azure.com https://*.livediagnostics.monitor.azure.com;
 style-src 'self' 'unsafe-inline';
 font-src 'self' data:;
 object-src 'none';
 frame-ancestors 'none';
 base-uri 'self';
-form-action 'none'
+form-action 'self'
 ```
 
 Translation:
 - **`default-src 'self'`** — load resources only from the site's own origin unless overridden.
-- **`img-src 'self' https://*.blob.core.windows.net data:`** — also allow images from any Azure Blob endpoint (lightbox full-res) and `data:` URIs (inlined SVG icons).
+- **`img-src 'self' https://*.blob.core.windows.net https://static.inaturalist.org https://inaturalist-open-data.s3.amazonaws.com data:`** — also allow images from any Azure Blob endpoint (lightbox full-res, hobby photos), the iNaturalist photo CDNs (the tide-pooling observations grid and species photos), and `data:` URIs (inlined SVG icons).
 - **`script-src 'self' https://js.monitor.azure.com`** — own origin + the App Insights SDK CDN.
-- **`connect-src 'self' https://*.in.applicationinsights.azure.com ...`** — App Insights ingestion endpoints.
+- **`connect-src 'self' https://*.blob.core.windows.net https://api.inaturalist.org https://*.in.applicationinsights.azure.com ...`** — Blob (lightbox original download), the public iNaturalist API (tide-pooling observations grid), and App Insights ingestion endpoints.
 - **`style-src 'self' 'unsafe-inline'`** — `'unsafe-inline'` is required by Astro's scoped style blocks. Can be tightened later with hashes; modest risk.
 - **`object-src 'none'`** — no `<object>` / `<embed>` / Flash-era nonsense.
 - **`frame-ancestors 'none'`** — modern equivalent of `X-Frame-Options: DENY`.

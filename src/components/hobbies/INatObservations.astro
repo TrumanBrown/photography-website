@@ -1,0 +1,72 @@
+---
+/**
+ * A live grid of a hobby's iNaturalist observations — the personal counterpart
+ * to the pixel game. Server-renders only the container, heading, and link;
+ * the (CSP-safe, Astro-processed) script fetches the public iNat API when the
+ * section scrolls into view and fills in thumbnail links. Any hobby with a real
+ * iNaturalist presence can drop this in (see the `inaturalist` block in the
+ * hobby content schema). The reveal of the games gets the pixel art; this gets
+ * the real-world record.
+ */
+interface Props {
+  /** iNaturalist login or numeric user id. */
+  userId: string;
+  /** Link to the full observations page on iNaturalist. */
+  url: string;
+  heading?: string;
+  blurb?: string;
+  /** Max thumbnails to show. */
+  limit?: number;
+  /** Optional iNat iconic taxa filter, e.g. "Animalia,Mollusca,Actinopterygii". */
+  iconicTaxa?: string;
+  /** Optional iNat taxon id filter (narrows to a clade). */
+  taxonId?: number;
+}
+const {
+  userId,
+  url,
+  heading = 'My iNaturalist observations',
+  blurb,
+  limit = 12,
+  iconicTaxa,
+  taxonId,
+} = Astro.props;
+---
+
+<section
+  class="not-prose mt-12"
+  aria-label={heading}
+  data-inat
+  data-inat-user={userId}
+  data-inat-limit={limit}
+  data-inat-iconic={iconicTaxa}
+  data-inat-taxon={taxonId}
+>
+  <div class="mb-4 flex items-end justify-between gap-3">
+    <div>
+      <h2 class="text-lg font-medium">{heading}</h2>
+      {blurb && <p class="mt-1 max-w-prose text-sm text-neutral-600 dark:text-neutral-400">{blurb}</p>}
+    </div>
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      class="shrink-0 rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium no-underline hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+    >View all on iNaturalist →</a>
+  </div>
+
+  <div data-inat-grid role="list" class="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
+    {
+      Array.from({ length: limit }).map(() => (
+        <div class="aspect-square animate-pulse rounded-md bg-neutral-200 dark:bg-neutral-800" />
+      ))
+    }
+  </div>
+  <p data-inat-status class="mt-2 text-xs text-neutral-500 dark:text-neutral-500"></p>
+</section>
+
+<script>
+  import { initINatObservations } from '@/lib/hobbies/inaturalist';
+
+  document.querySelectorAll<HTMLElement>('[data-inat]').forEach((el) => initINatObservations(el));
+</script>

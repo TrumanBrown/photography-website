@@ -100,7 +100,7 @@ const hobbies = defineCollection({
      * hobby; null/omitted renders the page without an interactive.
      */
     interactive: z
-      .enum(['aquarium', 'travel-map', 'wa-fishing', 'pixel-hike', 'repo-explorer'])
+      .enum(['aquarium', 'tidepool', 'travel-map', 'wa-fishing', 'pixel-hike', 'repo-explorer'])
       .nullable()
       .optional(),
     /** Heading for the photo gallery section (e.g. "My tank"). */
@@ -114,6 +114,25 @@ const hobbies = defineCollection({
       .object({
         hero: hobbyMediaItem.optional(),
         gallery: z.array(hobbyMediaItem).default([]),
+      })
+      .optional(),
+    /**
+     * Optional personal touch: a live grid of the author's real iNaturalist
+     * observations for this hobby, with a link to their full observations page.
+     * The pixel game is the playful side; this is the real-world record. Any
+     * hobby with an iNaturalist presence can add this block.
+     */
+    inaturalist: z
+      .object({
+        userId: z.string(),
+        url: z.string().url(),
+        heading: z.string().optional(),
+        blurb: z.string().optional(),
+        limit: z.number().int().positive().max(30).optional(),
+        /** iNat iconic taxa filter, e.g. "Animalia,Mollusca,Actinopterygii". */
+        iconicTaxa: z.string().optional(),
+        /** iNat taxon id filter (narrows to a clade). */
+        taxonId: z.number().int().positive().optional(),
       })
       .optional(),
   }),

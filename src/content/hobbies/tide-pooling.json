@@ -1,0 +1,16 @@
+{
+  "title": "Tide Pooling",
+  "summary": "Flip rocks on a pixel beach and meet Pacific Northwest tide pool critters.",
+  "intro": "Tide pooling is one of my favorite things to do on the coast. Tap the rocks and driftwood logs on the beach below to see what's hiding underneath, and learn a real fact about each creature. Try to find them all.",
+  "emoji": "🦀",
+  "accent": "#0891b2",
+  "order": 2,
+  "interactive": "tidepool",
+  "inaturalist": {
+    "userId": "trumanbrown",
+    "url": "https://www.inaturalist.org/observations?subview=map&user_id=trumanbrown&verifiable=any",
+    "heading": "My tide pooling observations",
+    "blurb": "Real critters I've logged on iNaturalist out on the rocks. Tap any photo to open the full observation.",
+    "iconicTaxa": "Animalia,Mollusca,Actinopterygii"
+  }
+}

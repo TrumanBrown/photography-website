@@ -1,0 +1,110 @@
+---
+/**
+ * Tide-pooling "flip a rock" game. Static markup + the reveal popup card; all
+ * behaviour (beach, flipping, sprites, journal) lives in @/lib/hobbies/tidepool,
+ * bound via the [data-tp-*] hooks. The <script> is an Astro-processed module
+ * (served from /_astro/), so it satisfies the strict `script-src 'self'` CSP.
+ */
+---
+
+<section data-tidepool aria-label="Tide pooling game" class="not-prose">
+  <div class="mb-3 flex items-end gap-3">
+    <div class="flex-1">
+      <div class="flex items-center justify-between text-xs text-neutral-500 dark:text-neutral-400">
+        <span class="font-semibold uppercase tracking-wider">Field journal</span>
+        <span data-tp-progress class="tabular-nums">0 species</span>
+      </div>
+      <div class="mt-1 h-2 w-full overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800">
+        <div data-tp-bar class="h-full w-0 rounded-full bg-emerald-500 transition-all duration-500"></div>
+      </div>
+    </div>
+    <button
+      type="button"
+      data-tp-reset
+      class="rounded-lg border border-neutral-300 px-3 py-1.5 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+    >New beach</button>
+  </div>
+
+  <div class="overflow-hidden rounded-xl border border-neutral-200 bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-900">
+    <canvas
+      data-tp-canvas
+      class="block w-full touch-manipulation"
+      style="image-rendering: pixelated"
+      role="img"
+      aria-label="A pixel beach at low tide. Tap rocks and driftwood logs to find the creatures hiding underneath."></canvas>
+  </div>
+  <p class="mt-2 text-xs text-neutral-500 dark:text-neutral-500">
+    Tap a rock or driftwood log to look underneath. Every PNW critter comes with a real fact, and your
+    field journal remembers what you've found. Please put real rocks back the way you found them.
+  </p>
+
+  <!-- Reveal popup -->
+  <div data-tp-card class="tp-card fixed inset-0 z-50 items-center justify-center bg-black/50 p-4">
+    <div class="w-full max-w-sm rounded-xl border border-neutral-200 bg-white p-5 shadow-xl dark:border-neutral-700 dark:bg-neutral-900">
+      <div class="flex items-start gap-4">
+        <div class="relative h-28 w-28 shrink-0">
+          <canvas
+            data-tp-reveal
+            width="120"
+            height="120"
+            class="h-28 w-28 rounded-lg"
+            style="image-rendering: pixelated"
+            aria-hidden="true"></canvas>
+          <img
+            data-tp-photo
+            alt=""
+            class="tp-hidden absolute inset-0 h-28 w-28 rounded-lg object-cover"
+            loading="lazy"
+            decoding="async"
+          />
+        </div>
+        <div class="min-w-0">
+          <span data-tp-badge class="tp-badge"></span>
+          <h3 data-tp-name class="mt-1 text-lg font-semibold leading-tight"></h3>
+          <p data-tp-sci class="text-xs italic text-neutral-500 dark:text-neutral-400"></p>
+        </div>
+      </div>
+      <p data-tp-fact class="mt-4 text-sm leading-relaxed text-neutral-700 dark:text-neutral-300"></p>
+      <p data-tp-credit class="tp-hidden mt-2 text-[11px] text-neutral-400 dark:text-neutral-500"></p>
+      <button
+        type="button"
+        data-tp-close
+        class="mt-5 w-full rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-500"
+      >Keep looking</button>
+    </div>
+  </div>
+</section>
+
+<style>
+  /* Toggle visibility with a class so Tailwind's display utilities can't
+     override the `hidden` attribute on the modal. */
+  .tp-card {
+    display: none;
+  }
+  .tp-card.tp-open {
+    display: flex;
+  }
+  .tp-hidden {
+    display: none;
+  }
+  .tp-badge {
+    display: inline-block;
+    border-radius: 9999px;
+    padding: 1px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    background: #fde68a;
+    color: #92400e;
+  }
+  .tp-badge.tp-badge-new {
+    background: #a7f3d0;
+    color: #065f46;
+  }
+</style>
+
+<script>
+  import { initTidepool } from '@/lib/hobbies/tidepool';
+
+  const root = document.querySelector<HTMLElement>('[data-tidepool]');
+  if (root) initTidepool(root);
+</script>

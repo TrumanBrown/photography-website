@@ -4,7 +4,7 @@ A second, **optional** top-level section beside Photography. Photography is unch
 
 This doc covers how the section is wired, how to add a hobby, the conventions every interactive follows, and the aquarium island as the reference implementation. It is written so a future session (or you) can pick the work back up cold.
 
-> Status: shell + the **Aquarium Keeping** pilot are live. Four more islands are planned (travel map, WA fishing map, pixel hike, repo explorer) and meant to be built **one at a time**.
+> Status: shell + two islands are live — **Aquarium Keeping** and **Tide Pooling**. More are planned (travel map, WA fishing map, pixel hike, repo explorer) and meant to be built **one at a time**.
 
 ---
 
@@ -146,6 +146,45 @@ Everything you see in the tank — fish, plants, rocks, driftwood, bubbles, ligh
 - Starting community shown on load: `STARTER`.
 - The look of anything: the `draw*` / `bake*` functions and the `PIX` constant.
 
+## Reference implementation 2: the tide pooling island
+
+A **"flip a rock" beach.** A pixel Pacific Northwest shoreline at low tide, scattered with rocks and driftwood logs. Tap one with the little hand cursor and it flips up to reveal a tide-pool critter, drawn as a pixel sprite, with a real fact about it. A **field journal** tracks how many of the 40 species you've turned up and remembers them between visits. It's a collect-them-all, not a simulator.
+
+**Files**
+
+- [src/components/hobbies/TidePool.astro](../src/components/hobbies/TidePool.astro) — the markup (journal bar, beach canvas, the reveal popup card) and the mounting `<script>`.
+- [src/lib/hobbies/tidepool.ts](../src/lib/hobbies/tidepool.ts) — the engine: scene building, the flip mechanic, every pixel sprite, the reveal card, and the journal. **Zero dependencies.**
+- [src/lib/hobbies/tidepool-species.ts](../src/lib/hobbies/tidepool-species.ts) — the species dataset (the single source of truth).
+- [src/lib/hobbies/tidepool-photos.json](../src/lib/hobbies/tidepool-photos.json) — optional real photos per species (see “Real photos in the reveal card” below).
+
+### The species data and where the facts come from
+
+The dataset is **40 common PNW tide-pool species**, each tagged with a `category` (16 in all: crabs, hermit crabs, sea stars, anemones, nudibranchs, chitons, snails, limpets, urchins, barnacles, mussels, sculpins, eel-shaped fish, shrimp, sea cucumbers, octopus), two display colors, a relative `size`, a `rarity`, and **two short facts**. On each reveal one fact is picked at random.
+
+Being upfront, since the point is that anyone can learn how this works:
+
+- **The facts are curated, not generated live.** They were written from standard references — Wikipedia and field guides such as *Between Pacific Tides* and the Walla Walla University / Rosario intertidal key — and a representative sample was grounded with live web research while building the dataset. They favor well-established, interesting tidbits over obscure claims.
+- **It's a learning game, not a textbook.** A quick review pass by someone who knows these animals is recommended before treating any single fact as authoritative; the dataset header says the same.
+- **`rarity` weights how often a species turns up** under a flipped rock (common appears far more than rare), so repeat flips stay varied. The journal counts *distinct* species found and persists them in `localStorage` (`tidepool-discovered-v1`), so it accumulates across visits. “New beach” reshuffles the layout without wiping the journal.
+
+### How the pixel art is made
+
+Like the aquarium, the whole beach is **drawn in code** with canvas `fillRect` — no image files in the scene itself.
+
+- **One sprite function per category** (16 of them) draws the critter from its colors and size, snapped to the same `PIX` (4px) grid with image smoothing off. A long species list stays cheap because the art is bounded to ~16 shapes parameterized by color/size, not one drawing per species.
+- **The beach is baked once per scene.** An offscreen layer holds the static parts — a sky→water→wet-sand gradient, a foam line at the waterline, dry and wet sand blotches, ripple marks, scattered pebbles and shells, rockweed tufts, and tide pools with a wet rim and a sky reflection. Each frame just blits that and draws the rocks and logs on top, so the per-frame cost is tiny.
+- **Rocks and logs are detailed and varied.** Rocks are rounded boulders with moss, barnacle clusters, and pock texture in a few stone tints; logs are driftwood billets with end-grain rings, wood grain, knots, and a mossy top edge. Each gets a soft contact shadow.
+- **Layout is seeded, stable, and reshuffleable.** Positions come from a seeded RNG keyed to the canvas width (so resizing doesn't reshuffle the beach), plus a “scene salt” the “New beach” button bumps to deal a fresh layout. The rock-to-log ratio is fixed (~78% rock) so every beach reads as a rocky flat instead of occasionally coming up all logs.
+- It pauses offscreen and when the tab is hidden, honors `prefers-reduced-motion`, and is touch-friendly (tap a rock to flip it).
+
+### Real photos in the reveal card
+
+The reveal card shows the **pixel sprite by default and a real photo when one is available** — the sprite still appears under the rock on the beach either way.
+
+- **Where photos come from.** Optional per-species photos live in [src/lib/hobbies/tidepool-photos.json](../src/lib/hobbies/tidepool-photos.json) as `id → { photo, credit }`. The engine merges that in when it builds the card: if a photo is present it's shown with its attribution line; otherwise — or if the image fails to load (an `onerror` fallback) — the card draws the pixel sprite. So partial coverage is fine and a dead link never breaks the card.
+- **Licensing is the whole point.** Photos are **Creative Commons only**, with attribution shown in the card. The helper [scripts/fetch-tidepool-photos.mjs](../scripts/fetch-tidepool-photos.mjs) (`npm run fetch:tidepool-photos`) queries the iNaturalist API for each species' scientific name, restricted to `cc0,cc-by,cc-by-nc`, prefers research-grade and most-faved observations, downloads the photo to `staging/tide-pooling/` (gitignored), and writes a manifest recording the photographer, license, and source observation URL for review.
+- **Two ways to serve them.** `--wire inat` writes the iNaturalist photo URLs straight into `tidepool-photos.json` (works immediately — the iNat image hosts are allow-listed in CSP). `--wire blob` instead points at your own `hobby-media` copies for self-hosting; upload `staging/tide-pooling/photos/*` to `hobby-media/tide-pooling/species/` first. Either way the attribution travels with the photo. Today it's wired with iNaturalist hotlinks (mostly CC BY-NC / CC BY, a few CC0).
+
 ## Photo galleries (`hobby-media`)
 
 Any hobby can show a photo gallery — a hero image up top plus a thumbnail grid, each click opening the full-resolution original in the same PhotoSwipe lightbox the photography pages use. It's driven by the optional `media` field on the hobby (`hero` + `gallery`), with `mediaTitle` setting the heading (e.g. "My tank"). The render lives in [src/pages/hobbies/[slug].astro](../src/pages/hobbies/%5Bslug%5D.astro) and only appears when `media` is present.
@@ -163,3 +202,32 @@ Any hobby can show a photo gallery — a hero image up top plus a thumbnail grid
 3. Optionally add `caption` text in the JSON, then commit + push. The gallery goes live on the next build.
 
 Web-friendly originals (JPG/PNG/WebP) are stored byte-for-byte as the full-res image; HEIC/TIFF are baked to a high-quality JPEG (HEIC needs `libheif` available to `sharp`). The `--hero` flag (or the first file alphabetically) chooses the large image at the top.
+
+## A personal element on every hobby
+
+Each hobby pairs its playful pixel interactive with something **real and personal**, so the section is a window into the actual hobby and not just a toy:
+
+- **Aquarium** → real photos of the tank (the `hobby-media` gallery above).
+- **Tide pooling** → the species photos in the game are real CC-licensed shots, plus a live grid of the author's own **iNaturalist observations** at the bottom of the page.
+
+New hobbies should follow the same pattern: build the game, then add a genuine personal artifact (photos, a map of real trips, real observations, and so on).
+
+### iNaturalist observations embed
+
+The tide pooling page ends with a live grid of the author's real observations, each linking out to iNaturalist.
+
+- **Component:** [src/components/hobbies/INatObservations.astro](../src/components/hobbies/INatObservations.astro) + logic [src/lib/hobbies/inaturalist.ts](../src/lib/hobbies/inaturalist.ts). It's reusable: any hobby switches it on with an optional `inaturalist` block in its content JSON:
+
+  ```json
+  "inaturalist": {
+    "userId": "trumanbrown",
+    "url": "https://www.inaturalist.org/observations?user_id=trumanbrown",
+    "heading": "My tide pooling observations",
+    "blurb": "…",
+    "iconicTaxa": "Animalia,Mollusca,Actinopterygii"
+  }
+  ```
+
+- **It's lazy and CSP-safe.** The grid stays empty (skeleton tiles) until the section scrolls near the viewport, then a `fetch` to the public iNaturalist API fills it in; thumbnails link to each observation and a “View all on iNaturalist” button links to the full profile. The script is an Astro-processed module, so it satisfies `script-src 'self'`.
+- **Filtering to the right critters.** iNaturalist has no “tide pooling” concept, so the embed filters by `iconic_taxa` — the broad taxonomic buckets. Tide pooling uses `Animalia,Mollusca,Actinopterygii`, which captures crabs, sea stars, anemones, and worms (Animalia), snails/chitons/nudibranchs (Mollusca), and fish (Actinopterygii) while dropping the birds, mammals, insects, and plants from the same account. For tighter curation, make an iNaturalist project and filter by it (the component also accepts a `taxonId`).
+- **CSP additions.** Showing this required allow-listing iNaturalist in [staticwebapp.config.json](../staticwebapp.config.json): the API host in `connect-src` (`https://api.inaturalist.org`) and the two photo CDNs in `img-src` (`https://static.inaturalist.org`, `https://inaturalist-open-data.s3.amazonaws.com`). Those are the only third-party hosts the hobbies section talks to, and they're documented in [docs/security.md](./security.md).

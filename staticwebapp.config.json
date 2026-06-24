@@ -7,7 +7,7 @@
     "X-Frame-Options": "DENY",
     "Referrer-Policy": "strict-origin-when-cross-origin",
     "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=()",
-    "Content-Security-Policy": "default-src 'self'; img-src 'self' https://*.blob.core.windows.net data:; script-src 'self' 'sha256-aDY6k+7Ni9U8YnR4lR1ejy1HFfkBhYOBaiahW0s6MGk=' 'sha256-3cgel1ns/hgDTvF/VcM7MDt0CSZILThGfNquuhB48kA=' https://js.monitor.azure.com; connect-src 'self' https://*.blob.core.windows.net https://*.in.applicationinsights.azure.com https://*.livediagnostics.monitor.azure.com; style-src 'self' 'unsafe-inline'; font-src 'self' data:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+    "Content-Security-Policy": "default-src 'self'; img-src 'self' https://*.blob.core.windows.net https://static.inaturalist.org https://inaturalist-open-data.s3.amazonaws.com data:; script-src 'self' 'sha256-aDY6k+7Ni9U8YnR4lR1ejy1HFfkBhYOBaiahW0s6MGk=' 'sha256-3cgel1ns/hgDTvF/VcM7MDt0CSZILThGfNquuhB48kA=' https://js.monitor.azure.com; connect-src 'self' https://*.blob.core.windows.net https://api.inaturalist.org https://*.in.applicationinsights.azure.com https://*.livediagnostics.monitor.azure.com; style-src 'self' 'unsafe-inline'; font-src 'self' data:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
   },
   "mimeTypes": {
     ".avif": "image/avif",
