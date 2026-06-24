@@ -6,5 +6,38 @@
   "iconSrc": "/hobbies/aquarium-icon.svg",
   "accent": "#0ea5e9",
   "order": 1,
-  "interactive": "aquarium"
+  "interactive": "aquarium",
+  "mediaTitle": "My tank",
+  "media": {
+    "hero": {
+      "src": "https://stphotoprodnowiur.blob.core.windows.net/hobby-media/aquarium-keeping/full/aquarium-full-pic.jpeg",
+      "display": "https://stphotoprodnowiur.blob.core.windows.net/hobby-media/aquarium-keeping/display/aquarium-full-pic.jpg",
+      "width": 6073,
+      "height": 3111,
+      "caption": ""
+    },
+    "gallery": [
+      {
+        "src": "https://stphotoprodnowiur.blob.core.windows.net/hobby-media/aquarium-keeping/full/gourami-and-loach.jpeg",
+        "display": "https://stphotoprodnowiur.blob.core.windows.net/hobby-media/aquarium-keeping/display/gourami-and-loach.jpg",
+        "width": 5147,
+        "height": 3809,
+        "caption": ""
+      },
+      {
+        "src": "https://stphotoprodnowiur.blob.core.windows.net/hobby-media/aquarium-keeping/full/gourami-and-plant.jpeg",
+        "display": "https://stphotoprodnowiur.blob.core.windows.net/hobby-media/aquarium-keeping/display/gourami-and-plant.jpg",
+        "width": 6192,
+        "height": 4128,
+        "caption": ""
+      },
+      {
+        "src": "https://stphotoprodnowiur.blob.core.windows.net/hobby-media/aquarium-keeping/full/hillstream-loach.jpeg",
+        "display": "https://stphotoprodnowiur.blob.core.windows.net/hobby-media/aquarium-keeping/display/hillstream-loach.jpg",
+        "width": 4174,
+        "height": 2783,
+        "caption": ""
+      }
+    ]
+  }
 }
