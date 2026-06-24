@@ -34,6 +34,16 @@ export const siteConfig = {
   sessionsSort: 'orderThenDateDesc' as 'orderThenDateDesc' | 'dateDesc',
 
   /**
+   * Optional top-level sections beyond Photography (which is always the home
+   * page). Toggling a flag shows/hides its co-equal nav link. Pages still
+   * build when a section is off — the flag only controls header discoverability.
+   */
+  sections: {
+    /** Show the "Hobbies" area + its nav link beside Photography. */
+    hobbies: true,
+  },
+
+  /**
    * Public Blob Storage account hostname. Used to build full-res image URLs
    * for the lightbox and to allowlist in CSP. The actual value is plugged in
    * by the IaC deploy; for local dev it can stay as the placeholder.

@@ -1,0 +1,33 @@
+---
+import { getCollection, type CollectionEntry } from 'astro:content';
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import AquariumTank from '@/components/hobbies/AquariumTank.astro';
+import { hobbySlug } from '@/lib/hobbies';
+
+export async function getStaticPaths() {
+  const hobbies = await getCollection('hobbies');
+  return hobbies.map((entry) => ({
+    params: { slug: hobbySlug(entry) },
+    props: { entry },
+  }));
+}
+
+interface Props {
+  entry: CollectionEntry<'hobbies'>;
+}
+
+const { entry } = Astro.props;
+const { title, summary, intro, interactive } = entry.data;
+---
+
+<BaseLayout title={title} description={summary} section="hobbies">
+  <article class="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+    <header class="mb-6 space-y-2">
+      <a href="/hobbies" class="text-xs text-neutral-600 no-underline hover:underline dark:text-neutral-400">← All hobbies</a>
+      <h1 class="text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h1>
+      {intro && <p class="max-w-prose text-sm text-neutral-700 dark:text-neutral-300">{intro}</p>}
+    </header>
+
+    {interactive === 'aquarium' && <AquariumTank />}
+  </article>
+</BaseLayout>

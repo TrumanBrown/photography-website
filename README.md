@@ -16,6 +16,7 @@ Personal photography portfolio. Photos live in Azure Blob Storage; the website i
 | What Infrastructure-as-Code (Bicep) is and what each `.bicep` file does | [docs/iac-bicep.md](docs/iac-bicep.md) |
 | How the GitHub Actions workflows work and why | [docs/cicd.md](docs/cicd.md) |
 | How a photo travels from your camera to the live site | [docs/image-pipeline.md](docs/image-pipeline.md) |
+| The optional **Hobbies** section + interactive islands | [docs/hobbies.md](docs/hobbies.md) |
 | Editing session metadata from the browser (`/admin`) | [docs/admin.md](docs/admin.md) |
 | Privacy-friendly traffic analytics (`/admin` Analytics tab) | [docs/analytics.md](docs/analytics.md) |
 | How the site is hardened (CSP, HSTS, etc.) | [docs/security.md](docs/security.md) |
@@ -27,7 +28,7 @@ Personal photography portfolio. Photos live in Azure Blob Storage; the website i
 
 ## Tech at a glance
 
-- **Frontend:** Astro 5 + Tailwind v4 (static build, near-zero JS) — see [docs/architecture.md](docs/architecture.md)
+- **Frontend:** Astro 5 + Tailwind v3 (static build, near-zero JS) — see [docs/architecture.md](docs/architecture.md)
 - **Hosting:** Azure Static Web Apps (Free tier) — see [docs/azure.md](docs/azure.md)
 - **Storage:** Azure Blob Storage, four containers: `originals`, `derivatives`, `variants`, `metadata` — see [docs/image-pipeline.md](docs/image-pipeline.md)
 - **Domain + DNS:** Azure App Service Domain + Azure DNS

@@ -1,0 +1,103 @@
+---
+/**
+ * Interactive planted-aquarium stocking sandbox.
+ *
+ * Markup is intentionally static and data-free — the species palette and
+ * stocking list are built at runtime by the engine in @/lib/hobbies/aquarium.
+ * The engine binds to the [data-aquarium-*] hooks below. The <script> is an
+ * Astro-processed module (served from /_astro/), so it satisfies the strict
+ * `script-src 'self'` CSP without any inline-hash bookkeeping.
+ */
+---
+
+<section data-aquarium aria-label="Interactive planted aquarium" class="not-prose">
+  <div class="overflow-hidden rounded-xl border border-neutral-200 bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-900">
+    <canvas
+      data-aquarium-canvas
+      class="block w-full touch-manipulation"
+      style="image-rendering: pixelated"
+      role="img"
+      aria-label="A planted freshwater tank. Add fish using the controls below."></canvas>
+  </div>
+
+  <div class="mt-4 grid gap-4 lg:grid-cols-[1fr_18rem]">
+    <div>
+      <h2 class="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+        Add a species
+      </h2>
+      <div data-aquarium-palette class="flex max-h-44 flex-wrap gap-2 overflow-y-auto pr-1"></div>
+      <p class="mt-3 text-xs text-neutral-500 dark:text-neutral-500">
+        Tap a species to add one, then tap in the tank to drop more. The bioload meter is just for fun,
+        so always look up a fish before you buy it.
+      </p>
+    </div>
+
+    <div class="space-y-4 rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
+      <div>
+        <div class="flex items-center justify-between text-sm">
+          <label for="aquarium-gallons" class="font-medium">Tank size</label>
+          <span data-aquarium-gallons-label class="tabular-nums text-neutral-600 dark:text-neutral-400">20 gal</span>
+        </div>
+        <input
+          id="aquarium-gallons"
+          data-aquarium-gallons
+          type="range"
+          min="5"
+          max="75"
+          step="5"
+          value="20"
+          class="mt-2 w-full accent-sky-500"
+        />
+      </div>
+
+      <div>
+        <div class="flex items-center justify-between text-sm">
+          <span class="font-medium">Bioload</span>
+          <span data-aquarium-bioload-label class="tabular-nums text-neutral-600 dark:text-neutral-400">0%</span>
+        </div>
+        <div class="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800">
+          <div data-aquarium-bioload-bar class="h-full w-0 rounded-full transition-all duration-300" style="background-color:#10b981"></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="mb-1 flex items-center justify-between text-sm">
+          <span class="font-medium">In the tank</span>
+          <button
+            type="button"
+            data-aquarium-reset
+            class="rounded px-2 py-0.5 text-xs text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
+          >Reset</button>
+        </div>
+        <ul data-aquarium-stock class="space-y-1 text-sm text-neutral-700 dark:text-neutral-300"></ul>
+        <p data-aquarium-empty class="text-xs text-neutral-500" hidden>Empty tank. Add a species to get started.</p>
+        <p data-aquarium-warn class="mt-1 text-xs text-amber-600 dark:text-amber-500" hidden></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="mt-10" aria-label="My tank">
+  <h2 class="mb-3 text-lg font-medium">My tank</h2>
+  <figure class="overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-800">
+    {/* Placeholder image. To use your own photo, drop it in public/hobbies/ and update this src. */}
+    <img
+      src="/hobbies/my-tank-placeholder.svg"
+      alt="A photo of my planted aquarium will go here"
+      width="1200"
+      height="800"
+      loading="lazy"
+      class="block aspect-[3/2] w-full bg-neutral-100 object-cover dark:bg-neutral-900"
+    />
+    <figcaption class="px-4 py-3 text-sm text-neutral-600 dark:text-neutral-400">
+      Placeholder for now. A photo of my actual tank is going here soon.
+    </figcaption>
+  </figure>
+</section>
+
+<script>
+  import { initAquarium } from '@/lib/hobbies/aquarium';
+
+  const root = document.querySelector<HTMLElement>('[data-aquarium]');
+  if (root) initAquarium(root);
+</script>

@@ -11,6 +11,9 @@ export const siteConfig = {
   domain: 'janedoe.com',
   defaultLocale: 'en-US',
   sessionsSort: 'orderThenDateDesc' as 'orderThenDateDesc' | 'dateDesc',
+  sections: {
+    hobbies: true,
+  },
   blobHost: 'stphotographyprodxyz.blob.core.windows.net',
 } as const;
 

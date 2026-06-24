@@ -1,0 +1,28 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import { hobbySlug } from '@/lib/hobbies';
+
+interface Props {
+  entry: CollectionEntry<'hobbies'>;
+}
+
+const { entry } = Astro.props;
+const slug = hobbySlug(entry);
+const { title, summary, emoji, accent } = entry.data;
+---
+
+<a href={`/hobbies/${slug}`} class="group block h-full no-underline">
+  <div class="flex h-full flex-col gap-4 rounded-lg border border-neutral-200 p-5 transition-colors hover:border-neutral-300 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:border-neutral-700 dark:hover:bg-neutral-900">
+    <div
+      class="flex h-14 w-14 items-center justify-center rounded-lg bg-neutral-100 text-3xl dark:bg-neutral-800"
+      style={accent ? `background-color:${accent}1a` : undefined}
+      aria-hidden="true"
+    >
+      {emoji}
+    </div>
+    <div class="space-y-1">
+      <h2 class="text-base font-medium group-hover:underline">{title}</h2>
+      <p class="text-sm text-neutral-600 dark:text-neutral-400">{summary}</p>
+    </div>
+  </div>
+</a>

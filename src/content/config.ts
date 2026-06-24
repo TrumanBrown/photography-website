@@ -58,4 +58,37 @@ const sessions = defineCollection({
   }),
 });
 
-export const collections = { sessions };
+/**
+ * Hobbies collection — one entry per hobby in the (optional) Hobbies section.
+ * Hand-authored JSON committed to the repo (unlike sessions, which prebuild
+ * generates from Blob Storage). Each hobby page may mount one self-contained
+ * interactive island.
+ *
+ * File: src/content/hobbies/<slug>.json
+ */
+const hobbies = defineCollection({
+  type: 'data',
+  schema: z.object({
+    title: z.string(),
+    /** Short blurb shown on the hobby card. */
+    summary: z.string(),
+    /** A sentence or two shown on the hobby page above the interactive. */
+    intro: z.string().default(''),
+    /** Emoji used as the card icon (keeps the grid asset-free). */
+    emoji: z.string().default('•'),
+    /** Optional hex accent (e.g. '#0ea5e9') tinting the card icon tile. */
+    accent: z.string().optional(),
+    /** Explicit ordering on the hobbies landing page (ascending). */
+    order: z.number().int().nullable().optional(),
+    /**
+     * Which interactive island to mount on the hobby page. One island per
+     * hobby; null/omitted renders the page without an interactive.
+     */
+    interactive: z
+      .enum(['aquarium', 'travel-map', 'wa-fishing', 'pixel-hike', 'repo-explorer'])
+      .nullable()
+      .optional(),
+  }),
+});
+
+export const collections = { sessions, hobbies };

@@ -14,9 +14,14 @@ interface Props {
   ogImage?: string;
   /** Slug of the current session, for nav highlight. */
   activeSlug?: string;
+  /**
+   * Top-level section. 'photography' (default) shows the sessions sidebar and
+   * its hamburger; 'hobbies' hides them and highlights the Hobbies nav item.
+   */
+  section?: 'photography' | 'hobbies';
 }
 
-const { title, description, ogImage, activeSlug } = Astro.props;
+const { title, description, ogImage, activeSlug, section = 'photography' } = Astro.props;
 const pageTitle = title ? `${title} — ${siteConfig.siteTitle}` : siteConfig.siteTitle;
 const pageDescription = description ?? siteConfig.siteDescription;
 const siteOrigin = Astro.site ?? `https://${siteConfig.domain}`;
@@ -54,9 +59,9 @@ const ogImageAbsolute = ogImage
   </head>
   <body class="min-h-screen">
     <div class="flex min-h-screen lg:flex-row">
-      <SessionNav activeSlug={activeSlug} />
+      {section === 'photography' && <SessionNav activeSlug={activeSlug} />}
       <div class="flex min-h-screen min-w-0 flex-1 flex-col">
-        <Header />
+        <Header section={section} />
         <main class="flex-1">
           <slot />
         </main>
