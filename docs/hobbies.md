@@ -151,7 +151,7 @@ Everything you see in the tank — fish, plants, rocks, driftwood, bubbles, ligh
 
 ## Reference implementation 2: the tide pooling island
 
-A **"flip a rock" beach.** A pixel Pacific Northwest shoreline at low tide, scattered with rocks and driftwood logs. Tap one with the little hand cursor and it flips up to reveal a tide-pool critter, drawn as a pixel sprite, with a real fact about it. A **field journal** tracks how many of the 40 species you've turned up and remembers them between visits. It's a collect-them-all, not a simulator.
+A **"flip a rock" beach.** A pixel Pacific Northwest shoreline at low tide, scattered with rocks and driftwood logs. Tap one with the little hand cursor and it flips up to reveal a tide-pool critter, drawn as a pixel sprite, with a real fact about it. Click the same rock again and it lowers back down over the same critter. Flip everything you can, then start a new beach for a fresh set. A **field journal** tracks how many of the 40 species you've turned up and remembers them between visits. It's a collect-them-all, not a simulator.
 
 **Files**
 
@@ -168,7 +168,7 @@ Being upfront, since the point is that anyone can learn how this works:
 
 - **The facts are curated, not generated live.** They were written from standard references — Wikipedia and field guides such as *Between Pacific Tides* and the Walla Walla University / Rosario intertidal key — and a representative sample was grounded with live web research while building the dataset. They favor well-established, interesting tidbits over obscure claims.
 - **It's a learning game, not a textbook.** A quick review pass by someone who knows these animals is recommended before treating any single fact as authoritative; the dataset header says the same.
-- **`rarity` weights how often a species turns up** under a flipped rock (common appears far more than rare), so repeat flips stay varied. The journal counts *distinct* species found and persists them in `localStorage` (`tidepool-discovered-v1`), so it accumulates across visits. “New beach” reshuffles the layout without wiping the journal.
+- **`rarity` weights which species a rock hides** when it's first flipped (common appears far more than rare). Each rock keeps that one critter for the life of the beach, so re-clicking a rock shows the same animal rather than rerolling. To turn up new species you start a new beach. The journal counts *distinct* species found and persists them in `localStorage` (`tidepool-discovered-v1`), so it accumulates across visits. “New beach” reshuffles the layout without wiping the journal.
 
 ### How the pixel art is made
 

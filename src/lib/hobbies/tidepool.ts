@@ -321,6 +321,7 @@ interface Stone {
   w: number;
   h: number;
   lift: number; // 0 = resting, 1 = fully flipped
+  open: boolean; // toggled by clicking: flipped up vs. lowered back down
   species: TidepoolSpecies | null;
   base: string; // per-stone color
   detail: Detail[]; // precomputed moss/barnacle/grain flecks (local coords)
@@ -423,7 +424,7 @@ export function initTidepool(root: HTMLElement): void {
       const h = kind === 'log' ? 20 + r() * 6 : big ? 40 + r() * 16 : 24 + r() * 12;
       const x = ((i + 0.5) / count) * W + (r() - 0.5) * 50;
       const y = sub + r() * (H - sub - 50) + 24;
-      stones.push({ kind, x, y, w, h, lift: 0, species: null, base: '', detail: [] });
+      stones.push({ kind, x, y, w, h, lift: 0, open: false, species: null, base: '', detail: [] });
     }
     stones.sort((a, b) => a.y - b.y);
     for (const s of stones) decorateStone(s, r);
@@ -643,7 +644,7 @@ export function initTidepool(root: HTMLElement): void {
   // ------------------------------------------------------------- the loop
   function update(dt: number): void {
     for (const s of stones) {
-      const target = s.species ? 1 : 0;
+      const target = s.open ? 1 : 0;
       if (s.lift < target) s.lift = Math.min(target, s.lift + dt * 4);
       else if (s.lift > target) s.lift = Math.max(target, s.lift - dt * 4);
     }
@@ -670,9 +671,18 @@ export function initTidepool(root: HTMLElement): void {
   }
 
   // ----------------------------------------------------------- discovery
+  // Clicking a stone toggles it: flip it up to reveal its critter, click again
+  // to lower it back down. The animal underneath is assigned once and stays the
+  // same. To get new critters, start a new beach.
   function flip(s: Stone): void {
-    const sp = pickSpecies(s.species?.id);
-    s.species = sp;
+    if (s.open) {
+      s.open = false;
+      card!.classList.remove('tp-open');
+      return;
+    }
+    s.open = true;
+    if (!s.species) s.species = pickSpecies();
+    const sp = s.species;
     const isNew = !discovered.has(sp.id);
     if (isNew) {
       discovered.add(sp.id);
@@ -769,7 +779,10 @@ export function initTidepool(root: HTMLElement): void {
     if (e.target === card) card.classList.remove('tp-open');
   });
   resetBtn?.addEventListener('click', () => {
-    for (const s of stones) s.species = null;
+    for (const s of stones) {
+      s.species = null;
+      s.open = false;
+    }
     sceneSalt++;
     buildScene();
   });
