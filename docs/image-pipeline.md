@@ -1,4 +1,4 @@
-# Image pipeline — how a photo gets from your camera to the live site
+# Image pipeline: how a photo gets from your camera to the live site
 
 > Audience: anyone uploading photos. Read this once to understand what happens when you drop a folder in Blob.
 
@@ -28,7 +28,7 @@
 
 Two paths to the visitor:
 - **Thumbnails + responsive variants** ship inside the SWA deploy. Tiny, optimized, multiple sizes.
-- **Full-resolution originals** stay in Blob and load only when the lightbox is opened. The lightbox has a **download button** that saves the original file (fetched cross-origin from Blob — allowed by the storage account's CORS rules and the site's `connect-src` CSP).
+- **Full-resolution originals** stay in Blob and load only when the lightbox is opened. The lightbox has a **download button** that saves the original file (fetched cross-origin from Blob, allowed by the storage account's CORS rules and the site's `connect-src` CSP).
 
 ---
 
@@ -36,13 +36,13 @@ Two paths to the visitor:
 
 ### Tools
 
-- **Azure Storage Explorer** (free desktop app from Microsoft, GUI) — easiest if you have a few hundred files.
-- **`az storage blob upload-batch`** (CLI) — easiest for scripted bulk uploads or remote work.
-- (Future) **admin upload UI on the site itself** — not built yet; see [architecture.md](architecture.md).
+- **Azure Storage Explorer** (free desktop app from Microsoft, GUI), easiest if you have a few hundred files.
+- **`az storage blob upload-batch`** (CLI), easiest for scripted bulk uploads or remote work.
+- (Future) **admin upload UI on the site itself**: not built yet; see [architecture.md](architecture.md).
 
 ### Folder convention
 
-Each top-level prefix in the `originals` container is one session. (Azure Blob doesn't actually have folders — it uses "prefixes" in blob names, e.g. `2025-china-trip/IMG_0001.jpg`. Same thing visually in any GUI.)
+Each top-level prefix in the `originals` container is one session. (Azure Blob doesn't actually have folders, it uses "prefixes" in blob names, e.g. `2025-china-trip/IMG_0001.jpg`. Same thing visually in any GUI.)
 
 ```
 originals/
@@ -104,7 +104,7 @@ Anything else is silently ignored. Add the extension to the matching set in `scr
 
 Three triggers can start a build (see [cicd.md](cicd.md)):
 - Push to `main` (you changed code)
-- Hourly cron (most common — picks up new photos automatically)
+- Hourly cron (most common, picks up new photos automatically)
 - Manual "Run workflow" click (impatience)
 
 What happens inside `scripts/prebuild.mjs`:
@@ -126,7 +126,7 @@ What happens inside `scripts/prebuild.mjs`:
    - Write `src/content/sessions/<slug>.json` for Astro to consume.
 5. **Save the updated manifest** back to `metadata/manifest.json`.
 
-The cache key is the blob ETag, which Azure changes every time a blob is modified — so renames or content changes invalidate cleanly.
+The cache key is the blob ETag, which Azure changes every time a blob is modified, so renames or content changes invalidate cleanly.
 
 ---
 
@@ -137,7 +137,7 @@ The cache key is the blob ETag, which Azure changes every time a blob is modifie
 **The solution:** convert RAW → TIFF → JPEG during the build:
 
 1. Download the RAW from Blob.
-2. Run `dcraw_emu -w -q 3 -T -o 1 <file>` — produces a high-quality TIFF in sRGB.
+2. Run `dcraw_emu -w -q 3 -T -o 1 <file>`, produces a high-quality TIFF in sRGB.
    - `-w` = use the camera's white balance
    - `-q 3` = highest-quality demosaicing (AHD)
    - `-T` = TIFF output
@@ -160,12 +160,12 @@ If you add a new RAW format, just add its lowercase extension to the `RAW_EXTS` 
 
 Once `src/content/sessions/` is populated, Astro's `astro build` does the rest:
 
-- **Content collection** — Astro reads each `<slug>.json` against the Zod schema in `src/content/config.ts`. Schema violations abort the build (good — catches bad sidecars before they reach prod).
-- **Image optimization** — every reference to a session image goes through `<Picture>`, which during build calls sharp to produce:
+- **Content collection.** Astro reads each `<slug>.json` against the Zod schema in `src/content/config.ts`. Schema violations abort the build, which is good: it catches bad sidecars before they reach prod.
+- **Image optimization**: every reference to a session image goes through `<Picture>`, which during build calls sharp to produce:
   - Multiple widths: 480, 800, 1200 px on cards, plus 1600 px on session pages
-  - Two formats per width: WebP (broadly supported, small) and JPEG (universal fallback). AVIF is intentionally **not** generated — its encoder is several times slower than WebP and would dominate build time for little extra savings.
-- **Static HTML** — every page is pre-rendered to a `.html` file. The `<picture>` tags contain `srcset` listing every variant; the browser picks the right one.
-- **Lightbox URL** — each image's full-res URL (either the original or the RAW-derived sidecar) is baked into the rendered HTML as `data-pswp-*` attributes. The lightbox loads it on click — never on initial page render.
+  - Two formats per width: WebP (broadly supported, small) and JPEG (universal fallback). AVIF is intentionally **not** generated: its encoder is several times slower than WebP and would dominate build time for little extra savings.
+- **Static HTML**: every page is pre-rendered to a `.html` file. The `<picture>` tags contain `srcset` listing every variant; the browser picks the right one.
+- **Lightbox URL.** Each image's full-res URL (either the original or the RAW-derived sidecar) is baked into the rendered HTML as `data-pswp-*` attributes. The lightbox loads it on click, never on initial page render.
 
 The output is a `dist/` folder of self-contained static files.
 
@@ -202,7 +202,7 @@ Incremental builds (only one new photo since last run) are usually under 90 seco
 
 | Path in repo | Contents |
 |---|---|
-| `src/content/sessions/*.json` | Per-session metadata + image list. Gitignored — written fresh by prebuild every run. |
+| `src/content/sessions/*.json` | Per-session metadata + image list. Gitignored, written fresh by prebuild every run. |
 | `src/content/sessions/<slug>/images/*` | The actual JPEGs Astro processes. Gitignored. |
 | `dist/` | The built site. Gitignored. Recreated every build. |
 | `.cache/prebuild/` | Local cache of downloaded blobs keyed by ETag. Gitignored. Persisted between CI runs via `actions/cache`. |

@@ -22,7 +22,7 @@ interface Props {
 }
 
 const { title, description, ogImage, activeSlug, section = 'photography' } = Astro.props;
-const pageTitle = title ? `${title} — ${siteConfig.siteTitle}` : siteConfig.siteTitle;
+const pageTitle = title ? `${title} | ${siteConfig.siteTitle}` : siteConfig.siteTitle;
 const pageDescription = description ?? siteConfig.siteDescription;
 const siteOrigin = Astro.site ?? `https://${siteConfig.domain}`;
 const canonical = new URL(Astro.url.pathname, siteOrigin).toString();

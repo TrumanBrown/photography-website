@@ -193,7 +193,7 @@
       const json = await res.json();
 
       if (json.ok) {
-        feedback.textContent = 'Message sent — thank you!';
+        feedback.textContent = 'Message sent. Thank you!';
         feedback.className = 'rounded-md bg-green-50 p-3 text-sm text-green-800 dark:bg-green-950 dark:text-green-200';
         form.reset();
         charCount.textContent = '0';
@@ -203,7 +203,7 @@
         feedback.className = 'rounded-md bg-red-50 p-3 text-sm text-red-800 dark:bg-red-950 dark:text-red-200';
       }
     } catch {
-      feedback.textContent = 'Network error — please try again.';
+      feedback.textContent = 'Network error. Please try again.';
       feedback.className = 'rounded-md bg-red-50 p-3 text-sm text-red-800 dark:bg-red-950 dark:text-red-200';
     } finally {
       btn.disabled = false;

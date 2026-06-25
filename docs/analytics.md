@@ -1,4 +1,4 @@
-# Analytics — privacy-friendly traffic metrics
+# Analytics: privacy-friendly traffic metrics
 
 > Audience: site owner. Explains how the built-in analytics work, what's collected (and deliberately not), and how to read the numbers in `/admin`.
 
@@ -7,12 +7,12 @@
 A lightweight, self-hosted analytics pipeline that records pageviews and time-on-page, then shows them in the **Analytics tab** of `/admin`. No Google Analytics, no third parties, no cookies.
 
 Metrics shown:
-- **Pageviews** — total page loads in the selected range.
-- **Unique visitors** — distinct visitors per day (see privacy note below).
-- **Avg. time on page** — how long visitors stay.
-- **Pageviews per day** — a simple bar chart over the range.
-- **Top pages** — most-viewed pages.
-- **Top referrers** — where visitors came from (hostname only).
+- **Pageviews**: total page loads in the selected range.
+- **Unique visitors**: distinct visitors per day (see privacy note below).
+- **Avg. time on page**: how long visitors stay.
+- **Pageviews per day**: a simple bar chart over the range.
+- **Top pages**: most-viewed pages.
+- **Top referrers**: where visitors came from (hostname only).
 
 Range is selectable: last 7, 30, or 90 days.
 
@@ -45,7 +45,7 @@ navigator.sendBeacon → POST /api/track { type:'dur', sid, pvid, dur }
 This follows the **cookieless, no-PII** approach used by privacy-first analytics tools (Plausible, Fathom):
 
 - **No IP address is ever stored.** To count unique visitors, the `/api/track` function computes `sha256(ip + user-agent + date + salt)` and stores only the first 16 hex chars. The raw IP is used for the hash and immediately discarded.
-- **No cross-day tracking.** The hash includes the current date, so the same visitor produces a *different* hash tomorrow — by design. This means "unique visitors" is counted per-day; a visitor returning on a later day counts again. This is the privacy feature, not a bug.
+- **No cross-day tracking.** The hash includes the current date, so the same visitor produces a *different* hash tomorrow, by design. This means "unique visitors" is counted per-day; a visitor returning on a later day counts again. This is the privacy feature, not a bug.
 - **No cookies / no localStorage identifiers.** The only client state is an ephemeral `sessionStorage` session id used to correlate a pageview with its duration beacon; it's cleared when the tab closes.
 - **Referrers stored as hostname only** (e.g. `google.com`), never full URLs with query strings.
 - **Bots are filtered** by user-agent so they don't inflate the numbers.
@@ -60,15 +60,15 @@ This follows the **cookieless, no-PII** approach used by privacy-first analytics
 
 ## Configuration
 
-- **`ANALYTICS_SALT`** (optional SWA env var) — extra secret mixed into the visitor hash. Defaults to a constant if unset. Set it to make hashes unguessable; changing it resets unique-visitor correlation.
+- **`ANALYTICS_SALT`** (optional SWA env var), extra secret mixed into the visitor hash. Defaults to a constant if unset. Set it to make hashes unguessable; changing it resets unique-visitor correlation.
 - No other setup. `/api/track` uses the same `AZURE_STORAGE_CONNECTION_STRING` as the contact form.
 
 ## Files
 
-- [api/track/index.js](../api/track/index.js) — the anonymous beacon endpoint.
-- [src/lib/analytics.ts](../src/lib/analytics.ts) — the client beacon (bundled into every page via BaseLayout).
-- [api/sessionmgr/index.js](../api/sessionmgr/index.js) — `?type=analytics` aggregation (admin-only).
-- [src/lib/admin.ts](../src/lib/admin.ts) — the Analytics tab rendering.
+- [api/track/index.js](../api/track/index.js), the anonymous beacon endpoint.
+- [src/lib/analytics.ts](../src/lib/analytics.ts), the client beacon (bundled into every page via BaseLayout).
+- [api/sessionmgr/index.js](../api/sessionmgr/index.js), `?type=analytics` aggregation (admin-only).
+- [src/lib/admin.ts](../src/lib/admin.ts), the Analytics tab rendering.
 
 ## Reading the numbers honestly
 

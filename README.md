@@ -1,8 +1,10 @@
 # photography-website
 
-Personal photography portfolio. Photos live in Azure Blob Storage; the website is a static Astro build hosted on Azure Static Web Apps. Drop a folder of photos into Blob, the site updates itself on the next build.
+A personal website built around a photography portfolio, with a **Hobbies** section of small hand-drawn interactive toys, a browser-based **admin panel** for editing content, a contact form, and privacy-friendly **traffic analytics**. Photos live in Azure Blob Storage and the site is a static Astro build hosted on Azure Static Web Apps. Drop a folder of photos into Blob and the site picks them up on the next build.
 
-**Why each piece exists** — see [docs/architecture.md](docs/architecture.md).
+The project started as a photography portfolio and has grown into a small personal site. The portfolio is still the home page; everything else (hobbies, admin, analytics, the contact form) sits beside it and can be toggled off in [site.config.ts](site.config.ts).
+
+**Why each piece exists**: see [docs/architecture.md](docs/architecture.md).
 **New to any of this?** Start with [docs/glossary.md](docs/glossary.md).
 
 ---
@@ -20,7 +22,7 @@ Personal photography portfolio. Photos live in Azure Blob Storage; the website i
 | Editing session metadata from the browser (`/admin`) | [docs/admin.md](docs/admin.md) |
 | Privacy-friendly traffic analytics (`/admin` Analytics tab) | [docs/analytics.md](docs/analytics.md) |
 | How the site is hardened (CSP, HSTS, etc.) | [docs/security.md](docs/security.md) |
-| Running locally — npm, dev server, fixtures | [docs/local-dev.md](docs/local-dev.md) |
+| Running locally, npm, dev server, fixtures | [docs/local-dev.md](docs/local-dev.md) |
 | **What personal info ends up in the public repo (and what doesn't)** | [docs/privacy.md](docs/privacy.md) |
 | Glossary of every term used here | [docs/glossary.md](docs/glossary.md) |
 
@@ -28,14 +30,17 @@ Personal photography portfolio. Photos live in Azure Blob Storage; the website i
 
 ## Tech at a glance
 
-- **Frontend:** Astro 5 + Tailwind v3 (static build, near-zero JS) — see [docs/architecture.md](docs/architecture.md)
-- **Hosting:** Azure Static Web Apps (Free tier) — see [docs/azure.md](docs/azure.md)
-- **Storage:** Azure Blob Storage, four containers: `originals`, `derivatives`, `variants`, `metadata` — see [docs/image-pipeline.md](docs/image-pipeline.md)
+- **Frontend:** Astro 5 + Tailwind v3 (static build, near-zero JS), see [docs/architecture.md](docs/architecture.md)
+- **Interactive hobbies:** hand-drawn canvas pixel-art islands (aquarium, tide-pooling, fishing) with zero runtime dependencies, see [docs/hobbies.md](docs/hobbies.md)
+- **Dynamic API:** three Azure Functions bundled with SWA (contact form, admin session manager, analytics beacon), see [docs/architecture.md](docs/architecture.md)
+- **Admin + analytics:** browser `/admin` panel gated by GitHub sign-in, cookieless traffic metrics, see [docs/admin.md](docs/admin.md) and [docs/analytics.md](docs/analytics.md)
+- **Hosting:** Azure Static Web Apps (Free tier), see [docs/azure.md](docs/azure.md)
+- **Storage:** Azure Blob Storage across four containers (`originals`, `derivatives`, `variants`, `metadata`), see [docs/image-pipeline.md](docs/image-pipeline.md)
 - **Domain + DNS:** Azure App Service Domain + Azure DNS
-- **IaC:** Bicep — see [docs/iac-bicep.md](docs/iac-bicep.md)
-- **CI/CD:** GitHub Actions, OIDC federation (no long-lived secrets) — see [docs/cicd.md](docs/cicd.md)
-- **Cost target:** ~$2–3/month at personal traffic (incl. `.com` domain) — see [docs/azure.md#monthly-cost](docs/azure.md#monthly-cost)
-- **What about your name/address/etc. in this repo?** — see [docs/privacy.md](docs/privacy.md)
+- **IaC:** Bicep, see [docs/iac-bicep.md](docs/iac-bicep.md)
+- **CI/CD:** GitHub Actions, OIDC federation (no long-lived secrets), see [docs/cicd.md](docs/cicd.md)
+- **Cost target:** ~$2–3/month at personal traffic (incl. `.com` domain), see [docs/azure.md#monthly-cost](docs/azure.md#monthly-cost)
+- **What about your name/address/etc. in this repo?** See [docs/privacy.md](docs/privacy.md)
 
 ---
 
@@ -67,14 +72,14 @@ Full walkthrough with explanations in [docs/azure.md](docs/azure.md) and [docs/c
 ### 1. Fill in placeholders
 
 Edit [site.config.ts](site.config.ts):
-- `ownerName` — your full name (drives footer + EXIF copyright; **becomes public when you push**)
-- `siteTitle`, `siteDescription` — taste
-- `domain` — apex domain you'll register (e.g. `<yourname>.com`)
-- `copyrightStartYear` — current year on first deploy
+- `ownerName`, your full name (drives footer + EXIF copyright; **becomes public when you push**)
+- `siteTitle`, `siteDescription`, taste
+- `domain`, apex domain you'll register (e.g. `<yourname>.com`)
+- `copyrightStartYear`, current year on first deploy
 
 Edit [infra/main.parameters.json](infra/main.parameters.json):
-- `githubOwner` — your GitHub username/org
-- `domainName` — leave `""` on first deploy if you want infra up before registering a domain; fill in and re-deploy later
+- `githubOwner`, your GitHub username/org
+- `domainName`, leave `""` on first deploy if you want infra up before registering a domain; fill in and re-deploy later
 
 > Full inventory of what becomes public and what stays private: [docs/privacy.md](docs/privacy.md).
 
@@ -111,7 +116,7 @@ az appservice domain create \
   --accept-terms
 ```
 
-`contact.json` format: <https://learn.microsoft.com/azure/app-service/manage-custom-dns-buy-domain>. **Gitignored** — never commit it.
+`contact.json` format: <https://learn.microsoft.com/azure/app-service/manage-custom-dns-buy-domain>. **Gitignored**: never commit it.
 
 Then set `domainName` in `infra/main.parameters.json` and re-run the Infra workflow, then bind the apex/www domains:
 
@@ -127,7 +132,7 @@ After the first infra deploy, set `blobHost` in [site.config.ts](site.config.ts)
 
 ## Adding a session
 
-The easy way — drop photos in `staging/` and run the upload script:
+The easy way, drop photos in `staging/` and run the upload script:
 
 ```bash
 # 1. Put your photos in a named folder under staging/
@@ -162,7 +167,7 @@ Two options:
   }
   ```
 
-Changes go live on the next build — click **Run workflow** on `Build and Deploy`
+Changes go live on the next build, click **Run workflow** on `Build and Deploy`
 (or **Rebuild Site** in the admin panel) for a ~5 minute publish, or wait for the cron.
 
 Full pipeline walkthrough: [docs/image-pipeline.md](docs/image-pipeline.md).
@@ -173,19 +178,23 @@ Full pipeline walkthrough: [docs/image-pipeline.md](docs/image-pipeline.md).
 
 ```
 photography-website/
-├── .github/workflows/         # CI/CD — see docs/cicd.md
+├── .github/workflows/         # CI/CD, see docs/cicd.md
+├── api/                       # Azure Functions: contact, sessionmgr, track
 ├── docs/                      # detailed docs (you are reading the index)
-├── infra/                     # Bicep IaC — see docs/iac-bicep.md
+├── infra/                     # Bicep IaC, see docs/iac-bicep.md
 ├── public/                    # static assets copied verbatim to the site root
 ├── scripts/                   # prebuild + bootstrap shell scripts
 ├── src/
 │   ├── components/            # Astro components (Header, SessionNav, Lightbox, …)
-│   ├── content/               # content collection (sessions populated by prebuild)
+│   │   └── hobbies/           # interactive island mounts (aquarium, tide pool, fishing)
+│   ├── content/               # content collections (sessions + hobbies)
 │   ├── layouts/               # page shells
-│   ├── lib/                   # blob URL helper, session sort, theme bootstrap
-│   ├── pages/                 # route definitions
+│   ├── lib/                   # blob URL helper, session sort, theme, admin, analytics
+│   │   └── hobbies/           # canvas pixel-art engines (zero dependencies)
+│   ├── pages/                 # route definitions (incl. /admin and /hobbies)
 │   └── styles/                # Tailwind entry
 ├── site.config.ts             # display config (committed; not for secrets)
-├── staticwebapp.config.json   # SWA headers + routing — see docs/security.md
+├── site.config.example.ts     # template for new clones
+├── staticwebapp.config.json   # SWA headers + routing, see docs/security.md
 └── README.md                  # this file
 ```

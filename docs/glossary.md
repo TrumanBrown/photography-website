@@ -4,7 +4,7 @@ Every term used in these docs, in alphabetical order. If anything still feels un
 
 ### apex (domain)
 
-The "root" of a domain — `yoursite.com`, no `www.` or other subdomain. Some DNS providers can't put certain record types at the apex; Azure DNS can.
+The "root" of a domain, `yoursite.com`, no `www.` or other subdomain. Some DNS providers can't put certain record types at the apex; Azure DNS can.
 
 ### ARM template
 
@@ -64,7 +64,7 @@ The JPEG sidecar generated from a RAW file. Stored in the `derivatives` containe
 
 ### EXIF
 
-The metadata embedded in image files by cameras — capture date, camera model, settings, GPS, etc. Our prebuild reads EXIF to derive a session's earliest date when no `_session.json` provides one. We also embed a copyright EXIF tag during RAW conversion.
+The metadata embedded in image files by cameras, capture date, camera model, settings, GPS, etc. Our prebuild reads EXIF to derive a session's earliest date when no `_session.json` provides one. We also embed a copyright EXIF tag during RAW conversion.
 
 ### Entra (Microsoft Entra)
 
@@ -100,7 +100,7 @@ Defining your cloud infrastructure in text files instead of clicking through a p
 
 ### Idempotent
 
-Running the same operation twice has the same result as running it once. Bicep deployments are idempotent — re-applying a template is safe.
+Running the same operation twice has the same result as running it once. Bicep deployments are idempotent, re-applying a template is safe.
 
 ### Jamstack
 

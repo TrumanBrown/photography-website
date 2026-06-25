@@ -4,7 +4,7 @@
 
 ## Requirements
 
-- **Node.js 22** — see [.nvmrc](../.nvmrc). On Ubuntu 24.04: install via [NodeSource](https://github.com/nodesource/distributions); on macOS via `brew install node@22`; with `nvm` use `nvm install && nvm use`.
+- **Node.js 22**: see [.nvmrc](../.nvmrc). On Ubuntu 24.04: install via [NodeSource](https://github.com/nodesource/distributions); on macOS via `brew install node@22`; with `nvm` use `nvm install && nvm use`.
 - **npm 10+** ships with Node 22.
 - (Optional) **`az` CLI** if you want to test the prebuild against a real Azure account.
 - (Optional) **`gh` CLI** for the bootstrap scripts.
@@ -58,21 +58,21 @@ The dev server hot-reloads on any file change. Component edits appear instantly;
 | Security headers | Not enforced by the dev server | Applied by SWA from `staticwebapp.config.json` |
 | HTTPS | No (`http://localhost:4321`) | Yes, forced |
 
-To preview production-style headers locally, use `npm run preview` after a build — it serves the static `dist/` folder and behaves much like SWA.
+To preview production-style headers locally, use `npm run preview` after a build, it serves the static `dist/` folder and behaves much like SWA.
 
 ## What's gitignored that you'll see locally
 
-- `node_modules/` — npm install output
-- `dist/` — build output
-- `.astro/` — Astro's type cache
-- `.cache/prebuild/` — incremental cache for the prebuild script
-- `src/content/sessions/*` — populated by `npm run fixtures` or `npm run prebuild:*`
-- `contact.json` — domain registration contact info (only relevant on the deploy machine)
-- `.env*` — never used today but reserved
+- `node_modules/`, npm install output
+- `dist/`, build output
+- `.astro/`, Astro's type cache
+- `.cache/prebuild/`, incremental cache for the prebuild script
+- `src/content/sessions/*`, populated by `npm run fixtures` or `npm run prebuild:*`
+- `contact.json`, domain registration contact info (only relevant on the deploy machine)
+- `.env*`, never used today but reserved
 
 ## Editing `site.config.ts`
 
-This file IS committed and IS the place to put display values that affect the rendered site — your name, copyright string, site title, domain. Don't put runtime secrets here; those go in GitHub Actions secrets.
+This file IS committed and IS the place to put display values that affect the rendered site, your name, copyright string, site title, domain. Don't put runtime secrets here; those go in GitHub Actions secrets.
 
 If you change `site.config.ts`, the dev server picks it up on the next request. For production, commit + push triggers a rebuild + redeploy.
 
@@ -95,7 +95,7 @@ az deployment sub what-if \
 
 ## Useful VS Code extensions
 
-- **Astro** (`astro-build.astro-vscode`) — syntax + IntelliSense for `.astro`
+- **Astro** (`astro-build.astro-vscode`), syntax + IntelliSense for `.astro`
 - **Tailwind CSS IntelliSense** (`bradlc.vscode-tailwindcss`)
 - **Bicep** (`ms-azuretools.vscode-bicep`)
 - **GitHub Actions** (`github.vscode-github-actions`)

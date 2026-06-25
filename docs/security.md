@@ -1,16 +1,16 @@
-# Security plan — every threat surface and the mitigation
+# Security plan: every threat surface and the mitigation
 
 > Audience: anyone who wants to understand or audit the site's posture.
 
 ## TL;DR
 
-The site has no public logins and no user database. An `/admin` panel exists but is gated by **SWA built-in auth** (GitHub OAuth + role invitation) — see [docs/admin.md](admin.md). Its **runtime** attack surface is essentially "what bugs exist in Microsoft's CDN," which is Microsoft's problem to fix. What we focus on:
+The site has no public logins and no user database. An `/admin` panel exists but is gated by **SWA built-in auth** (GitHub OAuth + role invitation), see [docs/admin.md](admin.md). Its **runtime** attack surface is essentially "what bugs exist in Microsoft's CDN," which is Microsoft's problem to fix. What we focus on:
 
 - Lock down the storage account so attackers can't enumerate or modify it.
 - Send strong HTTP security headers so visitors' browsers refuse to be misused.
 - Gate admin routes behind SWA role-based auth (GitHub OAuth, invite-only `admin` role).
 - Use short-lived, narrowly-scoped credentials everywhere (OIDC federation, no long-lived secrets).
-- Collect analytics **without storing any PII** (no IP, no cookies — see [docs/analytics.md](analytics.md)).
+- Collect analytics **without storing any PII** (no IP, no cookies, see [docs/analytics.md](analytics.md)).
 - Be honest about what's worth defending vs. what would just inflate the bill.
 
 ### Analytics endpoint
@@ -18,7 +18,7 @@ The site has no public logins and no user database. An `/admin` panel exists but
 `/api/track` is an anonymous POST endpoint that records pageviews. It is hardened against abuse and privacy issues:
 - **No PII stored.** Unique visitors are counted via a daily-salted `sha256(ip + ua + date + salt)` hash; the raw IP is never persisted. No cookies or persistent client identifiers.
 - **Input is bounded and sanitized** (path/referrer length caps, duration sanity range, bot-UA filtering). Referrers are reduced to hostname only.
-- **Fails silently** — the function always returns 204 and never surfaces errors to the page, so analytics can't break the site.
+- **Fails silently**: the function always returns 204 and never surfaces errors to the page, so analytics can't break the site.
 - Worst-case abuse is a flood of fake pageview rows in the `pageviews` table (cosmetic, cheap to clear). No data exposure, no write access to anything else.
 
 ---
@@ -32,7 +32,7 @@ The site has no public logins and no user database. An `/admin` panel exists but
 | Plaintext HTTP traffic | SWA enforces HTTPS-only. `http://` URLs redirect with 301 to `https://`. |
 | Certificate expiry | SWA auto-provisions and auto-renews TLS certificates for the default hostname and every custom domain. You never see a cert file. |
 | Old TLS versions on blob endpoint | Storage account configured `minimumTlsVersion: TLS1_2` and `supportsHttpsTrafficOnly: true`. |
-| Downgrade attacks | HSTS header with `max-age=63072000; includeSubDomains; preload` — browsers refuse `http://` for two years. |
+| Downgrade attacks | HSTS header with `max-age=63072000; includeSubDomains; preload`, browsers refuse `http://` for two years. |
 
 ### HTTP security headers
 
@@ -63,15 +63,15 @@ form-action 'self'
 ```
 
 Translation:
-- **`default-src 'self'`** — load resources only from the site's own origin unless overridden.
-- **`img-src 'self' https://*.blob.core.windows.net https://static.inaturalist.org https://inaturalist-open-data.s3.amazonaws.com data:`** — also allow images from any Azure Blob endpoint (lightbox full-res, hobby photos), the iNaturalist photo CDNs (the tide-pooling observations grid and species photos), and `data:` URIs (inlined SVG icons).
-- **`script-src 'self' https://js.monitor.azure.com`** — own origin + the App Insights SDK CDN.
-- **`connect-src 'self' https://*.blob.core.windows.net https://api.inaturalist.org https://*.in.applicationinsights.azure.com ...`** — Blob (lightbox original download), the public iNaturalist API (tide-pooling observations grid), and App Insights ingestion endpoints.
-- **`style-src 'self' 'unsafe-inline'`** — `'unsafe-inline'` is required by Astro's scoped style blocks. Can be tightened later with hashes; modest risk.
-- **`object-src 'none'`** — no `<object>` / `<embed>` / Flash-era nonsense.
-- **`frame-ancestors 'none'`** — modern equivalent of `X-Frame-Options: DENY`.
-- **`base-uri 'self'`** — attackers can't inject a `<base>` tag pointing relative URLs elsewhere.
-- **`form-action 'self'`** — forms can only submit to the site's own origin (contact form, admin).
+- **`default-src 'self'`**: load resources only from the site's own origin unless overridden.
+- **`img-src 'self' https://*.blob.core.windows.net https://static.inaturalist.org https://inaturalist-open-data.s3.amazonaws.com data:`**: also allow images from any Azure Blob endpoint (lightbox full-res, hobby photos), the iNaturalist photo CDNs (the tide-pooling observations grid and species photos), and `data:` URIs (inlined SVG icons).
+- **`script-src 'self' https://js.monitor.azure.com`**: own origin + the App Insights SDK CDN.
+- **`connect-src 'self' https://*.blob.core.windows.net https://api.inaturalist.org https://*.in.applicationinsights.azure.com ...`**: Blob (lightbox original download), the public iNaturalist API (tide-pooling observations grid), and App Insights ingestion endpoints.
+- **`style-src 'self' 'unsafe-inline'`**: `'unsafe-inline'` is required by Astro's scoped style blocks. Can be tightened later with hashes; modest risk.
+- **`object-src 'none'`**: no `<object>` / `<embed>` / Flash-era nonsense.
+- **`frame-ancestors 'none'`**: modern equivalent of `X-Frame-Options: DENY`.
+- **`base-uri 'self'`**: attackers can't inject a `<base>` tag pointing relative URLs elsewhere.
+- **`form-action 'self'`**: forms can only submit to the site's own origin (contact form, admin).
 
 If you ever add inline scripts, switch to per-script hashes rather than `'unsafe-inline'`. Astro can emit hash-based CSPs in a future iteration if needed.
 
@@ -93,14 +93,14 @@ What we do (cheap, reasonable):
 - EXIF copyright tag embedded into every derivative JPEG during prebuild.
 - Visible "© <Year> <Owner Name>" footer on every page.
 - Per-image credit text near each lightbox.
-- Right-click context-menu suppression on the lightbox image (mild deterrent, not security — anyone with DevTools can grab the URL anyway).
+- Right-click context-menu suppression on the lightbox image (mild deterrent, not security, anyone with DevTools can grab the URL anyway).
 - `robots.txt` allows search engines to crawl page URLs but doesn't promote the blob origin.
 
 What we don't do (expensive, low value):
 - **Rate limiting per IP.** Needs Front Door + WAF (~$35/mo). Vast overspend for a personal portfolio.
 - **SAS-signed URLs with short expiry.** Would break shareable image links and SEO previews.
 
-The honest framing: for a public portfolio, the goal isn't making theft impossible (it can't be — if it's visible it's downloadable). The goal is ensuring attribution + the copyright claim is unambiguous when theft happens.
+The honest framing: for a public portfolio, the goal isn't making theft impossible (it can't be, if it's visible it's downloadable). The goal is ensuring attribution + the copyright claim is unambiguous when theft happens.
 
 ### Web Application Firewall (WAF)
 
@@ -118,9 +118,9 @@ A static portfolio has none of those. Revisit if/when admin upload ships.
 
 - **No secrets in the repo, ever.** The only configurable values committed live in `site.config.ts` (display config) and `infra/main.parameters.json` (resource names + your GitHub username). Neither is sensitive.
 - **GitHub → Azure auth** is OIDC federation. No `client_secret` exists for an attacker to steal.
-- **One real secret in GitHub Actions:** `AZURE_STATIC_WEB_APPS_API_TOKEN` — the SWA deploy token. Rotated by re-running the Bicep deploy.
+- **One real secret in GitHub Actions:** `AZURE_STATIC_WEB_APPS_API_TOKEN`, the SWA deploy token. Rotated by re-running the Bicep deploy.
 - **Domain registration contact info** (`contact.json`, contains your real address and phone) is gitignored.
-- **Dependabot** is enabled for the `npm` and `github-actions` ecosystems — auto-PRs when a dependency has a CVE.
+- **Dependabot** is enabled for the `npm` and `github-actions` ecosystems, auto-PRs when a dependency has a CVE.
 
 ### Supply chain
 
@@ -160,7 +160,7 @@ Aim for an A or A+ on both securityheaders.com and ssllabs.com on first deploy.
 ## What I'd add later if the project grew
 
 In rough order:
-1. **CSP `'unsafe-inline'` tightening** via Astro's hash mode — easy win once we stop iterating on styles.
-2. **Subresource Integrity (SRI)** on App Insights script tag — pinned hash so a CDN compromise can't inject malicious JS.
+1. **CSP `'unsafe-inline'` tightening** via Astro's hash mode, easy win once we stop iterating on styles.
+2. **Subresource Integrity (SRI)** on App Insights script tag, pinned hash so a CDN compromise can't inject malicious JS.
 3. **`Cross-Origin-Opener-Policy: same-origin`** + **`Cross-Origin-Embedder-Policy: require-corp`** if we ever need full cross-origin isolation.
 4. **WAF + rate limiting** the moment the site gets any kind of upload endpoint or login.

@@ -6,7 +6,7 @@
 export const siteConfig = {
   ownerName: 'Jane Doe',
   copyrightStartYear: 2026,
-  siteTitle: 'Jane Doe — Photography',
+  siteTitle: 'Jane Doe Photography',
   siteDescription: 'Personal photography by Jane Doe.',
   domain: 'janedoe.com',
   defaultLocale: 'en-US',

@@ -1,4 +1,4 @@
-# Session handoff — engineering lessons
+# Session handoff: engineering lessons
 
 A reference for picking up the project on a new machine, in a new chat, or after a long break. The full design rationale lives in [docs/](.). This file is the short "what works today + what landed the hard way" version.
 
@@ -8,7 +8,7 @@ A reference for picking up the project on a new machine, in a new chat, or after
 
 ## Architecture in one paragraph
 
-Static Astro site deployed to **Azure Static Web Apps** (Free tier). Photos in **Azure Blob Storage** across four containers (`originals` / `derivatives` / `variants` / `metadata`). Build is a **GitHub Actions** workflow: hourly cron + push + manual. Auth between GitHub and Azure is **OIDC federation** on a user-assigned managed identity — no long-lived secrets. Infra defined in **Bicep**, applied via a separate manual workflow. Custom domain registered through **Azure App Service Domain**, bound to SWA via a post-deploy script. Realistic cost: ~$2/mo recurring + $12/yr domain.
+Static Astro site deployed to **Azure Static Web Apps** (Free tier). Photos in **Azure Blob Storage** across four containers (`originals` / `derivatives` / `variants` / `metadata`). Build is a **GitHub Actions** workflow: hourly cron + push + manual. Auth between GitHub and Azure is **OIDC federation** on a user-assigned managed identity, no long-lived secrets. Infra defined in **Bicep**, applied via a separate manual workflow. Custom domain registered through **Azure App Service Domain**, bound to SWA via a post-deploy script. Realistic cost: ~$2/mo recurring + $12/yr domain.
 
 ## Container roles
 
@@ -16,17 +16,17 @@ Static Astro site deployed to **Azure Static Web Apps** (Free tier). Photos in *
 |---|---|---|
 | `originals/` | Blob (anon read of known URLs, no list) | Source-of-truth uploads. JPG/HEIC/RAW. |
 | `derivatives/` | Blob | JPEG sidecars from RAW/HEIC sources, written by prebuild with a `source-etag` metadata tag for cache invalidation. |
-| `variants/` | Blob | Astro responsive WebP/JPEG outputs, moved here by [scripts/sync-variants.mjs](../scripts/sync-variants.mjs) after each build. Also stores admin thumbnails under `thumbs/<slug>/`. **Critical for staying under SWA Free's 250 MB app cap** — without this, ~50-photo sessions blow the limit. |
-| `metadata/` | Private | Prebuild's `manifest.json` (blob name → etag + target) and `admin-index.json` (resolved session metadata the admin panel reads — see lesson 19). |
+| `variants/` | Blob | Astro responsive WebP/JPEG outputs, moved here by [scripts/sync-variants.mjs](../scripts/sync-variants.mjs) after each build. Also stores admin thumbnails under `thumbs/<slug>/`. **Critical for staying under SWA Free's 250 MB app cap**: without this, ~50-photo sessions blow the limit. |
+| `metadata/` | Private | Prebuild's `manifest.json` (blob name → etag + target) and `admin-index.json` (resolved session metadata the admin panel reads, see lesson 19). |
 
 ## GitHub Actions secrets
 
 Set in the repo (Settings → Secrets and variables → Actions):
 
-- `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` — OIDC pointers (technically identifiers, not secrets).
-- `AZURE_STATIC_WEB_APPS_API_TOKEN` — real secret; rotated by re-running the Bicep deploy.
-- `AZURE_STORAGE_ACCOUNT` — storage account name.
-- `APPINSIGHTS_CONNECTION_STRING` — App Insights ingestion endpoint.
+- `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, OIDC pointers (technically identifiers, not secrets).
+- `AZURE_STATIC_WEB_APPS_API_TOKEN`, real secret; rotated by re-running the Bicep deploy.
+- `AZURE_STORAGE_ACCOUNT`, storage account name.
+- `APPINSIGHTS_CONNECTION_STRING`, App Insights ingestion endpoint.
 
 GitHub-side billing note: the **Actions account budget must be > $0 with stop-usage on**. The default $0 budget blocks all Actions runs, even on free public repos. Card-on-file is also required regardless.
 
@@ -34,19 +34,19 @@ GitHub-side billing note: the **Actions account budget must be > $0 with stop-us
 
 Set in Azure Portal → Static Web App → Environment variables:
 
-- `AZURE_STORAGE_ACCOUNT` — storage account name (same as GH Actions secret).
-- `AZURE_STORAGE_CONNECTION_STRING` — storage connection string (used by contact form + admin API).
-- `GITHUB_TOKEN` — fine-grained GitHub PAT with `actions:write` scope. Enables the "Rebuild Site" button in the admin panel. Optional.
-- `ADMIN_GITHUB_USERS` — comma-separated GitHub usernames allowed to use the admin API. Defaults to `trumanbrown`. Optional.
-- `ANALYTICS_SALT` — extra secret mixed into the privacy-friendly visitor hash for analytics. Optional (defaults to a constant). See [docs/analytics.md](analytics.md).
+- `AZURE_STORAGE_ACCOUNT`, storage account name (same as GH Actions secret).
+- `AZURE_STORAGE_CONNECTION_STRING`, storage connection string (used by contact form + admin API).
+- `GITHUB_TOKEN`, fine-grained GitHub PAT with `actions:write` scope. Enables the "Rebuild Site" button in the admin panel. Optional.
+- `ADMIN_GITHUB_USERS`, comma-separated GitHub usernames allowed to use the admin API. Defaults to `trumanbrown`. Optional.
+- `ANALYTICS_SALT`, extra secret mixed into the privacy-friendly visitor hash for analytics. Optional (defaults to a constant). See [docs/analytics.md](analytics.md).
 
 ## Hard-won lessons (in the order they bit us)
 
 1. **GitHub Actions requires a card on file** even for free public-repo runs. Set the Actions budget to $1 with stop-usage so the floor isn't $0 (which blocks everything).
 2. **OIDC federated credential subjects are literal strings.** A workflow with `environment: prod` produces subject `repo:<owner>/<repo>:environment:prod`, NOT `:ref:refs/heads/main`. Each variant needs its own federated credential on the MI.
 3. **SWA custom-domain bindings + Bicep don't mix.** The apex binding's validation needs a TXT record containing a token only available AFTER the binding HTTP call starts. Bicep tries to do both in the same deployment and deadlocks. Bindings now done by [scripts/bind-domain.sh](../scripts/bind-domain.sh) after `infra` deploy, using `az rest` to PUT bindings async and poll for `status=Ready`.
-4. **Azure rejects concurrent federated-credential writes** on the same MI. Bicep needs `dependsOn` between them — see [infra/modules/identity.bicep](../infra/modules/identity.bicep).
-5. **Storage account "Owner" doesn't grant data-plane access.** You need `Storage Blob Data Owner` (or Reader/Contributor) on the storage account scope. Bicep doesn't grant this to your user — do it manually after first deploy.
+4. **Azure rejects concurrent federated-credential writes** on the same MI. Bicep needs `dependsOn` between them, see [infra/modules/identity.bicep](../infra/modules/identity.bicep).
+5. **Storage account "Owner" doesn't grant data-plane access.** You need `Storage Blob Data Owner` (or Reader/Contributor) on the storage account scope. Bicep doesn't grant this to your user. Do it manually after first deploy.
 6. **`az monitor app-insights component show` requires a preview CLI extension** that prompts interactively (hangs scripts). Use `az resource show --resource-type Microsoft.Insights/components` instead. Fixed in [scripts/bootstrap-swa-token.sh](../scripts/bootstrap-swa-token.sh).
 7. **SWA action's `app_location` + `skip_app_build: true`** makes the action ignore `output_location` and treat `app_location` as the deploy root. Set `app_location: dist` directly.
 8. **`az storage blob upload-batch --pattern` doesn't support brace expansion.** Silently matches zero files when given `{*.jpg,*.png}`. Use `find` + per-file `az storage blob upload` instead. Fixed in [scripts/upload-session.sh](../scripts/upload-session.sh).
@@ -58,7 +58,7 @@ Set in Azure Portal → Static Web App → Environment variables:
 14. **Windows `az` CLI under WSL appends `\r`** to query output. The tenant-switching comparison (`$current_tenant != $AZURE_TENANT_ID`) always failed, triggering a login prompt every run. Fixed with `tr -d '\r'`.
 15. **SWA Functions: top-level `require()` of heavy SDKs crashes silently.** `require('@azure/storage-blob')` at module level kills the function under Functions Runtime ~4 + Node 22. The runtime drops the function (returns 404, zero error logs). Fix: lazy-load inside a getter function, never at top level.
 16. **SWA permanently caches broken function state.** If a function crashes on first deploy, it stays 404 even after code fixes. The only fix is renaming the function folder to force SWA to re-register it from scratch.
-17. **SWA `responseOverrides` for 401 is global** — applies to API routes too, breaking `fetch()` calls by redirecting to an HTML login page. Fix: don't use route-level auth on API endpoints; do server-side identity checks via the `x-ms-client-principal` header.
+17. **SWA `responseOverrides` for 401 is global**: applies to API routes too, breaking `fetch()` calls by redirecting to an HTML login page. Fix: don't use route-level auth on API endpoints; do server-side identity checks via the `x-ms-client-principal` header.
 18. **Admin API writing `"order": null` broke the Zod schema.** `z.number().int().optional()` rejects `null` (only allows `undefined` / missing). Prebuild then copies that null into the session JSON, failing the Astro build. Fix: schema accepts `.nullable()`, API deletes the key instead of writing null, prebuild uses `!= null` guard.
 19. **Admin showed broken thumbnails + wrong order for mixed-case folder names.** A session uploaded as `Shanghai-city-...` (mixed case) stored thumbnails under the prebuild-sanitized lowercase slug (`shanghai-city-...`), but the admin built thumbnail URLs from the raw folder name → 404. Also, the admin read dates from the `_session.json` sidecar, which usually has *no* date (dates are EXIF-derived by prebuild and only written to the generated session JSON), so sort order diverged from the public site. Fix: prebuild now writes `metadata/admin-index.json` with fully-resolved metadata (raw `prefix` for blob read/write + sanitized `slug` for thumbnail URLs + EXIF date). The admin API reads that single file (falls back to the originals scan if absent). The admin client uses `thumbSlug` for thumbnail URLs and sorts with the same `orderThenDateDesc` policy as the public site.
 
@@ -69,7 +69,7 @@ The site has an admin page at `/admin` for editing session metadata (title, cove
 **Key points:**
 - Auth: any GitHub user can view `/admin`, but the API function checks `x-ms-client-principal` server-side and only allows `TrumanBrown` (configurable via `ADMIN_GITHUB_USERS` env var).
 - Cover picker shows visual thumbnails (120px JPEG, ~5KB each) generated by prebuild and stored in `variants/thumbs/<slug>/`.
-- Three tabs: **Sessions** (edit metadata), **Messages** (read contact submissions), **Analytics** (privacy-friendly traffic metrics — see [docs/analytics.md](analytics.md)).
+- Three tabs: **Sessions** (edit metadata), **Messages** (read contact submissions), **Analytics** (privacy-friendly traffic metrics, see [docs/analytics.md](analytics.md)).
 - Writes a `_session.json` sidecar to Blob Storage; next build picks up the changes.
 - Cannot upload/delete images, delete sessions, or modify code.
 
@@ -91,9 +91,9 @@ The site has an admin page at `/admin` for editing session metadata (title, cove
 
 ## Workflow triggers (current)
 
-- [build-and-deploy.yml](../.github/workflows/build-and-deploy.yml) — push to main, hourly cron, manual dispatch, `repository_dispatch: blob-changed`. Concurrency-grouped per ref so newer pushes cancel older runs.
-- [infra.yml](../.github/workflows/infra.yml) — manual only. Re-run when Bicep changes.
-- [lint.yml](../.github/workflows/lint.yml) — PRs only.
+- [build-and-deploy.yml](../.github/workflows/build-and-deploy.yml), push to main, hourly cron, manual dispatch, `repository_dispatch: blob-changed`. Concurrency-grouped per ref so newer pushes cancel older runs.
+- [infra.yml](../.github/workflows/infra.yml), manual only. Re-run when Bicep changes.
+- [lint.yml](../.github/workflows/lint.yml), PRs only.
 
 ## Setting up on a new machine
 
@@ -115,7 +115,7 @@ az storage container list --account-name "$YOUR_STORAGE_ACCOUNT" --auth-mode log
 gh repo view <owner>/<repo>
 ```
 
-Photos in Blob, secrets in GH, infra in Azure — none is per-machine state. The only per-machine thing is `~/.config/<project>/contact.json` (WHOIS contact info, gitignored), needed only when updating the domain registration.
+Photos in Blob, secrets in GH, infra in Azure: none is per-machine state. The only per-machine thing is `~/.config/<project>/contact.json` (WHOIS contact info, gitignored), needed only when updating the domain registration.
 
 ## Open items (not blocking anything)
 

@@ -73,7 +73,7 @@ Assumes ~30 GB stored, ~5 GB egress, personal traffic. Region `westus3`.
 | Bicep deployments | Always free | $0.00 |
 | **Total** | | **~$2.10 – $2.60** |
 
-Even at 10× traffic and 100 GB stored, the bill stays under $6/mo — comfortably inside $150/mo credits.
+Even at 10× traffic and 100 GB stored, the bill stays under $6/mo, comfortably inside $150/mo credits.
 
 ### What we deliberately don't use
 
@@ -91,6 +91,6 @@ Even at 10× traffic and 100 GB stored, the bill stays under $6/mo — comfortab
 Each of these can be added later without touching anything above.
 
 - **Admin upload UI:** SWA supports managed auth (GitHub/Entra/OIDC) + serverless `/api/*` functions. Add an auth-gated route that streams to Blob. Same SWA, no new hosting tier.
-- **iCloud sync:** separate scheduled GitHub Action or Azure Function that writes blobs to `originals/`. Site code reacts to new blobs on the next build — no integration.
+- **iCloud sync:** separate scheduled GitHub Action or Azure Function that writes blobs to `originals/`. Site code reacts to new blobs on the next build, no integration.
 - **Sub-minute refresh:** Azure Event Grid → tiny Function → GitHub `repository_dispatch: blob-changed`. The build workflow already accepts that trigger.
 - **Login-gated originals:** every blob URL flows through [src/lib/blob.ts](../src/lib/blob.ts). Swap to SAS URLs there and the rest of the site is unchanged.

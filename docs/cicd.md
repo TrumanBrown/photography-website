@@ -1,4 +1,4 @@
-# CI/CD — what each workflow does and why
+# CI/CD: what each workflow does and why
 
 > Audience: someone who has read a `.github/workflows/*.yml` file and squinted at it.
 
@@ -10,8 +10,8 @@
 GitHub Actions is GitHub's built-in CI/CD service. It runs YAML files in `.github/workflows/` on free Linux VMs ("runners"). Each YAML file is a **workflow** containing one or more **jobs**, each with a sequence of **steps**.
 
 For this project we use it for two distinct purposes:
-1. **Deploying infrastructure** (rarely — only when Bicep changes).
-2. **Building and publishing the site** (often — on every push, every hour, and on demand).
+1. **Deploying infrastructure** (rarely, only when Bicep changes).
+2. **Building and publishing the site** (often, on every push, every hour, and on demand).
 
 ---
 
@@ -19,12 +19,12 @@ For this project we use it for two distinct purposes:
 
 ```
 .github/workflows/
-├── infra.yml              # deploy Bicep — manual trigger
-├── build-and-deploy.yml   # rebuild + publish site — push, hourly, manual
+├── infra.yml              # deploy Bicep (manual trigger)
+├── build-and-deploy.yml   # rebuild + publish site (push, hourly, manual)
 └── lint.yml               # PR quality gate
 ```
 
-### [`infra.yml`](../.github/workflows/infra.yml) — deploy Azure infrastructure
+### [`infra.yml`](../.github/workflows/infra.yml): deploy Azure infrastructure
 
 **When it runs:** only when you click "Run workflow" in the Actions tab. There is no automatic trigger because deploying infra during a normal site build would be wasteful and risky.
 
@@ -32,7 +32,7 @@ For this project we use it for two distinct purposes:
 1. Logs into Azure via OIDC (see below).
 2. Runs `azure/arm-deploy@v2` against `infra/subscription.bicep`. This creates or updates the resource group and everything inside it.
 3. Reads the deployment outputs (SWA deploy token, storage account name, App Insights connection string).
-4. Writes them into the repo's secrets via the `gh` CLI — if you've added a `GH_PAT_FOR_SECRETS` token. Without that, it prints them and you copy them manually once.
+4. Writes them into the repo's secrets via the `gh` CLI, if you've added a `GH_PAT_FOR_SECRETS` token. Without that, it prints them and you copy them manually once.
 
 **When to run it:**
 - First-time setup (after you've created the federated MI via `scripts/setup-federated-credential.sh`).
@@ -40,7 +40,7 @@ For this project we use it for two distinct purposes:
 - Whenever you change `domainName` in `main.parameters.json`.
 - **Never** for normal site/content changes.
 
-### [`build-and-deploy.yml`](../.github/workflows/build-and-deploy.yml) — rebuild and publish the site
+### [`build-and-deploy.yml`](../.github/workflows/build-and-deploy.yml): rebuild and publish the site
 
 **When it runs:**
 - `push` to `main` → code changed
@@ -49,33 +49,33 @@ For this project we use it for two distinct purposes:
 - `workflow_dispatch` → manual button for impatience
 - `repository_dispatch: blob-changed` → reserved for future Event Grid → webhook hookup; harmless to leave wired
 
-A `concurrency` block cancels older runs on the same branch when a new one arrives — useful when you push three commits in quick succession.
+A `concurrency` block cancels older runs on the same branch when a new one arrives, useful when you push three commits in quick succession.
 
 **Steps in order (with explanations):**
 
-1. **Checkout** the repo — pulls the code into the runner's working directory.
-2. **Set up Node.js 22** with `actions/setup-node@v4` — caches npm by `package-lock.json` so subsequent runs are fast.
-3. **`npm ci`** — installs dependencies. `ci` (rather than `install`) is the CI-friendly version: it uses the exact versions in `package-lock.json` and fails if anything has drifted, so your local environment and CI are guaranteed to match. Full npm primer below.
-4. **Install `libraw-bin`** via apt with cache — needed for Sony `.ARW` RAW conversion. See [image-pipeline.md](image-pipeline.md#raw-files-sony-arw-and-friends).
-5. **Azure login (OIDC)** — assumes the managed identity created in `infra/`. No password, no token in secrets. Explained below.
-6. **Restore prebuild cache** — `.cache/prebuild/` is a folder of already-downloaded images from previous runs, keyed by blob ETag. Lets incremental builds skip re-downloading unchanged photos.
-7. **Run `scripts/prebuild.mjs`** — scans Blob, downloads new photos, converts RAW, writes Astro content collection. Full mechanics: [image-pipeline.md](image-pipeline.md).
-8. **Restore Astro asset cache** — `.cache/astro/` holds Astro's build cache, including the optimized WebP/JPEG image variants. Persisting it across runs means only new or changed photos get re-encoded by sharp; unchanged variants are reused instead of regenerated from scratch every build.
-9. **`npm run build`** — runs `astro build`. Astro processes images through sharp into WebP/JPEG variants and outputs the `dist/` folder, reusing anything already in the asset cache.
+1. **Checkout** the repo, pulls the code into the runner's working directory.
+2. **Set up Node.js 22** with `actions/setup-node@v4`, caches npm by `package-lock.json` so subsequent runs are fast.
+3. **`npm ci`**: installs dependencies. `ci` (rather than `install`) is the CI-friendly version: it uses the exact versions in `package-lock.json` and fails if anything has drifted, so your local environment and CI are guaranteed to match. Full npm primer below.
+4. **Install `libraw-bin`** via apt with cache, needed for Sony `.ARW` RAW conversion. See [image-pipeline.md](image-pipeline.md#raw-files-sony-arw-and-friends).
+5. **Azure login (OIDC)**: assumes the managed identity created in `infra/`. No password, no token in secrets. Explained below.
+6. **Restore prebuild cache**: `.cache/prebuild/` is a folder of already-downloaded images from previous runs, keyed by blob ETag. Lets incremental builds skip re-downloading unchanged photos.
+7. **Run `scripts/prebuild.mjs`**: scans Blob, downloads new photos, converts RAW, writes Astro content collection. Full mechanics: [image-pipeline.md](image-pipeline.md).
+8. **Restore Astro asset cache**: `.cache/astro/` holds Astro's build cache, including the optimized WebP/JPEG image variants. Persisting it across runs means only new or changed photos get re-encoded by sharp; unchanged variants are reused instead of regenerated from scratch every build.
+9. **`npm run build`**: runs `astro build`. Astro processes images through sharp into WebP/JPEG variants and outputs the `dist/` folder, reusing anything already in the asset cache.
 10. **Save prebuild + Astro caches** for the next run.
 11. **Deploy to SWA** via `Azure/static-web-apps-deploy@v1` with `skip_app_build: true` (we already built). The action uploads `dist/` to the SWA deployment endpoint using the deploy token.
 
 **PR previews:** when the trigger is a `pull_request`, SWA automatically spins up a preview environment at a unique URL (`pr-<n>-<random>.<region>.azurestaticapps.net`). Once you merge or close the PR, a separate `close_pr` job tears the preview down so it doesn't count against quotas.
 
-### [`lint.yml`](../.github/workflows/lint.yml) — PR quality gate
+### [`lint.yml`](../.github/workflows/lint.yml): PR quality gate
 
 **When it runs:** on every push to `main` and every PR targeting `main`.
 
 **What it does:**
 1. `npm ci`
-2. Prettier check (non-blocking — flagged but doesn't fail the PR).
+2. Prettier check (non-blocking, flagged but doesn't fail the PR).
 3. Synthesizes fixture sessions via `scripts/generate-fixtures.mjs` (so Astro has content to type-check).
-4. Runs `npm run check` (which calls `astro check` — TypeScript on `.astro` files + content-collection Zod schema validation).
+4. Runs `npm run check` (which calls `astro check`, TypeScript on `.astro` files + content-collection Zod schema validation).
 
 This catches broken templates and schema-violating session JSON **before** they hit `main` and break a real build.
 
@@ -83,14 +83,14 @@ This catches broken templates and schema-violating session JSON **before** they 
 
 ## Why each trigger exists (the cron especially)
 
-The non-obvious one is the **hourly cron**. The site needs to update when you upload photos to Blob — but uploading to Blob doesn't touch the git repo. So how does the site know to rebuild?
+The non-obvious one is the **hourly cron**. The site needs to update when you upload photos to Blob, but uploading to Blob doesn't touch the git repo. So how does the site know to rebuild?
 
 Three options:
 1. **You click a button every time** (annoying, easy to forget).
 2. **A webhook fires the moment a blob changes** (Event Grid + Function → GitHub `repository_dispatch`). Best UX but adds two more pieces of infrastructure.
 3. **A cron job rebuilds periodically and notices new files** (free, no extra parts, latency ~30 min worst case).
 
-We chose (3) for now and pre-wired (2) — the workflow already accepts the `repository_dispatch: blob-changed` event type, so the day you add the Event Grid plumbing, the workflow needs no change.
+We chose (3) for now and pre-wired (2): the workflow already accepts the `repository_dispatch: blob-changed` event type, so the day you add the Event Grid plumbing, the workflow needs no change.
 
 If hourly latency annoys you, click **Run workflow** for instant rebuild.
 
@@ -125,10 +125,10 @@ After the workflow finishes, the token expires and there's nothing to leak. Even
 - The Bicep-managed identity for the build pipeline has the same shape via `modules/identity.bicep`.
 
 The only "secrets" you ever put in GitHub are:
-- `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` — these are IDs, not passwords. Knowing them does not grant access.
-- `AZURE_STATIC_WEB_APPS_API_TOKEN` — the one real secret. SWA insists on it for the deploy step; rotate by re-deploying the SWA module.
-- `AZURE_STORAGE_ACCOUNT` — just the account name.
-- `APPINSIGHTS_CONNECTION_STRING` — the AI instrumentation endpoint; not sensitive but tidier as a secret.
+- `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, these are IDs, not passwords. Knowing them does not grant access.
+- `AZURE_STATIC_WEB_APPS_API_TOKEN`, the one real secret. SWA insists on it for the deploy step; rotate by re-deploying the SWA module.
+- `AZURE_STORAGE_ACCOUNT`, just the account name.
+- `APPINSIGHTS_CONNECTION_STRING`, the AI instrumentation endpoint; not sensitive but tidier as a secret.
 
 ---
 
@@ -139,10 +139,10 @@ If you've used Node before, none of this is new. If you haven't:
 - **npm** = Node Package Manager. Ships with Node.js. Installs JavaScript packages.
 - **`package.json`** = the project's manifest. Lists dependencies and "scripts" (named command shortcuts you can run with `npm run <name>`).
 - **`package-lock.json`** = the exact resolved version of every dependency (including transitive). Should always be committed. Guarantees reproducible installs.
-- **`node_modules/`** = where npm installs the packages. **Never** committed — recreated from `package-lock.json` on every install.
+- **`node_modules/`** = where npm installs the packages. **Never** committed, recreated from `package-lock.json` on every install.
 - **`npm install`** = install dependencies, update `package-lock.json` if anything is missing.
 - **`npm ci`** = installer optimized for CI. Wipes `node_modules/` and installs exactly what `package-lock.json` says. Fails if the lock file is out of date. **This is what CI uses; you usually want it locally too.**
-- **`npm run dev`** = runs the `dev` script defined in `package.json`. In this project that's `astro dev` — a development server with hot reload on `http://localhost:4321`.
+- **`npm run dev`** = runs the `dev` script defined in `package.json`. In this project that's `astro dev`, a development server with hot reload on `http://localhost:4321`.
 - **`npm run build`** = runs `astro build`. Produces the production `dist/` folder.
 - **`npm run fixtures`** = generates fake sessions for local development. See [local-dev.md](local-dev.md).
 

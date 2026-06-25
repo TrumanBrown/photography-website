@@ -56,7 +56,7 @@ const coverResolved = resolved.find((r) => r.file === coverFile) ?? resolved[0];
 const ogImage = coverResolved?.fullUrl;
 ---
 
-<BaseLayout title={title} description={description || `${title} — photography session`} ogImage={ogImage} activeSlug={slug}>
+<BaseLayout title={title} description={description || `${title}: photography session`} ogImage={ogImage} activeSlug={slug}>
   <article class="mx-auto max-w-6xl px-4 py-10 sm:px-6">
     <header class="mb-8 space-y-2">
       <a href="/" class="text-xs text-neutral-600 no-underline hover:underline dark:text-neutral-400">← All sessions</a>

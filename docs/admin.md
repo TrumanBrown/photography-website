@@ -1,4 +1,4 @@
-# Admin panel — editing session metadata from the browser
+# Admin panel: editing session metadata from the browser
 
 > Audience: site owner (you). Explains what `/admin` does, how SWA auth protects it, and how to set it up on a fresh deployment.
 
@@ -6,21 +6,21 @@
 
 The admin page at `https://trumanbrown.com/admin` has three tabs:
 
-### Sessions tab — edit session metadata
+### Sessions tab: edit session metadata
 
-- **Title** — the display name shown on cards and the session page.
-- **Cover / thumbnail** — which image from the session to use as the card image on the home page.
-- **Location** — where the session was shot.
-- **Description** — a short blurb shown on the session page.
-- **Display order** — explicit sort priority (lower numbers first; blank = sort by date).
+- **Title**: the display name shown on cards and the session page.
+- **Cover / thumbnail**: which image from the session to use as the card image on the home page.
+- **Location**: where the session was shot.
+- **Description**: a short blurb shown on the session page.
+- **Display order**: explicit sort priority (lower numbers first; blank = sort by date).
 
 Changes are written to a `_session.json` sidecar file in `originals/<session>/` in Blob Storage. Click **Rebuild Site** to deploy changes (~5 min), or wait for the hourly cron.
 
-### Messages tab — read contact form submissions
+### Messages tab: read contact form submissions
 
-Read-only view of messages submitted through the contact form, newest first. Shows name, email (as a `mailto:` link), message, and timestamp. Useful on mobile since the Azure portal app can't browse Table Storage. No write/delete actions — manage or delete messages via Storage Explorer / the portal.
+Read-only view of messages submitted through the contact form, newest first. Shows name, email (as a `mailto:` link), message, and timestamp. Useful on mobile since the Azure portal app can't browse Table Storage. No write/delete actions, manage or delete messages via Storage Explorer / the portal.
 
-### Analytics tab — privacy-friendly traffic metrics
+### Analytics tab: privacy-friendly traffic metrics
 
 Read-only view of site traffic: pageviews, unique visitors, average time on page, a pageviews-per-day chart, top pages, and top referrers (last 7/30/90 days). No cookies, no third parties, no IP stored. See [docs/analytics.md](analytics.md) for the full privacy model and how it works.
 
@@ -98,7 +98,7 @@ After deploying the SWA infrastructure (Bicep), do these steps once:
 1. **Set the `AZURE_STORAGE_CONNECTION_STRING` app setting** on the SWA resource if not already done (needed by both the contact form and admin API).
 2. Optionally set `ADMIN_GITHUB_USERS` to a comma-separated list of GitHub usernames (defaults to `trumanbrown`).
 3. **Set `GITHUB_TOKEN`** to a fine-grained GitHub PAT with `actions:write` scope on this repo. This enables the "Rebuild Site" button. If omitted, the button shows an error but everything else works.
-4. Visit `https://yourdomain.com/admin` — sign in with GitHub and you'll see the session manager.
+4. Visit `https://yourdomain.com/admin`, sign in with GitHub and you'll see the session manager.
 
 ## What the admin panel cannot do
 

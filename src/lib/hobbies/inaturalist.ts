@@ -80,7 +80,7 @@ export function initINatObservations(root: HTMLElement): void {
         a.rel = 'noopener noreferrer';
         a.className =
           'group block overflow-hidden rounded-md bg-neutral-100 no-underline dark:bg-neutral-900';
-        a.title = name + (o.place_guess ? ` — ${o.place_guess}` : '');
+        a.title = name + (o.place_guess ? `, ${o.place_guess}` : '');
         a.setAttribute('role', 'listitem');
         const img = document.createElement('img');
         img.src = thumb;
@@ -98,7 +98,7 @@ export function initINatObservations(root: HTMLElement): void {
     } catch {
       grid.replaceChildren();
       if (status) {
-        status.textContent = 'Could not load observations right now — see them on iNaturalist.';
+        status.textContent = 'Could not load observations right now. See them on iNaturalist.';
       }
     }
   };
