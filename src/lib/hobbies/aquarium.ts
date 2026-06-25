@@ -24,7 +24,7 @@
  */
 
 export type Zone = 'top' | 'mid' | 'bottom';
-export type Shape = 'fish' | 'tall' | 'long' | 'shrimp' | 'snail';
+export type Shape = 'fish' | 'tall' | 'long' | 'gourami' | 'betta' | 'angelfish' | 'shrimp' | 'snail';
 
 export interface Species {
   id: string;
@@ -75,13 +75,13 @@ export const SPECIES: Species[] = [
   { id: 'cherry-barb', name: 'Cherry barb', emoji: '🐟', adultInches: 2.0, bioload: 0.45, minGallons: 15, zone: 'mid', shape: 'fish', color: '#c0392b', accent: '#e8a0a0' },
   { id: 'tiger-barb', name: 'Tiger barb', emoji: '🐟', adultInches: 2.8, bioload: 0.8, minGallons: 20, zone: 'mid', shape: 'fish', color: '#e0a73b', accent: '#2a2a2a' },
   // --- mid: gouramis + cichlids (tall, laterally compressed) ---
-  { id: 'honey-gourami', name: 'Honey gourami', emoji: '🐟', adultInches: 2.0, bioload: 0.9, minGallons: 10, zone: 'mid', shape: 'tall', color: '#f0b53d', accent: '#c97b1c' },
-  { id: 'dwarf-gourami', name: 'Dwarf gourami', emoji: '🐠', adultInches: 3.5, bioload: 1.2, minGallons: 15, zone: 'mid', shape: 'tall', color: '#2f6fb0', accent: '#d8542e' },
-  { id: 'pearl-gourami', name: 'Pearl gourami', emoji: '🐠', adultInches: 4.5, bioload: 1.6, minGallons: 30, zone: 'mid', shape: 'tall', color: '#cdb89a', accent: '#8a5a3a' },
-  { id: 'betta', name: 'Betta', emoji: '🐟', adultInches: 2.7, bioload: 1.0, minGallons: 5, zone: 'mid', shape: 'tall', color: '#3550d6', accent: '#d63b86' },
+  { id: 'honey-gourami', name: 'Honey gourami', emoji: '🐟', adultInches: 2.0, bioload: 0.9, minGallons: 10, zone: 'mid', shape: 'gourami', color: '#f0b53d', accent: '#c97b1c' },
+  { id: 'dwarf-gourami', name: 'Dwarf gourami', emoji: '🐠', adultInches: 3.5, bioload: 1.2, minGallons: 15, zone: 'mid', shape: 'gourami', color: '#2f6fb0', accent: '#d8542e' },
+  { id: 'pearl-gourami', name: 'Pearl gourami', emoji: '🐠', adultInches: 4.5, bioload: 1.6, minGallons: 30, zone: 'mid', shape: 'gourami', color: '#cdb89a', accent: '#8a5a3a' },
+  { id: 'betta', name: 'Betta', emoji: '🐟', adultInches: 2.7, bioload: 1.0, minGallons: 5, zone: 'mid', shape: 'betta', color: '#3550d6', accent: '#d63b86' },
   { id: 'german-blue-ram', name: 'German blue ram', emoji: '🐠', adultInches: 2.5, bioload: 1.3, minGallons: 20, zone: 'mid', shape: 'tall', color: '#3a7bd5', accent: '#f2c84b' },
   { id: 'bolivian-ram', name: 'Bolivian ram', emoji: '🐠', adultInches: 3.0, bioload: 1.4, minGallons: 20, zone: 'mid', shape: 'tall', color: '#c2a25a', accent: '#d9572b' },
-  { id: 'angelfish', name: 'Angelfish', emoji: '🐠', adultInches: 6.0, bioload: 3.0, minGallons: 29, zone: 'mid', shape: 'tall', color: '#dcdcdc', accent: '#2b2b2b' },
+  { id: 'angelfish', name: 'Angelfish', emoji: '🐠', adultInches: 6.0, bioload: 3.0, minGallons: 29, zone: 'mid', shape: 'angelfish', color: '#dcdcdc', accent: '#2b2b2b' },
   // --- top swimmers ---
   { id: 'hatchetfish', name: 'Hatchetfish', emoji: '🐟', adultInches: 1.8, bioload: 0.35, minGallons: 15, zone: 'top', shape: 'fish', color: '#cfd3c8', accent: '#7a6a3a' },
   { id: 'killifish', name: 'Killifish', emoji: '🐠', adultInches: 2.2, bioload: 0.5, minGallons: 10, zone: 'top', shape: 'fish', color: '#d98a3d', accent: '#3a7bd5' },
@@ -163,70 +163,166 @@ function shade(hex: string, amt: number): string {
 // All sprite drawers assume the context is already translated to the fish
 // center and scaled by its facing direction (so +x is "forward").
 
-function fishTail(c: CanvasRenderingContext2D, len: number, ht: number, color: string): void {
+function tailFan(c: CanvasRenderingContext2D, len: number, ht: number, color: string, round: boolean): void {
   const rx = len / 2;
-  const tl = len * 0.45;
+  const tl = len * 0.42;
   for (let xx = 0; xx <= tl; xx += PIX) {
     const f = xx / tl;
-    const hh = ht * 0.5 * f + PIX;
+    const hh = round ? ht * 0.5 * (0.45 + 0.55 * f) : ht * 0.5 * f + PIX;
     c.fillStyle = xx > tl * 0.6 ? shade(color, -0.15) : color;
     c.fillRect(snap(-rx - xx), snap(-hh), PIX, Math.max(PIX, snap(2 * hh)));
   }
 }
 
+function forkTail(c: CanvasRenderingContext2D, len: number, ht: number, color: string): void {
+  const rx = len / 2;
+  const tl = len * 0.42;
+  for (let xx = 0; xx <= tl; xx += PIX) {
+    const f = xx / tl;
+    const hh = ht * 0.5 * (0.2 + 0.8 * f);
+    c.fillStyle = xx > tl * 0.6 ? shade(color, -0.15) : color;
+    c.fillRect(snap(-rx - xx), snap(-hh), PIX, Math.max(PIX, snap(hh)));
+    c.fillRect(snap(-rx - xx), snap(hh * 0.1), PIX, Math.max(PIX, snap(hh)));
+  }
+}
+
+function fishMouth(c: CanvasRenderingContext2D, len: number, ht: number): void {
+  c.fillStyle = 'rgba(0,0,0,0.45)';
+  c.fillRect(snap(len * 0.46), snap(ht * 0.04), PIX, PIX);
+}
+
 function fishBody(c: CanvasRenderingContext2D, len: number, ht: number, color: string): void {
   const rx = len / 2;
   const ry = ht / 2;
-  const top = shade(color, 0.28);
-  const bottom = shade(color, -0.3);
+  const top = shade(color, 0.16);
+  const bottom = shade(color, -0.22);
   for (let yy = -ry; yy <= ry; yy += PIX) {
     const t = yy / ry;
     const hw = rx * Math.sqrt(Math.max(0, 1 - t * t));
     if (hw < PIX * 0.5) continue;
-    c.fillStyle = yy < -ry * 0.35 ? top : yy > ry * 0.4 ? bottom : color;
+    c.fillStyle = yy < -ry * 0.55 ? top : yy > ry * 0.6 ? bottom : color;
     const x0 = snap(-hw);
     c.fillRect(x0, snap(yy), Math.max(PIX, snap(hw) - x0), PIX);
   }
 }
 
 function fishEye(c: CanvasRenderingContext2D, len: number, ht: number): void {
-  const ex = snap(len * 0.28);
-  const ey = snap(-ht * 0.16);
-  c.fillStyle = '#ffffff';
-  c.fillRect(ex, ey, PIX * 2, PIX * 2);
-  c.fillStyle = '#0a0a0a';
-  c.fillRect(ex + PIX, ey, PIX, PIX * 2);
+  const ex = snap(len * 0.32);
+  const ey = snap(-ht * 0.14);
+  c.fillStyle = '#0d0d0d';
+  c.fillRect(ex, ey, PIX, PIX * 2);
+  c.fillStyle = 'rgba(240,240,240,0.55)';
+  c.fillRect(ex, ey, PIX, PIX);
 }
 
-function drawSwimmerSprite(
-  c: CanvasRenderingContext2D,
-  shape: Shape,
-  len: number,
-  ht: number,
-  color: string,
-  accent: string,
-): void {
-  fishTail(c, len, ht, color);
+const SHAPE_RATIO: Record<Shape, number> = {
+  fish: 0.46, long: 0.32, tall: 0.66, gourami: 0.6, betta: 0.58, angelfish: 1.15, shrimp: 1, snail: 1,
+};
+
+// generic schooling fish (tetras, barbs, danios, livebearers)
+function drawSwimmer(c: CanvasRenderingContext2D, len: number, ht: number, color: string, accent: string): void {
+  forkTail(c, len, ht, color);
   fishBody(c, len, ht, color);
+  const rx = len / 2;
   c.fillStyle = accent;
-  if (shape === 'tall') {
-    // vertical bars across the disc body
-    for (let bx = -len * 0.28; bx <= len * 0.3; bx += PIX * 3) {
-      c.fillRect(snap(bx), snap(-ht * 0.42), PIX, Math.max(PIX, snap(ht * 0.84)));
-    }
-  } else {
-    // lateral line down the flank
-    const rx = len / 2;
-    c.fillRect(snap(-rx * 0.7), snap(-PIX), Math.max(PIX, snap(rx * 1.4)), PIX * 2);
-  }
-  // dorsal fin
+  c.fillRect(snap(-rx * 0.7), snap(-PIX), Math.max(PIX, snap(rx * 1.4)), PIX * 2); // lateral stripe
   c.fillStyle = shade(color, -0.12);
-  c.fillRect(snap(-len * 0.12), snap(-ht * 0.5) - PIX, Math.max(PIX, snap(len * 0.32)), PIX);
-  // pectoral fin
+  c.fillRect(snap(-len * 0.12), snap(-ht * 0.5) - PIX, Math.max(PIX, snap(len * 0.34)), PIX); // dorsal
   c.fillStyle = shade(accent, -0.1);
-  c.fillRect(snap(len * 0.02), snap(ht * 0.16), PIX * 2, PIX);
-  c.fillRect(snap(len * 0.02), snap(ht * 0.16) + PIX, PIX, PIX);
+  c.fillRect(snap(-len * 0.1), snap(ht * 0.42), Math.max(PIX, snap(len * 0.2)), PIX); // anal fin
+  c.fillRect(snap(len * 0.04), snap(ht * 0.16), PIX * 2, PIX); // pectoral
   fishEye(c, len, ht);
+  fishMouth(c, len, ht);
+}
+
+// elongated bottom-dwellers (cory, loach, oto, pleco): downturned snout + barbels
+function drawLongFish(c: CanvasRenderingContext2D, len: number, ht: number, color: string, accent: string): void {
+  fishBody(c, len, ht, color);
+  tailFan(c, len, ht, color, false);
+  c.fillStyle = shade(color, -0.15);
+  c.fillRect(snap(-len * 0.05), snap(-ht * 0.5 - PIX), Math.max(PIX, snap(len * 0.26)), PIX); // dorsal
+  c.fillStyle = shade(color, -0.1);
+  c.fillRect(snap(len * 0.4), snap(ht * 0.12), PIX * 2, PIX); // downturned snout
+  c.fillStyle = accent;
+  c.fillRect(snap(len * 0.44), snap(ht * 0.28), PIX, PIX);
+  c.fillRect(snap(len * 0.38), snap(ht * 0.32), PIX, PIX); // barbels
+  c.fillStyle = shade(color, -0.18);
+  c.fillRect(snap(len * 0.02), snap(ht * 0.42), PIX * 2, PIX); // low pectoral
+  fishEye(c, len, ht);
+}
+
+// gourami: oval compressed body + the signature trailing pelvic feelers
+function drawGourami(c: CanvasRenderingContext2D, len: number, ht: number, color: string, accent: string): void {
+  const rx = len / 2, ry = ht / 2;
+  c.fillStyle = shade(color, -0.18);
+  c.fillRect(snap(-rx * 0.85), snap(ry - PIX), Math.max(PIX, snap(rx * 1.45)), PIX * 2); // long anal fin
+  c.fillStyle = shade(color, -0.1);
+  c.fillRect(snap(-rx * 0.5), snap(-ry - PIX), Math.max(PIX, snap(rx)), PIX);
+  c.fillRect(snap(-rx * 0.95), snap(-ry - PIX * 2), PIX * 3, PIX * 2); // dorsal ridge + rear point
+  fishBody(c, len, ht, color);
+  tailFan(c, len, ht, color, true);
+  c.fillStyle = accent; // pelvic feelers
+  const fx = snap(rx * 0.18);
+  const segs = Math.round((ht * 1.15) / PIX);
+  for (let i = 0; i < segs; i++) {
+    const yy = ry * 0.45 + i * PIX;
+    const off = Math.round(Math.sin(i * 0.45) * PIX * 1.2);
+    c.fillRect(fx + off + PIX * 2, snap(yy), PIX, PIX);
+    c.fillRect(fx + off - PIX, snap(yy + PIX), PIX, PIX);
+  }
+  fishEye(c, len, ht);
+  fishMouth(c, len, ht);
+}
+
+// betta: small body with big flowing fins
+function drawBetta(c: CanvasRenderingContext2D, len: number, ht: number, color: string, accent: string): void {
+  const rx = len / 2;
+  for (let xx = 0; xx <= len * 0.55; xx += PIX) {
+    const f = xx / (len * 0.55);
+    const hh = ht * 0.85 * (0.3 + 0.7 * f);
+    c.fillStyle = xx > len * 0.28 ? shade(accent, -0.14) : accent;
+    c.fillRect(snap(-rx - xx), snap(-hh), PIX, Math.max(PIX, snap(2 * hh)));
+  } // big flowing caudal
+  c.fillStyle = accent;
+  c.fillRect(snap(-rx * 0.7), snap(-ht * 0.5 - PIX * 3), Math.max(PIX, snap(rx * 1.15)), PIX * 3); // dorsal flow
+  c.fillStyle = shade(accent, -0.08);
+  c.fillRect(snap(-rx * 0.7), snap(ht * 0.38), Math.max(PIX, snap(rx * 1.25)), PIX * 3); // anal flow
+  fishBody(c, len, ht * 0.82, color);
+  c.fillStyle = shade(color, 0.15);
+  c.fillRect(snap(-rx * 0.6), snap(-PIX), Math.max(PIX, snap(rx)), PIX); // sheen
+  fishEye(c, len, ht * 0.82);
+  fishMouth(c, len, ht * 0.82);
+}
+
+// angelfish: tall diamond body with long swept-back dorsal/anal fins + ventral filaments + bars
+function drawAngelfish(c: CanvasRenderingContext2D, len: number, ht: number, color: string, accent: string): void {
+  const rx = len / 2, ry = ht / 2;
+  c.fillStyle = shade(color, -0.08);
+  const dn = Math.round((ry * 1.4) / PIX);
+  for (let i = 0; i <= dn; i++) { const f = i / dn; const y = -ry * 0.35 - i * PIX; const x0 = -rx * 0.6 * f - rx * 0.12; const x1 = rx * 0.4 * (1 - f); if (x1 <= x0) continue; c.fillRect(snap(x0), snap(y), Math.max(PIX, snap(x1 - x0)), PIX); }
+  for (let i = 0; i <= dn; i++) { const f = i / dn; const y = ry * 0.35 + i * PIX; const x0 = -rx * 0.6 * f - rx * 0.12; const x1 = rx * 0.35 * (1 - f); if (x1 <= x0) continue; c.fillRect(snap(x0), snap(y), Math.max(PIX, snap(x1 - x0)), PIX); }
+  for (let yy = -ry; yy <= ry; yy += PIX) { const t = yy / ry; const hw = rx * Math.pow(Math.max(0, 1 - t * t), 0.62); if (hw < PIX * 0.5) continue; c.fillStyle = yy < -ry * 0.5 ? shade(color, 0.16) : yy > ry * 0.55 ? shade(color, -0.22) : color; c.fillRect(snap(-hw), snap(yy), Math.max(PIX, snap(2 * hw)), PIX); }
+  c.fillStyle = accent;
+  for (const bx of [rx * 0.34, -rx * 0.02, -rx * 0.42]) c.fillRect(snap(bx), snap(-ry * 0.8), PIX, Math.max(PIX, snap(ry * 1.6)));
+  c.fillStyle = shade(color, -0.1);
+  for (let i = 0; i < Math.round((ry * 1.3) / PIX); i++) { const yy = ry * 0.55 + i * PIX; const off = Math.round(Math.sin(i * 0.3) * PIX); c.fillRect(snap(rx * 0.16 + off), snap(yy), PIX, PIX); }
+  const tl = len * 0.28;
+  for (let xx = 0; xx <= tl; xx += PIX) { const f = xx / tl; const hh = ry * 0.45 * (0.2 + 0.8 * f); c.fillStyle = color; c.fillRect(snap(-rx - xx), snap(-hh), PIX, Math.max(PIX, snap(hh))); c.fillRect(snap(-rx - xx), snap(hh * 0.1), PIX, Math.max(PIX, snap(hh))); }
+  fishEye(c, len, ht * 0.62);
+}
+
+// oval cichlid (rams): continuous dorsal + vertical bar
+function drawCichlid(c: CanvasRenderingContext2D, len: number, ht: number, color: string, accent: string): void {
+  c.fillStyle = shade(color, -0.15);
+  c.fillRect(snap(-len * 0.34), snap(-ht * 0.5 - PIX), Math.max(PIX, snap(len * 0.7)), PIX * 2); // continuous dorsal
+  fishBody(c, len, ht, color);
+  tailFan(c, len, ht, color, true);
+  c.fillStyle = accent;
+  c.fillRect(snap(-len * 0.04), snap(-ht * 0.42), PIX, Math.max(PIX, snap(ht * 0.84))); // vertical bar
+  c.fillStyle = shade(accent, -0.1);
+  c.fillRect(snap(0), snap(ht * 0.42), PIX * 2, PIX);
+  fishEye(c, len, ht);
+  fishMouth(c, len, ht);
 }
 
 function drawShrimpSprite(c: CanvasRenderingContext2D, size: number, color: string, accent: string): void {
@@ -694,13 +790,21 @@ export function initAquarium(root: HTMLElement): void {
   }
 
   function drawFish(f: Fish): void {
-    const ratio = f.species.shape === 'tall' ? 0.88 : f.species.shape === 'long' ? 0.34 : 0.5;
+    const sh = f.species.shape;
+    const len = f.size;
+    const ht = len * SHAPE_RATIO[sh];
+    const col = f.species.color, acc = f.species.accent;
     ctx!.save();
     ctx!.translate(snap(f.x), snap(f.y));
     ctx!.scale(f.dir, 1);
-    if (f.species.shape === 'shrimp') drawShrimpSprite(ctx!, f.size, f.species.color, f.species.accent);
-    else if (f.species.shape === 'snail') drawSnailSprite(ctx!, f.size, f.species.color, f.species.accent);
-    else drawSwimmerSprite(ctx!, f.species.shape, f.size, f.size * ratio, f.species.color, f.species.accent);
+    if (sh === 'shrimp') drawShrimpSprite(ctx!, f.size, col, acc);
+    else if (sh === 'snail') drawSnailSprite(ctx!, f.size, col, acc);
+    else if (sh === 'gourami') drawGourami(ctx!, len, ht, col, acc);
+    else if (sh === 'betta') drawBetta(ctx!, len, ht, col, acc);
+    else if (sh === 'angelfish') drawAngelfish(ctx!, len, ht, col, acc);
+    else if (sh === 'tall') drawCichlid(ctx!, len, ht, col, acc);
+    else if (sh === 'long') drawLongFish(ctx!, len, ht, col, acc);
+    else drawSwimmer(ctx!, len, ht, col, acc);
     ctx!.restore();
   }
 
