@@ -394,9 +394,19 @@ export function initAquarium(root: HTMLElement): void {
     return [H * 0.3, H * 0.74];
   }
 
+  // Tank-size feel: a fish looks smaller in a bigger tank (apparent size ~
+  // 1/cbrt(volume)); planting gets denser. Both clamped so it stays readable.
+  const REF_GALLONS = 20;
+  function fishScale(): number {
+    return Math.max(0.72, Math.min(1.3, Math.cbrt(REF_GALLONS / gallons)));
+  }
+  function plantFactor(): number {
+    return Math.max(0.65, Math.min(1.7, Math.pow(gallons / REF_GALLONS, 0.45)));
+  }
+
   function pxSize(s: Species): number {
     const base = 14 + s.adultInches * 6;
-    return base * Math.max(0.75, Math.min(1.3, W / 720));
+    return base * Math.max(0.75, Math.min(1.3, W / 720)) * fishScale();
   }
 
   // ------------------------------------------------------------- scene gen
@@ -412,7 +422,7 @@ export function initAquarium(root: HTMLElement): void {
       ['#b5532f', '#7e3a20'],
     ];
     const kinds: Array<Plant['kind']> = ['vallis', 'stem'];
-    const clumps = Math.max(4, Math.round(W / 110));
+    const clumps = Math.max(3, Math.round((W / 110) * plantFactor()));
     for (let i = 0; i < clumps; i++) {
       const kind = kinds[Math.floor(r() * kinds.length)];
       const x = ((i + 0.5) / clumps) * W + (r() - 0.5) * 28;
@@ -435,7 +445,7 @@ export function initAquarium(root: HTMLElement): void {
     }
 
     floaters = [];
-    const floatCount = Math.max(2, Math.round(W / 220));
+    const floatCount = Math.max(1, Math.round((W / 220) * plantFactor()));
     for (let i = 0; i < floatCount; i++) {
       floaters.push({
         x: ((i + 0.5) / floatCount) * W + (r() - 0.5) * 40,
@@ -466,7 +476,7 @@ export function initAquarium(root: HTMLElement): void {
 
     // background silhouette plants for depth
     const r = makeRng(Math.round(W) * 3 + 5);
-    const back = Math.max(5, Math.round(W / 90));
+    const back = Math.max(4, Math.round((W / 90) * plantFactor()));
     for (let i = 0; i < back; i++) {
       const x = ((i + 0.3) / back) * W + (r() - 0.5) * 20;
       bakeBlade(c, x, sub, H * (0.22 + 0.3 * r()), '#0c3a2a');
@@ -767,9 +777,23 @@ export function initAquarium(root: HTMLElement): void {
     palette.append(btn);
   }
 
+  let rebuildT = 0;
+  function rescaleFish(): void {
+    for (const f of fish) f.size = pxSize(f.species);
+  }
+  function scheduleRebuild(): void {
+    clearTimeout(rebuildT);
+    rebuildT = window.setTimeout(() => {
+      buildScene();
+      bake();
+      if (!running && onscreen && !document.hidden) render(performance.now());
+    }, 70);
+  }
   gallonsInput.addEventListener('input', () => {
     gallons = Number(gallonsInput.value) || 20;
     gallonsLabel.textContent = `${gallons} gal`;
+    rescaleFish();
+    scheduleRebuild();
     syncUI();
   });
   resetBtn.addEventListener('click', reset);

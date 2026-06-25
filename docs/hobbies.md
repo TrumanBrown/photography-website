@@ -110,6 +110,8 @@ The meter colors and labels come straight from `load%`:
 
 Separately, each species carries a `minGallons`. If the current tank is smaller than any stocked species likes, a note appears (for example "Angelfish likes 29+ gallons"). That check is independent of the bioload percentage, because some fish need swimming room regardless of waste.
 
+**Tank size also scales the scene, not just the meter.** The canvas stays the same size, but a bigger tank renders the fish smaller (apparent size roughly 1/∛volume, clamped ~0.72–1.3×) and grows the plant and floating-cover density (~0.65–1.7×); a small tank shows big fish and sparse planting. So dragging the gallons slider has an immediate visual effect — fish resize live and the planting re-aquascapes on a short debounce. See `fishScale()` / `plantFactor()` in [src/lib/hobbies/aquarium.ts](../src/lib/hobbies/aquarium.ts).
+
 ### Where the numbers and species come from
 
 Being upfront, because the request was that anyone can learn how this works:
@@ -143,6 +145,7 @@ Everything you see in the tank — fish, plants, rocks, driftwood, bubbles, ligh
 
 - Species roster and balance: the `SPECIES` array.
 - Overall stocking feel: `PLANTED_CAPACITY_PER_GALLON`.
+- How tank size scales the visuals: `fishScale()` (fish shrink in bigger tanks) and `plantFactor()` (denser planting).
 - Starting community shown on load: `STARTER`.
 - The look of anything: the `draw*` / `bake*` functions and the `PIX` constant.
 
