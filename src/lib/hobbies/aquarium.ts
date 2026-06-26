@@ -23,6 +23,8 @@
  * below (PIX / capacity / starter), and the draw* functions (look).
  */
 
+import { stockingStatus } from './stocking';
+
 export type Zone = 'top' | 'mid' | 'bottom';
 export type Shape = 'fish' | 'tall' | 'long' | 'gourami' | 'betta' | 'angelfish' | 'shrimp' | 'snail';
 
@@ -89,8 +91,6 @@ export const SPECIES: Species[] = [
 
 /** CSS pixels per drawn "pixel" block — the chunkiness of the 8-bit look. */
 const PIX = 4;
-/** Bioload units a planted gallon can comfortably carry (tuned for feel). */
-const PLANTED_CAPACITY_PER_GALLON = 0.55;
 /** Hard cap so the loop stays smooth on phones. */
 const MAX_FISH = 55;
 /** A pleasant non-empty starting community. */
@@ -661,21 +661,8 @@ export function initAquarium(root: HTMLElement): void {
 
   // -------------------------------------------------------------- UI sync
   function syncUI(): void {
-    const capacity = gallons * PLANTED_CAPACITY_PER_GALLON;
-    const pct = capacity > 0 ? totalBioload() / capacity : 0;
+    const { pct, label, color } = stockingStatus(gallons, totalBioload());
     bioloadBar!.style.width = `${Math.max(0, Math.min(1, pct)) * 100}%`;
-
-    let color = '#10b981';
-    let label = 'Lightly stocked';
-    if (pct > 1) {
-      color = '#ef4444';
-      label = 'Overstocked';
-    } else if (pct > 0.85) {
-      color = '#f59e0b';
-      label = 'Heavily stocked';
-    } else if (pct >= 0.4) {
-      label = 'Healthy';
-    }
     bioloadBar!.style.backgroundColor = color;
     bioloadLabel!.textContent = fish.length === 0 ? '0%' : `${Math.round(pct * 100)}% · ${label}`;
 

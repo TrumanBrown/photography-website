@@ -3,11 +3,12 @@
 // daily-rotating salted hash (the hash changes each day by design, so a
 // visitor cannot be tracked across days). No cookies, no third parties.
 
-const crypto = require('crypto');
+const { todayUtc, visitorHash } = require('../shared/visitor-hash');
 
 let TableClient;
 const TABLE = 'pageviews';
 const MAX_PATH = 300;
+const SALT = process.env.ANALYTICS_SALT || 'tb-analytics';
 
 function getTableClient() {
   const conn = process.env.AZURE_STORAGE_CONNECTION_STRING;
@@ -20,19 +21,6 @@ function getTableClient() {
 
 // Common bot/crawler user-agents we don't want inflating the numbers.
 const BOT_RE = /bot|crawl|spider|slurp|bingpreview|facebookexternalhit|embedly|quora|pinterest|vkshare|whatsapp|telegram|preview|monitor|curl|wget|python-requests|headless/i;
-
-function todayUtc() {
-  return new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-}
-
-function visitorHash(ip, ua) {
-  const salt = process.env.ANALYTICS_SALT || 'tb-analytics';
-  return crypto
-    .createHash('sha256')
-    .update(`${ip}|${ua}|${todayUtc()}|${salt}`)
-    .digest('hex')
-    .slice(0, 16);
-}
 
 function clientIp(req) {
   const xff = req.headers['x-forwarded-for'] || '';
@@ -82,7 +70,7 @@ module.exports = async function (context, req) {
         type: 'pv',
         path,
         ref,
-        vh: visitorHash(clientIp(req), ua),
+        vh: visitorHash(clientIp(req), ua, date, SALT),
         sid,
         pvid,
       });

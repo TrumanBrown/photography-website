@@ -75,6 +75,14 @@ Translation:
 
 If you ever add inline scripts, switch to per-script hashes rather than `'unsafe-inline'`. Astro can emit hash-based CSPs in a future iteration if needed.
 
+### Contact form abuse
+
+The public contact endpoint (`api/contact`) has layered protection:
+
+- **Honeypot field.** A hidden `website` input that humans never see. Bots that fill it get a fake success and are silently dropped.
+- **Server-side validation.** Name, email, and message are length-checked and the email is format-checked before anything is stored.
+- **Per-IP rate limit.** Each client is capped at a handful of messages per hour. The limiter stores only a salted, truncated hash of the IP (the same hashing the analytics beacon uses), never the raw IP, in a `contactratelimit` table. It fails open: if the limiter backend errors, a real message is never blocked.
+
 ### Blob storage access controls
 
 | Surface | Mitigation |

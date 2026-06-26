@@ -32,6 +32,169 @@ You drop a folder of photos. The site updates itself.
 
 ---
 
+## The complete picture
+
+The 30-second view leaves out the parts that make the site more than static pages: the admin panel, the contact form, analytics, and the interactive hobbies. Here is the whole system and how the pieces talk to each other.
+
+```mermaid
+flowchart TB
+    classDef author fill:#fde68a,stroke:#b45309,color:#3b2a06;
+    classDef github fill:#e9d5ff,stroke:#7c3aed,color:#2e1065;
+    classDef build fill:#bfdbfe,stroke:#1d4ed8,color:#0b2559;
+    classDef azure fill:#99f6e4,stroke:#0f766e,color:#063b35;
+    classDef store fill:#fed7aa,stroke:#c2410c,color:#3d1d05;
+    classDef runtime fill:#bbf7d0,stroke:#15803d,color:#052e16;
+    classDef third fill:#e5e7eb,stroke:#6b7280,color:#1f2937;
+
+    subgraph AUTHOR["Author (you)"]
+        direction TB
+        CAM["Camera / phone photos"]
+        STAGE["staging/&lt;name&gt;/ (local)"]
+        CODE["Source edits<br/>(Astro, Bicep, api/)"]
+    end
+
+    subgraph GH["GitHub"]
+        REPO["Repository (main)"]
+        SECRETS["Actions secrets<br/>OIDC IDs + SWA token"]
+    end
+
+    subgraph CI["GitHub Actions: Build and Deploy"]
+        direction TB
+        PRE["prebuild.mjs<br/>sync originals, RAW to JPEG"]
+        BUILD["astro build<br/>HTML/CSS/JS + image variants"]
+        SYNCV["sync-variants.mjs<br/>move variants to Blob"]
+        DEPLOY["SWA deploy<br/>dist/ + api/"]
+        PRE --> BUILD --> SYNCV --> DEPLOY
+    end
+
+    subgraph AZ["Azure (resource group: rg-photography-prod)"]
+        direction TB
+        subgraph SA["Storage account"]
+            direction TB
+            ORIG[("originals/")]
+            DERIV[("derivatives/")]
+            VAR[("variants/")]
+            META[("metadata/")]
+            HMEDIA[("hobby-media/")]
+            TMSG[("contactmessages")]
+            TPV[("pageviews")]
+            TRL[("contactratelimit")]
+        end
+        subgraph SWA["Static Web App + global CDN"]
+            direction TB
+            STATIC["Static site"]
+            FCON["/api/contact"]
+            FTRK["/api/track"]
+            FMGR["/api/sessionmgr"]
+            AUTHN["Built-in auth<br/>(GitHub OAuth + roles)"]
+        end
+        IDENT["Managed identity<br/>OIDC federation + RBAC"]
+        MON["App Insights + Log Analytics"]
+        DNS["App Service Domain + Azure DNS<br/>trumanbrown.com"]
+    end
+
+    subgraph VIS["Visitors"]
+        BROWSER["Public visitor browser"]
+        ADMIN["You, signed in at /admin"]
+    end
+
+    INAT["iNaturalist API + photo CDNs"]
+
+    %% build-time (write path)
+    CAM --> STAGE
+    STAGE -- "upload-session.sh" --> ORIG
+    STAGE -- "upload-hobby-media.mjs" --> HMEDIA
+    CODE -- "git push" --> REPO
+    REPO -- "push / hourly cron / dispatch" --> PRE
+    SECRETS -. "OIDC + deploy token" .-> CI
+    PRE -- "DefaultAzureCredential (OIDC)" --> ORIG
+    PRE -- "write JPEGs" --> DERIV
+    PRE -- "manifest.json" --> META
+    SYNCV -- "upload variants" --> VAR
+    DEPLOY -- "publish" --> STATIC
+    DEPLOY -- "deploy functions" --> FCON
+    IDENT -. "trusts GitHub OIDC" .-> CI
+    IDENT -. "RBAC on storage" .-> SA
+
+    %% run-time (read path)
+    BROWSER -- "HTTPS pages" --> STATIC
+    BROWSER -- "lightbox full-res" --> ORIG
+    BROWSER -- "responsive images" --> VAR
+    BROWSER -- "hobby photos" --> HMEDIA
+    BROWSER -- "POST pageview" --> FTRK
+    BROWSER -- "POST message" --> FCON
+    BROWSER -- "hobby grid" --> INAT
+    FTRK -- "no IP, daily hash" --> TPV
+    FCON -- "store message" --> TMSG
+    FCON -- "rate limit (hashed IP)" --> TRL
+    ADMIN -- "GitHub sign-in" --> AUTHN
+    ADMIN -- "edit / rebuild" --> FMGR
+    FMGR -- "read/write _session.json" --> ORIG
+    FMGR -- "admin-index.json" --> META
+    FMGR -- "read messages" --> TMSG
+    FMGR -- "read analytics" --> TPV
+    FMGR -. "Rebuild: repository_dispatch" .-> REPO
+    STATIC -. "JS telemetry" .-> MON
+    FCON -. "logs" .-> MON
+    DNS -. "DNS + TLS" .-> STATIC
+
+    class CAM,STAGE,CODE author;
+    class REPO,SECRETS github;
+    class PRE,BUILD,SYNCV,DEPLOY build;
+    class STATIC,FCON,FTRK,FMGR,AUTHN,IDENT,MON,DNS azure;
+    class ORIG,DERIV,VAR,META,HMEDIA,TMSG,TPV,TRL store;
+    class BROWSER,ADMIN runtime;
+    class INAT third;
+```
+
+**How to read it.** Color marks each box's role: amber is something you do, purple is GitHub, blue is the build pipeline, teal is Azure compute and identity, orange is Azure storage, green is a visitor, and gray is a third party. Solid arrows carry data; dotted arrows carry control, auth, or telemetry.
+
+Two phases matter, and the split is the key to the whole design:
+
+- **Build time (write path).** Photos and code go in, and the GitHub Actions pipeline turns them into a static site, pushing the heavy images to Blob Storage. None of this runs while a visitor is on the site.
+- **Run time (read path).** A visitor's browser loads static HTML from the CDN and talks to three small Azure Functions for the only dynamic bits: recording a pageview, sending a contact message, and (for you, signed in) editing sessions at `/admin`.
+
+### What happens on a build
+
+A push to `main`, the hourly cron, a manual run, or a `blob-changed` dispatch all kick off the same pipeline.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Dev as Author
+    participant GH as GitHub
+    participant GA as Actions runner
+    participant AZ as Azure Blob
+    participant SWA as Static Web App
+    Note over GH,GA: Triggers: push to main, hourly cron,<br/>manual dispatch, or blob-changed
+    GH->>GA: Start "Build and Deploy"
+    GA->>GA: npm ci, then unit tests
+    GA->>AZ: OIDC login (managed identity)
+    GA->>AZ: prebuild.mjs reads originals/, writes derivatives/
+    GA->>GA: astro build (HTML + responsive variants)
+    GA->>AZ: sync-variants.mjs uploads variants/
+    GA->>SWA: deploy dist/ + api/ functions
+    SWA-->>Dev: Live at trumanbrown.com (about 3 minutes)
+```
+
+### Components at a glance
+
+| Component | Where it lives | Deep dive |
+| --- | --- | --- |
+| Photo portfolio (static pages) | `src/pages/`, `src/components/`, built by Astro into `dist/` | this doc |
+| Build pipeline | `.github/workflows/build-and-deploy.yml`, `scripts/prebuild.mjs`, `scripts/sync-variants.mjs` | [cicd.md](cicd.md), [image-pipeline.md](image-pipeline.md) |
+| Blob containers (`originals`, `derivatives`, `variants`, `metadata`, `hobby-media`) | Azure Storage, defined in `infra/modules/storage.bicep` | [image-pipeline.md](image-pipeline.md) |
+| Contact form | `src/components/ContactForm.astro` + `api/contact/` (writes `contactmessages`, throttled via `contactratelimit`) | [security.md](security.md) |
+| Analytics | `src/lib/analytics.ts` + `api/track/` (writes `pageviews`) | [analytics.md](analytics.md) |
+| Admin panel | `src/pages/admin/`, `src/lib/admin.ts` + `api/sessionmgr/` | [admin.md](admin.md) |
+| Interactive hobbies | `src/components/hobbies/`, `src/lib/hobbies/` | [hobbies.md](hobbies.md) |
+| Admin auth | SWA built-in auth (GitHub OAuth), `staticwebapp.config.json` | [security.md](security.md) |
+| GitHub-to-Azure trust | OIDC federation on a managed identity, `infra/modules/identity.bicep` | [cicd.md](cicd.md) |
+| Monitoring | App Insights + Log Analytics, `infra/modules/monitoring.bicep` | [azure.md](azure.md) |
+| Domain + DNS | App Service Domain + Azure DNS, `infra/modules/domain.bicep` | [azure.md](azure.md) |
+
+---
+
 ## How this differs from a "normal" web server
 
 Three eras of web architecture exist. Knowing where Astro sits explains a lot of the choices in this repo.

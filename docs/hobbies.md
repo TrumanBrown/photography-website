@@ -97,7 +97,7 @@ capacity = gallons × PLANTED_CAPACITY_PER_GALLON     // 0.55 "load units" per g
 load%    = Σ(bioload of every fish in the tank) / capacity
 ```
 
-So a 20-gallon tank has a capacity of `20 × 0.55 = 11` units. Seven neon tetras at `0.3` each (`2.1`) plus four pygmy cory at `0.35` (`1.4`) plus five cherry shrimp at `0.05` (`0.25`) plus one honey gourami at `0.9` come to `~4.65`, or about 42% of capacity, which reads **Healthy**.
+So a 20-gallon tank has a capacity of `20 × 0.55 = 11` units. Seven neon tetras at `0.3` each (`2.1`) plus four pygmy cory at `0.35` (`1.4`) plus five cherry shrimp at `0.05` (`0.25`) plus one honey gourami at `0.9` come to `~4.65`, or about 42% of capacity, which reads **Healthy**. The formula lives in [src/lib/hobbies/stocking.ts](../src/lib/hobbies/stocking.ts), a pure module split out from the canvas engine and unit-tested in `stocking.test.ts`.
 
 The meter colors and labels come straight from `load%`:
 
@@ -144,7 +144,7 @@ Everything you see in the tank (fish, plants, rocks, driftwood, bubbles, light) 
 ### Tweaking it later
 
 - Species roster and balance: the `SPECIES` array.
-- Overall stocking feel: `PLANTED_CAPACITY_PER_GALLON`.
+- Overall stocking feel: `PLANTED_CAPACITY_PER_GALLON` (now in [src/lib/hobbies/stocking.ts](../src/lib/hobbies/stocking.ts), unit-tested).
 - How tank size scales the visuals: `fishScale()` (fish shrink in bigger tanks) and `plantFactor()` (denser planting).
 - Starting community shown on load: `STARTER`.
 - The look of anything: the `draw*` / `bake*` functions and the `PIX` constant.

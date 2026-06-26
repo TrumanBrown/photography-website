@@ -55,7 +55,7 @@ A `concurrency` block cancels older runs on the same branch when a new one arriv
 
 1. **Checkout** the repo, pulls the code into the runner's working directory.
 2. **Set up Node.js 22** with `actions/setup-node@v4`, caches npm by `package-lock.json` so subsequent runs are fast.
-3. **`npm ci`**: installs dependencies. `ci` (rather than `install`) is the CI-friendly version: it uses the exact versions in `package-lock.json` and fails if anything has drifted, so your local environment and CI are guaranteed to match. Full npm primer below.
+3. **`npm ci`**: installs dependencies. `ci` (rather than `install`) is the CI-friendly version: it uses the exact versions in `package-lock.json` and fails if anything has drifted, so your local environment and CI are guaranteed to match. Full npm primer below. Immediately after, **`npm test`** runs the unit suite (stocking math, session sort, blob URLs, the visitor hash); a failure stops the run before anything is built or deployed.
 4. **Install `libraw-bin`** via apt with cache, needed for Sony `.ARW` RAW conversion. See [image-pipeline.md](image-pipeline.md#raw-files-sony-arw-and-friends).
 5. **Azure login (OIDC)**: assumes the managed identity created in `infra/`. No password, no token in secrets. Explained below.
 6. **Restore prebuild cache**: `.cache/prebuild/` is a folder of already-downloaded images from previous runs, keyed by blob ETag. Lets incremental builds skip re-downloading unchanged photos.
@@ -73,9 +73,10 @@ A `concurrency` block cancels older runs on the same branch when a new one arriv
 
 **What it does:**
 1. `npm ci`
-2. Prettier check (non-blocking, flagged but doesn't fail the PR).
-3. Synthesizes fixture sessions via `scripts/generate-fixtures.mjs` (so Astro has content to type-check).
-4. Runs `npm run check` (which calls `astro check`, TypeScript on `.astro` files + content-collection Zod schema validation).
+2. **Unit tests** via `npm test` (the pure-logic suite; this one is blocking).
+3. Prettier check (non-blocking, flagged but doesn't fail the PR).
+4. Synthesizes fixture sessions via `scripts/generate-fixtures.mjs` (so Astro has content to type-check).
+5. Runs `npm run check` (which calls `astro check`, TypeScript on `.astro` files + content-collection Zod schema validation).
 
 This catches broken templates and schema-violating session JSON **before** they hit `main` and break a real build.
 

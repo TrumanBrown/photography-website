@@ -49,6 +49,9 @@ jobs:
       - name: Install npm deps
         run: npm ci
 
+      - name: Unit tests
+        run: npm test
+
       - name: Cache apt packages (libraw-bin)
         id: apt-cache
         uses: actions/cache@v4

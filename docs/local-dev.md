@@ -25,6 +25,8 @@ npm ci            # exact dependency install from package-lock.json
 | `npm run build` | Production build into `dist/` |
 | `npm run preview` | Serve `dist/` locally (mimics SWA) |
 | `npm run check` | Type-check `.astro` files + content collection schema |
+| `npm test` | Run the unit test suite (Vitest): stocking math, session sort, blob URLs, visitor hash |
+| `npm run test:watch` | Same suite in watch mode while developing |
 | `npm run fixtures` | Generate two synthetic sessions in `src/content/sessions/` |
 | `npm run fixtures:many` | Generate ~40 synthetic sessions across 5 years (great for testing the sidebar at scale) |
 | `npm run prebuild:remote` | Sync sessions from real Blob Storage (needs `AZURE_STORAGE_ACCOUNT` env and `az login`) |
