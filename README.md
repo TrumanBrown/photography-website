@@ -198,3 +198,13 @@ photography-website/
 ├── staticwebapp.config.json   # SWA headers + routing, see docs/security.md
 └── README.md                  # this file
 ```
+
+---
+
+## License
+
+The **source code** in this repository is licensed under the MIT License. See [LICENSE](LICENSE).
+
+The **photographs, graphics, and written content** are not covered by that license. All photographs and images on the site are © Truman Brown, all rights reserved, and are not licensed for reuse. The photos themselves are not stored in this repository; they live in Azure Blob Storage and are served to the site at build time.
+
+Third-party content carries its own terms: the tide-pooling reveal cards can show Creative Commons photos from iNaturalist with attribution shown in the card, and those remain under their respective CC licenses. See [docs/hobbies.md](docs/hobbies.md) for details.

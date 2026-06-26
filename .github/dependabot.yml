@@ -1,0 +1,42 @@
+# Dependabot keeps dependencies current with low noise: one grouped PR per
+# ecosystem per month. See docs/cicd.md for how these fit the workflows.
+version: 2
+updates:
+  # Site dependencies (Astro, Tailwind, sharp, etc.)
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    groups:
+      site-dependencies:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+
+  # Azure Functions API dependencies
+  - package-ecosystem: npm
+    directory: "/api"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    groups:
+      api-dependencies:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+
+  # GitHub Actions used by the workflows
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns:
+          - "*"

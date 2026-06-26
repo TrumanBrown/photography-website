@@ -3,6 +3,15 @@ name: Build and Deploy
 on:
   push:
     branches: [main]
+    # Docs, license, and meta files don't change the built site, so skip the
+    # full image build + deploy for commits that only touch them. The hourly
+    # cron and manual dispatch are still available if a rebuild is ever wanted.
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'LICENSE'
+      - '.github/dependabot.yml'
+      - '.github/SECURITY.md'
   pull_request:
     branches: [main]
   schedule:
