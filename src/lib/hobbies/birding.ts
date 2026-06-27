@@ -20,16 +20,16 @@
 import type { FaceLandmarker as FaceLandmarkerT, NormalizedLandmark } from '@mediapipe/tasks-vision';
 import {
   featuresToBird,
-  renderBird,
+  renderBirdPortrait,
   describeFeatures,
   type FaceFeatures,
   type FacePalette,
 } from './birding-bird';
 
 /** Longest side we downscale the selfie to before detection (speed vs accuracy). */
-const MAX_SOURCE = 640;
-/** Pixel size of the rendered bird canvas. */
-const BIRD_PX = 320;
+const MAX_SOURCE = 768;
+/** Pixel size of the rendered portrait canvas. */
+const BIRD_PX = 384;
 
 // MediaPipe FaceMesh canonical landmark indices.
 const IDX = {
@@ -240,7 +240,9 @@ export function initBirding(root: HTMLElement): void {
       const features = computeFeatures(lm, source.width, source.height);
       const palette = computePalette(lm, data);
       const bird = featuresToBird(features, palette);
-      if (birdCanvas) renderBird(birdCanvas, bird, BIRD_PX);
+      if (birdCanvas) {
+        renderBirdPortrait(birdCanvas, { source, landmarks: lm, palette, params: bird }, BIRD_PX);
+      }
       if (tagsEl) {
         tagsEl.replaceChildren(
           ...describeFeatures(features).map((t) => {

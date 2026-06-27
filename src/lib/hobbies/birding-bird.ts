@@ -143,131 +143,271 @@ export function describeFeatures(f: FaceFeatures): string[] {
   if (f.smile >= 0.2) tags.push('cheerful');
   return tags.length ? tags : ['one-of-a-kind'];
 }
+// ---------------------------------------------------------------------------
+// Portrait renderer. Unlike a from-scratch mascot, this keeps the *person*:
+// it crops the face out of the selfie, mildly pixelates it for a pixel-art
+// look, and overlays light bird touches (a feather crest, a beak over the
+// nose/mouth, cheek + brow tufts, and a feather collar) anchored to the facial
+// landmarks. The result reads as "you, with a few feathers", not a cartoon
+// bird. Browser-only (uses canvas/Image); not unit-tested.
+// ---------------------------------------------------------------------------
 
-// ---------------------------------------------------------------------------
-// Renderer. Draws into a logical BIRD_SPACE grid; the caller scales the canvas
-// up with imageSmoothingEnabled=false to get the chunky pixel look, matching
-// the other islands. Only browser code calls this; it is not unit-tested.
-// ---------------------------------------------------------------------------
+/** Working resolution of the pixel-art buffer. The face is drawn at this size
+ *  then scaled up with smoothing off, so a smaller value = chunkier pixels.
+ *  Tuned so the person stays clearly recognizable. */
+export const PIXEL_RES = 150;
 
 type Ctx = CanvasRenderingContext2D;
+type Pt = { x: number; y: number };
 
-function ellipse(ctx: Ctx, cx: number, cy: number, rx: number, ry: number, color: string): void {
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
-  ctx.fill();
+/** A normalized landmark (only x/y are used here). */
+export interface LandmarkXY {
+  x: number;
+  y: number;
+}
+
+export interface PortraitInput {
+  /** The selfie, already drawn into a canvas at its own pixel size. */
+  source: HTMLCanvasElement;
+  /** MediaPipe face landmarks, normalized to [0,1] over the source. */
+  landmarks: LandmarkXY[];
+  /** Colors sampled from the selfie. */
+  palette: FacePalette;
+  /** Feature-driven sizing (crest/beak), so your features still shape the bird. */
+  params: BirdParams;
+}
+
+// FaceMesh canonical indices used for placing the bird parts.
+const L = {
+  rEyeOuter: 33,
+  lEyeOuter: 263,
+  foreheadTop: 10,
+  chin: 152,
+  cheekR: 234,
+  cheekL: 454,
+  noseTip: 1,
+  noseBottom: 2,
+  mouthTop: 13,
+  mouthBot: 14,
+  browR: 70,
+  browL: 300,
+};
+
+const dist2 = (a: Pt, b: Pt): number => Math.hypot(a.x - b.x, a.y - b.y);
+const mid = (a: Pt, b: Pt): Pt => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+
+interface RGB {
+  r: number;
+  g: number;
+  b: number;
+}
+function hexToRgb(hex: string): RGB {
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex.trim());
+  if (!m) return { r: 128, g: 128, b: 128 };
+  return { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16) };
+}
+function rgbToHex(c: RGB): string {
+  const h = (v: number) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0');
+  return `#${h(c.r)}${h(c.g)}${h(c.b)}`;
+}
+const shadeHex = (hex: string, f: number): string => {
+  const c = hexToRgb(hex);
+  return rgbToHex({ r: c.r * f, g: c.g * f, b: c.b * f });
+};
+const mixHex = (a: string, b: string, t: number): string => {
+  const x = hexToRgb(a);
+  const y = hexToRgb(b);
+  return rgbToHex({ r: x.r + (y.r - x.r) * t, g: x.g + (y.g - x.g) * t, b: x.b + (y.b - x.b) * t });
+};
+
+/** Draw a filled feather (teardrop) from base to tip with a soft midrib. */
+function feather(o: Ctx, base: Pt, tip: Pt, halfW: number, color: string): void {
+  const ang = Math.atan2(tip.y - base.y, tip.x - base.x);
+  const nx = Math.cos(ang + Math.PI / 2);
+  const ny = Math.sin(ang + Math.PI / 2);
+  const m = mid(base, tip);
+  o.fillStyle = color;
+  o.beginPath();
+  o.moveTo(base.x + nx * halfW, base.y + ny * halfW);
+  o.quadraticCurveTo(m.x + nx * halfW * 0.7, m.y + ny * halfW * 0.7, tip.x, tip.y);
+  o.quadraticCurveTo(m.x - nx * halfW * 0.7, m.y - ny * halfW * 0.7, base.x - nx * halfW, base.y - ny * halfW);
+  o.closePath();
+  o.fill();
+  o.strokeStyle = shadeHex(color, 0.8);
+  o.lineWidth = Math.max(0.6, halfW * 0.12);
+  o.beginPath();
+  o.moveTo(base.x, base.y);
+  o.lineTo(tip.x, tip.y);
+  o.stroke();
 }
 
 /**
- * Render the bird to a canvas of `sizePx` (square). The canvas is drawn at
- * logical resolution then up-scaled with smoothing off for crisp pixels.
+ * Render the selfie as a pixel-art portrait with bird touches into `canvas`
+ * (a square of `sizePx`). Keeps the person recognizable.
  */
-export function renderBird(canvas: HTMLCanvasElement, p: BirdParams, sizePx: number): void {
+export function renderBirdPortrait(canvas: HTMLCanvasElement, input: PortraitInput, sizePx: number): void {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
+  const { source, landmarks, palette, params } = input;
+  const W = source.width;
+  const H = source.height;
+  if (!W || !H || landmarks.length < 468) return;
 
-  // Render into a small offscreen buffer, then blit it up nearest-neighbor.
+  // Face bounding box (in source pixels) from all landmarks.
+  let minX = 1;
+  let minY = 1;
+  let maxX = 0;
+  let maxY = 0;
+  for (const p of landmarks) {
+    if (p.x < minX) minX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y > maxY) maxY = p.y;
+  }
+  const fx0 = minX * W;
+  const fy0 = minY * H;
+  const fw = (maxX - minX) * W;
+  const fh = (maxY - minY) * H;
+
+  // Expand: extra headroom on top for the crest, a little around the rest.
+  const padTop = fh * 0.62;
+  const padBot = fh * 0.3;
+  const padX = fw * 0.22;
+  let x0 = fx0 - padX;
+  let y0 = fy0 - padTop;
+  const x1 = fx0 + fw + padX;
+  const y1 = fy0 + fh + padBot;
+  const cx = (x0 + x1) / 2;
+  const cy = (y0 + y1) / 2;
+  const side = Math.max(x1 - x0, y1 - y0);
+  x0 = cx - side / 2;
+  y0 = cy - side / 2;
+
+  const bg = mixHex(palette.body, '#ffffff', 0.55);
+
+  // Square padded crop (fills out-of-image areas with bg so the crest has a
+  // clean backdrop and there are no stretched edges).
+  const PAD = Math.max(1, Math.round(side));
+  const pad = document.createElement('canvas');
+  pad.width = PAD;
+  pad.height = PAD;
+  const pc = pad.getContext('2d');
+  if (!pc) return;
+  pc.fillStyle = bg;
+  pc.fillRect(0, 0, PAD, PAD);
+  pc.imageSmoothingEnabled = true;
+  pc.drawImage(source, -x0, -y0);
+
+  // Downscale the crop into the low-res buffer (this is what pixelates it).
+  const OFF = PIXEL_RES;
   const off = document.createElement('canvas');
-  off.width = BIRD_SPACE;
-  off.height = BIRD_SPACE;
+  off.width = OFF;
+  off.height = OFF;
   const o = off.getContext('2d');
   if (!o) return;
+  o.imageSmoothingEnabled = true;
+  o.drawImage(pad, 0, 0, PAD, PAD, 0, 0, OFF, OFF);
 
-  const cx = BIRD_SPACE / 2;
-  o.clearRect(0, 0, BIRD_SPACE, BIRD_SPACE);
+  // Landmark -> low-res buffer coordinates.
+  const p = (i: number): Pt => ({
+    x: ((landmarks[i].x * W - x0) / side) * OFF,
+    y: ((landmarks[i].y * H - y0) / side) * OFF,
+  });
 
-  // Perch
-  o.fillStyle = '#8a5a2b';
-  o.fillRect(18, 90, 64, 5);
-  o.fillStyle = '#6f4420';
-  o.fillRect(18, 95, 64, 3);
+  const eyeDist = Math.max(6, dist2(p(L.rEyeOuter), p(L.lEyeOuter)));
+  const headW = Math.max(eyeDist, dist2(p(L.cheekR), p(L.cheekL)));
+  const hair = palette.body;
+  const accent = palette.accent;
 
-  const bodyCx = cx;
-  const bodyCy = 56;
-  const bw = p.bodyWidth / 2;
-  const bh = p.bodyHeight / 2;
+  // --- Feather crest above the head ---
+  const headTop = p(L.foreheadTop);
+  const crestH = eyeDist * (0.7 + ((params.crestHeight - 4) / 18) * 1.0);
+  const n = 5;
+  for (let i = 0; i < n; i += 1) {
+    const t = i / (n - 1) - 0.5; // -0.5..0.5
+    const base: Pt = { x: headTop.x + t * headW * 0.72, y: headTop.y + Math.abs(t) * eyeDist * 0.22 };
+    const tip: Pt = { x: base.x + t * eyeDist * 0.5, y: base.y - crestH * (1 - Math.abs(t) * 0.32) };
+    const col = i % 2 === 0 ? accent : mixHex(hair, accent, 0.5);
+    feather(o, base, tip, eyeDist * 0.16, col);
+  }
 
-  // Tail
-  o.fillStyle = p.accent;
+  // --- Brow tufts (small feathers angled up-and-out over the outer brows) ---
+  for (const [idx, dir] of [
+    [L.browR, -1],
+    [L.browL, 1],
+  ] as const) {
+    const b = p(idx);
+    const base: Pt = { x: b.x, y: b.y - eyeDist * 0.05 };
+    const tip: Pt = { x: b.x + dir * eyeDist * 0.32, y: b.y - eyeDist * 0.3 };
+    feather(o, base, tip, eyeDist * 0.1, mixHex(hair, accent, 0.35));
+  }
+
+  // --- Cheek/jaw tufts (subtle, point down-and-out) ---
+  for (const [idx, dir] of [
+    [L.cheekR, -1],
+    [L.cheekL, 1],
+  ] as const) {
+    const c = p(idx);
+    for (let k = 0; k < 2; k += 1) {
+      const base: Pt = { x: c.x + dir * eyeDist * 0.04, y: c.y + k * eyeDist * 0.16 };
+      const tip: Pt = { x: c.x + dir * eyeDist * (0.26 + k * 0.06), y: c.y + eyeDist * (0.22 + k * 0.16) };
+      feather(o, base, tip, eyeDist * 0.09, shadeHex(hair, 0.92));
+    }
+  }
+
+  // --- Beak over the nose/mouth ---
+  const noseTip = p(L.noseTip);
+  const mouthC = mid(p(L.mouthTop), p(L.mouthBot));
+  const chin = p(L.chin);
+  const beakTopY = noseTip.y - eyeDist * 0.02;
+  const beakApexY = mouthC.y + (chin.y - mouthC.y) * 0.28;
+  const beakLen = Math.max(eyeDist * 0.5, beakApexY - beakTopY) * (0.85 + ((params.beakLength - 7) / 9) * 0.3);
+  const beakW = eyeDist * (0.5 + ((params.beakWidth - 7) / 8) * 0.26);
+  const bx = mouthC.x;
+  const apex: Pt = { x: bx, y: beakTopY + beakLen };
+  // upper mandible
+  o.fillStyle = palette.beak;
   o.beginPath();
-  o.moveTo(cx + bw - 6, bodyCy + bh - 10);
-  o.lineTo(cx + bw + 14, bodyCy + bh + 6);
-  o.lineTo(cx + bw - 4, bodyCy + bh + 2);
+  o.moveTo(bx - beakW / 2, beakTopY);
+  o.lineTo(bx + beakW / 2, beakTopY);
+  o.lineTo(apex.x, apex.y);
   o.closePath();
   o.fill();
-
-  // Crest (behind the head, on top)
-  if (p.crestHeight > 0) {
-    o.fillStyle = p.accent;
+  o.strokeStyle = shadeHex(palette.beak, 0.72);
+  o.lineWidth = Math.max(0.8, eyeDist * 0.03);
+  o.stroke();
+  // gape line (the beak's "mouth")
+  o.strokeStyle = shadeHex(palette.beak, 0.6);
+  o.lineWidth = Math.max(0.8, eyeDist * 0.035);
+  o.beginPath();
+  o.moveTo(bx - beakW * 0.42, beakTopY + beakLen * 0.42);
+  o.quadraticCurveTo(bx, beakTopY + beakLen * 0.6, bx + beakW * 0.42, beakTopY + beakLen * 0.42);
+  o.stroke();
+  // nostrils
+  o.fillStyle = shadeHex(palette.beak, 0.55);
+  for (const s of [-1, 1]) {
     o.beginPath();
-    o.moveTo(cx - 6, bodyCy - bh + 4);
-    o.lineTo(cx, bodyCy - bh - p.crestHeight);
-    o.lineTo(cx + 6, bodyCy - bh + 4);
-    o.closePath();
+    o.ellipse(bx + s * beakW * 0.2, beakTopY + beakLen * 0.18, eyeDist * 0.03, eyeDist * 0.045, 0, 0, Math.PI * 2);
     o.fill();
   }
 
-  // Body
-  ellipse(o, bodyCx, bodyCy, bw, bh, p.body);
-  // Belly patch
-  ellipse(o, bodyCx, bodyCy + bh * 0.28, bw * 0.62, bh * 0.6, p.belly);
-
-  // Wings
-  o.fillStyle = p.accent;
-  o.beginPath();
-  o.ellipse(bodyCx - bw * 0.74, bodyCy + 2, 8, bh * 0.55, -0.35, 0, Math.PI * 2);
-  o.fill();
-  o.beginPath();
-  o.ellipse(bodyCx + bw * 0.74, bodyCy + 2, 8, bh * 0.55, 0.35, 0, Math.PI * 2);
-  o.fill();
-
-  // Feet
-  o.strokeStyle = p.beak;
-  o.lineWidth = 2;
-  for (const fx of [cx - 8, cx + 8]) {
+  // --- Feather collar across the bottom (frames the face, hides the crop edge) ---
+  const collarBase = mixHex(hair, '#ffffff', 0.1);
+  const collarTop = OFF * 0.88;
+  const scallop = OFF / 9;
+  o.fillStyle = collarBase;
+  o.fillRect(0, Math.round(collarTop + scallop * 0.5), OFF, OFF);
+  for (let i = 0; i <= 9; i += 1) {
+    o.fillStyle = i % 2 === 0 ? collarBase : shadeHex(collarBase, 0.86);
     o.beginPath();
-    o.moveTo(fx, bodyCy + bh - 2);
-    o.lineTo(fx, 90);
-    o.stroke();
+    o.ellipse(i * scallop, collarTop + scallop * 0.5, scallop * 0.6, scallop * 0.62, 0, 0, Math.PI * 2);
+    o.fill();
   }
 
-  // Beak (centered, pointing down toward viewer)
-  const beakTopY = p.eyeY + 6;
-  o.fillStyle = p.beak;
-  o.beginPath();
-  o.moveTo(cx - p.beakWidth / 2, beakTopY);
-  o.lineTo(cx + p.beakWidth / 2, beakTopY);
-  o.lineTo(cx, beakTopY + p.beakLength);
-  o.closePath();
-  o.fill();
-
-  // Eyes
-  const half = p.eyeGap / 2;
-  for (const ex of [cx - half, cx + half]) {
-    ellipse(o, ex, p.eyeY, p.eyeRadius, p.eyeRadius, '#ffffff');
-    o.strokeStyle = '#1a1a1a';
-    o.lineWidth = 1;
-    o.beginPath();
-    o.ellipse(ex, p.eyeY, p.eyeRadius, p.eyeRadius, 0, 0, Math.PI * 2);
-    o.stroke();
-    // Pupil
-    ellipse(o, ex, p.eyeY + 0.5, p.eyeRadius * 0.5, p.eyeRadius * 0.5, '#1a1a1a');
-    // Catchlight
-    ellipse(o, ex - p.eyeRadius * 0.22, p.eyeY - p.eyeRadius * 0.25, p.eyeRadius * 0.18, p.eyeRadius * 0.18, '#ffffff');
-  }
-
-  // Cheek blush for a smiling face
-  if (p.blush) {
-    o.fillStyle = 'rgba(244,114,182,0.55)';
-    ellipse(o, cx - half - p.eyeRadius * 0.6, p.eyeY + p.eyeRadius + 2, 4, 2.5, 'rgba(244,114,182,0.55)');
-    ellipse(o, cx + half + p.eyeRadius * 0.6, p.eyeY + p.eyeRadius + 2, 4, 2.5, 'rgba(244,114,182,0.55)');
-  }
-
-  // Blit up nearest-neighbor.
+  // Blit up nearest-neighbor for crisp pixels.
   canvas.width = sizePx;
   canvas.height = sizePx;
   ctx.imageSmoothingEnabled = false;
   ctx.clearRect(0, 0, sizePx, sizePx);
-  ctx.drawImage(off, 0, 0, BIRD_SPACE, BIRD_SPACE, 0, 0, sizePx, sizePx);
+  ctx.drawImage(off, 0, 0, OFF, OFF, 0, 0, sizePx, sizePx);
 }

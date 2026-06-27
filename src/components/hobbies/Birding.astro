@@ -18,10 +18,10 @@
 
 <section data-bird-root aria-label="Selfie to bird generator" class="not-prose">
   <p class="mb-4 max-w-prose text-sm text-neutral-600 dark:text-neutral-400">
-    Take or upload a selfie and the page draws you as a little pixel bird. Your
-    photo is read on your device and never uploaded. If you have wide eyes, your
-    bird gets wide eyes. A rounder face gives a rounder bird, and your colors
-    become its feathers.
+    Take or upload a selfie and the page restyles your own face as a pixel-art
+    portrait with a few bird touches: a beak, a feather crest, and feather tufts,
+    tinted with colors pulled from your photo. It still looks like you. Your photo
+    is read on your device and never uploaded.
   </p>
 
   <div class="rounded-2xl border border-neutral-200 bg-neutral-50 p-4 sm:p-6 dark:border-neutral-800 dark:bg-neutral-900/40">
@@ -86,11 +86,11 @@
       <div class="overflow-hidden rounded-xl border border-neutral-200 bg-sky-50 dark:border-neutral-800 dark:bg-neutral-800/60">
         <canvas
           data-bird-canvas
-          width="320"
-          height="320"
-          style="image-rendering: pixelated; width: 320px; height: 320px; max-width: 80vw; max-height: 80vw"
+          width="384"
+          height="384"
+          style="image-rendering: pixelated; width: 384px; height: 384px; max-width: 82vw; max-height: 82vw"
           role="img"
-          aria-label="Your pixel-art bird"></canvas>
+          aria-label="Your selfie restyled as a pixel-art bird"></canvas>
       </div>
       <div data-bird-tags class="flex flex-wrap justify-center gap-2"></div>
       <div class="flex gap-3">
@@ -115,6 +115,19 @@
     image leaves your device only if you choose to download it.
   </p>
 </section>
+
+<style>
+  /*
+   * The view-switcher in birding.ts toggles the [hidden] attribute. Tailwind's
+   * Preflight is disabled in this project (applyBaseStyles: false), so there is
+   * no base [hidden]{display:none} rule, and an author `.flex` utility would
+   * otherwise beat the UA stylesheet and keep hidden views (including the busy
+   * spinner) visible. Force it here so only the active view shows.
+   */
+  [data-bird-root] [hidden] {
+    display: none !important;
+  }
+</style>
 
 <script>
   import { initBirding } from '@/lib/hobbies/birding';
