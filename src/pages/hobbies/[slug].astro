@@ -4,6 +4,7 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
 import AquariumTank from '@/components/hobbies/AquariumTank.astro';
 import TidePool from '@/components/hobbies/TidePool.astro';
 import Fishing from '@/components/hobbies/Fishing.astro';
+import Birding from '@/components/hobbies/Birding.astro';
 import INatObservations from '@/components/hobbies/INatObservations.astro';
 import Lightbox from '@/components/Lightbox.astro';
 import { hobbySlug } from '@/lib/hobbies';
@@ -36,6 +37,7 @@ const galleryItems = media?.gallery ?? [];
     {interactive === 'aquarium' && <AquariumTank />}
     {interactive === 'tidepool' && <TidePool />}
     {interactive === 'fishing' && <Fishing />}
+    {interactive === 'birding' && <Birding />}
 
     {
       media?.hero && (

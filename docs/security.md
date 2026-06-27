@@ -44,15 +44,16 @@ Delivered via [staticwebapp.config.json](../staticwebapp.config.json) `globalHea
 | `Content-Security-Policy` | See below | Browser refuses to execute resources outside the allowlist. |
 | `X-Content-Type-Options` | `nosniff` | Browsers don't guess file types; prevents `.jpg` containing JS from executing. |
 | `Referrer-Policy` | `strict-origin-when-cross-origin` | Outbound links leak only origin, not full URL. |
-| `Permissions-Policy` | `camera=(), microphone=(), geolocation=(), payment=()` | Explicitly deny powerful APIs. |
+| `Permissions-Policy` | `camera=(self), microphone=(), geolocation=(), payment=()` | Deny powerful APIs, except `camera` for the site's own origin (the Birding hobby's optional selfie capture; see note below). |
 | `X-Frame-Options` | `DENY` | Other sites can't iframe yours (clickjacking). |
 
 #### The CSP unpacked
 
 ```
 default-src 'self';
-img-src 'self' https://*.blob.core.windows.net https://static.inaturalist.org https://inaturalist-open-data.s3.amazonaws.com data:;
-script-src 'self' https://js.monitor.azure.com;
+img-src 'self' https://*.blob.core.windows.net https://static.inaturalist.org https://inaturalist-open-data.s3.amazonaws.com data: blob:;
+script-src 'self' 'wasm-unsafe-eval' https://js.monitor.azure.com;
+worker-src 'self' blob:;
 connect-src 'self' https://*.blob.core.windows.net https://api.inaturalist.org https://*.in.applicationinsights.azure.com https://*.livediagnostics.monitor.azure.com;
 style-src 'self' 'unsafe-inline';
 font-src 'self' data:;
@@ -62,11 +63,14 @@ base-uri 'self';
 form-action 'self'
 ```
 
+(The live policy in [staticwebapp.config.json](../staticwebapp.config.json) also carries two `sha256` hashes in `script-src` for the dark-mode inline scripts; they are omitted above for readability.)
+
 Translation:
 - **`default-src 'self'`**: load resources only from the site's own origin unless overridden.
-- **`img-src 'self' https://*.blob.core.windows.net https://static.inaturalist.org https://inaturalist-open-data.s3.amazonaws.com data:`**: also allow images from any Azure Blob endpoint (lightbox full-res, hobby photos), the iNaturalist photo CDNs (the tide-pooling observations grid and species photos), and `data:` URIs (inlined SVG icons).
-- **`script-src 'self' https://js.monitor.azure.com`**: own origin + the App Insights SDK CDN.
-- **`connect-src 'self' https://*.blob.core.windows.net https://api.inaturalist.org https://*.in.applicationinsights.azure.com ...`**: Blob (lightbox original download), the public iNaturalist API (tide-pooling observations grid), and App Insights ingestion endpoints.
+- **`img-src ... data: blob:`**: also allow images from any Azure Blob endpoint (lightbox full-res, hobby photos), the iNaturalist photo CDNs (the tide-pooling observations grid and species photos), `data:` URIs (inlined SVG icons), and `blob:` object URLs (the Birding island's local selfie preview).
+- **`script-src 'self' 'wasm-unsafe-eval' https://js.monitor.azure.com`**: own origin + the App Insights SDK CDN. `'wasm-unsafe-eval'` lets the Birding island compile the self-hosted MediaPipe WASM; it permits WebAssembly only, **not** JavaScript `eval`.
+- **`worker-src 'self' blob:`**: the MediaPipe runtime spawns a same-origin worker (and a `blob:` worker) to run the landmark model off the main thread.
+- **`connect-src 'self' ...`**: own origin (the Birding model + WASM are fetched from `/birding/`, so `'self'` covers them), Blob (lightbox original download), the public iNaturalist API, and App Insights ingestion endpoints.
 - **`style-src 'self' 'unsafe-inline'`**: `'unsafe-inline'` is required by Astro's scoped style blocks. Can be tightened later with hashes; modest risk.
 - **`object-src 'none'`**: no `<object>` / `<embed>` / Flash-era nonsense.
 - **`frame-ancestors 'none'`**: modern equivalent of `X-Frame-Options: DENY`.
@@ -143,6 +147,7 @@ A static portfolio has none of those. Revisit if/when admin upload ships.
 - **No analytics on visitors** unless `APPINSIGHTS_CONNECTION_STRING` is set. Even then, the snippet respects `navigator.doNotTrack`.
 - **No cookies.** Theme preference uses `localStorage`, which is client-only.
 - **No user accounts, no PII.**
+- **Birding selfies never leave the device.** The optional "you as a bird" island reads the selfie into a canvas and runs the MediaPipe landmark model entirely in the browser. The photo and the landmarks are never uploaded, stored, or logged; there is no server endpoint that receives them. The only network traffic is fetching the same-origin model + WASM, and the generated bird PNG is saved only if the visitor clicks Download.
 
 ---
 

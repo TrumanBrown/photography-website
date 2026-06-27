@@ -1,0 +1,124 @@
+---
+/**
+ * Birding hobby island: "you as a bird".
+ *
+ * Take or upload a selfie; the browser finds your facial landmarks with a
+ * vendored MediaPipe model (runs locally, nothing is uploaded) and draws a
+ * low-res pixel-art bird whose eyes, beak, body, crest, and plumage are derived
+ * from your features. Same pose and style every time; unique to you.
+ *
+ * All behaviour lives in @/lib/hobbies/birding, bound via [data-bird-*] hooks.
+ * The mounting <script> is an Astro module so it satisfies the strict CSP; the
+ * heavy landmark model is dynamically imported on first use.
+ *
+ * NOTE: this is the only island with a bundled dependency (@mediapipe/tasks-vision)
+ * and large vendored assets (public/birding/). See docs/hobbies.md.
+ */
+---
+
+<section data-bird-root aria-label="Selfie to bird generator" class="not-prose">
+  <p class="mb-4 max-w-prose text-sm text-neutral-600 dark:text-neutral-400">
+    Take or upload a selfie and the page draws you as a little pixel bird. Your
+    photo is read on your device and never uploaded. If you have wide eyes, your
+    bird gets wide eyes. A rounder face gives a rounder bird, and your colors
+    become its feathers.
+  </p>
+
+  <div class="rounded-2xl border border-neutral-200 bg-neutral-50 p-4 sm:p-6 dark:border-neutral-800 dark:bg-neutral-900/40">
+    <!-- choose -->
+    <div data-bird-choose class="flex flex-col items-center gap-4 py-6">
+      <div class="text-5xl" aria-hidden="true">🐦</div>
+      <div class="flex flex-col gap-3 sm:flex-row">
+        <button
+          type="button"
+          data-bird-camera
+          class="rounded-xl bg-neutral-900 px-5 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
+        >📷 Take a selfie</button>
+        <button
+          type="button"
+          data-bird-upload
+          class="rounded-xl border border-neutral-300 px-5 py-2.5 text-sm font-medium hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+        >🖼️ Upload a photo</button>
+      </div>
+      <input data-bird-file type="file" accept="image/*" class="hidden" />
+      <input data-bird-capture type="file" accept="image/*" capture="user" class="hidden" />
+    </div>
+
+    <!-- camera -->
+    <div data-bird-camera-view hidden class="flex flex-col items-center gap-4 py-2">
+      <div class="overflow-hidden rounded-xl border border-neutral-200 bg-black dark:border-neutral-800">
+        <!-- mirrored preview reads more naturally as a selfie -->
+        <video data-bird-video playsinline muted class="block max-h-[60vh] w-auto" style="transform: scaleX(-1)"></video>
+      </div>
+      <div class="flex gap-3">
+        <button
+          type="button"
+          data-bird-shoot
+          class="rounded-xl bg-neutral-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
+        >Capture</button>
+        <button
+          type="button"
+          data-bird-cancel
+          class="rounded-xl border border-neutral-300 px-5 py-2.5 text-sm font-medium hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+        >Cancel</button>
+      </div>
+    </div>
+
+    <!-- busy -->
+    <div data-bird-busy hidden class="flex flex-col items-center gap-3 py-12 text-sm text-neutral-600 dark:text-neutral-400">
+      <div class="h-8 w-8 animate-spin rounded-full border-2 border-neutral-300 border-t-neutral-700 dark:border-neutral-700 dark:border-t-neutral-200" aria-hidden="true"></div>
+      <p>Drawing your bird...</p>
+    </div>
+
+    <!-- error -->
+    <div data-bird-error hidden class="flex flex-col items-center gap-4 py-10 text-center">
+      <div class="text-3xl" aria-hidden="true">🪶</div>
+      <p data-bird-error-msg class="max-w-sm text-sm text-neutral-700 dark:text-neutral-300"></p>
+      <button
+        type="button"
+        data-bird-retry
+        class="rounded-xl border border-neutral-300 px-5 py-2.5 text-sm font-medium hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+      >Try again</button>
+    </div>
+
+    <!-- result -->
+    <div data-bird-result hidden class="flex flex-col items-center gap-4 py-2">
+      <div class="overflow-hidden rounded-xl border border-neutral-200 bg-sky-50 dark:border-neutral-800 dark:bg-neutral-800/60">
+        <canvas
+          data-bird-canvas
+          width="320"
+          height="320"
+          style="image-rendering: pixelated; width: 320px; height: 320px; max-width: 80vw; max-height: 80vw"
+          role="img"
+          aria-label="Your pixel-art bird"></canvas>
+      </div>
+      <div data-bird-tags class="flex flex-wrap justify-center gap-2"></div>
+      <div class="flex gap-3">
+        <button
+          type="button"
+          data-bird-download
+          class="rounded-xl bg-neutral-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
+        >Download PNG</button>
+        <button
+          type="button"
+          data-bird-again
+          class="rounded-xl border border-neutral-300 px-5 py-2.5 text-sm font-medium hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+        >Another selfie</button>
+      </div>
+    </div>
+  </div>
+
+  <p class="mx-auto mt-3 max-w-prose text-center text-xs text-neutral-500 dark:text-neutral-500">
+    Your selfie is handled only on your own device, and it stays in your
+    browser's memory just long enough to draw the bird. It is never uploaded or
+    saved to a database, and the site owner never sees or stores it. The bird
+    image leaves your device only if you choose to download it.
+  </p>
+</section>
+
+<script>
+  import { initBirding } from '@/lib/hobbies/birding';
+
+  const root = document.querySelector<HTMLElement>('[data-bird-root]');
+  if (root) initBirding(root);
+</script>

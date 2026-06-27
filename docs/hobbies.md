@@ -4,7 +4,7 @@ A second, **optional** top-level section beside Photography. Photography is unch
 
 This doc covers how the section is wired, how to add a hobby, the conventions every interactive follows, and the aquarium island as the reference implementation. It is written so a future session (or you) can pick the work back up cold.
 
-> Status: shell + three islands are live: **Aquarium Keeping**, **Tide Pooling**, and **Fishing**. More are planned (travel map, pixel hike, repo explorer) and meant to be built **one at a time**.
+> Status: shell + four islands are live: **Aquarium Keeping**, **Tide Pooling**, **Fishing**, and **Birding** (selfie to pixel bird). More are planned (travel map, pixel hike, repo explorer) and meant to be built **one at a time**.
 
 ---
 
@@ -67,7 +67,7 @@ That's it. No build-config, no Blob, no CI changes.
 
 Every island follows the same rules so they stay cheap, safe, and consistent with the rest of the site:
 
-1. **Self-contained & offline.** No runtime APIs, no map tiles, no third-party scripts, no remote data. All data is baked in; all graphics are drawn procedurally (canvas/SVG) or are tiny local assets. This keeps them free, fast, and **zero-maintenance**: once built you never feed them data (unlike photos).
+1. **Self-contained & offline.** No runtime APIs, no map tiles, no third-party scripts, no remote data. All data is baked in; all graphics are drawn procedurally (canvas/SVG) or are tiny local assets. This keeps them free, fast, and **zero-maintenance**: once built you never feed them data (unlike photos). (The Birding island is the documented exception: it bundles a dependency and self-hosts a landmark model. See "Reference implementation 4" below.)
 2. **CSP-safe by construction.** Use Astro's processed `<script>` (with `import`), **never** `is:inline`. Astro emits it as a same-origin module under `/_astro/…js`, which satisfies the strict `script-src 'self'` policy in [staticwebapp.config.json](../staticwebapp.config.json). No per-script hashes to maintain. (Confirmed in the build output: the aquarium ships as `/_astro/AquariumTank.astro_…js`.)
 3. **Lazy by route.** An island's script only loads on its own `/hobbies/<slug>` page, so Photography pages stay zero-JS and the build stays light.
 4. **Mobile-first-ish.** Works on touch, even if richer on desktop, same bar as the photography section. Responsive sizing (`ResizeObserver`), touch input (`pointerdown`, native range inputs), and pausing offscreen.
@@ -203,6 +203,36 @@ A **clickable pixel map** of the two places I fish: Minnesota and Washington. Ea
 - [src/lib/hobbies/fishing-sprites.ts](../src/lib/hobbies/fishing-sprites.ts), the shared `drawFish` sprite routine used for both the map markers and the gallery thumbnails.
 
 Like the other two islands, everything is **drawn in code**, all geometry and data are baked and committed (no runtime fetch), the loop pauses offscreen and when the tab is hidden, and it honors `prefers-reduced-motion`.
+
+## Reference implementation 4: the birding island (selfie to bird)
+
+Take or upload a selfie and the page draws you as a low-res pixel bird. The bird is a fixed front-facing, perched songbird (same pose, orientation, and art style every time); only its variable slots change, and each slot is driven by a measured facial feature, so wide eyes give a wide-eyed bird, wide-set eyes a wide-set bird, a rounder face a rounder body, a wider mouth a wider beak, raised brows a taller crest, and your sampled colors become the plumage. Given the same face the result is the same bird (deterministic).
+
+**This island intentionally breaks two of the conventions above, and that is the point of documenting it here.** It is the first island with a bundled dependency and the first that ships large vendored assets. The tradeoff is deliberate: feature-level likeness ("wide eyes to wide-eyed bird") needs real facial landmarks, which a from-scratch heuristic cannot do reliably.
+
+**How it stays safe and private:**
+
+- **Local-only.** The selfie is read into a canvas and the landmark model runs entirely in the browser (WASM). Nothing (not the photo, not the landmarks) is ever uploaded; there is no database and the owner never sees it. The only network calls are fetching the same-origin model and WASM. The bird PNG leaves the device only if the user clicks Download.
+- **CSP-safe, still same-origin.** The model and WASM are self-hosted under `public/birding/`, so `connect-src 'self'` still holds. Running WASM requires `'wasm-unsafe-eval'` in `script-src` and the worker it spawns needs `worker-src 'self' blob:`; the selfie preview uses an object URL so `img-src` gains `blob:`. The camera needs `Permissions-Policy: camera=(self)` (it was fully disabled before). `.wasm` is mapped to `application/wasm` in `mimeTypes`. All of these live in [staticwebapp.config.json](../staticwebapp.config.json).
+- **Lazy by route, and lazier within it.** The heavy `@mediapipe/tasks-vision` bundle and the model are dynamically `import()`ed only when the user generates a bird, so even the birding page is light until then. Other pages are unaffected.
+
+**Input.** Two choices are always offered: live camera via `getUserMedia({ facingMode: 'user' })` (works on desktop and mobile), and a normal file upload. If the camera is denied or unavailable, it falls back to a native `<input capture="user">`, which opens the phone camera on mobile.
+
+**Vendored assets** (under `public/birding/`):
+
+- `face_landmarker.task` (~3.8 MB) — Google's MediaPipe Face Landmarker model (478 landmarks), Apache-2.0. **Committed**, because it is not published to npm; committing it keeps builds offline and reproducible.
+- `wasm/` — the MediaPipe vision WASM runtime, **gitignored** and copied from the pinned `@mediapipe/tasks-vision` dependency at build time by [scripts/copy-birding-assets.mjs](../scripts/copy-birding-assets.mjs) (chained into the `dev` and `build` npm scripts). Reproducible from the lockfile, so there is no need to commit ~22 MB of it.
+
+**Files**
+
+- [src/components/hobbies/Birding.astro](../src/components/hobbies/Birding.astro), the markup (choose / camera / busy / error / result states + privacy note) and the mounting `<script>`.
+- [src/lib/hobbies/birding.ts](../src/lib/hobbies/birding.ts), the engine: camera and file input, lazy-loading the landmark model, turning landmarks into seven normalized features, and sampling the palette. This is the only file that touches MediaPipe or the DOM.
+- [src/lib/hobbies/birding-bird.ts](../src/lib/hobbies/birding-bird.ts), the **pure, dependency-free** mapping from features to bird slots plus the pixel renderer. Split out the same way `stocking.ts` is split from the aquarium, so it is unit-testable.
+- [src/lib/hobbies/birding-bird.test.ts](../src/lib/hobbies/birding-bird.test.ts), unit tests for the mapping (determinism, wide eyes to bigger eyes, quantized seed, etc.).
+
+### Where the numbers come from
+
+As with the aquarium, being upfront: the feature ranges are approximate and tuned by feel, not derived from any dataset. The extractor measures ratios from MediaPipe's canonical landmark indices (eye aspect, inter-ocular distance over face width, mouth width over face width, face width over height, nose length, brow-to-eye gap, mouth-corner curvature) and squashes each into a 0..1 value over a hand-picked min/max. `featuresToBird` then linearly maps those to drawing slots. The bird is rendered into a logical 100x100 buffer and scaled up with `imageSmoothingEnabled = false` for the chunky pixel look, the same trick the other islands use.
 
 ## Photo galleries (`hobby-media`)
 
