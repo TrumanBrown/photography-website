@@ -25,6 +25,9 @@ jobs:
       - name: Unit tests
         run: npm test
 
+      - name: ESLint
+        run: npm run lint
+
       - name: Prettier (check)
         run: npm run format:check
         continue-on-error: true

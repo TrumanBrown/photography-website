@@ -1,0 +1,8 @@
+# Generated, vendored, or binary paths Prettier should not touch.
+dist
+.cache
+node_modules
+package-lock.json
+public/birding/wasm
+src/content/sessions
+*.task
