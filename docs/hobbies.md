@@ -206,19 +206,20 @@ Like the other two islands, everything is **drawn in code**, all geometry and da
 
 ## Reference implementation 4: the birding island (selfie to bird)
 
-Take or upload a selfie and the page draws you as a **real, identifiable bird species** (a Northern Cardinal, Blue Jay, American Robin, Goldfinch, Mallard, Bald Eagle, Great Horned Owl, Atlantic Puffin, and more). Your selfie picks *which* species you are, your facial features drive its proportions, and your sampled iris colour becomes the bird's eyes. Given the same face the result is the same bird (deterministic).
+Take or upload a selfie and the page turns you into a **bird-person hybrid**: it keeps your real face from the photo and composites bird anatomy onto it — a 3D-shaded bill over the nose/mouth, a feather crest blended into the hairline, and feathering down the jaw and neck — the way the digital-painting reference does, but drawn procedurally on-device. Given the same face the result is the same hybrid (deterministic).
 
-**How "you" shows up in the bird:**
+**How "you" shows up:**
 
-- **Your colouring picks the species.** The dominant (hair) colour is bucketed into a coarse hue/lightness category, which biases the species choice toward birds whose real plumage resembles you (red hair leans Cardinal, blonde leans Goldfinch, black leans Crow/Puffin, brown leans Owl/Sparrow/Robin). The seed adds variety among the matching species, so two friends get clearly different birds and any meaningful selfie change yields a new one. Crucially, the species keeps its **accurate field marks** so the bird stays recognizable.
-- **Your features drive the proportions.** Eye size (from eye openness), eye spacing, crest height (from brow raise), beak size (from nose/mouth), and head roundness all come from measured landmarks. Your **iris colour is sampled** from the eye and used to paint the bird's eyes.
-- It is a smoothly-shaded illustration (gradients + feather texture), not a photo and not pixel art. This island deliberately renders smooth rather than pixelated, because the goal here is a believable, namable bird.
+- **It is literally your photo.** The selfie is drawn as the base, so every human feature (your eyes, skin, face shape, hair) is real — there is no synthetic face. The bird parts are overlaid and anchored to your facial landmarks.
+- **Your colouring drives the plumage.** The feather crest and neck feathers are coloured from your sampled hair tone (with shaded variants); the bill colour is seeded from a small palette of believable bill colours, so two friends get different bills/plumage and any meaningful selfie change yields a new one.
+- **Your features drive placement + size.** The bill is anchored between the eyes and the mouth and sized from your nose/mouth; the crest follows your hairline; feathers follow your jaw. Your iris colour is sampled too (kept for the tag/eye tint).
+- It is a smooth composite over the photo (gradients, soft cast shadow, feather shapes), **not** pixel art. This is the honest ceiling of an on-device, no-AI approach: it reads as a hybrid rather than a painted artwork. (The only way to reach the painterly reference is a generative image model, which would mean sending the selfie off-device — explicitly declined to keep it private.)
 
-**This island intentionally breaks two of the conventions above, and that is the point of documenting it here.** It is the first island with a bundled dependency and the first that ships large vendored assets. The tradeoff is deliberate: deriving the species and proportions from a face needs real facial landmarks, which a from-scratch heuristic cannot do reliably.
+**This island intentionally breaks two of the conventions above, and that is the point of documenting it here.** It is the first island with a bundled dependency and the first that ships large vendored assets. The tradeoff is deliberate: anchoring bird parts to a real face needs real facial landmarks, which a from-scratch heuristic cannot do reliably.
 
 **How it stays safe and private:**
 
-- **Local-only.** The selfie is read into a canvas and the landmark model runs entirely in the browser (WASM). Nothing (not the photo, not the landmarks) is ever uploaded; there is no database and the owner never sees it. The only network calls are fetching the same-origin model and WASM. The bird PNG leaves the device only if the user clicks Download.
+- **Local-only.** The selfie is read into a canvas and the landmark model runs entirely in the browser (WASM). Nothing (not the photo, not the landmarks) is ever uploaded; there is no database and the owner never sees it. The only network calls are fetching the same-origin model and WASM. The result PNG leaves the device only if the user clicks Download.
 - **CSP-safe, still same-origin.** The model and WASM are self-hosted under `public/birding/`, so `connect-src 'self'` still holds. Running WASM requires `'wasm-unsafe-eval'` in `script-src` and the worker it spawns needs `worker-src 'self' blob:`; the selfie preview uses an object URL so `img-src` gains `blob:`. The camera needs `Permissions-Policy: camera=(self)` (it was fully disabled before). `.wasm` is mapped to `application/wasm` in `mimeTypes`. All of these live in [staticwebapp.config.json](../staticwebapp.config.json).
 - **Lazy by route, and lazier within it.** The heavy `@mediapipe/tasks-vision` bundle and the model are dynamically `import()`ed only when the user generates a bird, so even the birding page is light until then. Other pages are unaffected.
 
@@ -233,12 +234,12 @@ Take or upload a selfie and the page draws you as a **real, identifiable bird sp
 
 - [src/components/hobbies/Birding.astro](../src/components/hobbies/Birding.astro), the markup (choose / camera / busy / error / result states + privacy note) and the mounting `<script>`.
 - [src/lib/hobbies/birding.ts](../src/lib/hobbies/birding.ts), the engine: camera and file input, lazy-loading the landmark model, turning landmarks into normalized features, and sampling the palette (hair, accent, skin, and iris colours). This is the only file that touches MediaPipe or the DOM.
-- [src/lib/hobbies/birding-bird.ts](../src/lib/hobbies/birding-bird.ts), the **pure, dependency-free** species roster (`SPECIES`), the species picker (`makeBirdStyle`), and the smoothly-shaded renderer (`renderBird`). Split out the same way `stocking.ts` is split from the aquarium, so the pure parts are unit-testable.
-- [src/lib/hobbies/birding-bird.test.ts](../src/lib/hobbies/birding-bird.test.ts), unit tests for the mapping and the species picker (determinism, feature mapping, species variety, different colouring → different species).
+- [src/lib/hobbies/birding-bird.ts](../src/lib/hobbies/birding-bird.ts), the **pure** feature mapping + style picker (`makeHybridStyle`, unit-tested) and the browser-only compositing renderer (`renderHybrid`) that draws the bill + feathers onto the selfie. Split out the same way `stocking.ts` is split from the aquarium.
+- [src/lib/hobbies/birding-bird.test.ts](../src/lib/hobbies/birding-bird.test.ts), unit tests for the mapping and the style picker (determinism, valid colours, iris passthrough, beak-colour variety).
 
-### Where the species come from
+### Honest notes on the look
 
-Being upfront, as with the aquarium: the species roster is hand-built from general bird knowledge, and each species' colours are approximate hex values chosen to read true to its signature field marks, not pulled from any dataset. The feature → proportion ranges are tuned by feel. The bird is drawn with canvas gradients and short feather strokes for a believable illustrated look (smoothing on), not the chunky pixel style of the other islands.
+As with the aquarium, being upfront: the bill colours and feather tones are approximate, chosen by feel, not from a dataset. The bird parts are procedural canvas shapes composited over the real photo — this keeps it private and on-device, at the cost of looking like a composited hybrid rather than a painted artwork. Reaching the painterly reference would require a generative image model and sending the selfie off-device, which was deliberately not done.
 
 ## Photo galleries (`hobby-media`)
 

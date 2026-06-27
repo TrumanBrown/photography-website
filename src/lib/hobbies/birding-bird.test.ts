@@ -3,7 +3,7 @@ import {
   featuresToBird,
   birdSeed,
   birdStyleSeed,
-  makeBirdStyle,
+  makeHybridStyle,
   describeFeatures,
   type FaceFeatures,
   type FacePalette,
@@ -122,25 +122,33 @@ describe('describeFeatures', () => {
   });
 });
 
-describe('makeBirdStyle', () => {
-  const pal = (hex: string): FacePalette => ({
+describe('makeHybridStyle', () => {
+  const pal = (hex: string, eye?: string): FacePalette => ({
     body: hex,
     belly: '#cccccc',
     accent: '#cc3344',
     beak: '#e2a04a',
+    eye,
   });
 
-  it('is deterministic: same selfie -> same bird', () => {
-    const a = makeBirdStyle(baseFeatures, palette);
-    const b = makeBirdStyle({ ...baseFeatures }, { ...palette });
+  it('is deterministic: same selfie -> same style', () => {
+    const a = makeHybridStyle(baseFeatures, palette);
+    const b = makeHybridStyle({ ...baseFeatures }, { ...palette });
     expect(a).toEqual(b);
   });
 
-  it('produces a species name and a valid feather hex', () => {
-    const s = makeBirdStyle(baseFeatures, palette);
-    expect(s.speciesName.length).toBeGreaterThan(0);
+  it('produces a name and valid beak + feather hexes', () => {
+    const s = makeHybridStyle(baseFeatures, palette);
+    expect(s.name.length).toBeGreaterThan(0);
+    expect(s.beak).toMatch(/^#[0-9a-f]{6}$/i);
+    expect(s.beakDark).toMatch(/^#[0-9a-f]{6}$/i);
     expect(s.feather).toMatch(/^#[0-9a-f]{6}$/i);
-    expect(s.beakColor).toMatch(/^#[0-9a-f]{6}$/i);
+  });
+
+  it('uses the sampled iris colour for the eyes when provided', () => {
+    expect(makeHybridStyle(baseFeatures, pal('#445566', '#5a8f3c')).eyeColor).toBe('#5a8f3c');
+    // falls back to a default when no iris colour is available
+    expect(makeHybridStyle(baseFeatures, pal('#445566')).eyeColor).toMatch(/^#[0-9a-f]{6}$/i);
   });
 
   it('changes the seed when any feature shifts', () => {
@@ -149,17 +157,8 @@ describe('makeBirdStyle', () => {
     );
   });
 
-  it('gives different species to people with clearly different colouring', () => {
-    const red = makeBirdStyle(baseFeatures, pal('#b51f2a'));
-    const blue = makeBirdStyle(baseFeatures, pal('#3a64b0'));
-    const black = makeBirdStyle(baseFeatures, pal('#161616'));
-    const yellow = makeBirdStyle(baseFeatures, pal('#e8c84a'));
-    const names = new Set([red.speciesName, blue.speciesName, black.speciesName, yellow.speciesName]);
-    expect(names.size).toBeGreaterThan(2);
-  });
-
-  it('yields real variety in species across many different selfies', () => {
-    const species = new Set<string>();
+  it('yields a variety of beak colours across many different selfies', () => {
+    const beaks = new Set<string>();
     for (let i = 0; i < 60; i += 1) {
       const f: FaceFeatures = {
         eyeOpenness: (i % 7) / 7,
@@ -171,10 +170,8 @@ describe('makeBirdStyle', () => {
         smile: ((i % 9) / 9) * 2 - 1,
       };
       const hex = `#${(i * 4 + 20).toString(16).padStart(2, '0')}${(i * 7 + 30).toString(16).padStart(2, '0')}66`;
-      const s = makeBirdStyle(f, pal(hex.slice(0, 7)));
-      species.add(s.speciesName);
+      beaks.add(makeHybridStyle(f, pal(hex.slice(0, 7))).beak);
     }
-    // Expect many distinct species across the varied inputs.
-    expect(species.size).toBeGreaterThan(6);
+    expect(beaks.size).toBeGreaterThan(3);
   });
 });
