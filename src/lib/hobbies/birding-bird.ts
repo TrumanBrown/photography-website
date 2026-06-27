@@ -319,7 +319,7 @@ export function renderBirdPortrait(canvas: HTMLCanvasElement, input: PortraitInp
   const hair = palette.body;
   const accent = palette.accent;
 
-  // --- Feather crest above the head ---
+  // --- Feather crest above the head (a hair-to-accent gradient reads as "their" feathers) ---
   const headTop = p(L.foreheadTop);
   const crestH = eyeDist * (0.7 + ((params.crestHeight - 4) / 18) * 1.0);
   const n = 5;
@@ -327,31 +327,31 @@ export function renderBirdPortrait(canvas: HTMLCanvasElement, input: PortraitInp
     const t = i / (n - 1) - 0.5; // -0.5..0.5
     const base: Pt = { x: headTop.x + t * headW * 0.72, y: headTop.y + Math.abs(t) * eyeDist * 0.22 };
     const tip: Pt = { x: base.x + t * eyeDist * 0.5, y: base.y - crestH * (1 - Math.abs(t) * 0.32) };
-    const col = i % 2 === 0 ? accent : mixHex(hair, accent, 0.5);
+    const col = mixHex(hair, accent, 0.3 + (i / (n - 1)) * 0.45);
     feather(o, base, tip, eyeDist * 0.16, col);
   }
 
-  // --- Brow tufts (small feathers angled up-and-out over the outer brows) ---
+  // --- Brow tufts (small, hair-toned feathers angled up over the outer brows) ---
   for (const [idx, dir] of [
     [L.browR, -1],
     [L.browL, 1],
   ] as const) {
     const b = p(idx);
     const base: Pt = { x: b.x, y: b.y - eyeDist * 0.05 };
-    const tip: Pt = { x: b.x + dir * eyeDist * 0.32, y: b.y - eyeDist * 0.3 };
-    feather(o, base, tip, eyeDist * 0.1, mixHex(hair, accent, 0.35));
+    const tip: Pt = { x: b.x + dir * eyeDist * 0.24, y: b.y - eyeDist * 0.26 };
+    feather(o, base, tip, eyeDist * 0.08, shadeHex(hair, 0.9));
   }
 
-  // --- Cheek/jaw tufts (subtle, point down-and-out) ---
+  // --- Cheek/jaw tufts (subtle, hair-toned, hug the jawline) ---
   for (const [idx, dir] of [
     [L.cheekR, -1],
     [L.cheekL, 1],
   ] as const) {
     const c = p(idx);
     for (let k = 0; k < 2; k += 1) {
-      const base: Pt = { x: c.x + dir * eyeDist * 0.04, y: c.y + k * eyeDist * 0.16 };
-      const tip: Pt = { x: c.x + dir * eyeDist * (0.26 + k * 0.06), y: c.y + eyeDist * (0.22 + k * 0.16) };
-      feather(o, base, tip, eyeDist * 0.09, shadeHex(hair, 0.92));
+      const base: Pt = { x: c.x + dir * eyeDist * 0.02, y: c.y + k * eyeDist * 0.14 };
+      const tip: Pt = { x: c.x + dir * eyeDist * (0.14 + k * 0.04), y: c.y + eyeDist * (0.26 + k * 0.16) };
+      feather(o, base, tip, eyeDist * 0.08, shadeHex(hair, 0.95));
     }
   }
 
