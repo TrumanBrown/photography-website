@@ -20,6 +20,7 @@
 import type { FaceLandmarker as FaceLandmarkerT, NormalizedLandmark } from '@mediapipe/tasks-vision';
 import {
   featuresToBird,
+  makeBirdStyle,
   renderBirdPortrait,
   describeFeatures,
   type FaceFeatures,
@@ -240,11 +241,17 @@ export function initBirding(root: HTMLElement): void {
       const features = computeFeatures(lm, source.width, source.height);
       const palette = computePalette(lm, data);
       const bird = featuresToBird(features, palette);
+      const style = makeBirdStyle(features, palette);
       if (birdCanvas) {
-        renderBirdPortrait(birdCanvas, { source, landmarks: lm, palette, params: bird }, BIRD_PX);
+        renderBirdPortrait(birdCanvas, { source, landmarks: lm, palette, params: bird, style }, BIRD_PX);
       }
       if (tagsEl) {
+        const speciesSpan = document.createElement('span');
+        speciesSpan.className =
+          'rounded-full bg-neutral-900 px-2.5 py-1 text-xs font-medium text-white dark:bg-white dark:text-neutral-900';
+        speciesSpan.textContent = style.speciesName;
         tagsEl.replaceChildren(
+          speciesSpan,
           ...describeFeatures(features).map((t) => {
             const span = document.createElement('span');
             span.className =

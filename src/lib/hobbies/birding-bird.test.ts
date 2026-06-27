@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   featuresToBird,
   birdSeed,
+  birdStyleSeed,
+  makeBirdStyle,
   describeFeatures,
   type FaceFeatures,
   type FacePalette,
@@ -117,5 +119,60 @@ describe('describeFeatures', () => {
 
   it('always returns at least one tag', () => {
     expect(describeFeatures(baseFeatures).length).toBeGreaterThan(0);
+  });
+});
+
+describe('makeBirdStyle', () => {
+  const pal = (hex: string): FacePalette => ({
+    body: hex,
+    belly: '#cccccc',
+    accent: '#cc3344',
+    beak: '#e2a04a',
+  });
+
+  it('is deterministic: same selfie -> same bird', () => {
+    const a = makeBirdStyle(baseFeatures, palette);
+    const b = makeBirdStyle({ ...baseFeatures }, { ...palette });
+    expect(a).toEqual(b);
+  });
+
+  it('produces a species name and a valid feather hex', () => {
+    const s = makeBirdStyle(baseFeatures, palette);
+    expect(s.speciesName.length).toBeGreaterThan(0);
+    expect(s.feather).toMatch(/^#[0-9a-f]{6}$/i);
+    expect(s.beakColor).toMatch(/^#[0-9a-f]{6}$/i);
+  });
+
+  it('gives a different bird when a feature shifts noticeably', () => {
+    const a = makeBirdStyle(withFeature('eyeOpenness', 0.1), palette);
+    const b = makeBirdStyle(withFeature('eyeOpenness', 0.9), palette);
+    expect(birdStyleSeed(withFeature('eyeOpenness', 0.1), palette)).not.toBe(
+      birdStyleSeed(withFeature('eyeOpenness', 0.9), palette),
+    );
+    // Different seed should usually change the species or the colors.
+    expect(a.speciesName !== b.speciesName || a.feather !== b.feather).toBe(true);
+  });
+
+  it('yields real variety in species across many different selfies', () => {
+    const names = new Set<string>();
+    const species = new Set<string>();
+    for (let i = 0; i < 60; i += 1) {
+      const f: FaceFeatures = {
+        eyeOpenness: (i % 7) / 7,
+        eyeSpacing: (i % 5) / 5,
+        mouthWidth: (i % 4) / 4,
+        faceRoundness: (i % 6) / 6,
+        browRaise: (i % 3) / 3,
+        noseLength: (i % 8) / 8,
+        smile: ((i % 9) / 9) * 2 - 1,
+      };
+      const hex = `#${(i * 4 + 20).toString(16).padStart(2, '0')}${(i * 7 + 30).toString(16).padStart(2, '0')}66`;
+      const s = makeBirdStyle(f, pal(hex.slice(0, 7)));
+      names.add(s.speciesName);
+      species.add(s.speciesName.split(' ').slice(-1)[0]);
+    }
+    // Expect many distinct full names and several distinct base species.
+    expect(names.size).toBeGreaterThan(15);
+    expect(species.size).toBeGreaterThan(5);
   });
 });
