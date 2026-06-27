@@ -21,7 +21,7 @@ import type { FaceLandmarker as FaceLandmarkerT, NormalizedLandmark } from '@med
 import {
   featuresToBird,
   makeBirdStyle,
-  renderBirdPortrait,
+  renderBird,
   describeFeatures,
   type FaceFeatures,
   type FacePalette,
@@ -29,8 +29,8 @@ import {
 
 /** Longest side we downscale the selfie to before detection (speed vs accuracy). */
 const MAX_SOURCE = 768;
-/** Pixel size of the rendered portrait canvas. */
-const BIRD_PX = 384;
+/** Pixel size of the rendered bird canvas. */
+const BIRD_PX = 512;
 
 // MediaPipe FaceMesh canonical landmark indices.
 const IDX = {
@@ -40,6 +40,8 @@ const IDX = {
   mouthR: 61, mouthL: 291, mouthTop: 13, mouthBot: 14,
   noseBridge: 168, noseTip: 1, browR: 105, browL: 334,
   cheekSampleR: 50, cheekSampleL: 280,
+  // Iris centres (present because the face_landmarker model outputs 478 points).
+  rIris: 468, lIris: 473,
 };
 
 type Pt = { x: number; y: number };
@@ -150,11 +152,25 @@ function computePalette(lm: NormalizedLandmark[], data: ImageData): FacePalette 
   };
   const beak: RGB = { r: Math.min(255, cheek.r * 1.15 + 35), g: cheek.g * 0.92, b: cheek.b * 0.5 };
 
+  // Iris colour: sample a tiny region at each iris centre (478-point model).
+  const eye =
+    lm.length > IDX.lIris
+      ? {
+          r: (sampleAvg(data, p(IDX.rIris).x, p(IDX.rIris).y, Math.max(1, rad * 0.4)).r +
+              sampleAvg(data, p(IDX.lIris).x, p(IDX.lIris).y, Math.max(1, rad * 0.4)).r) / 2,
+          g: (sampleAvg(data, p(IDX.rIris).x, p(IDX.rIris).y, Math.max(1, rad * 0.4)).g +
+              sampleAvg(data, p(IDX.lIris).x, p(IDX.lIris).y, Math.max(1, rad * 0.4)).g) / 2,
+          b: (sampleAvg(data, p(IDX.rIris).x, p(IDX.rIris).y, Math.max(1, rad * 0.4)).b +
+              sampleAvg(data, p(IDX.lIris).x, p(IDX.lIris).y, Math.max(1, rad * 0.4)).b) / 2,
+        }
+      : { r: 58, g: 42, b: 31 };
+
   return {
     body: hex(body),
     belly: hex(lighten(body, 0.45)),
     accent: hex(accent),
     beak: hex(beak),
+    eye: hex(eye),
   };
 }
 
@@ -243,7 +259,7 @@ export function initBirding(root: HTMLElement): void {
       const bird = featuresToBird(features, palette);
       const style = makeBirdStyle(features, palette);
       if (birdCanvas) {
-        renderBirdPortrait(birdCanvas, { source, landmarks: lm, palette, params: bird, style }, BIRD_PX);
+        renderBird(birdCanvas, { palette, params: bird, style }, BIRD_PX);
       }
       if (tagsEl) {
         const speciesSpan = document.createElement('span');

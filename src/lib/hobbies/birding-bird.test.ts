@@ -143,18 +143,22 @@ describe('makeBirdStyle', () => {
     expect(s.beakColor).toMatch(/^#[0-9a-f]{6}$/i);
   });
 
-  it('gives a different bird when a feature shifts noticeably', () => {
-    const a = makeBirdStyle(withFeature('eyeOpenness', 0.1), palette);
-    const b = makeBirdStyle(withFeature('eyeOpenness', 0.9), palette);
+  it('changes the seed when any feature shifts', () => {
     expect(birdStyleSeed(withFeature('eyeOpenness', 0.1), palette)).not.toBe(
       birdStyleSeed(withFeature('eyeOpenness', 0.9), palette),
     );
-    // Different seed should usually change the species or the colors.
-    expect(a.speciesName !== b.speciesName || a.feather !== b.feather).toBe(true);
+  });
+
+  it('gives different species to people with clearly different colouring', () => {
+    const red = makeBirdStyle(baseFeatures, pal('#b51f2a'));
+    const blue = makeBirdStyle(baseFeatures, pal('#3a64b0'));
+    const black = makeBirdStyle(baseFeatures, pal('#161616'));
+    const yellow = makeBirdStyle(baseFeatures, pal('#e8c84a'));
+    const names = new Set([red.speciesName, blue.speciesName, black.speciesName, yellow.speciesName]);
+    expect(names.size).toBeGreaterThan(2);
   });
 
   it('yields real variety in species across many different selfies', () => {
-    const names = new Set<string>();
     const species = new Set<string>();
     for (let i = 0; i < 60; i += 1) {
       const f: FaceFeatures = {
@@ -168,11 +172,9 @@ describe('makeBirdStyle', () => {
       };
       const hex = `#${(i * 4 + 20).toString(16).padStart(2, '0')}${(i * 7 + 30).toString(16).padStart(2, '0')}66`;
       const s = makeBirdStyle(f, pal(hex.slice(0, 7)));
-      names.add(s.speciesName);
-      species.add(s.speciesName.split(' ').slice(-1)[0]);
+      species.add(s.speciesName);
     }
-    // Expect many distinct full names and several distinct base species.
-    expect(names.size).toBeGreaterThan(15);
-    expect(species.size).toBeGreaterThan(5);
+    // Expect many distinct species across the varied inputs.
+    expect(species.size).toBeGreaterThan(6);
   });
 });

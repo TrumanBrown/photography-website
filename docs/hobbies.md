@@ -4,7 +4,7 @@ A second, **optional** top-level section beside Photography. Photography is unch
 
 This doc covers how the section is wired, how to add a hobby, the conventions every interactive follows, and the aquarium island as the reference implementation. It is written so a future session (or you) can pick the work back up cold.
 
-> Status: shell + four islands are live: **Aquarium Keeping**, **Tide Pooling**, **Fishing**, and **Birding** (selfie to pixel bird). More are planned (travel map, pixel hike, repo explorer) and meant to be built **one at a time**.
+> Status: shell + four islands are live: **Aquarium Keeping**, **Tide Pooling**, **Fishing**, and **Birding** (selfie to bird). More are planned (travel map, pixel hike, repo explorer) and meant to be built **one at a time**.
 
 ---
 
@@ -206,9 +206,15 @@ Like the other two islands, everything is **drawn in code**, all geometry and da
 
 ## Reference implementation 4: the birding island (selfie to bird)
 
-Take or upload a selfie and the page draws you as a low-res pixel bird. The bird is a fixed front-facing, perched songbird (same pose, orientation, and art style every time); only its variable slots change, and each slot is driven by a measured facial feature, so wide eyes give a wide-eyed bird, wide-set eyes a wide-set bird, a rounder face a rounder body, a wider mouth a wider beak, raised brows a taller crest, and your sampled colors become the plumage. Given the same face the result is the same bird (deterministic).
+Take or upload a selfie and the page draws you as a **real, identifiable bird species** (a Northern Cardinal, Blue Jay, American Robin, Goldfinch, Mallard, Bald Eagle, Great Horned Owl, Atlantic Puffin, and more). Your selfie picks *which* species you are, your facial features drive its proportions, and your sampled iris colour becomes the bird's eyes. Given the same face the result is the same bird (deterministic).
 
-**This island intentionally breaks two of the conventions above, and that is the point of documenting it here.** It is the first island with a bundled dependency and the first that ships large vendored assets. The tradeoff is deliberate: feature-level likeness ("wide eyes to wide-eyed bird") needs real facial landmarks, which a from-scratch heuristic cannot do reliably.
+**How "you" shows up in the bird:**
+
+- **Your colouring picks the species.** The dominant (hair) colour is bucketed into a coarse hue/lightness category, which biases the species choice toward birds whose real plumage resembles you (red hair leans Cardinal, blonde leans Goldfinch, black leans Crow/Puffin, brown leans Owl/Sparrow/Robin). The seed adds variety among the matching species, so two friends get clearly different birds and any meaningful selfie change yields a new one. Crucially, the species keeps its **accurate field marks** so the bird stays recognizable.
+- **Your features drive the proportions.** Eye size (from eye openness), eye spacing, crest height (from brow raise), beak size (from nose/mouth), and head roundness all come from measured landmarks. Your **iris colour is sampled** from the eye and used to paint the bird's eyes.
+- It is a smoothly-shaded illustration (gradients + feather texture), not a photo and not pixel art. This island deliberately renders smooth rather than pixelated, because the goal here is a believable, namable bird.
+
+**This island intentionally breaks two of the conventions above, and that is the point of documenting it here.** It is the first island with a bundled dependency and the first that ships large vendored assets. The tradeoff is deliberate: deriving the species and proportions from a face needs real facial landmarks, which a from-scratch heuristic cannot do reliably.
 
 **How it stays safe and private:**
 
@@ -220,19 +226,19 @@ Take or upload a selfie and the page draws you as a low-res pixel bird. The bird
 
 **Vendored assets** (under `public/birding/`):
 
-- `face_landmarker.task` (~3.8 MB) — Google's MediaPipe Face Landmarker model (478 landmarks), Apache-2.0. **Committed**, because it is not published to npm; committing it keeps builds offline and reproducible.
+- `face_landmarker.task` (~3.8 MB) — Google's MediaPipe Face Landmarker model (478 landmarks, including iris points), Apache-2.0. **Committed**, because it is not published to npm; committing it keeps builds offline and reproducible.
 - `wasm/` — the MediaPipe vision WASM runtime, **gitignored** and copied from the pinned `@mediapipe/tasks-vision` dependency at build time by [scripts/copy-birding-assets.mjs](../scripts/copy-birding-assets.mjs) (chained into the `dev` and `build` npm scripts). Reproducible from the lockfile, so there is no need to commit ~22 MB of it.
 
 **Files**
 
 - [src/components/hobbies/Birding.astro](../src/components/hobbies/Birding.astro), the markup (choose / camera / busy / error / result states + privacy note) and the mounting `<script>`.
-- [src/lib/hobbies/birding.ts](../src/lib/hobbies/birding.ts), the engine: camera and file input, lazy-loading the landmark model, turning landmarks into seven normalized features, and sampling the palette. This is the only file that touches MediaPipe or the DOM.
-- [src/lib/hobbies/birding-bird.ts](../src/lib/hobbies/birding-bird.ts), the **pure, dependency-free** mapping from features to bird slots plus the pixel renderer. Split out the same way `stocking.ts` is split from the aquarium, so it is unit-testable.
-- [src/lib/hobbies/birding-bird.test.ts](../src/lib/hobbies/birding-bird.test.ts), unit tests for the mapping (determinism, wide eyes to bigger eyes, quantized seed, etc.).
+- [src/lib/hobbies/birding.ts](../src/lib/hobbies/birding.ts), the engine: camera and file input, lazy-loading the landmark model, turning landmarks into normalized features, and sampling the palette (hair, accent, skin, and iris colours). This is the only file that touches MediaPipe or the DOM.
+- [src/lib/hobbies/birding-bird.ts](../src/lib/hobbies/birding-bird.ts), the **pure, dependency-free** species roster (`SPECIES`), the species picker (`makeBirdStyle`), and the smoothly-shaded renderer (`renderBird`). Split out the same way `stocking.ts` is split from the aquarium, so the pure parts are unit-testable.
+- [src/lib/hobbies/birding-bird.test.ts](../src/lib/hobbies/birding-bird.test.ts), unit tests for the mapping and the species picker (determinism, feature mapping, species variety, different colouring → different species).
 
-### Where the numbers come from
+### Where the species come from
 
-As with the aquarium, being upfront: the feature ranges are approximate and tuned by feel, not derived from any dataset. The extractor measures ratios from MediaPipe's canonical landmark indices (eye aspect, inter-ocular distance over face width, mouth width over face width, face width over height, nose length, brow-to-eye gap, mouth-corner curvature) and squashes each into a 0..1 value over a hand-picked min/max. `featuresToBird` then linearly maps those to drawing slots. The bird is rendered into a logical 100x100 buffer and scaled up with `imageSmoothingEnabled = false` for the chunky pixel look, the same trick the other islands use.
+Being upfront, as with the aquarium: the species roster is hand-built from general bird knowledge, and each species' colours are approximate hex values chosen to read true to its signature field marks, not pulled from any dataset. The feature → proportion ranges are tuned by feel. The bird is drawn with canvas gradients and short feather strokes for a believable illustrated look (smoothing on), not the chunky pixel style of the other islands.
 
 ## Photo galleries (`hobby-media`)
 
