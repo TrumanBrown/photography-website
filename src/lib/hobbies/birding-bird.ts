@@ -180,6 +180,8 @@ export interface PortraitInput {
 // FaceMesh canonical indices used for placing the bird parts.
 const L = {
   rEyeOuter: 33,
+  rEyeInner: 133,
+  lEyeInner: 362,
   lEyeOuter: 263,
   foreheadTop: 10,
   chin: 152,
@@ -308,99 +310,181 @@ export function renderBirdPortrait(canvas: HTMLCanvasElement, input: PortraitInp
   o.imageSmoothingEnabled = true;
   o.drawImage(pad, 0, 0, PAD, PAD, 0, 0, OFF, OFF);
 
+  // Keep a copy of the pixelated selfie so we can reuse human traits (eyes/brow)
+  // inside a bird-first head shape.
+  const faceTex = document.createElement('canvas');
+  faceTex.width = OFF;
+  faceTex.height = OFF;
+  const ft = faceTex.getContext('2d');
+  if (!ft) return;
+  ft.imageSmoothingEnabled = false;
+  ft.drawImage(off, 0, 0);
+
   // Landmark -> low-res buffer coordinates.
   const p = (i: number): Pt => ({
     x: ((landmarks[i].x * W - x0) / side) * OFF,
     y: ((landmarks[i].y * H - y0) / side) * OFF,
   });
 
-  const eyeDist = Math.max(6, dist2(p(L.rEyeOuter), p(L.lEyeOuter)));
-  const headW = Math.max(eyeDist, dist2(p(L.cheekR), p(L.cheekL)));
-  const hair = palette.body;
-  const accent = palette.accent;
-
-  // --- Feather crest above the head (a hair-to-accent gradient reads as "their" feathers) ---
+  const eyeR = mid(p(L.rEyeOuter), p(L.rEyeInner));
+  const eyeL = mid(p(L.lEyeOuter), p(L.lEyeInner));
+  const eyeMid = mid(eyeR, eyeL);
+  const eyeDist = Math.max(6, dist2(eyeR, eyeL));
+  const cheekR = p(L.cheekR);
+  const cheekL = p(L.cheekL);
   const headTop = p(L.foreheadTop);
-  const crestH = eyeDist * (0.7 + ((params.crestHeight - 4) / 18) * 1.0);
-  const n = 5;
-  for (let i = 0; i < n; i += 1) {
-    const t = i / (n - 1) - 0.5; // -0.5..0.5
-    const base: Pt = { x: headTop.x + t * headW * 0.72, y: headTop.y + Math.abs(t) * eyeDist * 0.22 };
-    const tip: Pt = { x: base.x + t * eyeDist * 0.5, y: base.y - crestH * (1 - Math.abs(t) * 0.32) };
-    const col = mixHex(hair, accent, 0.3 + (i / (n - 1)) * 0.45);
-    feather(o, base, tip, eyeDist * 0.16, col);
+  const chin = p(L.chin);
+  const headW = Math.max(eyeDist, dist2(cheekR, cheekL));
+  const headH = Math.max(eyeDist * 1.8, dist2(headTop, chin));
+  const headCx = (cheekR.x + cheekL.x) / 2;
+  const headCy = eyeMid.y + headH * 0.12;
+  const headRx = headW * 0.7;
+  const headRy = headH * 0.7;
+
+  const featherBase = mixHex(palette.body, '#171717', 0.15);
+  const featherDark = shadeHex(featherBase, 0.72);
+  const featherLight = mixHex(featherBase, '#f7f7f7', 0.16);
+
+  // Clear out selfie-first look and rebuild as a bird-first portrait.
+  o.clearRect(0, 0, OFF, OFF);
+
+  // Backdrop
+  o.fillStyle = bg;
+  o.fillRect(0, 0, OFF, OFF);
+
+  // Neck and body plumage
+  o.fillStyle = featherDark;
+  o.beginPath();
+  o.moveTo(headCx - headRx * 0.45, headCy + headRy * 0.52);
+  o.lineTo(headCx + headRx * 0.45, headCy + headRy * 0.52);
+  o.lineTo(headCx + headRx * 0.85, OFF);
+  o.lineTo(headCx - headRx * 0.85, OFF);
+  o.closePath();
+  o.fill();
+
+  // Main bird head silhouette
+  o.fillStyle = featherBase;
+  o.beginPath();
+  o.ellipse(headCx, headCy, headRx, headRy, 0, 0, Math.PI * 2);
+  o.fill();
+
+  // Lighter facial disk around eyes (owl-ish) so human eye features sit naturally.
+  o.fillStyle = featherLight;
+  o.beginPath();
+  o.ellipse(headCx, eyeMid.y + eyeDist * 0.06, headRx * 0.73, headRy * 0.45, 0, 0, Math.PI * 2);
+  o.fill();
+
+  // Crown/crest feathers
+  const crestSpread = headW * 0.75;
+  const crestHeight = eyeDist * (0.65 + ((params.crestHeight - 4) / 18) * 1.2);
+  const crestCount = 7;
+  for (let i = 0; i < crestCount; i += 1) {
+    const t = i / (crestCount - 1) - 0.5;
+    const base: Pt = {
+      x: headCx + t * crestSpread,
+      y: headTop.y + headH * 0.12 + Math.abs(t) * eyeDist * 0.1,
+    };
+    const tip: Pt = {
+      x: base.x + t * eyeDist * 0.35,
+      y: base.y - crestHeight * (1 - Math.abs(t) * 0.45),
+    };
+    const col = mixHex(featherBase, palette.accent, 0.25 + ((i % 3) / 3) * 0.35);
+    feather(o, base, tip, eyeDist * 0.11, col);
   }
 
-  // --- Brow tufts (small, hair-toned feathers angled up over the outer brows) ---
-  for (const [idx, dir] of [
-    [L.browR, -1],
-    [L.browL, 1],
-  ] as const) {
-    const b = p(idx);
-    const base: Pt = { x: b.x, y: b.y - eyeDist * 0.05 };
-    const tip: Pt = { x: b.x + dir * eyeDist * 0.24, y: b.y - eyeDist * 0.26 };
-    feather(o, base, tip, eyeDist * 0.08, shadeHex(hair, 0.9));
-  }
-
-  // --- Cheek/jaw tufts (subtle, hair-toned, hug the jawline) ---
-  for (const [idx, dir] of [
+  // Side feathers for a stronger bird-head silhouette.
+  for (const [side, dir] of [
     [L.cheekR, -1],
     [L.cheekL, 1],
   ] as const) {
-    const c = p(idx);
-    for (let k = 0; k < 2; k += 1) {
-      const base: Pt = { x: c.x + dir * eyeDist * 0.02, y: c.y + k * eyeDist * 0.14 };
-      const tip: Pt = { x: c.x + dir * eyeDist * (0.14 + k * 0.04), y: c.y + eyeDist * (0.26 + k * 0.16) };
-      feather(o, base, tip, eyeDist * 0.08, shadeHex(hair, 0.95));
+    const c = p(side);
+    for (let k = 0; k < 3; k += 1) {
+      const base: Pt = { x: c.x + dir * eyeDist * 0.05, y: c.y - eyeDist * 0.07 + k * eyeDist * 0.15 };
+      const tip: Pt = { x: c.x + dir * eyeDist * (0.42 + k * 0.05), y: c.y + eyeDist * (0.02 + k * 0.18) };
+      feather(o, base, tip, eyeDist * 0.08, mixHex(featherDark, featherBase, k * 0.2));
     }
   }
 
-  // --- Beak over the nose/mouth ---
-  const noseTip = p(L.noseTip);
+  // Preserve human identity in a narrow mask around eyes + brow ridge.
+  const eyeMaskW = eyeDist * 2.15;
+  const eyeMaskH = eyeDist * 1.15;
+  o.save();
+  o.beginPath();
+  o.ellipse(eyeMid.x, eyeMid.y, eyeMaskW * 0.5, eyeMaskH * 0.52, 0, 0, Math.PI * 2);
+  o.clip();
+  o.drawImage(faceTex, 0, 0);
+  o.restore();
+
+  // Brow ridge accent around preserved human eye region.
+  o.strokeStyle = mixHex(featherDark, '#000000', 0.35);
+  o.lineWidth = Math.max(1.2, eyeDist * 0.07);
+  o.beginPath();
+  o.ellipse(eyeMid.x, eyeMid.y - eyeDist * 0.02, eyeMaskW * 0.52, eyeMaskH * 0.46, 0, Math.PI * 1.02, Math.PI * 1.98);
+  o.stroke();
+
+  // Bird eye rings around each eye to integrate human eyes into avian anatomy.
+  for (const e of [eyeR, eyeL]) {
+    o.strokeStyle = mixHex(featherDark, '#111111', 0.25);
+    o.lineWidth = Math.max(1.2, eyeDist * 0.06);
+    o.beginPath();
+    o.ellipse(e.x, e.y, eyeDist * 0.22, eyeDist * 0.19, 0, 0, Math.PI * 2);
+    o.stroke();
+  }
+
+  // Prominent bird beak (bird-first): larger and more curved than before.
   const mouthC = mid(p(L.mouthTop), p(L.mouthBot));
-  const chin = p(L.chin);
-  const beakTopY = noseTip.y - eyeDist * 0.02;
-  const beakApexY = mouthC.y + (chin.y - mouthC.y) * 0.28;
-  const beakLen = Math.max(eyeDist * 0.5, beakApexY - beakTopY) * (0.85 + ((params.beakLength - 7) / 9) * 0.3);
-  const beakW = eyeDist * (0.5 + ((params.beakWidth - 7) / 8) * 0.26);
-  const bx = mouthC.x;
-  const apex: Pt = { x: bx, y: beakTopY + beakLen };
-  // upper mandible
+  const beakTopY = eyeMid.y + eyeDist * 0.45;
+  const beakLen = eyeDist * (1.05 + ((params.beakLength - 7) / 9) * 0.38);
+  const beakW = eyeDist * (0.95 + ((params.beakWidth - 7) / 8) * 0.35);
+  const bx = headCx + (mouthC.x - headCx) * 0.35;
+  const tipY = beakTopY + beakLen;
+
+  // Upper mandible (hooked)
   o.fillStyle = palette.beak;
   o.beginPath();
-  o.moveTo(bx - beakW / 2, beakTopY);
-  o.lineTo(bx + beakW / 2, beakTopY);
-  o.lineTo(apex.x, apex.y);
+  o.moveTo(bx - beakW * 0.52, beakTopY);
+  o.quadraticCurveTo(bx, beakTopY - eyeDist * 0.09, bx + beakW * 0.52, beakTopY);
+  o.quadraticCurveTo(bx + beakW * 0.25, beakTopY + beakLen * 0.48, bx, tipY);
+  o.quadraticCurveTo(bx - beakW * 0.3, beakTopY + beakLen * 0.5, bx - beakW * 0.52, beakTopY);
   o.closePath();
   o.fill();
-  o.strokeStyle = shadeHex(palette.beak, 0.72);
-  o.lineWidth = Math.max(0.8, eyeDist * 0.03);
+  o.strokeStyle = shadeHex(palette.beak, 0.62);
+  o.lineWidth = Math.max(1, eyeDist * 0.04);
   o.stroke();
-  // gape line (the beak's "mouth")
-  o.strokeStyle = shadeHex(palette.beak, 0.6);
-  o.lineWidth = Math.max(0.8, eyeDist * 0.035);
+
+  // Lower mandible
+  o.fillStyle = shadeHex(palette.beak, 0.85);
   o.beginPath();
-  o.moveTo(bx - beakW * 0.42, beakTopY + beakLen * 0.42);
-  o.quadraticCurveTo(bx, beakTopY + beakLen * 0.6, bx + beakW * 0.42, beakTopY + beakLen * 0.42);
+  o.moveTo(bx - beakW * 0.32, beakTopY + beakLen * 0.38);
+  o.quadraticCurveTo(bx, beakTopY + beakLen * 0.82, bx + beakW * 0.32, beakTopY + beakLen * 0.38);
+  o.quadraticCurveTo(bx, beakTopY + beakLen * 0.72, bx - beakW * 0.32, beakTopY + beakLen * 0.38);
+  o.closePath();
+  o.fill();
+
+  // Gape line + nostrils
+  o.strokeStyle = shadeHex(palette.beak, 0.52);
+  o.lineWidth = Math.max(0.9, eyeDist * 0.03);
+  o.beginPath();
+  o.moveTo(bx - beakW * 0.34, beakTopY + beakLen * 0.4);
+  o.quadraticCurveTo(bx, beakTopY + beakLen * 0.57, bx + beakW * 0.34, beakTopY + beakLen * 0.4);
   o.stroke();
-  // nostrils
-  o.fillStyle = shadeHex(palette.beak, 0.55);
+  o.fillStyle = shadeHex(palette.beak, 0.45);
   for (const s of [-1, 1]) {
     o.beginPath();
-    o.ellipse(bx + s * beakW * 0.2, beakTopY + beakLen * 0.18, eyeDist * 0.03, eyeDist * 0.045, 0, 0, Math.PI * 2);
+    o.ellipse(bx + s * beakW * 0.18, beakTopY + beakLen * 0.2, eyeDist * 0.035, eyeDist * 0.045, 0, 0, Math.PI * 2);
     o.fill();
   }
 
-  // --- Feather collar across the bottom (frames the face, hides the crop edge) ---
-  const collarBase = mixHex(hair, '#ffffff', 0.1);
-  const collarTop = OFF * 0.88;
-  const scallop = OFF / 9;
-  o.fillStyle = collarBase;
-  o.fillRect(0, Math.round(collarTop + scallop * 0.5), OFF, OFF);
+  // Feather chest/collar at the bottom.
+  const chestTop = OFF * 0.86;
+  const scallop = OFF / 8.5;
+  const chest = mixHex(featherBase, '#ffffff', 0.1);
+  o.fillStyle = chest;
+  o.fillRect(0, Math.round(chestTop + scallop * 0.45), OFF, OFF);
   for (let i = 0; i <= 9; i += 1) {
-    o.fillStyle = i % 2 === 0 ? collarBase : shadeHex(collarBase, 0.86);
+    o.fillStyle = i % 2 === 0 ? chest : shadeHex(chest, 0.86);
     o.beginPath();
-    o.ellipse(i * scallop, collarTop + scallop * 0.5, scallop * 0.6, scallop * 0.62, 0, 0, Math.PI * 2);
+    o.ellipse(i * scallop, chestTop + scallop * 0.45, scallop * 0.58, scallop * 0.64, 0, 0, Math.PI * 2);
     o.fill();
   }
 
