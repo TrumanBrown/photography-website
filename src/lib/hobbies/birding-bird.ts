@@ -313,6 +313,37 @@ function shadedPlume(o: CanvasRenderingContext2D, base: Pt, tip: Pt, halfW: numb
 }
 
 /**
+ * Draw one source-image triangle into a destination triangle (affine warp),
+ * clipped to the destination. Used to morph the real photo into bird shapes.
+ */
+function warpTri(
+  o: CanvasRenderingContext2D,
+  img: CanvasImageSource,
+  s0: Pt, s1: Pt, s2: Pt,
+  d0: Pt, d1: Pt, d2: Pt,
+): void {
+  const den = s0.x * (s1.y - s2.y) - s1.x * (s0.y - s2.y) + s2.x * (s0.y - s1.y);
+  if (Math.abs(den) < 1e-6) return;
+  const a = (d0.x * (s1.y - s2.y) - d1.x * (s0.y - s2.y) + d2.x * (s0.y - s1.y)) / den;
+  const c = (s0.x * (d1.x - d2.x) - s1.x * (d0.x - d2.x) + s2.x * (d0.x - d1.x)) / den;
+  const e = (s0.x * (s1.y * d2.x - s2.y * d1.x) - s1.x * (s0.y * d2.x - s2.y * d0.x) + s2.x * (s0.y * d1.x - s1.y * d0.x)) / den;
+  const b = (d0.y * (s1.y - s2.y) - d1.y * (s0.y - s2.y) + d2.y * (s0.y - s1.y)) / den;
+  const d = (s0.x * (d1.y - d2.y) - s1.x * (d0.y - d2.y) + s2.x * (d0.y - d1.y)) / den;
+  const f = (s0.x * (s1.y * d2.y - s2.y * d1.y) - s1.x * (s0.y * d2.y - s2.y * d0.y) + s2.x * (s0.y * d1.y - s1.y * d0.y)) / den;
+  o.save();
+  o.beginPath();
+  // grow the clip triangle by a hair to avoid seam gaps between cells
+  o.moveTo(d0.x, d0.y);
+  o.lineTo(d1.x, d1.y);
+  o.lineTo(d2.x, d2.y);
+  o.closePath();
+  o.clip();
+  o.setTransform(a, b, c, d, e, f);
+  o.drawImage(img, 0, 0);
+  o.restore();
+}
+
+/**
  * Composite a bird beak + feathers onto the real selfie. Keeps the person's
  * actual face (real human features) and grafts on avian parts anchored to the
  * facial landmarks, the way the reference hybrid does.
@@ -349,7 +380,6 @@ export function renderHybrid(canvas: HTMLCanvasElement, input: HybridInput, size
   const offX = S / 2 - faceCx * scale;
   const offY = S * 0.42 - eyeMidSrc.y * scale;
   const T = (p: Pt): Pt => ({ x: p.x * scale + offX, y: p.y * scale + offY });
-  const P = (i: number): Pt => T(lp(i));
 
   // Background fill (so any uncovered edge is a soft backdrop, not transparent).
   const bgGrad = o.createLinearGradient(0, 0, 0, S);
@@ -366,9 +396,6 @@ export function renderHybrid(canvas: HTMLCanvasElement, input: HybridInput, size
   const Tchin = T(chin);
   const TcheekR = T(cheekR);
   const TcheekL = T(cheekL);
-  const eyeR = midp(P(M.rEyeOuter), P(M.rEyeInner));
-  const eyeL = midp(P(M.lEyeOuter), P(M.lEyeInner));
-  const eyeMid = midp(eyeR, eyeL);
   const faceWOut = dist2(TcheekR, TcheekL);
   const ecx = (TcheekR.x + TcheekL.x) / 2;
   const ecy = (Tfore.y + Tchin.y) / 2;
@@ -383,15 +410,15 @@ export function renderHybrid(canvas: HTMLCanvasElement, input: HybridInput, size
     const x = ecx + (rng() - 0.5) * halfSpan * 2;
     const norm = (x - ecx) / halfSpan;
     const arc = Math.max(0, 1 - norm * norm); // 1 in the middle, 0 at the temples
-    const baseY = crownY - arc * ery * 0.16 + (rng() - 0.5) * ery * 0.14;
+    const baseY = crownY - arc * ery * 0.16 + (rng() - 0.5) * ery * 0.22;
     const len = faceWOut * (0.1 + arc * 0.17) * (0.7 + rng() * 0.6);
     const lean = norm * 1.2 + (rng() - 0.5) * 0.5;
-    const base = { x, y: baseY + faceWOut * 0.045 };
+    const base = { x, y: baseY + faceWOut * 0.05 };
     const tip = { x: x + lean * faceWOut * 0.11, y: baseY - len };
     const pick = Math.floor(rng() * 3);
     const col = pick === 0 ? style.featherLight : pick === 1 ? style.feather : style.featherDark;
     o.globalAlpha = 0.88;
-    shadedPlume(o, base, tip, faceWOut * (0.024 + arc * 0.012), col, shade(style.featherDark, 0.8));
+    shadedPlume(o, base, tip, faceWOut * (0.018 + arc * 0.01), col, shade(style.featherDark, 0.8));
   }
   o.globalAlpha = 1;
 
@@ -412,89 +439,124 @@ export function renderHybrid(canvas: HTMLCanvasElement, input: HybridInput, size
   }
   o.globalAlpha = 1;
 
-  // --- Beak: a believable front-on bill over the nose/mouth ---
-  const noseTipP = P(M.noseTip);
-  const mouthC = midp(P(M.mouthTop), P(M.mouthBot));
-  const cxb = noseTipP.x;
-  const topY = midp(eyeMid, P(M.noseBridge)).y;
-  const tipY = mouthC.y + (Tchin.y - mouthC.y) * 0.28;
-  const len = Math.max(faceWOut * 0.45, tipY - topY);
-  const w = faceWOut * lerp(0.2, 0.27, clamp01((input.params.beakWidth - 7) / 8));
-  const midY = topY + len * 0.3;
+  // --- Beak: warp the real nose/mouth pixels into a beak (made of their skin) ---
+  const bridgeS = lp(M.noseBridge);
+  const noseTipS = lp(M.noseTip);
+  const mouthCS = midp(lp(M.mouthTop), lp(M.mouthBot));
+  const chinS = lp(M.chin);
+  const boxCx = noseTipS.x;
+  const boxHalf = faceW * 0.2; // source px
+  const boxTop = midp(eyeMidSrc, bridgeS).y;
+  const mouthBotS = lp(M.mouthBot);
+  const boxBot = mouthBotS.y + (chinS.y - mouthBotS.y) * 0.12; // stop just below the mouth
+  const beakScale = lerp(0.9, 1.3, clamp01((input.params.beakLength - 7) / 9));
+  const Q = faceWOut * 0.36 * beakScale; // downward protrusion (output px)
+  const Pp = faceWOut * 0.52; // inward pinch -> a pointier tip
 
-  const beakPath = (): void => {
-    o.beginPath();
-    o.moveTo(cxb, topY);
-    o.quadraticCurveTo(cxb + w * 0.72, topY + len * 0.04, cxb + w * 0.5, midY);
-    o.quadraticCurveTo(cxb + w * 0.4, midY + len * 0.36, cxb, tipY);
-    o.quadraticCurveTo(cxb - w * 0.4, midY + len * 0.36, cxb - w * 0.5, midY);
-    o.quadraticCurveTo(cxb - w * 0.72, topY + len * 0.04, cxb, topY);
-    o.closePath();
-  };
+  const cols = 8;
+  const rows = 12;
+  const gS: Pt[][] = [];
+  const gD: Pt[][] = [];
+  for (let r = 0; r <= rows; r += 1) {
+    const v = r / rows;
+    const rowS: Pt[] = [];
+    const rowD: Pt[] = [];
+    for (let c = 0; c <= cols; c += 1) {
+      const u = (c / cols) * 2 - 1;
+      const sx = boxCx + u * boxHalf;
+      const sy = boxTop + v * (boxBot - boxTop);
+      const base = T({ x: sx, y: sy });
+      const maskU = 1 - u * u;
+      const prot = 4 * v * (1 - v); // 0 at top/bottom, peak in the middle
+      const dy = Math.pow(maskU, 1.4) * prot * Q; // centre extends most -> pointed
+      const dx = -u * maskU * prot * Pp;
+      rowS.push({ x: sx, y: sy });
+      rowD.push({ x: base.x + dx, y: base.y + dy });
+    }
+    gS.push(rowS);
+    gD.push(rowD);
+  }
+  for (let r = 0; r < rows; r += 1) {
+    for (let c = 0; c < cols; c += 1) {
+      warpTri(o, source, gS[r][c], gS[r][c + 1], gS[r + 1][c], gD[r][c], gD[r][c + 1], gD[r + 1][c]);
+      warpTri(o, source, gS[r][c + 1], gS[r + 1][c + 1], gS[r + 1][c], gD[r][c + 1], gD[r + 1][c + 1], gD[r + 1][c]);
+    }
+  }
 
-  // soft cast shadow grounding the bill on the face
+  // Shade the warped beak for 3D form (no hard outline, so it stays part of the face).
+  const axisX = T(noseTipS).x;
+  const topY = T({ x: noseTipS.x, y: boxTop }).y;
+  const tipY = T(mouthCS).y + Q * 0.78;
+  const halfWOut = boxHalf * scale;
+  const beakLen = tipY - topY;
+
+  // Ambient-occlusion: a soft dark contour just outside the beak sides to lift it
+  // off the face (drawn before the fill so it reads as a cast/contact shadow).
   o.save();
-  o.shadowColor = 'rgba(0,0,0,0.4)';
-  o.shadowBlur = faceWOut * 0.1;
-  o.shadowOffsetY = faceWOut * 0.025;
-  o.fillStyle = style.beakDark;
-  beakPath();
-  o.fill();
+  o.strokeStyle = 'rgba(0,0,0,0.3)';
+  o.lineWidth = halfWOut * 0.22;
+  o.lineCap = 'round';
+  for (const s of [-1, 1]) {
+    o.beginPath();
+    o.moveTo(axisX + s * halfWOut * 0.5, topY + beakLen * 0.12);
+    o.quadraticCurveTo(axisX + s * halfWOut * 0.62, topY + beakLen * 0.45, axisX, tipY);
+    o.stroke();
+  }
   o.restore();
 
-  // base colour: side-lit gradient
-  const sideGrad = o.createLinearGradient(cxb - w * 0.5, 0, cxb + w * 0.5, 0);
-  sideGrad.addColorStop(0, style.beakLight);
-  sideGrad.addColorStop(0.5, style.beak);
-  sideGrad.addColorStop(1, style.beakDark);
-  o.fillStyle = sideGrad;
-  beakPath();
-  o.fill();
-
-  // length + ridge shading, clipped to the bill
   o.save();
-  beakPath();
+  o.beginPath();
+  o.ellipse(axisX, (topY + tipY) / 2, halfWOut * 0.96, beakLen / 2 * 1.04, 0, 0, Math.PI * 2);
   o.clip();
-  const lenGrad = o.createLinearGradient(0, topY, 0, tipY);
-  lenGrad.addColorStop(0, 'rgba(255,255,255,0.14)');
-  lenGrad.addColorStop(0.4, 'rgba(255,255,255,0)');
-  lenGrad.addColorStop(1, 'rgba(0,0,0,0.42)');
-  o.fillStyle = lenGrad;
-  o.fillRect(cxb - w, topY - w, w * 2, len + w * 2);
-  // central culmen highlight ridge
+  // tint toward the bill colour while keeping skin texture
+  o.globalCompositeOperation = 'soft-light';
+  o.globalAlpha = 0.9;
+  o.fillStyle = style.beak;
+  o.fillRect(axisX - halfWOut, topY - beakLen * 0.1, halfWOut * 2, beakLen * 1.25);
+  // a second, gentler colour pass for saturation
+  o.globalCompositeOperation = 'overlay';
+  o.globalAlpha = 0.28;
+  o.fillRect(axisX - halfWOut, topY - beakLen * 0.1, halfWOut * 2, beakLen * 1.25);
+  o.globalCompositeOperation = 'source-over';
+  // a low-alpha solid pass so the bill reads as a solid surface, not see-through
+  o.globalAlpha = 0.32;
+  o.fillStyle = style.beak;
+  o.fillRect(axisX - halfWOut, topY - beakLen * 0.1, halfWOut * 2, beakLen * 1.25);
+  o.globalAlpha = 1;
+  // side shading -> rounded cross-section
+  const sg = o.createLinearGradient(axisX - halfWOut, 0, axisX + halfWOut, 0);
+  sg.addColorStop(0, 'rgba(0,0,0,0.44)');
+  sg.addColorStop(0.5, 'rgba(255,255,255,0.1)');
+  sg.addColorStop(1, 'rgba(0,0,0,0.44)');
+  o.fillStyle = sg;
+  o.fillRect(axisX - halfWOut, topY, halfWOut * 2, beakLen);
+  // under-tip shadow
+  const ug = o.createLinearGradient(0, (topY + tipY) / 2, 0, tipY);
+  ug.addColorStop(0, 'rgba(0,0,0,0)');
+  ug.addColorStop(1, 'rgba(0,0,0,0.5)');
+  o.fillStyle = ug;
+  o.fillRect(axisX - halfWOut, (topY + tipY) / 2, halfWOut * 2, beakLen / 2);
+  // culmen highlight ridge
   o.strokeStyle = 'rgba(255,255,255,0.42)';
-  o.lineWidth = w * 0.1;
+  o.lineWidth = halfWOut * 0.16;
   o.lineCap = 'round';
   o.beginPath();
-  o.moveTo(cxb, topY + len * 0.08);
-  o.lineTo(cxb, midY + len * 0.1);
-  o.stroke();
-  // faint centre seam toward the tip (where the mandibles meet) — reads as a bill, not a mouth
-  o.strokeStyle = 'rgba(0,0,0,0.28)';
-  o.lineWidth = Math.max(1, w * 0.04);
-  o.beginPath();
-  o.moveTo(cxb, midY + len * 0.05);
-  o.lineTo(cxb, tipY - len * 0.04);
+  o.moveTo(axisX, topY + beakLen * 0.1);
+  o.lineTo(axisX, topY + beakLen * 0.66);
   o.stroke();
   o.restore();
 
-  // nostrils: thin slits high on the bill, near the centre
+  // nostrils high on the bill
   o.fillStyle = 'rgba(0,0,0,0.5)';
   for (const s of [-1, 1]) {
     o.save();
-    o.translate(cxb + s * w * 0.16, topY + len * 0.16);
-    o.rotate(s * 0.25);
+    o.translate(axisX + s * halfWOut * 0.28, topY + beakLen * 0.16);
+    o.rotate(s * 0.3);
     o.beginPath();
-    o.ellipse(0, 0, w * 0.03, len * 0.05, 0, 0, Math.PI * 2);
+    o.ellipse(0, 0, halfWOut * 0.055, beakLen * 0.05, 0, 0, Math.PI * 2);
     o.fill();
     o.restore();
   }
-
-  // crisp outline
-  o.strokeStyle = style.beakDark;
-  o.lineWidth = Math.max(1, S * 0.003);
-  beakPath();
-  o.stroke();
 
   // --- Vignette for cohesion ---
   const vg = o.createRadialGradient(S / 2, S * 0.45, S * 0.25, S / 2, S * 0.5, S * 0.72);
