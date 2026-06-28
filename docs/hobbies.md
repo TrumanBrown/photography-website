@@ -206,7 +206,7 @@ Like the other two islands, everything is **drawn in code**, all geometry and da
 
 ## Reference implementation 4: the birding island (selfie to bird)
 
-Take or upload a selfie and the page turns you into a **bird-person hybrid**: it keeps your real face from the photo and morphs/composites bird anatomy onto it. The nose and mouth are **warped (a triangle-mesh face morph) into a beak made of your own skin**, then shaded for 3D form; a feather crest is blended into the hairline and feathering runs down the jaw and neck. It is procedural and on-device, so it reads as a stylized morph rather than the painterly reference. Given the same face the result is the same hybrid (deterministic).
+Take or upload a selfie and the page turns you into a **bird-person hybrid**: it keeps your real face from the photo and morphs/composites bird anatomy onto it. A single seamless **triangle-mesh face warp** over the face does three things at once from your own skin: it **enlarges and rounds the eyes**, **narrows the lower face** toward a bird skull, and **pulls the nose/mouth into a beak** (then shaded for 3D form). A feather crest is blended into the hairline and feathering runs down the jaw and neck. A **Shuffle** button re-rolls the bill colour + feather variation on the same selfie. It is procedural and on-device, so it reads as a stylized morph rather than the painterly reference. Given the same face + variant the result is the same hybrid (deterministic).
 
 **How "you" shows up:**
 

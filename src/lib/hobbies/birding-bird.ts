@@ -224,20 +224,21 @@ export interface HybridStyle {
 
 const BEAKS: [string, string][] = [
   ['#ef8a1f', 'Ember'],
-  ['#f3c01c', 'Golden'],
+  ['#f3b81c', 'Golden'],
   ['#e0532a', 'Sunset'],
   ['#cf3b2c', 'Scarlet'],
-  ['#6b6f78', 'Slate'],
+  ['#5b5f66', 'Slate'],
   ['#26262c', 'Onyx'],
-  ['#d9d2c4', 'Bone'],
+  ['#c79a44', 'Horn'],
 ];
 
 /**
  * Decide the beak colour and feather tones for a face. Pure + deterministic.
  * The beak colour is seeded (variety); the feathers come from the person's hair.
+ * `variant` lets the UI re-roll (the "shuffle" button) without a new selfie.
  */
-export function makeHybridStyle(features: FaceFeatures, palette: FacePalette): HybridStyle {
-  const seed = birdStyleSeed(features, palette);
+export function makeHybridStyle(features: FaceFeatures, palette: FacePalette, variant = 0): HybridStyle {
+  const seed = (birdStyleSeed(features, palette) ^ Math.imul(variant, 0x9e3779b1)) >>> 0;
   const rng = mulberry32(seed);
   const [beak, beakName] = BEAKS[Math.floor(rng() * BEAKS.length) % BEAKS.length];
   const feather = /^#[0-9a-f]{6}$/i.test(palette.body) ? palette.body : '#3a2a1f';
@@ -402,59 +403,37 @@ export function renderHybrid(canvas: HTMLCanvasElement, input: HybridInput, size
   const erx = (faceWOut / 2) * 1.04;
   const ery = (Tchin.y - Tfore.y) / 2 * 1.06;
 
-  // --- Crest: a dense, scattered tuft of feathers blended into the hairline ---
-  const crownY = Tfore.y - ery * 0.08;
-  const halfSpan = erx * 1.02;
-  const crestN = 44;
-  for (let i = 0; i < crestN; i += 1) {
-    const x = ecx + (rng() - 0.5) * halfSpan * 2;
-    const norm = (x - ecx) / halfSpan;
-    const arc = Math.max(0, 1 - norm * norm); // 1 in the middle, 0 at the temples
-    const baseY = crownY - arc * ery * 0.16 + (rng() - 0.5) * ery * 0.22;
-    const len = faceWOut * (0.1 + arc * 0.17) * (0.7 + rng() * 0.6);
-    const lean = norm * 1.2 + (rng() - 0.5) * 0.5;
-    const base = { x, y: baseY + faceWOut * 0.05 };
-    const tip = { x: x + lean * faceWOut * 0.11, y: baseY - len };
-    const pick = Math.floor(rng() * 3);
-    const col = pick === 0 ? style.featherLight : pick === 1 ? style.feather : style.featherDark;
-    o.globalAlpha = 0.88;
-    shadedPlume(o, base, tip, faceWOut * (0.018 + arc * 0.01), col, shade(style.featherDark, 0.8));
-  }
-  o.globalAlpha = 1;
+  // (Crest + jaw feathers are drawn after the warp below, so the warp doesn't
+  // paint over them.)
 
-  // --- Jaw / neck feathers feathering the face into plumage (scattered rows) ---
-  const jawN = 52;
-  for (let i = 0; i < jawN; i += 1) {
-    const tt = rng();
-    const a = (15 + tt * 150) * (Math.PI / 180); // lower arc, left -> right
-    const bx = ecx + Math.cos(a) * erx * (0.94 + rng() * 0.14);
-    const by = ecy + Math.sin(a) * ery * (1.0 + rng() * 0.16);
-    if (by < ecy + ery * 0.4) continue; // jaw + neck only
-    const len = faceWOut * (0.05 + rng() * 0.06);
-    const tip = { x: bx + Math.cos(a) * len * 0.3, y: by + len };
-    const pick = Math.floor(rng() * 3);
-    const col = pick === 0 ? style.featherDark : pick === 1 ? shade(style.feather, 0.82) : style.feather;
-    o.globalAlpha = 0.86;
-    shadedPlume(o, { x: bx, y: by }, tip, faceWOut * 0.02, col, shade(style.featherDark, 0.72));
-  }
-  o.globalAlpha = 1;
-
-  // --- Beak: warp the real nose/mouth pixels into a beak (made of their skin) ---
+  // --- Composite face-warp: enlarge eyes, narrow the lower face, and pull the
+  //     nose/mouth into a beak — one seamless morph over a face-sized box. ---
   const bridgeS = lp(M.noseBridge);
   const noseTipS = lp(M.noseTip);
   const mouthCS = midp(lp(M.mouthTop), lp(M.mouthBot));
   const chinS = lp(M.chin);
-  const boxCx = noseTipS.x;
-  const boxHalf = faceW * 0.2; // source px
-  const boxTop = midp(eyeMidSrc, bridgeS).y;
-  const mouthBotS = lp(M.mouthBot);
-  const boxBot = mouthBotS.y + (chinS.y - mouthBotS.y) * 0.12; // stop just below the mouth
-  const beakScale = lerp(0.9, 1.3, clamp01((input.params.beakLength - 7) / 9));
-  const Q = faceWOut * 0.36 * beakScale; // downward protrusion (output px)
-  const Pp = faceWOut * 0.52; // inward pinch -> a pointier tip
+  const faceHsrc = Math.max(1, dist2(lp(M.foreheadTop), chinS));
 
-  const cols = 8;
-  const rows = 12;
+  // Box covers forehead → upper neck, a bit wider than the face (source px).
+  const boxCxS = faceCx;
+  const boxHalfS = faceW * 0.85;
+  const boxTopS = lp(M.foreheadTop).y - faceHsrc * 0.2;
+  const boxBotS = chinS.y + (chinS.y - mouthCS.y) * 0.6;
+
+  const beakScale = lerp(0.9, 1.3, clamp01((input.params.beakLength - 7) / 9));
+  const Q = faceWOut * 0.34 * beakScale; // beak protrusion (output px)
+  const Pp = faceWOut * 0.5; // beak pinch
+
+  // Output-space anchors for the displacement field.
+  const eyeCO = [T(midp(lp(M.rEyeOuter), lp(M.rEyeInner))), T(midp(lp(M.lEyeOuter), lp(M.lEyeInner)))];
+  const eyeWO = dist2(T(lp(M.rEyeOuter)), T(lp(M.rEyeInner)));
+  const cxO = T({ x: boxCxS, y: chinS.y }).x;
+  const noseTipO = T(noseTipS);
+  const cheekYO = T({ x: boxCxS, y: (lp(M.cheekR).y + lp(M.cheekL).y) / 2 }).y;
+  const chinYO = T(chinS).y;
+
+  const cols = 18;
+  const rows = 26;
   const gS: Pt[][] = [];
   const gD: Pt[][] = [];
   for (let r = 0; r <= rows; r += 1) {
@@ -463,15 +442,45 @@ export function renderHybrid(canvas: HTMLCanvasElement, input: HybridInput, size
     const rowD: Pt[] = [];
     for (let c = 0; c <= cols; c += 1) {
       const u = (c / cols) * 2 - 1;
-      const sx = boxCx + u * boxHalf;
-      const sy = boxTop + v * (boxBot - boxTop);
-      const base = T({ x: sx, y: sy });
-      const maskU = 1 - u * u;
-      const prot = 4 * v * (1 - v); // 0 at top/bottom, peak in the middle
-      const dy = Math.pow(maskU, 1.4) * prot * Q; // centre extends most -> pointed
-      const dx = -u * maskU * prot * Pp;
+      const sx = boxCxS + u * boxHalfS;
+      const sy = boxTopS + v * (boxBotS - boxTopS);
+      const p0 = T({ x: sx, y: sy });
+      let dx = 0;
+      let dy = 0;
+
+      // Eyes: push pixels radially outward from each eye centre (bigger, rounder).
+      for (const ec of eyeCO) {
+        const ex = p0.x - ec.x;
+        const ey = p0.y - ec.y;
+        const dd = Math.hypot(ex, ey);
+        const R = eyeWO * 1.35;
+        if (dd < R) {
+          const f = (1 - dd / R) * 0.32;
+          dx += ex * f;
+          dy += ey * f;
+        }
+      }
+
+      // Beak: nose/mouth region pulled down + pinched to a point.
+      const bx = (p0.x - noseTipO.x) / (faceWOut * 0.2);
+      const by = (p0.y - noseTipO.y) / Math.max(1, chinYO - noseTipO.y);
+      if (by > -0.4 && by < 1.3) {
+        const maskU = Math.max(0, 1 - bx * bx);
+        const prot = Math.max(0, 1 - ((by - 0.4) / 0.7) ** 2);
+        dy += Math.pow(maskU, 1.4) * prot * Q;
+        dx += -Math.sign(bx) * Math.min(1, Math.abs(bx)) * maskU * prot * Pp;
+      }
+
+      // Jaw: narrow the lower face toward the centre (bird skull).
+      if (p0.y > cheekYO) {
+        const jf = Math.min(1, (p0.y - cheekYO) / Math.max(1, chinYO - cheekYO)) * 0.16;
+        dx += (cxO - p0.x) * jf;
+      }
+
+      // Fade all displacement to zero at the box border -> seamless, no gaps.
+      const em = (1 - u * u) * Math.sin(Math.PI * Math.min(1, Math.max(0, v)));
       rowS.push({ x: sx, y: sy });
-      rowD.push({ x: base.x + dx, y: base.y + dy });
+      rowD.push({ x: p0.x + dx * em, y: p0.y + dy * em });
     }
     gS.push(rowS);
     gD.push(rowD);
@@ -484,10 +493,10 @@ export function renderHybrid(canvas: HTMLCanvasElement, input: HybridInput, size
   }
 
   // Shade the warped beak for 3D form (no hard outline, so it stays part of the face).
-  const axisX = T(noseTipS).x;
-  const topY = T({ x: noseTipS.x, y: boxTop }).y;
-  const tipY = T(mouthCS).y + Q * 0.78;
-  const halfWOut = boxHalf * scale;
+  const axisX = noseTipO.x;
+  const topY = T({ x: noseTipS.x, y: midp(eyeMidSrc, bridgeS).y }).y;
+  const tipY = T(mouthCS).y + Q * 0.85;
+  const halfWOut = faceWOut * 0.19;
   const beakLen = tipY - topY;
 
   // Ambient-occlusion: a soft dark contour just outside the beak sides to lift it
@@ -557,6 +566,43 @@ export function renderHybrid(canvas: HTMLCanvasElement, input: HybridInput, size
     o.fill();
     o.restore();
   }
+
+  // --- Crest: a dense, scattered tuft of feathers blended into the hairline ---
+  const crownY = Tfore.y - ery * 0.08;
+  const halfSpan = erx * 1.02;
+  const crestN = 44;
+  for (let i = 0; i < crestN; i += 1) {
+    const x = ecx + (rng() - 0.5) * halfSpan * 2;
+    const norm = (x - ecx) / halfSpan;
+    const arc = Math.max(0, 1 - norm * norm); // 1 in the middle, 0 at the temples
+    const baseY = crownY - arc * ery * 0.16 + (rng() - 0.5) * ery * 0.22;
+    const len = faceWOut * (0.1 + arc * 0.17) * (0.7 + rng() * 0.6);
+    const lean = norm * 1.2 + (rng() - 0.5) * 0.5;
+    const base = { x, y: baseY + faceWOut * 0.05 };
+    const tip = { x: x + lean * faceWOut * 0.11, y: baseY - len };
+    const pick = Math.floor(rng() * 3);
+    const col = pick === 0 ? style.featherLight : pick === 1 ? style.feather : style.featherDark;
+    o.globalAlpha = 0.88;
+    shadedPlume(o, base, tip, faceWOut * (0.018 + arc * 0.01), col, shade(style.featherDark, 0.8));
+  }
+  o.globalAlpha = 1;
+
+  // --- Jaw / neck feathers feathering the face into plumage (scattered rows) ---
+  const jawN = 52;
+  for (let i = 0; i < jawN; i += 1) {
+    const tt = rng();
+    const a = (15 + tt * 150) * (Math.PI / 180); // lower arc, left -> right
+    const bx = ecx + Math.cos(a) * erx * (0.94 + rng() * 0.14);
+    const by = ecy + Math.sin(a) * ery * (1.0 + rng() * 0.16);
+    if (by < ecy + ery * 0.4) continue; // jaw + neck only
+    const len = faceWOut * (0.05 + rng() * 0.06);
+    const tip = { x: bx + Math.cos(a) * len * 0.3, y: by + len };
+    const pick = Math.floor(rng() * 3);
+    const col = pick === 0 ? style.featherDark : pick === 1 ? shade(style.feather, 0.82) : style.feather;
+    o.globalAlpha = 0.86;
+    shadedPlume(o, { x: bx, y: by }, tip, faceWOut * 0.02, col, shade(style.featherDark, 0.72));
+  }
+  o.globalAlpha = 1;
 
   // --- Vignette for cohesion ---
   const vg = o.createRadialGradient(S / 2, S * 0.45, S * 0.25, S / 2, S * 0.5, S * 0.72);

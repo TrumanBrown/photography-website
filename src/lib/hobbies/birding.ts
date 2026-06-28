@@ -198,10 +198,14 @@ export function initBirding(root: HTMLElement): void {
   const tagsEl = $('[data-bird-tags]');
   const btnDownload = $<HTMLButtonElement>('[data-bird-download]');
   const btnAgain = $<HTMLButtonElement>('[data-bird-again]');
+  const btnShuffle = $<HTMLButtonElement>('[data-bird-shuffle]');
 
   const source = document.createElement('canvas');
   let landmarker: FaceLandmarkerT | null = null;
   let stream: MediaStream | null = null;
+  // Last successful detection, kept so "Shuffle" can re-roll without a new selfie.
+  let last: { lm: NormalizedLandmark[]; features: FaceFeatures; palette: FacePalette } | null = null;
+  let variant = 0;
 
   function show(view: keyof typeof views): void {
     for (const [k, el] of Object.entries(views)) {
@@ -237,6 +241,32 @@ export function initBirding(root: HTMLElement): void {
     sctx.drawImage(img, 0, 0, source.width, source.height);
   }
 
+  /** Render the bird for the current `last` detection + `variant` (shuffle). */
+  function renderResult(): void {
+    if (!last) return;
+    const bird = featuresToBird(last.features, last.palette);
+    const style = makeHybridStyle(last.features, last.palette, variant);
+    if (birdCanvas) {
+      renderHybrid(birdCanvas, { source, landmarks: last.lm, palette: last.palette, params: bird, style }, BIRD_PX);
+    }
+    if (tagsEl) {
+      const nameSpan = document.createElement('span');
+      nameSpan.className =
+        'rounded-full bg-neutral-900 px-2.5 py-1 text-xs font-medium text-white dark:bg-white dark:text-neutral-900';
+      nameSpan.textContent = style.name;
+      tagsEl.replaceChildren(
+        nameSpan,
+        ...describeFeatures(last.features).map((t) => {
+          const span = document.createElement('span');
+          span.className =
+            'rounded-full bg-neutral-100 px-2.5 py-1 text-xs text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300';
+          span.textContent = t;
+          return span;
+        }),
+      );
+    }
+  }
+
   async function processSource(): Promise<void> {
     show('busy');
     try {
@@ -256,27 +286,9 @@ export function initBirding(root: HTMLElement): void {
       const data = sctx.getImageData(0, 0, source.width, source.height);
       const features = computeFeatures(lm, source.width, source.height);
       const palette = computePalette(lm, data);
-      const bird = featuresToBird(features, palette);
-      const style = makeHybridStyle(features, palette);
-      if (birdCanvas) {
-        renderHybrid(birdCanvas, { source, landmarks: lm, palette, params: bird, style }, BIRD_PX);
-      }
-      if (tagsEl) {
-        const nameSpan = document.createElement('span');
-        nameSpan.className =
-          'rounded-full bg-neutral-900 px-2.5 py-1 text-xs font-medium text-white dark:bg-white dark:text-neutral-900';
-        nameSpan.textContent = style.name;
-        tagsEl.replaceChildren(
-          nameSpan,
-          ...describeFeatures(features).map((t) => {
-            const span = document.createElement('span');
-            span.className =
-              'rounded-full bg-neutral-100 px-2.5 py-1 text-xs text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300';
-            span.textContent = t;
-            return span;
-          }),
-        );
-      }
+      last = { lm, features, palette };
+      variant = 0;
+      renderResult();
       show('result');
     } catch (err) {
       console.error('[birding] generation failed', err);
@@ -357,6 +369,11 @@ export function initBirding(root: HTMLElement): void {
   btnCancel?.addEventListener('click', reset);
   btnRetry?.addEventListener('click', reset);
   btnAgain?.addEventListener('click', reset);
+  btnShuffle?.addEventListener('click', () => {
+    if (!last) return;
+    variant += 1;
+    renderResult();
+  });
   btnDownload?.addEventListener('click', () => {
     if (!birdCanvas) return;
     const a = document.createElement('a');
