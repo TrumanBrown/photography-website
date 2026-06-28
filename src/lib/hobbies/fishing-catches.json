@@ -1,15 +1,22 @@
 {
-  "$comment": "Personal 'fish I've caught' gallery. fishId references fishing-species.ts; the map sprite is shown beside a placeholder until a real photo is added (drop a hobby-media photo URL into `photo` later, like the tide-pool photos).",
+  "$comment": "Personal 'fish I've caught' gallery. fishId references fishing-species.ts (the same pixel sprite is drawn on each card). state splits the gallery into Washington and Minnesota. photo is the basename in src/assets/hobbies/fishing/<photo>.jpg, optimized by Astro and opened in the PhotoSwipe lightbox.",
   "catches": [
-    { "fishId": "walleye", "where": "Mille Lacs Lake, MN" },
-    { "fishId": "largemouth-bass", "where": "Lake Minnetonka, MN" },
-    { "fishId": "northern-pike", "where": "Leech Lake, MN" },
-    { "fishId": "muskellunge", "where": "Lake Vermilion, MN" },
-    { "fishId": "black-crappie", "where": "Bde Maka Ska, MN" },
-    { "fishId": "smallmouth-bass", "where": "Mississippi River, MN" },
-    { "fishId": "chinook-salmon", "where": "Columbia River, WA" },
-    { "fishId": "steelhead", "where": "Skagit River, WA" },
-    { "fishId": "cutthroat-trout", "where": "Yakima River, WA" },
-    { "fishId": "rainbow-trout", "where": "Lake Roosevelt, WA" }
+    { "fishId": "chinook-salmon", "state": "wa", "where": "Sammamish River", "photo": "chinook-salmon-wa-sammamish-river" },
+    { "fishId": "coho-salmon", "state": "wa", "where": "Near the Sauk River", "photo": "large-coho-salmon-wa-near-sauk-river" },
+    { "fishId": "chum-salmon", "state": "wa", "where": "Snoqualmie River", "photo": "chum-salmon-wa-snoqualmie-river" },
+    { "fishId": "cutthroat-trout", "state": "wa", "where": "Snoqualmie River", "photo": "coastal-cutthroat-snoqualmie-river" },
+    { "fishId": "rainbow-trout", "state": "wa", "where": "Skykomish River", "photo": "rainbow-trout-wa-skykomish-river" },
+    { "fishId": "rainbow-trout", "state": "wa", "where": "Eastern Washington", "photo": "rainbow-trout-wa-eastern-wa" },
+    { "fishId": "brook-trout", "state": "wa", "where": "Trout Lake", "photo": "brook-trout-wa-trout-lake" },
+    { "fishId": "brook-trout", "state": "wa", "where": "Near Mt. Adams", "photo": "brook-trout-wa-near-mt-adams" },
+    { "fishId": "northern-pikeminnow", "state": "wa", "where": "Sammamish River", "photo": "pike-minnow-wa-sammamish-river" },
+    { "fishId": "yellow-perch", "state": "wa", "where": "Lake Washington", "photo": "perch-wa-lake-washington" },
+    { "fishId": "muskellunge", "state": "mn", "where": "Lake of the Woods", "photo": "musky-mn-lake-of-the-woods" },
+    { "fishId": "pickerel", "state": "mn", "where": "Lake of the Woods", "photo": "pickerel-mn-lake-of-the-woods" },
+    { "fishId": "smallmouth-bass", "state": "mn", "where": "Vermillion River", "photo": "smallmouth-bass-mn-vermillion-river" },
+    { "fishId": "brown-trout", "state": "mn", "where": "A small stream", "photo": "brown-trout-mn-small-stream" },
+    { "fishId": "largemouth-bass", "state": "mn", "where": "Eagan, MN", "photo": "largemouth-bass-mn-eagan-lake" },
+    { "fishId": "largemouth-bass", "state": "mn", "where": "A Twin Cities lake", "photo": "largemouth-bass-mn-small-twin-cities-lake" },
+    { "fishId": "rock-bass", "state": "mn", "where": "Eagan, MN", "photo": "rock-bass-mn-eagan-lake" }
   ]
 }

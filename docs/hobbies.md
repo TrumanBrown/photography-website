@@ -190,7 +190,7 @@ The reveal card shows the **pixel sprite by default and a real photo when one is
 
 ## Reference implementation 3: the fishing island
 
-A **clickable pixel map** of the two places I fish: Minnesota and Washington. Each map is drawn from a baked land/lake/river/sound mask, and every named water shows up as a small fish sprite of its signature species. Tap a water and a panel lists what you can catch there. The Twin Cities metro gets its own zoomed inset, since those lakes are tiny at full state scale. Below the maps, a **catch gallery** shows real catches, each rendered as the same pixel sprite. There are 32 waters across the two states, 30 species, and 10 catches today.
+A **clickable pixel map** of the two places I fish: Minnesota and Washington. Each map is drawn from a baked land/lake/river/sound mask, and every named water shows up as a small fish sprite of its signature species. Tap a water and a panel lists what you can catch there. The Twin Cities metro gets its own zoomed inset, since those lakes are tiny at full state scale. Below the maps, a **catch gallery** of real photos sits beside the matching pixel sprite, split into Washington and Minnesota; tapping a photo opens it full-screen in the same PhotoSwipe lightbox the photography pages use. There are 37 waters across the two states, 33 species, and 17 catches today.
 
 **Files**
 
@@ -199,8 +199,9 @@ A **clickable pixel map** of the two places I fish: Minnesota and Washington. Ea
 - [src/lib/hobbies/fishing-geo.json](../src/lib/hobbies/fishing-geo.json), the baked land/water masks per state plus the Twin Cities inset.
 - [src/lib/hobbies/fishing-waters.json](../src/lib/hobbies/fishing-waters.json), the named waters (location on the map, kind, and which species live there).
 - [src/lib/hobbies/fishing-species.ts](../src/lib/hobbies/fishing-species.ts), the species dataset.
-- [src/lib/hobbies/fishing-catches.json](../src/lib/hobbies/fishing-catches.json), the catch gallery entries.
+- [src/lib/hobbies/fishing-catches.json](../src/lib/hobbies/fishing-catches.json), the catch gallery entries (each pairs a species + location with a photo).
 - [src/lib/hobbies/fishing-sprites.ts](../src/lib/hobbies/fishing-sprites.ts), the shared `drawFish` sprite routine used for both the map markers and the gallery thumbnails.
+- [src/assets/hobbies/fishing/](../src/assets/hobbies/fishing/), the catch photos. They go through Astro's image pipeline, so the responsive variants get offloaded to Blob by `sync-variants.mjs` in CI; [scripts/convert-fishing-catches.py](../scripts/convert-fishing-catches.py) makes them (upright, EXIF/GPS stripped, resized) from the originals in `staging/fishing/`.
 
 Like the other two islands, everything is **drawn in code**, all geometry and data are baked and committed (no runtime fetch), the loop pauses offscreen and when the tab is hidden, and it honors `prefers-reduced-motion`.
 

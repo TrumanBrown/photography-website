@@ -9,8 +9,51 @@
  */
 import catchesJson from '@/lib/hobbies/fishing-catches.json';
 import { FISH_BY_ID } from '@/lib/hobbies/fishing-species';
+import { getImage } from 'astro:assets';
+import type { ImageMetadata } from 'astro';
+import Lightbox from '@/components/Lightbox.astro';
 
 const catches = catchesJson.catches;
+
+// Real catch photos live in src/assets and go through Astro's image pipeline,
+// so the responsive variants get offloaded to Blob by sync-variants.mjs in CI.
+const photoModules = import.meta.glob<{ default: ImageMetadata }>(
+  '../../assets/hobbies/fishing/*.jpg',
+  { eager: true },
+);
+const photoBy: Record<string, ImageMetadata> = {};
+for (const [path, mod] of Object.entries(photoModules)) {
+  const base = path
+    .split('/')
+    .pop()!
+    .replace(/\.jpg$/, '');
+  photoBy[base] = mod.default;
+}
+
+async function buildCard(c: (typeof catches)[number]) {
+  const f = FISH_BY_ID[c.fishId];
+  const meta = photoBy[c.photo];
+  const fullW = Math.min(1600, meta.width);
+  const fullH = Math.round((fullW * meta.height) / meta.width);
+  const [thumb, full] = await Promise.all([
+    getImage({ src: meta, width: 700 }),
+    getImage({ src: meta, width: fullW }),
+  ]);
+  return {
+    fishId: c.fishId,
+    name: f?.common ?? c.fishId,
+    where: c.where,
+    thumb: thumb.src,
+    full: full.src,
+    w: fullW,
+    h: fullH,
+  };
+}
+
+const groups = [
+  { label: 'Washington', cards: await Promise.all(catches.filter((c) => c.state === 'wa').map(buildCard)) },
+  { label: 'Minnesota', cards: await Promise.all(catches.filter((c) => c.state === 'mn').map(buildCard)) },
+];
 ---
 
 <section data-fishing aria-label="Fishing map" class="not-prose">
@@ -87,34 +130,54 @@ const catches = catchesJson.catches;
   <section class="mt-12" aria-label="Fish I've caught">
     <h2 class="text-lg font-medium">Fish I've caught</h2>
     <p class="mt-1 max-w-prose text-sm text-neutral-600 dark:text-neutral-400">
-      The same pixel fish from the maps, beside the real thing. Photos coming soon.
+      The same pixel fish from the maps, beside the real thing. Tap a photo to take a closer look.
     </p>
-    <ul class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+    <div id="fishing-catches" class="mt-6 space-y-8">
       {
-        catches.map((c) => {
-          const f = FISH_BY_ID[c.fishId];
-          return (
-            <li class="overflow-hidden rounded-lg border border-neutral-200 dark:border-neutral-800">
-              <div class="flex items-center justify-center bg-sky-50 py-2 dark:bg-neutral-800/60">
-                <canvas
-                  data-fish-sprite={c.fishId}
-                  width="84"
-                  height="48"
-                  style="image-rendering: pixelated; width: 84px; height: 48px"
-                  aria-hidden="true"></canvas>
-              </div>
-              <div class="flex aspect-[4/3] items-center justify-center bg-neutral-100 text-[10px] uppercase tracking-wide text-neutral-400 dark:bg-neutral-900">
-                photo coming soon
-              </div>
-              <div class="p-2">
-                <div class="text-xs font-medium leading-tight">{f?.common ?? c.fishId}</div>
-                <div class="text-[11px] text-neutral-500 dark:text-neutral-400">{c.where}</div>
-              </div>
-            </li>
-          );
-        })
+        groups.map((g) => (
+          <div>
+            <div class="mb-3 text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+              {g.label}
+            </div>
+            <ul class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+              {g.cards.map((card) => (
+                <li class="overflow-hidden rounded-lg border border-neutral-200 dark:border-neutral-800">
+                  <div class="flex items-center justify-center bg-sky-50 py-2 dark:bg-neutral-800/60">
+                    <canvas
+                      data-fish-sprite={card.fishId}
+                      width="84"
+                      height="48"
+                      style="image-rendering: pixelated; width: 84px; height: 48px"
+                      aria-hidden="true"
+                    />
+                  </div>
+                  <a
+                    href={card.full}
+                    data-pswp-width={card.w}
+                    data-pswp-height={card.h}
+                    data-pswp-caption={`${card.name} · ${card.where}`}
+                    class="group block no-underline"
+                    aria-label={`Open photo: ${card.name}, ${card.where}`}
+                  >
+                    <img
+                      src={card.thumb}
+                      alt={`${card.name} caught at ${card.where}`}
+                      loading="lazy"
+                      class="block aspect-[4/3] w-full bg-neutral-100 object-cover transition-opacity duration-300 group-hover:opacity-90 dark:bg-neutral-900"
+                    />
+                  </a>
+                  <div class="p-2">
+                    <div class="text-xs font-medium leading-tight">{card.name}</div>
+                    <div class="text-[11px] text-neutral-500 dark:text-neutral-400">{card.where}</div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))
       }
-    </ul>
+    </div>
+    <Lightbox gallerySelector="#fishing-catches" />
   </section>
 </section>
 

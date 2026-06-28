@@ -97,6 +97,16 @@ const SPRITES: Record<FishCategory, Sprite> = {
     R(c, u, -8, -1.4, 2, 1, acc); R(c, u, -8, 0.6, 2, 1, acc); R(c, u, -7.5, -0.6, 1.5, 1, acc);
     R(c, u, -5.6, -0.7, 1, 1, EYE);
   },
+  minnow(c, u, col, acc) {
+    const dk = shade(col, -0.2),
+      lt = shade(col, 0.2);
+    R(c, u, -6, -1.5, 11, 3, col); R(c, u, -6, -1.5, 11, 1, lt); R(c, u, -6, 1.1, 11, 0.9, dk);
+    R(c, u, -7, -0.7, 1, 1.4, col); R(c, u, -7.7, -0.2, 0.8, 0.8, col);
+    R(c, u, 5, -1.4, 1.6, 2.8, col); R(c, u, 6.6, -2.2, 1, 1.8, col); R(c, u, 6.6, 0.4, 1, 1.8, col);
+    R(c, u, 0.5, -2.4, 2.4, 1, dk);
+    R(c, u, -2, 1.7, 1.6, 1, acc); R(c, u, 2.4, 1.5, 1.4, 1, acc);
+    R(c, u, -5.6, -0.6, 1, 1, EYE);
+  },
 };
 
 /** Draw a fish centered at (cx, cy). `dir` -1 = facing left (default), 1 = right. */

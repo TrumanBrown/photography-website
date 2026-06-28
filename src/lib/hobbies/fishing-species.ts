@@ -19,7 +19,8 @@ export type FishCategory =
   | 'trout'
   | 'salmon'
   | 'sturgeon'
-  | 'catfish';
+  | 'catfish'
+  | 'minnow';
 
 export interface FishSpecies {
   id: string;
@@ -57,6 +58,8 @@ export const FISH: FishSpecies[] = [
     note: "Toothy, aggressive 'water wolf' that ambushes from the weed edge." },
   { id: 'muskellunge', common: 'Muskellunge', category: 'pike', color: '#6a7355', accent: '#c8c89a',
     note: "The 'fish of 10,000 casts' — the giant apex predator of the north." },
+  { id: 'pickerel', common: 'Pickerel', category: 'pike', color: '#6f7a45', accent: '#33421f',
+    note: 'A small, toothy member of the pike family marked with dark chain-like links.' },
 
   // ---- panfish ----
   { id: 'bluegill', common: 'Bluegill', category: 'panfish', color: '#4f7d86', accent: '#e08a3a',
@@ -87,6 +90,8 @@ export const FISH: FishSpecies[] = [
     note: "The 'king' — Washington's biggest and most prized salmon." },
   { id: 'coho-salmon', common: 'Coho salmon', category: 'salmon', color: '#7a8a6a', accent: '#d6b0a0',
     note: "The 'silver' — chrome-bright and a hard, fast fighter in the rivers." },
+  { id: 'chum-salmon', common: 'Chum salmon', category: 'salmon', color: '#7e8a82', accent: '#9c6f86',
+    note: "The 'dog' salmon; ocean-bright in the river with faint calico bars and a hard pull." },
   { id: 'sockeye-salmon', common: 'Sockeye salmon', category: 'salmon', color: '#9a4a3a', accent: '#e0c060',
     note: 'Turns deep red to spawn; the richest-eating of the salmon.' },
   { id: 'pink-salmon', common: 'Pink salmon', category: 'salmon', color: '#9a7a82', accent: '#d0c0c8',
@@ -105,6 +110,8 @@ export const FISH: FishSpecies[] = [
     note: 'Big, solitary predator that hunts live prey in deep river holes.' },
   { id: 'burbot', common: 'Burbot', category: 'catfish', color: '#6a6450', accent: '#bcae7a',
     note: "Freshwater cod ('eelpout') — an ugly but excellent ice-fishing catch." },
+  { id: 'northern-pikeminnow', common: 'Northern pikeminnow', category: 'minnow', color: '#8a8458', accent: '#d8954a',
+    note: 'Native Columbia-system minnow that grows surprisingly big and pulls hard on light tackle.' },
   { id: 'lingcod', common: 'Lingcod', category: 'bass', color: '#5f6a55', accent: '#b0a060',
     note: 'Toothy Puget Sound bottomfish — fearsome looking, fantastic eating.' },
 ];
