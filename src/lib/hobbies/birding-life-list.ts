@@ -5,10 +5,12 @@
  * under the site's strict CSP (the API host + iNat photo CDNs are allow-listed
  * in staticwebapp.config.json).
  *
- * Two passes:
+ * Three passes:
  *   1. /observations/species_counts — every distinct species the user has
  *      logged, with how many times they logged it (the life list itself).
- *   2. /taxa/<ids> — for the handful of globally-rarest species, pull the
+ *   2. /observations — the user's own photos, so each species shows one of
+ *      their best (most-faved) shots rather than a generic representative one.
+ *   3. /taxa/<ids> — for the handful of globally-rarest species, pull the
  *      Wikipedia summary to use as a fun-fact/range blurb on the featured cards.
  *
  * "Rarity" here is the global iNaturalist observation count for the species
@@ -27,6 +29,7 @@ const BIRD_FAMILIES = birdFamiliesRaw as Record<string, FamilyInfo>;
 
 const SPECIES_COUNTS =
   "https://api.inaturalist.org/v1/observations/species_counts";
+const OBSERVATIONS = "https://api.inaturalist.org/v1/observations";
 const TAXA = "https://api.inaturalist.org/v1/taxa";
 const PHOTO_HOSTS = [
   "https://inaturalist-open-data.s3.amazonaws.com/",
@@ -158,6 +161,64 @@ async function fetchSummaries(ids: number[]): Promise<Map<number, string>> {
     if (blurb) map.set(t.id, blurb);
   }
   return map;
+}
+
+interface INatObservation {
+  taxon?: { id?: number; ancestor_ids?: number[] } | null;
+  photos?: INatPhoto[];
+}
+
+/** Which life-list species an observation belongs to (its taxon may be a subspecies). */
+function speciesIdFor(
+  taxon: INatObservation["taxon"],
+  speciesIds: Set<number>,
+): number | null {
+  if (!taxon) return null;
+  if (taxon.id != null && speciesIds.has(taxon.id)) return taxon.id;
+  for (const a of taxon.ancestor_ids ?? []) if (speciesIds.has(a)) return a;
+  return null;
+}
+
+/**
+ * Map each species id to one of the user's OWN observation photos. Observations
+ * are paged most-faved first, so the first photo seen for a species is their
+ * best one. Caps at 5 pages (1000 observations) as a safety bound.
+ */
+async function fetchMyPhotos(
+  userId: string,
+  iconic: string,
+  speciesIds: Set<number>,
+): Promise<Map<number, string>> {
+  const mine = new Map<number, string>();
+  for (let page = 1; page <= 5; page += 1) {
+    const q = new URLSearchParams({
+      user_id: userId,
+      photos: "true",
+      per_page: "200",
+      page: String(page),
+      order_by: "votes",
+      order: "desc",
+      locale: "en",
+    });
+    if (iconic) q.set("iconic_taxa", iconic);
+    const res = await fetch(`${OBSERVATIONS}?${q.toString()}`, {
+      headers: { Accept: "application/json" },
+    });
+    if (!res.ok) break;
+    const data = (await res.json()) as {
+      total_results?: number;
+      results?: INatObservation[];
+    };
+    for (const o of data.results ?? []) {
+      const photo = safePhoto(o.photos?.[0]?.url);
+      if (!photo) continue;
+      const sid = speciesIdFor(o.taxon, speciesIds);
+      if (sid != null && !mine.has(sid)) mine.set(sid, photo);
+    }
+    const total = data.total_results ?? 0;
+    if (page * 200 >= total) break;
+  }
+  return mine;
 }
 
 function renderFeaturedCard(
@@ -391,6 +452,16 @@ export function initBirdingLifeList(root: HTMLElement): void {
       }
 
       if (countEl) countEl.textContent = `${species.length} species`;
+
+      const myPhotos = await fetchMyPhotos(
+        userId,
+        iconic,
+        new Set(species.map((s) => s.id)),
+      );
+      for (const s of species) {
+        const mine = myPhotos.get(s.id);
+        if (mine) s.photo = mine;
+      }
 
       const byRarity = [...species].sort(
         (a, b) => a.globalCount - b.globalCount,

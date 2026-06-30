@@ -307,7 +307,7 @@ The birding page reuses the same live-iNaturalist approach in two richer forms. 
   }
   ```
 
-  It calls `/observations/species_counts` for the full list, sorts by the species' **global** iNaturalist `observations_count` (fewer records worldwide = more unique), features the `featured` rarest as cards, and batch-fetches `/taxa/<ids>` for their Wikipedia summaries to use as the fun-fact/range blurb. The rest are grouped by **taxonomic family** (largest family first) into a compact list. "Rarity" here is global record count, not a formal conservation status.
+  It calls `/observations/species_counts` for the full list, sorts by the species' **global** iNaturalist `observations_count` (fewer records worldwide = more unique), features the `featured` rarest as cards, and batch-fetches `/taxa/<ids>` for their Wikipedia summaries to use as the fun-fact/range blurb. It also pages `/observations` (most-faved first) to show one of the author's **own** photos per species rather than a generic representative one. The rest are grouped by **taxonomic family** (largest family first) into a compact list. "Rarity" here is global record count, not a formal conservation status.
 
   The family grouping needs no extra API calls: `species_counts` already returns each species' `ancestor_ids`, and [src/lib/hobbies/bird-families.json](../src/lib/hobbies/bird-families.json) maps every iNaturalist bird-family taxon id to its name, so the grouping is computed client-side and stays live. Regenerate that file with `node scripts/fetch-bird-families.mjs` if iNat ever adds or renames a family.
 
