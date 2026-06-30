@@ -1,0 +1,1034 @@
+{
+  "5": {
+    "common": "Limpkins",
+    "sci": "Aramidae"
+  },
+  "12": {
+    "common": "Seriemas",
+    "sci": "Cariamidae"
+  },
+  "17": {
+    "common": "Sunbitterns",
+    "sci": "Eurypygidae"
+  },
+  "23": {
+    "common": "Cranes",
+    "sci": "Gruidae"
+  },
+  "58": {
+    "common": "Finfoots",
+    "sci": "Heliornithidae"
+  },
+  "69": {
+    "common": "Mesites",
+    "sci": "Mesitornithidae"
+  },
+  "75": {
+    "common": "Bustards",
+    "sci": "Otididae"
+  },
+  "142": {
+    "common": "Trumpeters",
+    "sci": "Psophiidae"
+  },
+  "154": {
+    "common": "Rails, Gallinules, and Coots",
+    "sci": "Rallidae"
+  },
+  "570": {
+    "common": "Kagus",
+    "sci": "Rhynochetidae"
+  },
+  "574": {
+    "common": "Pheasants, Grouse, and Allies",
+    "sci": "Phasianidae"
+  },
+  "1278": {
+    "common": "New World Quails",
+    "sci": "Odontophoridae"
+  },
+  "1426": {
+    "common": "Guineafowl",
+    "sci": "Numididae"
+  },
+  "1454": {
+    "common": "Jacamars",
+    "sci": "Galbulidae"
+  },
+  "1505": {
+    "common": "Puffbirds",
+    "sci": "Bucconidae"
+  },
+  "1624": {
+    "common": "Hoatzins",
+    "sci": "Opisthocomidae"
+  },
+  "1627": {
+    "common": "Cuckoos",
+    "sci": "Cuculidae"
+  },
+  "2017": {
+    "common": "Megapodes",
+    "sci": "Megapodiidae"
+  },
+  "2043": {
+    "common": "Guans, Chachalacas, and Curassows",
+    "sci": "Cracidae"
+  },
+  "2115": {
+    "common": "Todies",
+    "sci": "Todidae"
+  },
+  "2122": {
+    "common": "Motmots",
+    "sci": "Momotidae"
+  },
+  "2183": {
+    "common": "Bee-eaters",
+    "sci": "Meropidae"
+  },
+  "2256": {
+    "common": "Cuckoo-Rollers",
+    "sci": "Leptosomidae"
+  },
+  "2262": {
+    "common": "Rollers",
+    "sci": "Coraciidae"
+  },
+  "2304": {
+    "common": "Ground-Rollers",
+    "sci": "Brachypteraciidae"
+  },
+  "2314": {
+    "common": "Kingfishers",
+    "sci": "Alcedinidae"
+  },
+  "2715": {
+    "common": "Pigeons and Doves",
+    "sci": "Columbidae"
+  },
+  "3687": {
+    "common": "Mousebirds",
+    "sci": "Coliidae"
+  },
+  "3727": {
+    "common": "Ibises and Spoonbills",
+    "sci": "Threskiornithidae"
+  },
+  "3777": {
+    "common": "Seedsnipes",
+    "sci": "Thinocoridae"
+  },
+  "3784": {
+    "common": "Boobies and Gannets",
+    "sci": "Sulidae"
+  },
+  "3806": {
+    "common": "Penguins",
+    "sci": "Spheniscidae"
+  },
+  "3832": {
+    "common": "Hamerkops",
+    "sci": "Scopidae"
+  },
+  "3835": {
+    "common": "Sandpipers and Allies",
+    "sci": "Scolopacidae"
+  },
+  "3995": {
+    "common": "Painted-snipes",
+    "sci": "Rostratulidae"
+  },
+  "4020": {
+    "common": "Shearwaters and Petrels",
+    "sci": "Procellariidae"
+  },
+  "4203": {
+    "common": "Grebes",
+    "sci": "Podicipedidae"
+  },
+  "4255": {
+    "common": "Flamingos",
+    "sci": "Phoenicopteridae"
+  },
+  "4262": {
+    "common": "Cormorants and Shags",
+    "sci": "Phalacrocoracidae"
+  },
+  "4312": {
+    "common": "Tropicbirds",
+    "sci": "Phaethontidae"
+  },
+  "4323": {
+    "common": "Pelicans",
+    "sci": "Pelecanidae"
+  },
+  "4339": {
+    "common": "Plains-wanderers",
+    "sci": "Pedionomidae"
+  },
+  "4342": {
+    "common": "Gulls, Terns, and Skimmers",
+    "sci": "Laridae"
+  },
+  "4574": {
+    "common": "Jacanas",
+    "sci": "Jacanidae"
+  },
+  "4590": {
+    "common": "Pratincoles and Coursers",
+    "sci": "Glareolidae"
+  },
+  "4619": {
+    "common": "Loons",
+    "sci": "Gaviidae"
+  },
+  "4628": {
+    "common": "Frigatebirds",
+    "sci": "Fregatidae"
+  },
+  "4637": {
+    "common": "Falcons and Caracaras",
+    "sci": "Falconidae"
+  },
+  "4730": {
+    "common": "Storks",
+    "sci": "Ciconiidae"
+  },
+  "4783": {
+    "common": "Plovers and Lapwings",
+    "sci": "Charadriidae"
+  },
+  "4917": {
+    "common": "Stone-curlews and Thick-knees",
+    "sci": "Burhinidae"
+  },
+  "4929": {
+    "common": "Herons, Egrets, and Bitterns",
+    "sci": "Ardeidae"
+  },
+  "5059": {
+    "common": "Darters",
+    "sci": "Anhingidae"
+  },
+  "5067": {
+    "common": "Hawks, Eagles, and Kites",
+    "sci": "Accipitridae"
+  },
+  "5438": {
+    "common": "Hornbills",
+    "sci": "Bucerotidae"
+  },
+  "5562": {
+    "common": "Hummingbirds",
+    "sci": "Trochilidae"
+  },
+  "6526": {
+    "common": "Treeswifts",
+    "sci": "Hemiprocnidae"
+  },
+  "6544": {
+    "common": "Swifts",
+    "sci": "Apodidae"
+  },
+  "6906": {
+    "common": "Screamers",
+    "sci": "Anhimidae"
+  },
+  "6912": {
+    "common": "Ducks, Geese, and Swans",
+    "sci": "Anatidae"
+  },
+  "7194": {
+    "common": "Turacos",
+    "sci": "Musophagidae"
+  },
+  "7252": {
+    "common": "New Zealand Wrens",
+    "sci": "Acanthisittidae"
+  },
+  "7264": {
+    "common": "Long-tailed Tits and Bushtits",
+    "sci": "Aegithalidae"
+  },
+  "7284": {
+    "common": "Larks",
+    "sci": "Alaudidae"
+  },
+  "7417": {
+    "common": "Scrubbirds",
+    "sci": "Atrichornithidae"
+  },
+  "7423": {
+    "common": "Waxwings",
+    "sci": "Bombycillidae"
+  },
+  "7448": {
+    "common": "Treecreepers",
+    "sci": "Certhiidae"
+  },
+  "7640": {
+    "common": "Dippers",
+    "sci": "Cinclidae"
+  },
+  "7649": {
+    "common": "Cisticolas and Allies",
+    "sci": "Cisticolidae"
+  },
+  "7787": {
+    "common": "Australasian Treecreepers",
+    "sci": "Climacteridae"
+  },
+  "7813": {
+    "common": "Gnateaters",
+    "sci": "Conopophagidae"
+  },
+  "7823": {
+    "common": "Crows, Jays, and Magpies",
+    "sci": "Corvidae"
+  },
+  "8659": {
+    "common": "Cotingas",
+    "sci": "Cotingidae"
+  },
+  "8945": {
+    "common": "Asian and Grauer's Broadbills",
+    "sci": "Eurylaimidae"
+  },
+  "9011": {
+    "common": "Antthrushes",
+    "sci": "Formicariidae"
+  },
+  "9079": {
+    "common": "Finches, Euphonias, and Allies",
+    "sci": "Fringillidae"
+  },
+  "10732": {
+    "common": "Ovenbirds and Woodcreepers",
+    "sci": "Furnariidae"
+  },
+  "11853": {
+    "common": "Swallows and Martins",
+    "sci": "Hirundinidae"
+  },
+  "11989": {
+    "common": "New World Blackbirds and Orioles",
+    "sci": "Icteridae"
+  },
+  "12002": {
+    "common": "Fairy-bluebirds",
+    "sci": "Irenidae"
+  },
+  "12015": {
+    "common": "Shrikes",
+    "sci": "Laniidae"
+  },
+  "12061": {
+    "common": "Fairywrens and Allies",
+    "sci": "Maluridae"
+  },
+  "12146": {
+    "common": "Berrypeckers and Longbills",
+    "sci": "Melanocharitidae"
+  },
+  "12160": {
+    "common": "Honeyeaters",
+    "sci": "Meliphagidae"
+  },
+  "12697": {
+    "common": "Lyrebirds",
+    "sci": "Menuridae"
+  },
+  "12704": {
+    "common": "Old World Flycatchers, Robins, and Chats",
+    "sci": "Muscicapidae"
+  },
+  "13273": {
+    "common": "Sunbirds and Spiderhunters",
+    "sci": "Nectariniidae"
+  },
+  "13453": {
+    "common": "Logrunners",
+    "sci": "Orthonychidae"
+  },
+  "13462": {
+    "common": "Pardalotes",
+    "sci": "Pardalotidae"
+  },
+  "13547": {
+    "common": "Tits, Chickadees, and Titmice",
+    "sci": "Paridae"
+  },
+  "13685": {
+    "common": "Old World Sparrows",
+    "sci": "Passeridae"
+  },
+  "14149": {
+    "common": "Australasian Robins",
+    "sci": "Petroicidae"
+  },
+  "14207": {
+    "common": "Asities",
+    "sci": "Philepittidae"
+  },
+  "14214": {
+    "common": "Rockfowl",
+    "sci": "Picathartidae"
+  },
+  "14221": {
+    "common": "Manakins",
+    "sci": "Pipridae"
+  },
+  "14373": {
+    "common": "Pittas",
+    "sci": "Pittidae"
+  },
+  "14488": {
+    "common": "Australo-Papuan Babblers",
+    "sci": "Pomatostomidae"
+  },
+  "14495": {
+    "common": "Bowerbirds",
+    "sci": "Ptilonorhynchidae"
+  },
+  "14556": {
+    "common": "Bulbuls",
+    "sci": "Pycnonotidae"
+  },
+  "14732": {
+    "common": "Tapaculos",
+    "sci": "Rhinocryptidae"
+  },
+  "14799": {
+    "common": "Nuthatches",
+    "sci": "Sittidae"
+  },
+  "14841": {
+    "common": "Starlings",
+    "sci": "Sturnidae"
+  },
+  "15050": {
+    "common": "Sylviid Warblers and Allies",
+    "sci": "Sylviidae"
+  },
+  "15726": {
+    "common": "Typical Antbirds",
+    "sci": "Thamnophilidae"
+  },
+  "15964": {
+    "common": "Wrens",
+    "sci": "Troglodytidae"
+  },
+  "15977": {
+    "common": "Thrushes",
+    "sci": "Turdidae"
+  },
+  "17354": {
+    "common": "Vireos, Shrike-Babblers, and Erpornis",
+    "sci": "Vireonidae"
+  },
+  "17438": {
+    "common": "White-eyes, Yuhinas, and Allies",
+    "sci": "Zosteropidae"
+  },
+  "17551": {
+    "common": "Honeyguides",
+    "sci": "Indicatoridae"
+  },
+  "17599": {
+    "common": "Woodpeckers",
+    "sci": "Picidae"
+  },
+  "18485": {
+    "common": "Toucans",
+    "sci": "Ramphastidae"
+  },
+  "18875": {
+    "common": "New World and African Parrots",
+    "sci": "Psittacidae"
+  },
+  "19351": {
+    "common": "Owlet-nightjars",
+    "sci": "Aegothelidae"
+  },
+  "19376": {
+    "common": "Nightjars and Allies",
+    "sci": "Caprimulgidae"
+  },
+  "19664": {
+    "common": "Potoos",
+    "sci": "Nyctibiidae"
+  },
+  "19685": {
+    "common": "Frogmouths",
+    "sci": "Podargidae"
+  },
+  "19725": {
+    "common": "Oilbirds",
+    "sci": "Steatornithidae"
+  },
+  "19728": {
+    "common": "Typical Owls",
+    "sci": "Strigidae"
+  },
+  "20413": {
+    "common": "Barn Owls",
+    "sci": "Tytonidae"
+  },
+  "20488": {
+    "common": "Kiwis",
+    "sci": "Apterygidae"
+  },
+  "20510": {
+    "common": "Rheas",
+    "sci": "Rheidae"
+  },
+  "20523": {
+    "common": "Ostriches",
+    "sci": "Struthionidae"
+  },
+  "20531": {
+    "common": "Tinamous",
+    "sci": "Tinamidae"
+  },
+  "20716": {
+    "common": "Trogons",
+    "sci": "Trogonidae"
+  },
+  "20863": {
+    "common": "Buttonquails",
+    "sci": "Turnicidae"
+  },
+  "20932": {
+    "common": "Woodhoopoes and Scimitarbills",
+    "sci": "Phoeniculidae"
+  },
+  "20967": {
+    "common": "Hoopoes",
+    "sci": "Upupidae"
+  },
+  "59911": {
+    "common": "Mockingbirds and Thrashers",
+    "sci": "Mimidae"
+  },
+  "67526": {
+    "common": "Albatrosses",
+    "sci": "Diomedeidae"
+  },
+  "68490": {
+    "common": "Wattle-eyes and Batises",
+    "sci": "Platysteiridae"
+  },
+  "68491": {
+    "common": "Indigobirds and Whydahs",
+    "sci": "Viduidae"
+  },
+  "71292": {
+    "common": "Thornbills and Allies",
+    "sci": "Acanthizidae"
+  },
+  "71294": {
+    "common": "Ioras",
+    "sci": "Aegithinidae"
+  },
+  "71295": {
+    "common": "Auks, Murres, and Puffins",
+    "sci": "Alcidae"
+  },
+  "71296": {
+    "common": "Woodswallows, Butcherbirds, and Currawongs",
+    "sci": "Artamidae"
+  },
+  "71297": {
+    "common": "Shoebills",
+    "sci": "Balaenicipitidae"
+  },
+  "71303": {
+    "common": "Cuckooshrikes",
+    "sci": "Campephagidae"
+  },
+  "71305": {
+    "common": "Cardinals and Allies",
+    "sci": "Cardinalidae"
+  },
+  "71306": {
+    "common": "New World Vultures",
+    "sci": "Cathartidae"
+  },
+  "71309": {
+    "common": "Sheathbills",
+    "sci": "Chionidae"
+  },
+  "71310": {
+    "common": "Leafbirds",
+    "sci": "Chloropseidae"
+  },
+  "71311": {
+    "common": "Quailthrushes and Jewel-Babblers",
+    "sci": "Cinclosomatidae"
+  },
+  "71312": {
+    "common": "Satinbirds",
+    "sci": "Cnemophilidae"
+  },
+  "71314": {
+    "common": "Australian Mudnesters",
+    "sci": "Corcoracidae"
+  },
+  "71316": {
+    "common": "Bristlebirds",
+    "sci": "Dasyornithidae"
+  },
+  "71317": {
+    "common": "Flowerpeckers",
+    "sci": "Dicaeidae"
+  },
+  "71318": {
+    "common": "Drongos",
+    "sci": "Dicruridae"
+  },
+  "71320": {
+    "common": "Crab-Plovers",
+    "sci": "Dromadidae"
+  },
+  "71321": {
+    "common": "Palmchats",
+    "sci": "Dulidae"
+  },
+  "71322": {
+    "common": "Waxbills and Allies",
+    "sci": "Estrildidae"
+  },
+  "71323": {
+    "common": "Rail-babblers",
+    "sci": "Eupetidae"
+  },
+  "71325": {
+    "common": "Oystercatchers",
+    "sci": "Haematopodidae"
+  },
+  "71326": {
+    "common": "Northern Storm-Petrels",
+    "sci": "Hydrobatidae"
+  },
+  "71330": {
+    "common": "Ibisbills",
+    "sci": "Ibidorhynchidae"
+  },
+  "71332": {
+    "common": "Boatbills",
+    "sci": "Machaerirhynchidae"
+  },
+  "71333": {
+    "common": "Bushshrikes and Allies",
+    "sci": "Malaconotidae"
+  },
+  "71337": {
+    "common": "Hawaiian Honeyeaters",
+    "sci": "Mohoidae"
+  },
+  "71338": {
+    "common": "Monarch Flycatchers",
+    "sci": "Monarchidae"
+  },
+  "71339": {
+    "common": "Wagtails and Pipits",
+    "sci": "Motacillidae"
+  },
+  "71340": {
+    "common": "Sittellas",
+    "sci": "Neosittidae"
+  },
+  "71343": {
+    "common": "Old World Orioles",
+    "sci": "Oriolidae"
+  },
+  "71345": {
+    "common": "Whistlers and Allies",
+    "sci": "Pachycephalidae"
+  },
+  "71348": {
+    "common": "Birds-of-Paradise",
+    "sci": "Paradisaeidae"
+  },
+  "71349": {
+    "common": "New World Warblers",
+    "sci": "Parulidae"
+  },
+  "71351": {
+    "common": "Olive Warblers",
+    "sci": "Peucedramidae"
+  },
+  "71354": {
+    "common": "Weavers and Allies",
+    "sci": "Ploceidae"
+  },
+  "71355": {
+    "common": "Gnatcatchers and Gnatwrens",
+    "sci": "Polioptilidae"
+  },
+  "71357": {
+    "common": "Sugarbirds",
+    "sci": "Promeropidae"
+  },
+  "71358": {
+    "common": "Accentors",
+    "sci": "Prunellidae"
+  },
+  "71361": {
+    "common": "Stilts and Avocets",
+    "sci": "Recurvirostridae"
+  },
+  "71362": {
+    "common": "Penduline-Tits",
+    "sci": "Remizidae"
+  },
+  "71364": {
+    "common": "Fantails",
+    "sci": "Rhipiduridae"
+  },
+  "71367": {
+    "common": "Skuas and Jaegers",
+    "sci": "Stercorariidae"
+  },
+  "71369": {
+    "common": "Tanagers and Allies",
+    "sci": "Thraupidae"
+  },
+  "71371": {
+    "common": "Tree-Babblers, Scimitar-Babblers, and Allies",
+    "sci": "Timaliidae"
+  },
+  "71373": {
+    "common": "Pinktails",
+    "sci": "Urocynchramidae"
+  },
+  "71374": {
+    "common": "Vangas, Helmetshrikes, and Allies",
+    "sci": "Vangidae"
+  },
+  "85585": {
+    "common": "Magpie Geese",
+    "sci": "Anseranatidae"
+  },
+  "85778": {
+    "common": "Shriketits",
+    "sci": "Falcunculidae"
+  },
+  "116376": {
+    "common": "Donacobiuses",
+    "sci": "Donacobiidae"
+  },
+  "119157": {
+    "common": "Cockatoos",
+    "sci": "Cacatuidae"
+  },
+  "144306": {
+    "common": "Fairy Flycatchers",
+    "sci": "Stenostiridae"
+  },
+  "144307": {
+    "common": "African Warblers",
+    "sci": "Macrosphenidae"
+  },
+  "144308": {
+    "common": "Bush Warblers and Allies",
+    "sci": "Cettiidae"
+  },
+  "144309": {
+    "common": "Malagasy Warblers",
+    "sci": "Bernieridae"
+  },
+  "144310": {
+    "common": "Ground Babblers and Allies",
+    "sci": "Pellorneidae"
+  },
+  "180354": {
+    "common": "Kinglets",
+    "sci": "Regulidae"
+  },
+  "200957": {
+    "common": "Secretarybirds",
+    "sci": "Sagittariidae"
+  },
+  "200958": {
+    "common": "Ospreys",
+    "sci": "Pandionidae"
+  },
+  "200959": {
+    "common": "Magellanic Plovers",
+    "sci": "Pluvianellidae"
+  },
+  "200960": {
+    "common": "Sandgrouse",
+    "sci": "Pteroclidae"
+  },
+  "200961": {
+    "common": "African Barbets",
+    "sci": "Lybiidae"
+  },
+  "200962": {
+    "common": "Asian Barbets",
+    "sci": "Megalaimidae"
+  },
+  "200963": {
+    "common": "New World Barbets",
+    "sci": "Capitonidae"
+  },
+  "200964": {
+    "common": "Toucan-Barbets",
+    "sci": "Semnornithidae"
+  },
+  "200965": {
+    "common": "New Zealand Parrots",
+    "sci": "Strigopidae"
+  },
+  "200966": {
+    "common": "African and Green Broadbills",
+    "sci": "Calyptomenidae"
+  },
+  "200967": {
+    "common": "Sapayoas",
+    "sci": "Sapayoidae"
+  },
+  "200968": {
+    "common": "Crescentchests",
+    "sci": "Melanopareiidae"
+  },
+  "200969": {
+    "common": "Antpittas",
+    "sci": "Grallariidae"
+  },
+  "200970": {
+    "common": "Sharpbills",
+    "sci": "Oxyruncidae"
+  },
+  "200971": {
+    "common": "Tityras and Allies",
+    "sci": "Tityridae"
+  },
+  "200972": {
+    "common": "Painted Berrypeckers",
+    "sci": "Paramythiidae"
+  },
+  "200973": {
+    "common": "New Zealand Wattlebirds",
+    "sci": "Callaeidae"
+  },
+  "200974": {
+    "common": "Stitchbirds",
+    "sci": "Notiomystidae"
+  },
+  "200975": {
+    "common": "Whipbirds and Wedgebills",
+    "sci": "Psophodidae"
+  },
+  "200977": {
+    "common": "Rockjumpers",
+    "sci": "Chaetopidae"
+  },
+  "200978": {
+    "common": "Reedlings",
+    "sci": "Panuridae"
+  },
+  "200979": {
+    "common": "Nicators",
+    "sci": "Nicatoridae"
+  },
+  "200980": {
+    "common": "Wallcreepers",
+    "sci": "Tichodromidae"
+  },
+  "200981": {
+    "common": "Cupwings",
+    "sci": "Pnoepygidae"
+  },
+  "200982": {
+    "common": "Leaf Warblers",
+    "sci": "Phylloscopidae"
+  },
+  "200983": {
+    "common": "Reed Warblers and Allies",
+    "sci": "Acrocephalidae"
+  },
+  "200984": {
+    "common": "Grassbirds and Allies",
+    "sci": "Locustellidae"
+  },
+  "200986": {
+    "common": "Hyliotas",
+    "sci": "Hyliotidae"
+  },
+  "200987": {
+    "common": "Oxpeckers",
+    "sci": "Buphagidae"
+  },
+  "200989": {
+    "common": "Hylocitreas",
+    "sci": "Hylocitreidae"
+  },
+  "200990": {
+    "common": "Hypocoliuses",
+    "sci": "Hypocoliidae"
+  },
+  "200991": {
+    "common": "Longspurs and Snow Buntings",
+    "sci": "Calcariidae"
+  },
+  "339896": {
+    "common": "Egyptian Plovers",
+    "sci": "Pluvianidae"
+  },
+  "367704": {
+    "common": "Old World Parrots",
+    "sci": "Psittaculidae"
+  },
+  "367705": {
+    "common": "New Zealand Creepers",
+    "sci": "Mohouidae"
+  },
+  "367706": {
+    "common": "Australo-Papuan Bellbirds",
+    "sci": "Oreoicidae"
+  },
+  "367707": {
+    "common": "Elachuras",
+    "sci": "Elachuridae"
+  },
+  "367708": {
+    "common": "Silky-flycatchers",
+    "sci": "Ptiliogonatidae"
+  },
+  "373237": {
+    "common": "Emeidae",
+    "sci": "Emeidae"
+  },
+  "373238": {
+    "common": "Giant Moa",
+    "sci": "Dinornithidae"
+  },
+  "508095": {
+    "common": "Ploughbills",
+    "sci": "Eulacestomatidae"
+  },
+  "508096": {
+    "common": "Berryhunters",
+    "sci": "Rhagologidae"
+  },
+  "508252": {
+    "common": "Cassowaries and Emus",
+    "sci": "Casuariidae"
+  },
+  "509332": {
+    "common": "Melampittas",
+    "sci": "Melampittidae"
+  },
+  "512109": {
+    "common": "Ifritas",
+    "sci": "Ifritidae"
+  },
+  "543268": {
+    "common": "Adzebills",
+    "sci": "Aptornithidae"
+  },
+  "559246": {
+    "common": "Spot-throat, Dapple-throat, and Gray-chested Babbler",
+    "sci": "Modulatricidae"
+  },
+  "559247": {
+    "common": "Thrush-Tanagers",
+    "sci": "Rhodinocichlidae"
+  },
+  "559248": {
+    "common": "New World Sparrows",
+    "sci": "Passerellidae"
+  },
+  "559249": {
+    "common": "Old World Buntings",
+    "sci": "Emberizidae"
+  },
+  "559255": {
+    "common": "Chat-Tanagers",
+    "sci": "Calyptophilidae"
+  },
+  "559256": {
+    "common": "Greater Antillean Tanagers",
+    "sci": "Phaenicophilidae"
+  },
+  "559259": {
+    "common": "Wrenthrushes",
+    "sci": "Zeledoniidae"
+  },
+  "559260": {
+    "common": "Cuban Warblers",
+    "sci": "Teretistridae"
+  },
+  "559263": {
+    "common": "Yellow-breasted Chats",
+    "sci": "Icteriidae"
+  },
+  "559264": {
+    "common": "Mitrospingid Tanagers",
+    "sci": "Mitrospingidae"
+  },
+  "570755": {
+    "common": "Elephant Birds",
+    "sci": "Aepyornithidae"
+  },
+  "632159": {
+    "common": "Teratorns",
+    "sci": "Teratornithidae"
+  },
+  "632211": {
+    "common": "Sylviornithids",
+    "sci": "Sylviornithidae"
+  },
+  "793432": {
+    "common": "Bristleheads",
+    "sci": "Pityriasidae"
+  },
+  "793434": {
+    "common": "Jayshrikes",
+    "sci": "Platylophidae"
+  },
+  "793435": {
+    "common": "Southern Storm-Petrels",
+    "sci": "Oceanitidae"
+  },
+  "980017": {
+    "common": "Tyrant Flycatchers",
+    "sci": "Tyrannidae"
+  },
+  "980121": {
+    "common": "Flufftails and Forest Rails",
+    "sci": "Sarothruridae"
+  },
+  "980192": {
+    "common": "Laughingthrushes and Allies",
+    "sci": "Leiothrichidae"
+  },
+  "1505889": {
+    "common": "Parrotbills and Allies",
+    "sci": "Paradoxornithidae"
+  },
+  "1505944": {
+    "common": "Hylias",
+    "sci": "Hyliidae"
+  },
+  "1580618": {
+    "common": "Royal Flycatchers and Allies",
+    "sci": "Onychorhynchidae"
+  },
+  "1581901": {
+    "common": "Megalapterygidae",
+    "sci": "Megalapterygidae"
+  },
+  "1583691": {
+    "common": "Spotted creepers",
+    "sci": "Salpornithidae"
+  },
+  "1583693": {
+    "common": "Yellow Flycatchers",
+    "sci": "Erythrocercidae"
+  }
+}

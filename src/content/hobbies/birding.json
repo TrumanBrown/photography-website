@@ -5,5 +5,24 @@
   "emoji": "🐦",
   "accent": "#0ea5e9",
   "order": 4,
-  "interactive": "birding"
+  "interactive": "birding",
+  "spark": {
+    "userId": "trumanbrown",
+    "taxonId": 4838,
+    "heading": "My spark bird",
+    "species": "Black Oystercatcher",
+    "scientificName": "Haematopus bachmani",
+    "story": [
+      "I was at the Seattle Aquarium on a date with my girlfriend. We were looking at the coastal bird section, and we couldn't get over how silly the oystercatcher looked with its big orange beak and bright eyes. We thought it was so cool, and we were surprised it actually lived in Washington. That's really what made me realize how interesting birds could be.",
+      "Fast forward a little over a year later: my girlfriend and I were on a Valentine's Day trip out on the Olympic coast, tide pooling and fishing together, when a group of oystercatchers flew down nearby and started searching for food. It was amazing to see them again in the wild after our first run-in with them at the aquarium."
+    ]
+  },
+  "lifeList": {
+    "userId": "trumanbrown",
+    "url": "https://www.inaturalist.org/observations?user_id=trumanbrown&iconic_taxa=Aves&verifiable=any",
+    "heading": "My birding life list",
+    "blurb": "Every bird species I've logged on iNaturalist, pulled live. The most globally uncommon ones I've found are featured up top, with a fact about each.",
+    "iconicTaxa": "Aves",
+    "featured": 6
+  }
 }

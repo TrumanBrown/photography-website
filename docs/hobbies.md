@@ -266,6 +266,7 @@ Each hobby pairs its playful pixel interactive with something **real and persona
 
 - **Aquarium** → real photos of the tank (the `hobby-media` gallery above).
 - **Tide pooling** → the species photos in the game are real CC-licensed shots, plus a live grid of the author's own **iNaturalist observations** at the bottom of the page.
+- **Birding** → a live **life list** built from the author's real iNaturalist sightings (rarest species featured with a fun-fact/range blurb), plus a written **"spark bird"** story shown beside the author's own observation of that bird.
 
 New hobbies should follow the same pattern: build the game, then add a genuine personal artifact (photos, a map of real trips, real observations, and so on).
 
@@ -288,3 +289,39 @@ The tide pooling page ends with a live grid of the author's real observations, e
 - **It's lazy and CSP-safe.** The grid stays empty (skeleton tiles) until the section scrolls near the viewport, then a `fetch` to the public iNaturalist API fills it in; thumbnails link to each observation and a “View all on iNaturalist” button links to the full profile. The script is an Astro-processed module, so it satisfies `script-src 'self'`.
 - **Filtering to the right critters.** iNaturalist has no “tide pooling” concept, so the embed filters by `iconic_taxa`, the broad taxonomic buckets. Tide pooling uses `Animalia,Mollusca,Actinopterygii`, which captures crabs, sea stars, anemones, and worms (Animalia), snails/chitons/nudibranchs (Mollusca), and fish (Actinopterygii) while dropping the birds, mammals, insects, and plants from the same account. For tighter curation, make an iNaturalist project and filter by it (the component also accepts a `taxonId`).
 - **CSP additions.** Showing this required allow-listing iNaturalist in [staticwebapp.config.json](../staticwebapp.config.json): the API host in `connect-src` (`https://api.inaturalist.org`) and the two photo CDNs in `img-src` (`https://static.inaturalist.org`, `https://inaturalist-open-data.s3.amazonaws.com`). Those are the only third-party hosts the hobbies section talks to, and they're documented in [docs/security.md](./security.md).
+
+### Birding life list and spark bird
+
+The birding page reuses the same live-iNaturalist approach in two richer forms. Both are lazy and CSP-safe (same hosts as above — no new allow-listing needed), and both degrade gracefully if the API is unavailable.
+
+- **Life list.** [src/components/hobbies/BirdingLifeList.astro](../src/components/hobbies/BirdingLifeList.astro) + [src/lib/hobbies/birding-life-list.ts](../src/lib/hobbies/birding-life-list.ts). Switched on with an optional `lifeList` block:
+
+  ```json
+  "lifeList": {
+    "userId": "trumanbrown",
+    "url": "https://www.inaturalist.org/observations?user_id=trumanbrown&iconic_taxa=Aves",
+    "heading": "My birding life list",
+    "blurb": "…",
+    "iconicTaxa": "Aves",
+    "featured": 6
+  }
+  ```
+
+  It calls `/observations/species_counts` for the full list, sorts by the species' **global** iNaturalist `observations_count` (fewer records worldwide = more unique), features the `featured` rarest as cards, and batch-fetches `/taxa/<ids>` for their Wikipedia summaries to use as the fun-fact/range blurb. The rest are grouped by **taxonomic family** (largest family first) into a compact list. "Rarity" here is global record count, not a formal conservation status.
+
+  The family grouping needs no extra API calls: `species_counts` already returns each species' `ancestor_ids`, and [src/lib/hobbies/bird-families.json](../src/lib/hobbies/bird-families.json) maps every iNaturalist bird-family taxon id to its name, so the grouping is computed client-side and stays live. Regenerate that file with `node scripts/fetch-bird-families.mjs` if iNat ever adds or renames a family.
+
+- **Spark bird.** [src/components/hobbies/BirdingSpark.astro](../src/components/hobbies/BirdingSpark.astro) + [src/lib/hobbies/birding-spark.ts](../src/lib/hobbies/birding-spark.ts). Switched on with an optional `spark` block:
+
+  ```json
+  "spark": {
+    "userId": "trumanbrown",
+    "taxonId": 4838,
+    "heading": "My spark bird",
+    "species": "Black Oystercatcher",
+    "scientificName": "Haematopus bachmani",
+    "story": ["First paragraph…", "Second paragraph…"]
+  }
+  ```
+
+  The written `story` is server-rendered (it never depends on the network); the script pulls the author's most recent observation of `taxonId` and shows that photo, place, and date beside it.

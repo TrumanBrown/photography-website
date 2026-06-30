@@ -1,4 +1,4 @@
-import { defineCollection, z } from 'astro:content';
+import { defineCollection, z } from "astro:content";
 
 /**
  * Sessions collection — one entry per photography session.
@@ -9,14 +9,14 @@ import { defineCollection, z } from 'astro:content';
  * Its referenced images live alongside: src/content/sessions/<slug>/images/*.jpg
  */
 const sessions = defineCollection({
-  type: 'data',
+  type: "data",
   schema: z.object({
     title: z.string(),
     date: z.string().refine((v) => !Number.isNaN(Date.parse(v)), {
-      message: 'date must be an ISO date string (YYYY-MM-DD)',
+      message: "date must be an ISO date string (YYYY-MM-DD)",
     }),
-    location: z.string().default(''),
-    description: z.string().default(''),
+    location: z.string().default(""),
+    description: z.string().default(""),
     cover: z.string().optional(),
     order: z.number().int().nullable().optional(),
     images: z
@@ -80,15 +80,15 @@ const hobbyMediaItem = z.object({
 });
 
 const hobbies = defineCollection({
-  type: 'data',
+  type: "data",
   schema: z.object({
     title: z.string(),
     /** Short blurb shown on the hobby card. */
     summary: z.string(),
     /** A sentence or two shown on the hobby page above the interactive. */
-    intro: z.string().default(''),
+    intro: z.string().default(""),
     /** Emoji used as the card icon (keeps the grid asset-free). */
-    emoji: z.string().default('•'),
+    emoji: z.string().default("•"),
     /** Optional icon image (e.g. an SVG under public/); overrides the emoji on the card. */
     iconSrc: z.string().optional(),
     /** Optional hex accent (e.g. '#0ea5e9') tinting the card icon tile. */
@@ -100,7 +100,15 @@ const hobbies = defineCollection({
      * hobby; null/omitted renders the page without an interactive.
      */
     interactive: z
-      .enum(['aquarium', 'tidepool', 'fishing', 'birding', 'travel-map', 'pixel-hike', 'repo-explorer'])
+      .enum([
+        "aquarium",
+        "tidepool",
+        "fishing",
+        "birding",
+        "travel-map",
+        "pixel-hike",
+        "repo-explorer",
+      ])
       .nullable()
       .optional(),
     /** Heading for the photo gallery section (e.g. "My tank"). */
@@ -133,6 +141,43 @@ const hobbies = defineCollection({
         iconicTaxa: z.string().optional(),
         /** iNat taxon id filter (narrows to a clade). */
         taxonId: z.number().int().positive().optional(),
+      })
+      .optional(),
+    /**
+     * Optional personal touch: a live "life list" built from the author's real
+     * iNaturalist species_counts. Features the globally-rarest species the
+     * author has logged (with a fun-fact/range blurb pulled live from iNat's
+     * Wikipedia summaries) above a compact grid of the full list.
+     */
+    lifeList: z
+      .object({
+        userId: z.string(),
+        url: z.string().url(),
+        heading: z.string().optional(),
+        blurb: z.string().optional(),
+        /** iNat iconic taxa filter, e.g. "Aves" for birds. */
+        iconicTaxa: z.string().optional(),
+        /** How many of the rarest species to feature with a blurb. */
+        featured: z.number().int().positive().max(12).optional(),
+      })
+      .optional(),
+    /**
+     * Optional "spark" story: a short first-person note about the species that
+     * got the author into this hobby, shown alongside the author's real
+     * iNaturalist observation of that species.
+     */
+    spark: z
+      .object({
+        userId: z.string(),
+        /** iNat taxon id of the spark species (used to pull the observation). */
+        taxonId: z.number().int().positive(),
+        heading: z.string().optional(),
+        /** Common name shown as the card title. */
+        species: z.string(),
+        /** Scientific name shown beneath the title. */
+        scientificName: z.string().optional(),
+        /** The story, one paragraph per array entry. */
+        story: z.array(z.string()).min(1),
       })
       .optional(),
   }),

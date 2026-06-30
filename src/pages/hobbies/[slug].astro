@@ -1,16 +1,18 @@
 ---
-import { getCollection, type CollectionEntry } from 'astro:content';
-import BaseLayout from '@/layouts/BaseLayout.astro';
-import AquariumTank from '@/components/hobbies/AquariumTank.astro';
-import TidePool from '@/components/hobbies/TidePool.astro';
-import Fishing from '@/components/hobbies/Fishing.astro';
-import Birding from '@/components/hobbies/Birding.astro';
-import INatObservations from '@/components/hobbies/INatObservations.astro';
-import Lightbox from '@/components/Lightbox.astro';
-import { hobbySlug } from '@/lib/hobbies';
+import { getCollection, type CollectionEntry } from "astro:content";
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import AquariumTank from "@/components/hobbies/AquariumTank.astro";
+import TidePool from "@/components/hobbies/TidePool.astro";
+import Fishing from "@/components/hobbies/Fishing.astro";
+import Birding from "@/components/hobbies/Birding.astro";
+import BirdingSpark from "@/components/hobbies/BirdingSpark.astro";
+import BirdingLifeList from "@/components/hobbies/BirdingLifeList.astro";
+import INatObservations from "@/components/hobbies/INatObservations.astro";
+import Lightbox from "@/components/Lightbox.astro";
+import { hobbySlug } from "@/lib/hobbies";
 
 export async function getStaticPaths() {
-  const hobbies = await getCollection('hobbies');
+  const hobbies = await getCollection("hobbies");
   return hobbies.map((entry) => ({
     params: { slug: hobbySlug(entry) },
     props: { entry },
@@ -18,43 +20,89 @@ export async function getStaticPaths() {
 }
 
 interface Props {
-  entry: CollectionEntry<'hobbies'>;
+  entry: CollectionEntry<"hobbies">;
 }
 
 const { entry } = Astro.props;
-const { title, summary, intro, interactive, media, mediaTitle, inaturalist } = entry.data;
+const {
+  title,
+  summary,
+  intro,
+  interactive,
+  media,
+  mediaTitle,
+  inaturalist,
+  lifeList,
+  spark,
+} = entry.data;
 const galleryItems = media?.gallery ?? [];
 ---
 
 <BaseLayout title={title} description={summary} section="hobbies">
   <article class="mx-auto max-w-6xl px-4 py-10 sm:px-6">
     <header class="mb-6 space-y-2">
-      <a href="/hobbies" class="text-xs text-neutral-600 no-underline hover:underline dark:text-neutral-400">← All hobbies</a>
+      <a
+        href="/hobbies"
+        class="text-xs text-neutral-600 no-underline hover:underline dark:text-neutral-400"
+        >← All hobbies</a
+      >
       <h1 class="text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h1>
-      {intro && <p class="max-w-prose text-sm text-neutral-700 dark:text-neutral-300">{intro}</p>}
+      {
+        intro && (
+          <p class="max-w-prose text-sm text-neutral-700 dark:text-neutral-300">
+            {intro}
+          </p>
+        )
+      }
     </header>
 
-    {interactive === 'aquarium' && <AquariumTank />}
-    {interactive === 'tidepool' && <TidePool />}
-    {interactive === 'fishing' && <Fishing />}
-    {interactive === 'birding' && <Birding />}
+    {interactive === "aquarium" && <AquariumTank />}
+    {interactive === "tidepool" && <TidePool />}
+    {interactive === "fishing" && <Fishing />}
+    {interactive === "birding" && <Birding />}
+
+    {
+      spark && (
+        <BirdingSpark
+          userId={spark.userId}
+          taxonId={spark.taxonId}
+          heading={spark.heading}
+          species={spark.species}
+          scientificName={spark.scientificName}
+          story={spark.story}
+        />
+      )
+    }
+
+    {
+      lifeList && (
+        <BirdingLifeList
+          userId={lifeList.userId}
+          url={lifeList.url}
+          heading={lifeList.heading}
+          blurb={lifeList.blurb}
+          iconicTaxa={lifeList.iconicTaxa}
+          featured={lifeList.featured}
+        />
+      )
+    }
 
     {
       media?.hero && (
-        <section class="mt-12" aria-label={mediaTitle ?? 'Photos'}>
-          <h2 class="mb-4 text-lg font-medium">{mediaTitle ?? 'Photos'}</h2>
+        <section class="mt-12" aria-label={mediaTitle ?? "Photos"}>
+          <h2 class="mb-4 text-lg font-medium">{mediaTitle ?? "Photos"}</h2>
           <div id="hobby-media">
             <a
               href={media.hero.src}
               data-pswp-width={media.hero.width}
               data-pswp-height={media.hero.height}
-              data-pswp-caption={media.hero.caption ?? ''}
+              data-pswp-caption={media.hero.caption ?? ""}
               class="group block overflow-hidden rounded-xl border border-neutral-200 no-underline dark:border-neutral-800"
-              aria-label={media.hero.caption ?? 'Open full-resolution photo'}
+              aria-label={media.hero.caption ?? "Open full-resolution photo"}
             >
               <img
                 src={media.hero.display}
-                alt={media.hero.caption ?? ''}
+                alt={media.hero.caption ?? ""}
                 width={media.hero.width}
                 height={media.hero.height}
                 loading="lazy"
@@ -70,13 +118,13 @@ const galleryItems = media?.gallery ?? [];
                       href={it.src}
                       data-pswp-width={it.width}
                       data-pswp-height={it.height}
-                      data-pswp-caption={it.caption ?? ''}
+                      data-pswp-caption={it.caption ?? ""}
                       class="group block overflow-hidden rounded-lg bg-neutral-100 no-underline dark:bg-neutral-900"
-                      aria-label={it.caption ?? 'Open full-resolution photo'}
+                      aria-label={it.caption ?? "Open full-resolution photo"}
                     >
                       <img
                         src={it.display}
-                        alt={it.caption ?? ''}
+                        alt={it.caption ?? ""}
                         loading="lazy"
                         class="aspect-square w-full object-cover transition-opacity duration-300 group-hover:opacity-90"
                       />

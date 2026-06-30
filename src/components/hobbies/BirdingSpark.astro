@@ -1,0 +1,69 @@
+---
+/**
+ * "Spark bird" story: a short first-person note about the species that got the
+ * author into the hobby, shown beside their real iNaturalist observation of it.
+ * Server-renders the written story (always present); the CSP-safe script lazily
+ * loads the observation photo from the public iNat API and removes its slot if
+ * the API is unavailable, so the story never depends on the network.
+ * Driven by the `spark` block in the hobby content schema.
+ */
+interface Props {
+  userId: string;
+  taxonId: number;
+  heading?: string;
+  species: string;
+  scientificName?: string;
+  story: string[];
+}
+const {
+  userId,
+  taxonId,
+  heading = "My spark bird",
+  species,
+  scientificName,
+  story,
+} = Astro.props;
+---
+
+<section
+  class="not-prose mt-12"
+  aria-label={heading}
+  data-spark
+  data-spark-user={userId}
+  data-spark-taxon={taxonId}
+>
+  <h2 class="mb-4 text-lg font-medium">{heading}</h2>
+  <div
+    class="grid grid-cols-1 gap-6 sm:grid-cols-[minmax(0,18rem)_1fr] sm:items-start"
+  >
+    <div data-spark-media class="overflow-hidden rounded-xl">
+      <div
+        class="aspect-square w-full animate-pulse rounded-xl bg-neutral-200 dark:bg-neutral-800"
+      >
+      </div>
+    </div>
+    <div>
+      <h3 class="text-base font-semibold leading-tight">{species}</h3>
+      {
+        scientificName && (
+          <p class="text-sm italic text-neutral-500 dark:text-neutral-400">
+            {scientificName}
+          </p>
+        )
+      }
+      <div
+        class="mt-3 space-y-3 text-sm leading-relaxed text-neutral-700 dark:text-neutral-300"
+      >
+        {story.map((paragraph) => <p>{paragraph}</p>)}
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  import { initBirdingSpark } from "@/lib/hobbies/birding-spark";
+
+  document
+    .querySelectorAll<HTMLElement>("[data-spark]")
+    .forEach((el) => initBirdingSpark(el));
+</script>
