@@ -36,12 +36,12 @@ jobs:
     runs-on: ubuntu-latest
     name: Build and deploy
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: false
           lfs: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
@@ -54,7 +54,7 @@ jobs:
 
       - name: Cache apt packages (libraw-bin)
         id: apt-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: /var/cache/apt/archives
           key: apt-libraw-bin-v2
@@ -73,14 +73,14 @@ jobs:
           sudo pip install --break-system-packages --quiet pillow pillow-heif
 
       - name: Azure login (OIDC)
-        uses: azure/login@v2
+        uses: azure/login@v3
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Restore prebuild cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .cache/prebuild
           key: prebuild-cache-${{ github.run_id }}
@@ -96,7 +96,7 @@ jobs:
         # .cache/astro holds Astro's optimized image variants. Persisting it
         # means only new/changed photos are re-encoded by sharp each build,
         # instead of regenerating every variant from scratch.
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .cache/astro
           key: astro-cache-${{ github.run_id }}
@@ -125,14 +125,14 @@ jobs:
 
       - name: Save prebuild cache
         if: always()
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: .cache/prebuild
           key: prebuild-cache-${{ github.run_id }}
 
       - name: Save Astro asset cache
         if: always()
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: .cache/astro
           key: astro-cache-${{ github.run_id }}
