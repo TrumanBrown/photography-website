@@ -65,6 +65,13 @@ interface Species {
   globalCount: number;
   wikipediaUrl: string | null;
   ancestorIds: number[];
+  /** Date (YYYY-MM-DD) of the user's most recent observation of this species. */
+  lastObservedOn: string | null;
+}
+
+/** Leading word of a scientific name is the genus. */
+function genusOf(s: Species): string {
+  return s.scientific.split(" ")[0] || s.scientific;
 }
 
 /** The bird family a species belongs to, resolved from its ancestor chain. */
@@ -143,6 +150,7 @@ async function fetchSpecies(
       globalCount: t.observations_count ?? Number.MAX_SAFE_INTEGER,
       wikipediaUrl: t.wikipedia_url || null,
       ancestorIds: t.ancestor_ids ?? [],
+      lastObservedOn: null,
     });
   }
   return out;
@@ -166,6 +174,7 @@ async function fetchSummaries(ids: number[]): Promise<Map<number, string>> {
 interface INatObservation {
   taxon?: { id?: number; ancestor_ids?: number[] } | null;
   photos?: INatPhoto[];
+  observed_on?: string | null;
 }
 
 /** Which life-list species an observation belongs to (its taxon may be a subspecies). */
@@ -179,17 +188,26 @@ function speciesIdFor(
   return null;
 }
 
+interface MyObservationData {
+  /** The user's best (most-faved) photo for the species. */
+  photo?: string;
+  /** The user's most recent observation date (YYYY-MM-DD) for the species. */
+  lastObservedOn?: string;
+}
+
 /**
- * Map each species id to one of the user's OWN observation photos. Observations
- * are paged most-faved first, so the first photo seen for a species is their
- * best one. Caps at 5 pages (1000 observations) as a safety bound.
+ * Walk the user's OWN bird observations once and, per species, keep their best
+ * (most-faved) photo and most recent observation date. Observations are paged
+ * most-faved first, so the first photo seen for a species is their best one;
+ * the latest date is tracked across all observations. Caps at 5 pages (1000
+ * observations) as a safety bound.
  */
-async function fetchMyPhotos(
+async function fetchMyObservationData(
   userId: string,
   iconic: string,
   speciesIds: Set<number>,
-): Promise<Map<number, string>> {
-  const mine = new Map<number, string>();
+): Promise<Map<number, MyObservationData>> {
+  const mine = new Map<number, MyObservationData>();
   for (let page = 1; page <= 5; page += 1) {
     const q = new URLSearchParams({
       user_id: userId,
@@ -210,10 +228,16 @@ async function fetchMyPhotos(
       results?: INatObservation[];
     };
     for (const o of data.results ?? []) {
-      const photo = safePhoto(o.photos?.[0]?.url);
-      if (!photo) continue;
       const sid = speciesIdFor(o.taxon, speciesIds);
-      if (sid != null && !mine.has(sid)) mine.set(sid, photo);
+      if (sid == null) continue;
+      const entry = mine.get(sid) ?? {};
+      const photo = safePhoto(o.photos?.[0]?.url);
+      if (photo && !entry.photo) entry.photo = photo;
+      const date = o.observed_on || undefined;
+      if (date && (!entry.lastObservedOn || date > entry.lastObservedOn)) {
+        entry.lastObservedOn = date;
+      }
+      mine.set(sid, entry);
     }
     const total = data.total_results ?? 0;
     if (page * 200 >= total) break;
@@ -322,7 +346,7 @@ function renderListRow(s: Species, userId: string): HTMLElement {
 
   const thumb = el(
     "div",
-    "h-11 w-11 shrink-0 overflow-hidden rounded-md bg-neutral-100 dark:bg-neutral-900",
+    "h-16 w-16 shrink-0 overflow-hidden rounded-md bg-neutral-100 dark:bg-neutral-900",
   );
   if (s.photo) {
     const img = el("img", "h-full w-full object-cover");
@@ -346,14 +370,29 @@ function renderListRow(s: Species, userId: string): HTMLElement {
     );
   a.appendChild(text);
 
-  a.appendChild(
+  const meta = el("div", "flex shrink-0 flex-col items-end gap-0.5 text-right");
+  meta.appendChild(
     el(
       "span",
-      "shrink-0 text-xs text-neutral-400 dark:text-neutral-500",
+      "text-xs text-neutral-400 dark:text-neutral-500",
       s.mine === 1 ? "×1" : `×${s.mine}`,
     ),
   );
+  const seen = formatSeen(s.lastObservedOn);
+  if (seen)
+    meta.appendChild(
+      el("span", "text-[11px] text-neutral-400 dark:text-neutral-500", seen),
+    );
+  a.appendChild(meta);
   return a;
+}
+
+/** "Mar 2024"-style month/year for a YYYY-MM-DD observation date. */
+function formatSeen(value: string | null): string {
+  if (!value) return "";
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("en-US", { month: "short", year: "numeric" });
 }
 
 interface FamilyGroup {
@@ -425,11 +464,67 @@ function renderFamilyGroup(group: FamilyGroup, userId: string): HTMLElement {
   return section;
 }
 
+type SortMode = "family" | "recent" | "name" | "genus" | "most-seen" | "rarest";
+
+/** Case/diacritic-insensitive substring test over common + scientific names. */
+function matchesQuery(s: Species, query: string): boolean {
+  if (!query) return true;
+  const haystack = `${s.common} ${s.scientific}`
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  return haystack.includes(query);
+}
+
+function sortSpecies(species: Species[], mode: SortMode): Species[] {
+  const list = [...species];
+  switch (mode) {
+    case "recent":
+      // Most recent first; species with no date sink to the bottom.
+      return list.sort((a, b) =>
+        (b.lastObservedOn ?? "").localeCompare(a.lastObservedOn ?? ""),
+      );
+    case "genus":
+      return list.sort(
+        (a, b) =>
+          genusOf(a).localeCompare(genusOf(b)) ||
+          a.scientific.localeCompare(b.scientific),
+      );
+    case "most-seen":
+      return list.sort(
+        (a, b) => b.mine - a.mine || a.common.localeCompare(b.common),
+      );
+    case "rarest":
+      return list.sort(
+        (a, b) =>
+          a.globalCount - b.globalCount || a.common.localeCompare(b.common),
+      );
+    case "name":
+    default:
+      return list.sort((a, b) => a.common.localeCompare(b.common));
+  }
+}
+
+/** A flat, sorted grid of species rows (used by every sort mode except family). */
+function renderFlatList(species: Species[], userId: string): HTMLElement {
+  const grid = el(
+    "div",
+    "grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3",
+  );
+  grid.setAttribute("role", "list");
+  for (const s of species) grid.appendChild(renderListRow(s, userId));
+  return grid;
+}
+
 export function initBirdingLifeList(root: HTMLElement): void {
   const featuredWrap = root.querySelector<HTMLElement>("[data-life-featured]");
   const listWrap = root.querySelector<HTMLElement>("[data-life-list]");
   const status = root.querySelector<HTMLElement>("[data-life-status]");
   const countEl = root.querySelector<HTMLElement>("[data-life-count]");
+  const controls = root.querySelector<HTMLElement>("[data-life-controls]");
+  const searchInput =
+    root.querySelector<HTMLInputElement>("[data-life-search]");
+  const sortSelect = root.querySelector<HTMLSelectElement>("[data-life-sort]");
   const userId = root.dataset.lifeUser;
   const iconic = root.dataset.lifeIconic || "";
   const featuredN = Math.max(
@@ -437,6 +532,47 @@ export function initBirdingLifeList(root: HTMLElement): void {
     Math.min(12, Number(root.dataset.lifeFeatured) || 6),
   );
   if (!featuredWrap || !listWrap || !userId) return;
+
+  const normalizeQuery = (raw: string): string =>
+    raw
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+
+  /** Re-render just the full list from the current search + sort controls. */
+  const renderList = (allSpecies: Species[]): void => {
+    const query = normalizeQuery(searchInput?.value ?? "");
+    const mode = (sortSelect?.value as SortMode) || "family";
+    const matched = allSpecies.filter((s) => matchesQuery(s, query));
+
+    if (matched.length === 0) {
+      listWrap.replaceChildren();
+      if (status) {
+        status.textContent = query
+          ? `No species match "${searchInput?.value.trim()}".`
+          : "";
+      }
+      return;
+    }
+
+    if (mode === "family") {
+      const groups = groupByFamily(matched);
+      listWrap.replaceChildren(
+        ...groups.map((group) => renderFamilyGroup(group, userId)),
+      );
+    } else {
+      listWrap.replaceChildren(
+        renderFlatList(sortSpecies(matched, mode), userId),
+      );
+    }
+
+    if (status) {
+      status.textContent = query
+        ? `${matched.length} of ${allSpecies.length} species`
+        : "";
+    }
+  };
 
   let started = false;
   const load = async (): Promise<void> => {
@@ -453,14 +589,15 @@ export function initBirdingLifeList(root: HTMLElement): void {
 
       if (countEl) countEl.textContent = `${species.length} species`;
 
-      const myPhotos = await fetchMyPhotos(
+      const myData = await fetchMyObservationData(
         userId,
         iconic,
         new Set(species.map((s) => s.id)),
       );
       for (const s of species) {
-        const mine = myPhotos.get(s.id);
-        if (mine) s.photo = mine;
+        const mine = myData.get(s.id);
+        if (mine?.photo) s.photo = mine.photo;
+        if (mine?.lastObservedOn) s.lastObservedOn = mine.lastObservedOn;
       }
 
       const byRarity = [...species].sort(
@@ -475,12 +612,12 @@ export function initBirdingLifeList(root: HTMLElement): void {
         ),
       );
 
-      const groups = groupByFamily(species);
-      listWrap.replaceChildren(
-        ...groups.map((group) => renderFamilyGroup(group, userId)),
-      );
-
-      if (status) status.textContent = "";
+      // Reveal search + sort now that the data is here, and keep the list in
+      // sync with them.
+      if (controls) controls.hidden = false;
+      searchInput?.addEventListener("input", () => renderList(species));
+      sortSelect?.addEventListener("change", () => renderList(species));
+      renderList(species);
     } catch {
       featuredWrap.replaceChildren();
       listWrap.replaceChildren();

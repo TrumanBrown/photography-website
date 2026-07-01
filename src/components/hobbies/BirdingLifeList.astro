@@ -37,9 +37,11 @@ const {
   data-life-iconic={iconicTaxa}
   data-life-featured={featured}
 >
-  <div class="mb-4 flex items-end justify-between gap-3">
-    <div>
-      <div class="flex items-center gap-2">
+  <div
+    class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"
+  >
+    <div class="min-w-0">
+      <div class="flex flex-wrap items-center gap-2">
         <h2 class="text-lg font-medium">{heading}</h2>
         <span
           data-life-count
@@ -58,7 +60,7 @@ const {
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      class="shrink-0 rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium no-underline hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+      class="shrink-0 self-start rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium no-underline hover:bg-neutral-100 sm:self-auto dark:border-neutral-700 dark:hover:bg-neutral-800"
       >View all on iNaturalist →</a
     >
   </div>
@@ -89,8 +91,42 @@ const {
   <h3
     class="mb-3 mt-8 text-sm font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400"
   >
-    The full list, by family
+    The full list
   </h3>
+
+  <div
+    data-life-controls
+    hidden
+    class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center"
+  >
+    <label class="relative flex-1">
+      <span class="sr-only">Search species</span>
+      <input
+        data-life-search
+        type="search"
+        placeholder="Search by name…"
+        autocomplete="off"
+        class="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm placeholder:text-neutral-400 focus:border-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:placeholder:text-neutral-500"
+      />
+    </label>
+    <label
+      class="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400"
+    >
+      <span class="shrink-0">Sort</span>
+      <select
+        data-life-sort
+        class="rounded-lg border border-neutral-300 bg-white px-2 py-2 text-sm focus:border-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900"
+      >
+        <option value="family">By family</option>
+        <option value="recent">Recently seen</option>
+        <option value="name">Name (A–Z)</option>
+        <option value="genus">Genus (scientific)</option>
+        <option value="most-seen">Most seen</option>
+        <option value="rarest">Rarest first</option>
+      </select>
+    </label>
+  </div>
+
   <div data-life-list class="space-y-6">
     {
       Array.from({ length: 2 }).map(() => (
@@ -99,7 +135,7 @@ const {
           <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {Array.from({ length: 3 }).map(() => (
               <div class="flex items-center gap-3 rounded-lg border border-neutral-200 p-2 dark:border-neutral-800">
-                <div class="h-11 w-11 shrink-0 animate-pulse rounded-md bg-neutral-200 dark:bg-neutral-800" />
+                <div class="h-16 w-16 shrink-0 animate-pulse rounded-md bg-neutral-200 dark:bg-neutral-800" />
                 <div class="flex-1 space-y-1.5">
                   <div class="h-3.5 w-1/2 animate-pulse rounded bg-neutral-200 dark:bg-neutral-800" />
                   <div class="h-3 w-2/3 animate-pulse rounded bg-neutral-200 dark:bg-neutral-800" />
@@ -117,6 +153,18 @@ const {
   >
   </p>
 </section>
+
+<style>
+  /*
+   * Preflight is disabled (applyBaseStyles: false), so there is no base
+   * [hidden]{display:none} rule, and the `flex` utility on the controls would
+   * otherwise beat the UA stylesheet and show them before the data loads. Force
+   * it here so [data-life-controls][hidden] stays hidden until JS reveals it.
+   */
+  [data-life] [hidden] {
+    display: none !important;
+  }
+</style>
 
 <script>
   import { initBirdingLifeList } from "@/lib/hobbies/birding-life-list";
