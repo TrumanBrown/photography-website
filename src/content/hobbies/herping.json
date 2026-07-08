@@ -1,0 +1,16 @@
+{
+  "title": "Herping",
+  "summary": "Drive a dark PNW road at night and find salamanders by their eyeshine.",
+  "intro": "Herping is going out to look for reptiles and amphibians — and the best salamander hunting happens on wet nights, when they're out crossing the road. Take the wheel below: steer your headlight down the dark road and watch for the tiny eyeshine glint of an animal's eyes. Center your light on it and tap to stop and ID it. Below the game is a map of the real reptiles and amphibians I've logged on iNaturalist.",
+  "emoji": "🦎",
+  "accent": "#65a30d",
+  "order": 5,
+  "interactive": "roadcruise",
+  "herpMap": {
+    "userId": "trumanbrown",
+    "url": "https://www.inaturalist.org/observations?user_id=trumanbrown&iconic_taxa=Reptilia,Amphibia&subview=map&verifiable=any",
+    "heading": "My reptiles & amphibians, by state",
+    "blurb": "Every reptile and amphibian I've logged on iNaturalist, bucketed by state. Toggle reptiles vs. amphibians, then tap a state to see what I found there.",
+    "limit": 300
+  }
+}

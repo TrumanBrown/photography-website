@@ -14,6 +14,8 @@
     "fixtures": "node scripts/generate-fixtures.mjs",
     "fixtures:many": "node scripts/generate-fixtures.mjs --many",
     "fetch:tidepool-photos": "node scripts/fetch-tidepool-photos.mjs",
+    "fetch:herping-photos": "node scripts/fetch-herping-photos.mjs",
+    "build:herp-geo": "node scripts/build-herp-geo.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint .",

@@ -105,6 +105,7 @@ const hobbies = defineCollection({
         "tidepool",
         "fishing",
         "birding",
+        "roadcruise",
         "travel-map",
         "pixel-hike",
         "repo-explorer",
@@ -178,6 +179,23 @@ const hobbies = defineCollection({
         scientificName: z.string().optional(),
         /** The story, one paragraph per array entry. */
         story: z.array(z.string()).min(1),
+      })
+      .optional(),
+    /**
+     * Optional personal touch: a live map of the author's real iNaturalist
+     * reptile + amphibian observations, bucketed by US state (via iNat
+     * `place_ids`, admin_level 10) and drawn as a choropleth with a
+     * Reptiles/Amphibians toggle. The road-cruise game is the playful side;
+     * this is the real herping record. Rendered by INatHerpMap.astro.
+     */
+    herpMap: z
+      .object({
+        userId: z.string(),
+        url: z.string().url(),
+        heading: z.string().optional(),
+        blurb: z.string().optional(),
+        /** How many observations to pull per class (reptiles/amphibians). */
+        limit: z.number().int().positive().max(500).optional(),
       })
       .optional(),
   }),

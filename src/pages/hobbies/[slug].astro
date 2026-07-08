@@ -5,9 +5,11 @@ import AquariumTank from "@/components/hobbies/AquariumTank.astro";
 import TidePool from "@/components/hobbies/TidePool.astro";
 import Fishing from "@/components/hobbies/Fishing.astro";
 import Birding from "@/components/hobbies/Birding.astro";
+import HerpingNight from "@/components/hobbies/HerpingNight.astro";
 import BirdingSpark from "@/components/hobbies/BirdingSpark.astro";
 import BirdingLifeList from "@/components/hobbies/BirdingLifeList.astro";
 import INatObservations from "@/components/hobbies/INatObservations.astro";
+import INatHerpMap from "@/components/hobbies/INatHerpMap.astro";
 import Lightbox from "@/components/Lightbox.astro";
 import { hobbySlug } from "@/lib/hobbies";
 
@@ -34,6 +36,7 @@ const {
   inaturalist,
   lifeList,
   spark,
+  herpMap,
 } = entry.data;
 const galleryItems = media?.gallery ?? [];
 ---
@@ -60,6 +63,7 @@ const galleryItems = media?.gallery ?? [];
     {interactive === "tidepool" && <TidePool />}
     {interactive === "fishing" && <Fishing />}
     {interactive === "birding" && <Birding />}
+    {interactive === "roadcruise" && <HerpingNight />}
 
     {
       spark && (
@@ -149,6 +153,18 @@ const galleryItems = media?.gallery ?? [];
           limit={inaturalist.limit}
           iconicTaxa={inaturalist.iconicTaxa}
           taxonId={inaturalist.taxonId}
+        />
+      )
+    }
+
+    {
+      herpMap && (
+        <INatHerpMap
+          userId={herpMap.userId}
+          url={herpMap.url}
+          heading={herpMap.heading}
+          blurb={herpMap.blurb}
+          limit={herpMap.limit}
         />
       )
     }

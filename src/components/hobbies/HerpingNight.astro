@@ -1,0 +1,136 @@
+---
+/**
+ * Herping "night drive" game. Static markup + the reveal popup card; all
+ * behaviour (dark road, headlight beam, eyeshine, sprites, journal) lives in
+ * @/lib/hobbies/herping, bound via the [data-hp-*] hooks. The mounting script is
+ * an Astro-processed module (served from /_astro/), so it satisfies the strict
+ * `script-src 'self'` CSP.
+ */
+---
+
+<section data-herping aria-label="Herping night drive game" class="not-prose">
+  <div class="mb-3 flex items-end gap-3">
+    <div class="flex-1">
+      <div
+        class="flex items-center justify-between text-xs text-neutral-500 dark:text-neutral-400"
+      >
+        <span class="font-semibold uppercase tracking-wider">Field journal</span
+        >
+        <span data-hp-progress class="tabular-nums">0 species</span>
+      </div>
+      <div
+        class="mt-1 h-2 w-full overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800"
+      >
+        <div
+          data-hp-bar
+          class="h-full w-0 rounded-full bg-lime-500 transition-all duration-500"
+        >
+        </div>
+      </div>
+    </div>
+    <button
+      type="button"
+      data-hp-reset
+      class="rounded-lg border border-neutral-300 px-3 py-1.5 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+      >New road</button
+    >
+  </div>
+
+  <div class="overflow-hidden rounded-xl border border-neutral-800 bg-black">
+    <canvas
+      data-hp-canvas
+      class="block w-full touch-none"
+      style="image-rendering: pixelated"
+      role="img"
+      aria-label="A dark rainy road at night. Steer the headlight beam and look for the eyeshine of amphibians hiding on the road, then tap one to identify it."
+    ></canvas>
+  </div>
+  <p class="mt-2 text-xs text-neutral-500 dark:text-neutral-500">
+    Move your headlight beam (mouse, or drag on touch) down the dark road. Watch
+    for a tiny
+    <span class="text-lime-500">eyeshine glint</span> — that's an animal's eyes catching
+    the light. Steer onto it and tap to stop and ID it. Please never handle real salamanders
+    with bug-sprayed or lotioned hands, and put any cover you flip back the way you
+    found it.
+  </p>
+
+  <!-- Reveal popup -->
+  <div
+    data-hp-card
+    class="hp-card fixed inset-0 z-50 items-center justify-center bg-black/60 p-4"
+  >
+    <div
+      class="w-full max-w-sm overflow-hidden rounded-xl border border-neutral-700 bg-neutral-900 text-neutral-100 shadow-xl"
+    >
+      <div class="relative h-48 w-full overflow-hidden bg-neutral-950">
+        <canvas
+          data-hp-reveal
+          width="120"
+          height="120"
+          class="absolute left-1/2 top-1/2 h-28 w-28 -translate-x-1/2 -translate-y-1/2 rounded-lg"
+          style="image-rendering: pixelated"
+          aria-hidden="true"></canvas>
+        <img
+          data-hp-photo
+          alt=""
+          class="hp-hidden absolute inset-0 h-full w-full object-cover"
+          loading="lazy"
+          decoding="async"
+        />
+        <span data-hp-badge class="hp-badge absolute left-3 top-3"></span>
+      </div>
+      <div class="p-5">
+        <h3 data-hp-name class="text-lg font-semibold leading-tight"></h3>
+        <p data-hp-sci class="text-xs italic text-neutral-400"></p>
+        <p data-hp-fact class="mt-3 text-sm leading-relaxed text-neutral-300">
+        </p>
+        <p data-hp-credit class="hp-hidden mt-2 text-[11px] text-neutral-500">
+        </p>
+        <button
+          type="button"
+          data-hp-close
+          class="mt-5 w-full rounded-lg bg-lime-600 px-4 py-2 text-sm font-medium text-white hover:bg-lime-500"
+          >Keep driving</button
+        >
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  /* Toggle visibility with a class so Tailwind's display utilities can't
+     override the `hidden` attribute on the modal. */
+  .hp-card {
+    display: none;
+  }
+  .hp-card.hp-open {
+    display: flex;
+  }
+  .hp-hidden {
+    display: none;
+  }
+  .hp-badge {
+    display: inline-block;
+    border-radius: 9999px;
+    padding: 1px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    background: #fde68a;
+    color: #92400e;
+  }
+  .hp-badge.hp-badge-new {
+    background: #a7f3d0;
+    color: #065f46;
+  }
+  .hp-badge.hp-badge-warn {
+    background: #fecaca;
+    color: #991b1b;
+  }
+</style>
+
+<script>
+  import { initHerping } from "@/lib/hobbies/herping";
+
+  const root = document.querySelector<HTMLElement>("[data-herping]");
+  if (root) initHerping(root);
+</script>

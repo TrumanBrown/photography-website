@@ -4,22 +4,22 @@ A second, **optional** top-level section beside Photography. Photography is unch
 
 This doc covers how the section is wired, how to add a hobby, the conventions every interactive follows, and the aquarium island as the reference implementation. It is written so a future session (or you) can pick the work back up cold.
 
-> Status: shell + four islands are live: **Aquarium Keeping**, **Tide Pooling**, **Fishing**, and **Birding** (selfie to bird). More are planned (travel map, pixel hike, repo explorer) and meant to be built **one at a time**.
+> Status: shell + five islands are live: **Aquarium Keeping**, **Tide Pooling**, **Fishing**, **Birding** (selfie to bird), and **Herping** (night-drive road cruising). More are planned (travel map, pixel hike, repo explorer) and meant to be built **one at a time**.
 
 ---
 
 ## At a glance
 
-| Thing | Where |
-|---|---|
-| On/off toggle | [site.config.ts](../site.config.ts) → `sections.hobbies` (boolean) |
-| Content (one per hobby) | `src/content/hobbies/<slug>.json`, a **committed** content collection |
-| Schema | [src/content/config.ts](../src/content/config.ts) → `hobbies` collection |
-| Landing grid | [src/pages/hobbies/index.astro](../src/pages/hobbies/index.astro) |
-| Per-hobby page | [src/pages/hobbies/[slug].astro](../src/pages/hobbies/%5Bslug%5D.astro) |
-| Card | [src/components/HobbyCard.astro](../src/components/HobbyCard.astro) |
-| Slug + sort helpers | [src/lib/hobbies.ts](../src/lib/hobbies.ts) |
-| Nav + sidebar behavior | [src/components/Header.astro](../src/components/Header.astro), [src/layouts/BaseLayout.astro](../src/layouts/BaseLayout.astro) |
+| Thing                   | Where                                                                                                                          |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| On/off toggle           | [site.config.ts](../site.config.ts) → `sections.hobbies` (boolean)                                                             |
+| Content (one per hobby) | `src/content/hobbies/<slug>.json`, a **committed** content collection                                                          |
+| Schema                  | [src/content/config.ts](../src/content/config.ts) → `hobbies` collection                                                       |
+| Landing grid            | [src/pages/hobbies/index.astro](../src/pages/hobbies/index.astro)                                                              |
+| Per-hobby page          | [src/pages/hobbies/[slug].astro](../src/pages/hobbies/%5Bslug%5D.astro)                                                        |
+| Card                    | [src/components/HobbyCard.astro](../src/components/HobbyCard.astro)                                                            |
+| Slug + sort helpers     | [src/lib/hobbies.ts](../src/lib/hobbies.ts)                                                                                    |
+| Nav + sidebar behavior  | [src/components/Header.astro](../src/components/Header.astro), [src/layouts/BaseLayout.astro](../src/layouts/BaseLayout.astro) |
 
 Key differences from the Photography (`sessions`) collection:
 
@@ -56,7 +56,7 @@ The `sections.hobbies` flag only controls the **header nav link** (discoverabili
 3. **Wire the island** in [src/pages/hobbies/[slug].astro](../src/pages/hobbies/%5Bslug%5D.astro): import the component and add a branch:
 
    ```astro
-   {interactive === 'pixel-hike' && <PixelHike />}
+   {interactive === "pixel-hike" && <PixelHike />}
    ```
 
 That's it. No build-config, no Blob, no CI changes.
@@ -71,7 +71,7 @@ Every island follows the same rules so they stay cheap, safe, and consistent wit
 2. **CSP-safe by construction.** Use Astro's processed `<script>` (with `import`), **never** `is:inline`. Astro emits it as a same-origin module under `/_astro/…js`, which satisfies the strict `script-src 'self'` policy in [staticwebapp.config.json](../staticwebapp.config.json). No per-script hashes to maintain. (Confirmed in the build output: the aquarium ships as `/_astro/AquariumTank.astro_…js`.)
 3. **Lazy by route.** An island's script only loads on its own `/hobbies/<slug>` page, so Photography pages stay zero-JS and the build stays light.
 4. **Mobile-first-ish.** Works on touch, even if richer on desktop, same bar as the photography section. Responsive sizing (`ResizeObserver`), touch input (`pointerdown`, native range inputs), and pausing offscreen.
-5. **Minimal dependencies.** Prefer vanilla + canvas/SVG. Add a small library only if it *meaningfully* improves graphics/accuracy, and document it here.
+5. **Minimal dependencies.** Prefer vanilla + canvas/SVG. Add a small library only if it _meaningfully_ improves graphics/accuracy, and document it here.
 
 Markup lives in a `.astro` component under `src/components/hobbies/`; non-trivial logic lives in `src/lib/hobbies/<name>.ts` and is imported by the component's `<script>`. The component binds to the engine via `data-*` hooks, so the engine owns behavior and the markup stays static.
 
@@ -101,12 +101,12 @@ So a 20-gallon tank has a capacity of `20 × 0.55 = 11` units. Seven neon tetras
 
 The meter colors and labels come straight from `load%`:
 
-| Load | Label | Color |
-|---|---|---|
-| `< 40%` | Lightly stocked | green |
-| `40–85%` | Healthy | green |
+| Load      | Label           | Color |
+| --------- | --------------- | ----- |
+| `< 40%`   | Lightly stocked | green |
+| `40–85%`  | Healthy         | green |
 | `85–100%` | Heavily stocked | amber |
-| `> 100%` | Overstocked | red |
+| `> 100%`  | Overstocked     | red   |
 
 Separately, each species carries a `minGallons`. If the current tank is smaller than any stocked species likes, a note appears (for example "Angelfish likes 29+ gallons"). That check is independent of the bioload percentage, because some fish need swimming room regardless of waste.
 
@@ -166,9 +166,9 @@ The dataset is **40 common PNW tide-pool species**, each tagged with a `category
 
 Being upfront, since the point is that anyone can learn how this works:
 
-- **The facts are curated, not generated live.** They were written from standard references (Wikipedia and field guides such as *Between Pacific Tides* and the Walla Walla University / Rosario intertidal key) and a representative sample was grounded with live web research while building the dataset. They favor well-established, interesting tidbits over obscure claims.
+- **The facts are curated, not generated live.** They were written from standard references (Wikipedia and field guides such as _Between Pacific Tides_ and the Walla Walla University / Rosario intertidal key) and a representative sample was grounded with live web research while building the dataset. They favor well-established, interesting tidbits over obscure claims.
 - **It's a learning game, not a textbook.** A quick review pass by someone who knows these animals is recommended before treating any single fact as authoritative; the dataset header says the same.
-- **`rarity` weights which species a rock hides** when it's first flipped (common appears far more than rare). Each rock keeps that one critter for the life of the beach, so re-clicking a rock shows the same animal rather than rerolling. To turn up new species you start a new beach. The journal counts *distinct* species found and persists them in `localStorage` (`tidepool-discovered-v1`), so it accumulates across visits. “New beach” reshuffles the layout without wiping the journal.
+- **`rarity` weights which species a rock hides** when it's first flipped (common appears far more than rare). Each rock keeps that one critter for the life of the beach, so re-clicking a rock shows the same animal rather than rerolling. To turn up new species you start a new beach. The journal counts _distinct_ species found and persists them in `localStorage` (`tidepool-discovered-v1`), so it accumulates across visits. “New beach” reshuffles the layout without wiping the journal.
 
 ### How the pixel art is made
 
@@ -242,6 +242,29 @@ Take or upload a selfie and the page turns you into a **bird-person hybrid**: it
 
 As with the aquarium, being upfront: the bill colours and feather tones are approximate, chosen by feel, not from a dataset. The bird parts are procedural canvas shapes composited over the real photo — this keeps it private and on-device, at the cost of looking like a composited hybrid rather than a painted artwork. Reaching the painterly reference would require a generative image model and sending the selfie off-device, which was deliberately not done.
 
+## Reference implementation 5: the herping island (night drive)
+
+A **road-cruising game**: a dark, wet Pacific Northwest back road scrolls toward you at night while your **headlight beam follows the pointer / finger**. Herps sit on and beside the road; as the beam nears one, a coloured **eyeshine glint** shimmers — the real herper's tell (a salamander's or frog's eyes catching the light) — faint at the edge of the beam and brightest once the light is on the animal. Steer onto it and **tap to "brake and ID"** it: the reveal card shows the common + scientific name, a real CC photo, and a fun fact, and the field journal (localStorage) tracks how many of the ~20 species you've found. It is the "dark twin" of the tide pooling flip-a-rock game: same reveal-card + journal pattern, opposite lighting.
+
+**Files**
+
+- [src/components/hobbies/HerpingNight.astro](../src/components/hobbies/HerpingNight.astro), the markup (canvas + reveal card + journal) and the mounting `<script>`.
+- [src/lib/hobbies/herping.ts](../src/lib/hobbies/herping.ts), the whole engine: the scrolling road, the headlight lighting, the eyeshine tells, the pixel sprites, tap-to-reveal, and the journal. **Zero dependencies, no runtime fetch.**
+- [src/lib/hobbies/herping-species.ts](../src/lib/hobbies/herping-species.ts), the ~20-species PNW roster (salamander-forward — 12 of the 20 are salamanders/newts — led by the real animals the author has logged), each with a sprite `category`, `rarity`, `eyeshine` colour, and a couple of real facts.
+- [src/lib/hobbies/herping-photos.json](../src/lib/hobbies/herping-photos.json), the CC-licensed reveal photos (falls back to the pixel sprite if a photo fails to load).
+
+**How the lighting works.** The scene is drawn bright (road tile + animals), then a near-opaque night veil is laid over the whole canvas and the headlight beam is "punched" back out with `globalCompositeOperation = 'destination-out'` and an elliptical radial gradient centred on the beam — so only what the beam touches is visible. A warm `overlay` gradient tints the lit pool, and the car's two **headlamps** are drawn on the hood as layered round lights (dark housing ring, bright lens, hot core, soft additive glow). The **eyeshine glints are drawn on top of the veil** with an intensity that rises as the beam nears the animal (`1.25 − d/1.35`, where `d` is the elliptical distance to the beam centre), so eyes are faint at the beam's edge and brightest once lit — which is what makes sweeping the light feel like a real search. The road is a single baked tile blitted twice with a scroll offset so it slides seamlessly; the centre-line dashes are drawn live.
+
+**How the pixel art is made.** Same approach as the other islands: six `fillRect` sprite routines (salamander, newt, lizard, frog, toad, snake) drawn pointing "up" toward the oncoming light, parameterised by each species' `color`/`accent`/`size`. The reveal card reuses the sprite for its fallback thumbnail.
+
+**Salamander-forward on purpose.** The whole conceit is finding salamanders on a wet night, so a `CATEGORY_WEIGHT` table biases spawning heavily toward caudates (salamander 10, newt 7, frog/toad 2, snake/lizard 1.2), multiplied by each species' rarity weight. So the road is mostly salamanders with the occasional frog and a rare snake, and the ~20-species journal fills salamander-first.
+
+**Where the species and facts come from.** Hand-picked PNW herps you'd actually meet cruising a rainy road west of the Cascades, led by the salamanders the author has logged on iNaturalist (Ensatina, Western Red-backed, Dunn's, Northwestern, Rough-skinned Newt, Pacific Giant), plus more PNW caudates (Cope's Giant, Cascade Torrent, Van Dyke's, Clouded, Western Tiger, Long-toed). Facts are curated from standard references and are meant to be interesting, not authoritative. The American Bullfrog is flagged `nonNative` and badged accordingly in the card.
+
+**Real photos.** Identical pattern to tide pooling. The helper [scripts/fetch-herping-photos.mjs](../scripts/fetch-herping-photos.mjs) (`npm run fetch:herping-photos`) first tries each species' iNaturalist **taxon default photo** — the community-curated, clearly-representative ID shot — then falls back to research-grade / most-faved observations, all restricted to `cc0,cc-by,cc-by-nc`. `--place 46` prefers Washington photos, `--size large` pulls a crisp image for the card's photo banner. `--wire inat` writes the iNat photo URLs into `herping-photos.json` (allow-listed hosts); `--wire blob` points at self-hosted `hobby-media` copies instead. Attribution travels with each photo and is shown in the card.
+
+Like the other islands, everything is **drawn in code**, the loop pauses offscreen and when the tab is hidden, and it honors `prefers-reduced-motion` — which **parks the car** (the road stops moving) and degrades to a stationary headlamp-sweep so there's no vestibular motion.
+
 ## Photo galleries (`hobby-media`)
 
 Any hobby can show a photo gallery, a hero image up top plus a thumbnail grid, each click opening the full-resolution original in the same PhotoSwipe lightbox the photography pages use. It's driven by the optional `media` field on the hobby (`hero` + `gallery`), with `mediaTitle` setting the heading (e.g. "My tank"). The render lives in [src/pages/hobbies/[slug].astro](../src/pages/hobbies/%5Bslug%5D.astro) and only appears when `media` is present.
@@ -267,6 +290,7 @@ Each hobby pairs its playful pixel interactive with something **real and persona
 - **Aquarium** → real photos of the tank (the `hobby-media` gallery above).
 - **Tide pooling** → the species photos in the game are real CC-licensed shots, plus a live grid of the author's own **iNaturalist observations** at the bottom of the page.
 - **Birding** → a live **life list** built from the author's real iNaturalist sightings (rarest species featured with a fun-fact/range blurb), plus a written **"spark bird"** story shown beside the author's own observation of that bird.
+- **Herping** → the game's reveal photos are real CC-licensed shots, and below the game a live **map of the real US** heat-maps every reptile and amphibian the author has logged on iNaturalist by true location; click a state to zoom in to individual observation pins and a details grid, with a Reptiles/Amphibians toggle.
 
 New hobbies should follow the same pattern: build the game, then add a genuine personal artifact (photos, a map of real trips, real observations, and so on).
 
@@ -325,3 +349,25 @@ The birding page reuses the same live-iNaturalist approach in two richer forms. 
   ```
 
   The written `story` is server-rendered (it never depends on the network); the script pulls the author's most recent observation of `taxonId` and shows that photo, place, and date beside it.
+
+### Herping reptiles & amphibians map (real geography + heatmap)
+
+The herping page ends with a live, **real US map** of the author's reptile and amphibian observations: a heat map of their true coordinates that you can click to zoom into a single state.
+
+- **Component:** [src/components/hobbies/INatHerpMap.astro](../src/components/hobbies/INatHerpMap.astro) + logic [src/lib/hobbies/inat-herp-map.ts](../src/lib/hobbies/inat-herp-map.ts). Switched on with an optional `herpMap` block:
+
+  ```json
+  "herpMap": {
+    "userId": "trumanbrown",
+    "url": "https://www.inaturalist.org/observations?user_id=trumanbrown&iconic_taxa=Reptilia,Amphibia&subview=map",
+    "heading": "My reptiles & amphibians, by state",
+    "blurb": "…",
+    "limit": 300
+  }
+  ```
+
+- **Real geography, still no map tiles.** The state outlines are committed vector geometry, not tiles or a dependency, so the offline/CSP ethos holds. [scripts/build-herp-geo.mjs](../scripts/build-herp-geo.mjs) (`npm run build:herp-geo`) downloads a public-domain US-states GeoJSON once, Douglas–Peucker-simplifies each state's outline, and writes lon/lat rings + a bbox per state to [src/lib/hobbies/herp-geo.json](../src/lib/hobbies/herp-geo.json) (~56KB). The runtime projects those rings (equirectangular, cosine-corrected for latitude) and draws them on a `<canvas>`; only the iNat API + already-allow-listed photo CDNs are contacted at runtime.
+- **Overview = heatmap of true coordinates.** Each observation's real `geojson.coordinates` are projected and accumulated into an offscreen alpha buffer, then colourised (blue → lime → yellow → orange → red by density) so clusters glow hot — e.g. the author's are densest around Puget Sound and central/eastern WA. States with data are tinted; the rest stay dark. Alaska/Puerto Rico are dropped from the CONUS frame and **Hawaii is drawn as a bottom-left inset** (the author has HI data).
+- **Click a state to zoom in.** Clicking a state that has observations blows it up to its own outline (re-projected to that state's bbox) with a **pin at every observation's true coordinate**, colour-coded by class (amber = reptile, blue = amphibian), plus a legend and a "← US map" back button. Point-in-polygon hit-testing drives both the overview click and hover tooltips.
+- **Grid with real info before you leave.** Below the map, the selected state's observations render as cards showing the **common name, scientific name, observed date, and place**, with an "approx." tag when iNaturalist obscured the coordinates (many sensitive herps are). Each card links out to its iNaturalist observation.
+- **Reptiles vs. amphibians.** Two API calls (`iconic_taxa=Reptilia` and `=Amphibia`) back an **All / Reptiles / Amphibians** toggle that re-filters the heatmap, pins, and grid. States are still bucketed via each observation's `place_ids` intersected with iNaturalist's known **US-state place ids** (admin_level 10 — e.g. Washington is `46`) for the counts and per-state grid. It's lazy (fetches on scroll), CSP-safe, and degrades gracefully if the API is unavailable.

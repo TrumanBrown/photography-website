@@ -1,0 +1,116 @@
+---
+/**
+ * A live US map of a user's iNaturalist reptile + amphibian observations,
+ * bucketed by state. Server-renders the shell, toggle, and link; the (CSP-safe,
+ * Astro-processed) script fetches the public iNat API when scrolled into view,
+ * shades the state tiles by count, and fills the per-state thumbnail strip.
+ * Behaviour lives in @/lib/hobbies/inat-herp-map, bound via [data-herpmap-*].
+ */
+interface Props {
+  userId: string;
+  url: string;
+  heading?: string;
+  blurb?: string;
+  limit?: number;
+}
+const {
+  userId,
+  url,
+  heading = "My reptiles & amphibians, by state",
+  blurb,
+  limit = 200,
+} = Astro.props;
+---
+
+<section
+  class="not-prose mt-12"
+  aria-label={heading}
+  data-herpmap
+  data-herpmap-user={userId}
+  data-herpmap-limit={limit}
+>
+  <div class="mb-4 flex items-end justify-between gap-3">
+    <div>
+      <h2 class="text-lg font-medium">{heading}</h2>
+      {
+        blurb && (
+          <p class="mt-1 max-w-prose text-sm text-neutral-600 dark:text-neutral-400">
+            {blurb}
+          </p>
+        )
+      }
+    </div>
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      class="shrink-0 rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium no-underline hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+      >View all on iNaturalist →</a
+    >
+  </div>
+
+  <div class="mb-4 flex items-center justify-between gap-2">
+    <div
+      class="inline-flex gap-1 rounded-lg border border-neutral-300 p-1 text-xs dark:border-neutral-700"
+    >
+      <button
+        type="button"
+        data-herpmap-cls="all"
+        aria-pressed="true"
+        class="rounded-md border border-lime-600 bg-lime-600 px-3 py-1 font-medium text-white"
+        >All</button
+      >
+      <button
+        type="button"
+        data-herpmap-cls="reptiles"
+        aria-pressed="false"
+        class="rounded-md border border-transparent px-3 py-1 font-medium hover:bg-neutral-100 dark:hover:bg-neutral-800"
+        >Reptiles</button
+      >
+      <button
+        type="button"
+        data-herpmap-cls="amphibians"
+        aria-pressed="false"
+        class="rounded-md border border-transparent px-3 py-1 font-medium hover:bg-neutral-100 dark:hover:bg-neutral-800"
+        >Amphibians</button
+      >
+    </div>
+    <button
+      type="button"
+      data-herpmap-back
+      class="hidden rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+      >← US map</button
+    >
+  </div>
+
+  <div
+    class="relative overflow-hidden rounded-xl border border-neutral-200 bg-[#0b1220] dark:border-neutral-800"
+  >
+    <canvas
+      data-herpmap-canvas
+      class="block w-full touch-manipulation"
+      role="img"
+      aria-label="A map of the United States showing a heat map of my reptile and amphibian observations. Tap a highlighted state to zoom in and see individual observation pins."
+    ></canvas>
+    <div
+      data-herpmap-tip
+      class="pointer-events-none absolute hidden -translate-x-1/2 -translate-y-full rounded bg-neutral-900/95 px-2 py-1 text-[11px] text-white shadow-lg"
+    >
+    </div>
+  </div>
+
+  <p
+    data-herpmap-status
+    class="mt-2 text-xs text-neutral-500 dark:text-neutral-500"
+  >
+  </p>
+  <div data-herpmap-detail class="mt-4"></div>
+</section>
+
+<script>
+  import { initHerpMap } from "@/lib/hobbies/inat-herp-map";
+
+  document
+    .querySelectorAll<HTMLElement>("[data-herpmap]")
+    .forEach((el) => initHerpMap(el));
+</script>
