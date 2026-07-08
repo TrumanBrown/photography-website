@@ -290,7 +290,7 @@ Each hobby pairs its playful pixel interactive with something **real and persona
 - **Aquarium** → real photos of the tank (the `hobby-media` gallery above).
 - **Tide pooling** → the species photos in the game are real CC-licensed shots, plus a live grid of the author's own **iNaturalist observations** at the bottom of the page.
 - **Birding** → a live **life list** built from the author's real iNaturalist sightings (rarest species featured with a fun-fact/range blurb), plus a written **"spark bird"** story shown beside the author's own observation of that bird.
-- **Herping** → the game's reveal photos are real CC-licensed shots, and below the game a live **map of the real US** heat-maps every reptile and amphibian the author has logged on iNaturalist by true location; click a state to zoom in to individual observation pins and a details grid, with a Reptiles/Amphibians toggle.
+- **Herping** → the game's reveal photos are real CC-licensed shots, and below the game a live **world map** heat-maps every reptile and amphibian the author has logged on iNaturalist by true location; tap a country (or the US, then a state) to zoom in to individual observation pins and a details grid, with a Reptiles/Amphibians toggle.
 
 New hobbies should follow the same pattern: build the game, then add a genuine personal artifact (photos, a map of real trips, real observations, and so on).
 
@@ -350,9 +350,9 @@ The birding page reuses the same live-iNaturalist approach in two richer forms. 
 
   The written `story` is server-rendered (it never depends on the network); the script pulls the author's most recent observation of `taxonId` and shows that photo, place, and date beside it.
 
-### Herping reptiles & amphibians map (real geography + heatmap)
+### Herping reptiles & amphibians map (world → country/state, heatmap + pins)
 
-The herping page ends with a live, **real US map** of the author's reptile and amphibian observations: a heat map of their true coordinates that you can click to zoom into a single state.
+The herping page ends with a live, **real geographic map** of the author's reptile and amphibian observations: a world heat map of their true coordinates that you can drill from world → country (or the US → state) down to individual observation pins.
 
 - **Component:** [src/components/hobbies/INatHerpMap.astro](../src/components/hobbies/INatHerpMap.astro) + logic [src/lib/hobbies/inat-herp-map.ts](../src/lib/hobbies/inat-herp-map.ts). Switched on with an optional `herpMap` block:
 
@@ -360,14 +360,17 @@ The herping page ends with a live, **real US map** of the author's reptile and a
   "herpMap": {
     "userId": "trumanbrown",
     "url": "https://www.inaturalist.org/observations?user_id=trumanbrown&iconic_taxa=Reptilia,Amphibia&subview=map",
-    "heading": "My reptiles & amphibians, by state",
+    "heading": "My reptiles & amphibians, mapped",
     "blurb": "…",
     "limit": 300
   }
   ```
 
-- **Real geography, still no map tiles.** The state outlines are committed vector geometry, not tiles or a dependency, so the offline/CSP ethos holds. [scripts/build-herp-geo.mjs](../scripts/build-herp-geo.mjs) (`npm run build:herp-geo`) downloads a public-domain US-states GeoJSON once, Douglas–Peucker-simplifies each state's outline, and writes lon/lat rings + a bbox per state to [src/lib/hobbies/herp-geo.json](../src/lib/hobbies/herp-geo.json) (~56KB). The runtime projects those rings (equirectangular, cosine-corrected for latitude) and draws them on a `<canvas>`; only the iNat API + already-allow-listed photo CDNs are contacted at runtime.
-- **Overview = heatmap of true coordinates.** Each observation's real `geojson.coordinates` are projected and accumulated into an offscreen alpha buffer, then colourised (blue → lime → yellow → orange → red by density) so clusters glow hot — e.g. the author's are densest around Puget Sound and central/eastern WA. States with data are tinted; the rest stay dark. Alaska/Puerto Rico are dropped from the CONUS frame and **Hawaii is drawn as a bottom-left inset** (the author has HI data).
-- **Click a state to zoom in.** Clicking a state that has observations blows it up to its own outline (re-projected to that state's bbox) with a **pin at every observation's true coordinate**, colour-coded by class (amber = reptile, blue = amphibian), plus a legend and a "← US map" back button. Point-in-polygon hit-testing drives both the overview click and hover tooltips.
-- **Grid with real info before you leave.** Below the map, the selected state's observations render as cards showing the **common name, scientific name, observed date, and place**, with an "approx." tag when iNaturalist obscured the coordinates (many sensitive herps are). Each card links out to its iNaturalist observation.
-- **Reptiles vs. amphibians.** Two API calls (`iconic_taxa=Reptilia` and `=Amphibia`) back an **All / Reptiles / Amphibians** toggle that re-filters the heatmap, pins, and grid. States are still bucketed via each observation's `place_ids` intersected with iNaturalist's known **US-state place ids** (admin_level 10 — e.g. Washington is `46`) for the counts and per-state grid. It's lazy (fetches on scroll), CSP-safe, and degrades gracefully if the API is unavailable.
+- **Real geography, still no map tiles.** All outlines are committed vector geometry, not tiles or a dependency, so the offline/CSP ethos holds. [scripts/build-herp-geo.mjs](../scripts/build-herp-geo.mjs) (`npm run build:herp-geo`) downloads two public-domain sources once — a US-states GeoJSON and **Natural Earth 110m admin_0 countries** — Douglas–Peucker-simplifies each outline (states finely, countries coarsely for world scale), and writes lon/lat rings + a bbox per state and per country (keyed by ISO A2) to [src/lib/hobbies/herp-geo.json](../src/lib/hobbies/herp-geo.json) (~150KB). The runtime projects those rings (equirectangular, cosine-corrected for latitude) onto a `<canvas>`; only the iNat API + already-allow-listed photo CDNs are contacted at runtime.
+- **Three zoom levels.**
+  - **World** (default): every country is drawn, those with data tinted, and all observations' real `geojson.coordinates` are accumulated into an offscreen alpha buffer and colourised (blue → lime → yellow → orange → red by density) so clusters glow hot — the author's light up the US Pacific NW, Hawaii, and China. Tap a highlighted country to zoom.
+  - **US states**: tapping the US opens a US map (state outlines + a Hawaii inset) with the same heat map; tap a state to zoom. (Other countries skip straight to their detail view.)
+  - **Country / state detail**: the region's outline blown up with a **pin at every observation's true coordinate**, colour-coded by class (amber = reptile, blue = amphibian), a legend, and a "← Back" button that walks the levels back up.
+- **How regions are assigned.** Each observation is bucketed to a **country by point-in-polygon** of its coordinates against the baked country rings (with a US fallback when a US state matched), and to a **US state** via its `place_ids` intersected with iNaturalist's known state place ids (admin_level 10 — e.g. Washington is `46`). Point-in-polygon also drives the map click + hover tooltips.
+- **Grid with real info before you leave.** Below the map, the selected region's observations render as cards showing the **common name, scientific name, observed date, and place**, with an "approx." tag when iNaturalist obscured the coordinates (many sensitive herps are). Each card links out to its iNaturalist observation.
+- **Reptiles vs. amphibians.** Two API calls (`iconic_taxa=Reptilia` and `=Amphibia`) back an **All / Reptiles / Amphibians** toggle that re-filters the heat map, pins, tints, and grid at every level. It's lazy (fetches on scroll), CSP-safe, and degrades gracefully if the API is unavailable.

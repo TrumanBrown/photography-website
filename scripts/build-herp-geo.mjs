@@ -1,24 +1,32 @@
 #!/usr/bin/env node
 /**
- * Build committed US state boundary geometry for the Herping iNaturalist map.
+ * Build committed boundary geometry for the Herping iNaturalist map.
  *
- * Downloads a public-domain US states GeoJSON once, simplifies each state's
- * outline (Douglas–Peucker) to keep the file small, and writes lon/lat polygon
- * rings + a bounding box per state to src/lib/hobbies/herp-geo.json. The runtime
+ * Downloads two public-domain GeoJSON sources once:
+ *   - US states (for the US drill-down: overview + per-state zoom), and
+ *   - world countries (Natural Earth 110m admin_0, for the world overview +
+ *     per-country zoom).
+ * It simplifies each outline (Douglas–Peucker) to keep the file small, and
+ * writes lon/lat polygon rings + a bounding box per state and per country to
+ * src/lib/hobbies/herp-geo.json. The runtime
  * ([src/lib/hobbies/inat-herp-map.ts]) projects those rings to screen space and
  * plots real iNaturalist observation coordinates on top (heatmap + pins). No map
  * tiles and no runtime geo fetch — same "bake and commit" approach as the
  * fishing island, so nothing changes in the CSP.
  *
- * Run: node scripts/build-herp-geo.mjs   (downloads ~2MB to .cache once)
+ * Run: node scripts/build-herp-geo.mjs   (downloads a few MB to .cache once)
  */
 import { mkdir, readFile, writeFile, access } from "node:fs/promises";
 
 const SOURCE =
   "https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json";
+const WORLD_SOURCE =
+  "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson";
 const CACHE = ".cache/us-states.json";
+const WORLD_CACHE = ".cache/ne-110m-countries.json";
 const OUT = "src/lib/hobbies/herp-geo.json";
-const TOLERANCE = 0.035; // degrees (~3-4km) — smooth but compact
+const TOLERANCE = 0.035; // degrees (~3-4km) — smooth US states
+const WORLD_TOLERANCE = 0.25; // coarser — countries only need to read at world scale
 
 const ABBR = {
   Alabama: "AL",
@@ -123,7 +131,7 @@ function round(pt) {
   return [Math.round(pt[0] * 1000) / 1000, Math.round(pt[1] * 1000) / 1000];
 }
 
-function ringsFromGeometry(geom) {
+function ringsFromGeometry(geom, tol = TOLERANCE, minRingLen = 0) {
   const polys =
     geom.type === "Polygon"
       ? [geom.coordinates]
@@ -132,11 +140,12 @@ function ringsFromGeometry(geom) {
         : [];
   const out = [];
   for (const poly of polys) {
-    // outer ring only (index 0); holes are rare for states and not needed here
+    // outer ring only (index 0); holes aren't needed for these fills/hit-tests
     const ring = poly[0];
     if (!ring || ring.length < 4) continue;
-    const simplified = simplify(ring, TOLERANCE).map(round);
-    if (simplified.length >= 3) out.push(simplified);
+    const simplified = simplify(ring, tol).map(round);
+    if (simplified.length >= 3 && simplified.length >= minRingLen)
+      out.push(simplified);
   }
   return out;
 }
@@ -159,19 +168,21 @@ function bboxOf(rings) {
   );
 }
 
+async function cachedJson(cachePath, url, label) {
+  if (await exists(cachePath))
+    return JSON.parse(await readFile(cachePath, "utf8"));
+  process.stdout.write(`Fetching ${label} … `);
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
+  const json = await res.json();
+  await writeFile(cachePath, JSON.stringify(json));
+  console.log("done.");
+  return json;
+}
+
 async function main() {
   await mkdir(".cache", { recursive: true });
-  let raw;
-  if (await exists(CACHE)) {
-    raw = JSON.parse(await readFile(CACHE, "utf8"));
-  } else {
-    process.stdout.write("Fetching US states GeoJSON … ");
-    const res = await fetch(SOURCE);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    raw = await res.json();
-    await writeFile(CACHE, JSON.stringify(raw));
-    console.log("done.");
-  }
+  const raw = await cachedJson(CACHE, SOURCE, "US states GeoJSON");
 
   const states = {};
   let totalPts = 0;
@@ -185,17 +196,41 @@ async function main() {
     states[abbr] = { name, bbox: bboxOf(rings), rings };
   }
 
+  // World countries (Natural Earth 110m admin_0) for the world overview.
+  const world = await cachedJson(
+    WORLD_CACHE,
+    WORLD_SOURCE,
+    "world countries GeoJSON",
+  );
+  const countries = {};
+  let countryPts = 0;
+  for (const f of world.features ?? []) {
+    const p = f.properties ?? {};
+    const name = p.ADMIN || p.NAME || p.NAME_LONG;
+    // ISO_A2_EH resolves cases Natural Earth marks "-99" in ISO_A2 (France, etc.).
+    let iso = p.ISO_A2_EH && p.ISO_A2_EH !== "-99" ? p.ISO_A2_EH : p.ISO_A2;
+    if (!iso || iso === "-99") iso = (name || "").slice(0, 2).toUpperCase();
+    if (!name || name === "Antarctica") continue;
+    // Drop tiny slivers of huge multipolygons at world scale to save space.
+    const rings = ringsFromGeometry(f.geometry, WORLD_TOLERANCE, 4);
+    if (rings.length === 0) continue;
+    countryPts += rings.reduce((n, r) => n + r.length, 0);
+    countries[iso] = { name, bbox: bboxOf(rings), rings };
+  }
+
   const payload = {
     $comment:
-      "Committed US state outlines (lon/lat rings + bbox), simplified from public-domain us-states.json by scripts/build-herp-geo.mjs. Used by the herping iNaturalist map to draw a real map and plot true observation coordinates. No runtime geo fetch.",
+      "Committed boundary geometry (lon/lat rings + bbox) for the herping iNaturalist map: `states` = US states (from public-domain us-states.json), `countries` = world countries keyed by ISO A2 (from Natural Earth 110m admin_0). Simplified/committed by scripts/build-herp-geo.mjs. The runtime draws a real map and plots real observation coordinates on top. No runtime geo fetch.",
     generated: new Date().toISOString(),
     tolerance: TOLERANCE,
+    worldTolerance: WORLD_TOLERANCE,
     states,
+    countries,
   };
   await writeFile(OUT, JSON.stringify(payload) + "\n");
   const kb = ((await readFile(OUT)).length / 1024).toFixed(0);
   console.log(
-    `Wrote ${OUT}: ${Object.keys(states).length} states, ${totalPts} points, ${kb}KB.`,
+    `Wrote ${OUT}: ${Object.keys(states).length} states (${totalPts} pts), ${Object.keys(countries).length} countries (${countryPts} pts), ${kb}KB.`,
   );
 }
 

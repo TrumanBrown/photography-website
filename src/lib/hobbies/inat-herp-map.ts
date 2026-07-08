@@ -3,14 +3,15 @@
  * herp observations, the personal counterpart to the road-cruise game.
  *
  * It fetches the user's Reptilia and Amphibia observations from the public iNat
- * API and draws them two ways on a canvas:
- *   - Overview: a real US map (state outlines projected from committed public-
- *     domain geometry, plus a Hawaii inset) with a HEAT MAP of the true
- *     observation coordinates. Denser areas glow hotter (e.g. more reptiles in
- *     eastern Washington). Click a state that has data to zoom in.
- *   - State view: that state's real outline blown up, with a PIN at every
- *     observation's true (or iNat-obscured) coordinate. A grid below lists each
- *     observation with its species, place, and date before you click through.
+ * API and draws them on a canvas at three zoom levels:
+ *   - World: a real world map (country outlines from committed public-domain
+ *     geometry) with a HEAT MAP of every observation's true coordinates. Click a
+ *     country that has data to zoom in.
+ *   - US states: clicking the US opens a US map (state outlines + Hawaii inset)
+ *     with the same heat map; click a state to zoom to it.
+ *   - State / country detail: that region's outline blown up with a PIN at every
+ *     observation's true (or iNat-obscured) coordinate, and a grid below listing
+ *     each observation's species, place, and date before you click through.
  *
  * A Reptiles / Amphibians / All toggle switches datasets. No map tiles and no
  * runtime geo fetch — the boundaries are baked/committed (scripts/build-herp-geo.mjs),
@@ -27,7 +28,7 @@ const PHOTO_HOSTS = [
   "https://static.inaturalist.org/",
 ];
 
-/** iNat place ids for US states (admin_level 10). Used to bucket observations. */
+/** iNat place ids for US states (admin_level 10). Used to bucket US observations. */
 const STATE_ID: Record<string, number> = {
   AL: 19,
   AK: 6,
@@ -139,17 +140,26 @@ const STATE_NAME: Record<string, string> = {
   DC: "D.C.",
 };
 
-interface StateGeo {
+interface RegionGeo {
   name: string;
   bbox: [number, number, number, number];
   rings: [number, number][][];
 }
-const GEO = (geoData as unknown as { states: Record<string, StateGeo> }).states;
+const GEO_STATES = (geoData as unknown as { states: Record<string, RegionGeo> })
+  .states;
+const GEO_COUNTRIES = (
+  geoData as unknown as { countries: Record<string, RegionGeo> }
+).countries;
+
+/** World frame (drops Antarctica and the empty far north for a tighter fit). */
+const WORLD_BBOX: [number, number, number, number] = [-180, -56, 180, 84];
+/** Contiguous-US frame for the US states view (AK/HI are inset/omitted). */
+const CONUS_SKIP = new Set(["AK", "HI", "PR"]);
 
 type Cls = "reptiles" | "amphibians";
-type View = "overview" | "state";
+type View = "world" | "us" | "state" | "country";
 
-/** Class-coded pin/heat colors. */
+/** Class-coded pin colors. */
 const CLS_COLOR: Record<Cls, string> = {
   reptiles: "#f59e0b",
   amphibians: "#38bdf8",
@@ -159,7 +169,8 @@ interface Obs {
   id: number;
   uri: string;
   cls: Cls;
-  state: string | null;
+  state: string | null; // US state abbr (via place_ids)
+  country: string | null; // ISO A2 (via point-in-polygon / US fallback)
   lng: number | null;
   lat: number | null;
   obscured: boolean;
@@ -215,6 +226,27 @@ function coordsOf(o: INatObs): [number | null, number | null] {
       return [parts[1], parts[0]]; // "lat,lng" -> [lng, lat]
   }
   return [null, null];
+}
+
+function pointInRing(x: number, y: number, ring: [number, number][]): boolean {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i];
+    const [xj, yj] = ring[j];
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi)
+      inside = !inside;
+  }
+  return inside;
+}
+
+/** Which country (ISO A2) contains lon/lat, via bbox pre-filter + point-in-poly. */
+function countryOf(lng: number, lat: number): string | null {
+  for (const [iso, g] of Object.entries(GEO_COUNTRIES)) {
+    const [minLon, minLat, maxLon, maxLat] = g.bbox;
+    if (lng < minLon || lng > maxLon || lat < minLat || lat > maxLat) continue;
+    for (const ring of g.rings) if (pointInRing(lng, lat, ring)) return iso;
+  }
+  return null;
 }
 
 function fmtDate(iso: string): string {
@@ -298,43 +330,30 @@ export function initHerpMap(root: HTMLElement): void {
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
 
-  // CONUS bbox = union of all states except AK/HI/PR (inset or omitted).
-  const CONUS_SKIP = new Set(["AK", "HI", "PR"]);
-  const conus: [number, number, number, number] = [
-    Infinity,
-    Infinity,
-    -Infinity,
-    -Infinity,
-  ];
-  for (const [abbr, g] of Object.entries(GEO)) {
-    if (CONUS_SKIP.has(abbr)) continue;
-    conus[0] = Math.min(conus[0], g.bbox[0]);
-    conus[1] = Math.min(conus[1], g.bbox[1]);
-    conus[2] = Math.max(conus[2], g.bbox[2]);
-    conus[3] = Math.max(conus[3], g.bbox[3]);
-  }
-
   let all: Obs[] = [];
   let active: Cls | "all" = "all";
-  let selected: string | null = null;
-  let view: View = "overview";
+  let view: View = "world";
+  let selState: string | null = null;
+  let selCountry: string | null = null; // ISO A2 for the country detail view
   let started = false;
   let W = 0;
   let H = 0;
   let dpr = 1;
 
   // Per-render caches for hit-testing.
-  let statePolys: { abbr: string; pts: [number, number][][] }[] = [];
+  let regionPolys: { key: string; pts: [number, number][][] }[] = [];
   let pinHits: { x: number; y: number; o: Obs }[] = [];
   let hiInset: { x: number; y: number; w: number; h: number } | null = null;
 
   function pool(): Obs[] {
     return active === "all" ? all : all.filter((o) => o.cls === active);
   }
-  function counts(): Map<string, number> {
+  function countBy(key: (o: Obs) => string | null): Map<string, number> {
     const m = new Map<string, number>();
-    for (const o of pool())
-      if (o.state) m.set(o.state, (m.get(o.state) ?? 0) + 1);
+    for (const o of pool()) {
+      const k = key(o);
+      if (k) m.set(k, (m.get(k) ?? 0) + 1);
+    }
     return m;
   }
 
@@ -351,7 +370,7 @@ export function initHerpMap(root: HTMLElement): void {
   }
 
   function drawRings(
-    g: StateGeo,
+    g: RegionGeo,
     project: Project,
     fill: string,
     stroke: string,
@@ -378,7 +397,7 @@ export function initHerpMap(root: HTMLElement): void {
     return projected;
   }
 
-  /** Heatmap: accumulate alpha blobs offscreen, then colorize by density. */
+  /** Heatmap: accumulate alpha blobs offscreen, then colourise by density. */
   function drawHeat(pts: { x: number; y: number }[], radius: number): void {
     if (pts.length === 0) return;
     const off = document.createElement("canvas");
@@ -418,9 +437,7 @@ export function initHerpMap(root: HTMLElement): void {
 
   function projectedPoints(
     project: Project,
-    within: [number, number, number, number] | null,
-    offX = 0,
-    offY = 0,
+    keep: (o: Obs) => boolean,
   ): {
     heat: { x: number; y: number }[];
     pins: { x: number; y: number; o: Obs }[];
@@ -428,45 +445,113 @@ export function initHerpMap(root: HTMLElement): void {
     const heat: { x: number; y: number }[] = [];
     const pins: { x: number; y: number; o: Obs }[] = [];
     for (const o of pool()) {
-      if (o.lng == null || o.lat == null) continue;
-      if (
-        within &&
-        (o.lng < within[0] ||
-          o.lng > within[2] ||
-          o.lat < within[1] ||
-          o.lat > within[3])
-      )
-        continue;
-      const [px, py] = project(o.lng, o.lat);
-      const x = px + offX;
-      const y = py + offY;
+      if (o.lng == null || o.lat == null || !keep(o)) continue;
+      const [x, y] = project(o.lng, o.lat);
       heat.push({ x, y });
       pins.push({ x, y, o });
     }
     return { heat, pins };
   }
 
-  function renderOverview(): void {
+  function label(text: string): void {
+    ctx!.fillStyle = "rgba(230,235,240,0.95)";
+    ctx!.font = "600 13px system-ui, sans-serif";
+    ctx!.fillText(text, 14, 22);
+  }
+
+  function drawLegend(): void {
+    const legend: [Cls, string][] = [
+      ["reptiles", "Reptiles"],
+      ["amphibians", "Amphibians"],
+    ];
+    let lx = 14;
+    const ly = H - 14;
+    for (const [cls, lbl] of legend) {
+      ctx!.beginPath();
+      ctx!.arc(lx + 5, ly - 4, 4.5, 0, Math.PI * 2);
+      ctx!.fillStyle = CLS_COLOR[cls];
+      ctx!.fill();
+      ctx!.strokeStyle = "rgba(255,255,255,0.9)";
+      ctx!.lineWidth = 1;
+      ctx!.stroke();
+      ctx!.fillStyle = "rgba(210,220,228,0.9)";
+      ctx!.font = "500 11px system-ui, sans-serif";
+      ctx!.fillText(lbl, lx + 14, ly);
+      lx += 14 + ctx!.measureText(lbl).width + 16;
+    }
+  }
+
+  function drawPins(pins: { x: number; y: number; o: Obs }[]): void {
+    for (const p of pins) {
+      pinHits.push(p);
+      ctx!.beginPath();
+      ctx!.arc(p.x, p.y, 4.5, 0, Math.PI * 2);
+      ctx!.fillStyle = CLS_COLOR[p.o.cls];
+      ctx!.fill();
+      ctx!.lineWidth = 1.5;
+      ctx!.strokeStyle = "rgba(255,255,255,0.9)";
+      ctx!.stroke();
+    }
+  }
+
+  function clearFrame(): void {
     ctx!.clearRect(0, 0, W, H);
     ctx!.fillStyle = "#0b1220";
     ctx!.fillRect(0, 0, W, H);
-    statePolys = [];
+    regionPolys = [];
     pinHits = [];
+    hiInset = null;
+  }
 
-    const cnt = counts();
+  // ---------------------------------------------------------- world view
+  function renderWorld(): void {
+    clearFrame();
+    const cnt = countBy((o) => o.country);
+    const project = makeProjection(WORLD_BBOX, W, H, 8);
+    for (const [iso, g] of Object.entries(GEO_COUNTRIES)) {
+      const n = cnt.get(iso) ?? 0;
+      const fill = n > 0 ? "rgba(56,80,60,0.95)" : "rgba(28,38,54,0.9)";
+      const pr = drawRings(g, project, fill, "rgba(90,110,120,0.35)", 0.5);
+      regionPolys.push({ key: iso, pts: pr });
+    }
+    const { heat } = projectedPoints(project, () => true);
+    drawHeat(heat, Math.max(9, W * 0.018));
+    label("Tap a highlighted country to zoom in");
+  }
+
+  // ------------------------------------------------------- US states view
+  function renderUS(): void {
+    clearFrame();
+    const cnt = countBy((o) => o.state);
+    const conus: [number, number, number, number] = [
+      Infinity,
+      Infinity,
+      -Infinity,
+      -Infinity,
+    ];
+    for (const [abbr, g] of Object.entries(GEO_STATES)) {
+      if (CONUS_SKIP.has(abbr)) continue;
+      conus[0] = Math.min(conus[0], g.bbox[0]);
+      conus[1] = Math.min(conus[1], g.bbox[1]);
+      conus[2] = Math.max(conus[2], g.bbox[2]);
+      conus[3] = Math.max(conus[3], g.bbox[3]);
+    }
     const project = makeProjection(conus, W, H, 16);
-    for (const [abbr, g] of Object.entries(GEO)) {
+    for (const [abbr, g] of Object.entries(GEO_STATES)) {
       if (CONUS_SKIP.has(abbr)) continue;
       const n = cnt.get(abbr) ?? 0;
       const fill = n > 0 ? "rgba(56,80,60,0.9)" : "rgba(30,41,59,0.9)";
       const pr = drawRings(g, project, fill, "rgba(120,140,120,0.4)", 0.6);
-      statePolys.push({ abbr, pts: pr });
+      regionPolys.push({ key: abbr, pts: pr });
     }
-    const { heat } = projectedPoints(project, conus);
+    const { heat } = projectedPoints(
+      project,
+      (o) => o.state != null && o.state !== "HI",
+    );
     drawHeat(heat, Math.max(14, W * 0.03));
 
-    // Hawaii inset (bottom-left) — HI has data for this user.
-    const hg = GEO.HI;
+    // Hawaii inset (bottom-left)
+    const hg = GEO_STATES.HI;
     if (hg) {
       const iw = Math.max(90, W * 0.16);
       const ih = iw * 0.62;
@@ -490,100 +575,59 @@ export function initHerpMap(root: HTMLElement): void {
         0.6,
       );
       ctx!.restore();
-      const hiPts = projectedPoints(
-        makeProjection(hg.bbox, iw, ih, 8),
-        hg.bbox,
-        ix,
-        iy,
-      );
-      drawHeat(hiPts.heat, Math.max(10, iw * 0.12));
+      const hiProj2 = makeProjection(hg.bbox, iw, ih, 8);
+      const hiHeat = pool()
+        .filter((o) => o.state === "HI" && o.lng != null)
+        .map((o) => {
+          const [x, y] = hiProj2(o.lng!, o.lat!);
+          return { x: x + ix, y: y + iy };
+        });
+      drawHeat(hiHeat, Math.max(10, iw * 0.12));
       ctx!.strokeStyle = "rgba(120,140,120,0.5)";
       ctx!.lineWidth = 1;
       ctx!.strokeRect(ix, iy, iw, ih);
       ctx!.fillStyle = "rgba(200,210,220,0.8)";
       ctx!.font = "600 10px system-ui, sans-serif";
       ctx!.fillText("HI", ix + 6, iy + 14);
-    } else {
-      hiInset = null;
     }
-
-    ctx!.fillStyle = "rgba(200,210,220,0.7)";
-    ctx!.font = "600 12px system-ui, sans-serif";
-    ctx!.fillText("Tap a highlighted state to zoom in", 14, 22);
+    label("United States — tap a state to zoom in");
   }
 
-  function renderState(abbr: string): void {
-    ctx!.clearRect(0, 0, W, H);
-    ctx!.fillStyle = "#0b1220";
-    ctx!.fillRect(0, 0, W, H);
-    pinHits = [];
-    statePolys = [];
-    const g = GEO[abbr];
-    if (!g) return;
+  // --------------------------------------------------- state / country detail
+  function renderDetailMap(
+    g: RegionGeo,
+    title: string,
+    keep: (o: Obs) => boolean,
+  ): void {
+    clearFrame();
     const project = makeProjection(g.bbox, W, H, 24);
     drawRings(g, project, "rgba(26,38,28,0.95)", "rgba(150,170,150,0.6)", 1.2);
-
-    const { heat, pins } = projectedPoints(project, g.bbox);
-    drawHeat(heat, Math.max(18, W * 0.05));
-
-    for (const p of pins) {
-      pinHits.push(p);
-      ctx!.beginPath();
-      ctx!.arc(p.x, p.y, 4.5, 0, Math.PI * 2);
-      ctx!.fillStyle = CLS_COLOR[p.o.cls];
-      ctx!.fill();
-      ctx!.lineWidth = 1.5;
-      ctx!.strokeStyle = "rgba(255,255,255,0.9)";
-      ctx!.stroke();
-    }
-
-    ctx!.fillStyle = "rgba(230,235,240,0.95)";
-    ctx!.font = "600 14px system-ui, sans-serif";
-    ctx!.fillText(STATE_NAME[abbr] ?? abbr, 14, 22);
-
-    const legend: [Cls, string][] = [
-      ["reptiles", "Reptiles"],
-      ["amphibians", "Amphibians"],
-    ];
-    let lx = 14;
-    const ly = H - 14;
-    for (const [cls, label] of legend) {
-      ctx!.beginPath();
-      ctx!.arc(lx + 5, ly - 4, 4.5, 0, Math.PI * 2);
-      ctx!.fillStyle = CLS_COLOR[cls];
-      ctx!.fill();
-      ctx!.strokeStyle = "rgba(255,255,255,0.9)";
-      ctx!.lineWidth = 1;
-      ctx!.stroke();
-      ctx!.fillStyle = "rgba(210,220,228,0.9)";
-      ctx!.font = "500 11px system-ui, sans-serif";
-      ctx!.fillText(label, lx + 14, ly);
-      lx += 14 + ctx!.measureText(label).width + 16;
-    }
+    const { heat, pins } = projectedPoints(project, keep);
+    drawHeat(heat, Math.max(16, W * 0.045));
+    drawPins(pins);
+    label(title);
+    drawLegend();
   }
 
   function render(): void {
-    if (view === "state" && selected) renderState(selected);
-    else renderOverview();
-    if (backBtn) backBtn.classList.toggle("hidden", view !== "state");
+    if (view === "world") renderWorld();
+    else if (view === "us") renderUS();
+    else if (view === "state" && selState)
+      renderDetailMap(
+        GEO_STATES[selState],
+        STATE_NAME[selState] ?? selState,
+        (o) => o.state === selState,
+      );
+    else if (view === "country" && selCountry)
+      renderDetailMap(
+        GEO_COUNTRIES[selCountry],
+        GEO_COUNTRIES[selCountry]?.name ?? selCountry,
+        (o) => o.country === selCountry,
+      );
+    if (backBtn) backBtn.classList.toggle("hidden", view === "world");
   }
 
-  function pointInPoly(
-    x: number,
-    y: number,
-    poly: [number, number][],
-  ): boolean {
-    let inside = false;
-    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-      const [xi, yi] = poly[i];
-      const [xj, yj] = poly[j];
-      if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi)
-        inside = !inside;
-    }
-    return inside;
-  }
-
-  function stateAt(x: number, y: number): string | null {
+  function regionAt(x: number, y: number): string | null {
     if (
       hiInset &&
       x >= hiInset.x &&
@@ -592,8 +636,8 @@ export function initHerpMap(root: HTMLElement): void {
       y <= hiInset.y + hiInset.h
     )
       return "HI";
-    for (const sp of statePolys) {
-      for (const poly of sp.pts) if (pointInPoly(x, y, poly)) return sp.abbr;
+    for (const sp of regionPolys) {
+      for (const poly of sp.pts) if (pointInRing(x, y, poly)) return sp.key;
     }
     return null;
   }
@@ -611,42 +655,58 @@ export function initHerpMap(root: HTMLElement): void {
     return best;
   }
 
-  function openState(abbr: string): void {
-    if (!(counts().get(abbr) ?? 0)) return;
-    selected = abbr;
-    view = "state";
+  function goBack(): void {
+    if (view === "state") view = "us";
+    else if (view === "us" || view === "country") view = "world";
+    selState = null;
+    if (view === "world") selCountry = null;
     render();
     renderDetail();
   }
 
+  function detailItems(): { title: string; items: Obs[] } | null {
+    if (view === "state" && selState)
+      return {
+        title: `${STATE_NAME[selState] ?? selState} — `,
+        items: pool().filter((o) => o.state === selState),
+      };
+    if (view === "country" && selCountry)
+      return {
+        title: `${GEO_COUNTRIES[selCountry]?.name ?? selCountry} — `,
+        items: pool().filter((o) => o.country === selCountry),
+      };
+    return null;
+  }
+
   function renderDetail(): void {
     if (!detailEl) return;
-    const inState = view === "state" && !!selected;
-    const items = inState ? pool().filter((o) => o.state === selected) : [];
+    const detail = detailItems();
     if (statusEl) {
-      if (inState) {
+      if (detail) {
         statusEl.textContent = "";
+      } else if (view === "us") {
+        const states = countBy((o) => o.state).size;
+        statusEl.textContent = `United States — ${pool().filter((o) => o.state).length} observations across ${states} state${states === 1 ? "" : "s"}. Tap a state to zoom in.`;
       } else {
-        const cnt = counts();
-        const states = cnt.size;
+        const cc = countBy((o) => o.country);
         const mapped = pool().filter((o) => o.lng != null).length;
-        statusEl.textContent = states
-          ? `${pool().length} observations across ${states} state${states === 1 ? "" : "s"} (${mapped} mapped). Tap a highlighted state to zoom in.`
+        statusEl.textContent = cc.size
+          ? `${pool().length} observations across ${cc.size} countr${cc.size === 1 ? "y" : "ies"} (${mapped} mapped). Tap a highlighted country to zoom in.`
           : "";
       }
     }
-    if (!inState || items.length === 0) {
+    if (!detail || detail.items.length === 0) {
       detailEl.replaceChildren();
       return;
     }
     const head = document.createElement("h3");
     head.className = "mb-3 text-sm font-semibold";
-    head.textContent = `${STATE_NAME[selected!]} — ${items.length} observation${items.length === 1 ? "" : "s"}`;
+    head.textContent = `${detail.title}${detail.items.length} observation${detail.items.length === 1 ? "" : "s"}`;
 
     const grid = document.createElement("div");
     grid.className = "grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3";
     grid.setAttribute("role", "list");
-    for (const o of items) {
+    for (const o of detail.items) {
       const a = document.createElement("a");
       a.href = o.uri;
       a.target = "_blank";
@@ -694,6 +754,24 @@ export function initHerpMap(root: HTMLElement): void {
     detailEl.replaceChildren(head, grid);
   }
 
+  function openRegion(key: string): void {
+    if (view === "world") {
+      if (!(countBy((o) => o.country).get(key) ?? 0)) return;
+      if (key === "US") {
+        view = "us";
+      } else {
+        selCountry = key;
+        view = "country";
+      }
+    } else if (view === "us") {
+      if (!(countBy((o) => o.state).get(key) ?? 0)) return;
+      selState = key;
+      view = "state";
+    }
+    render();
+    renderDetail();
+  }
+
   async function fetchClass(cls: Cls, iconic: string): Promise<Obs[]> {
     const out: Obs[] = [];
     const perPage = 200;
@@ -724,11 +802,17 @@ export function initHerpMap(root: HTMLElement): void {
         const thumb = upgrade(raw);
         if (!allowedHost(thumb)) continue;
         const [lng, lat] = coordsOf(o);
+        const state = stateOf(o);
+        // Country from coordinates; fall back to US when a US state matched.
+        let country: string | null = null;
+        if (lng != null && lat != null) country = countryOf(lng, lat);
+        if (!country && state) country = "US";
         out.push({
           id: o.id,
           uri: o.uri || `https://www.inaturalist.org/observations/${o.id}`,
           cls,
-          state: stateOf(o),
+          state,
+          country,
           lng,
           lat,
           obscured: !!o.obscured,
@@ -786,19 +870,19 @@ export function initHerpMap(root: HTMLElement): void {
 
   canvas.addEventListener("pointerdown", (e) => {
     const [x, y] = toCanvas(e);
-    if (view === "state") {
+    if (view === "state" || view === "country") {
       const o = pinAt(x, y);
       if (o) window.open(o.uri, "_blank", "noopener");
     } else {
-      const abbr = stateAt(x, y);
-      if (abbr) openState(abbr);
+      const key = regionAt(x, y);
+      if (key) openRegion(key);
     }
   });
 
   canvas.addEventListener("pointermove", (e) => {
     if (e.pointerType === "touch") return;
     const [x, y] = toCanvas(e);
-    if (view === "state") {
+    if (view === "state" || view === "country") {
       const o = pinAt(x, y);
       canvas!.style.cursor = o ? "pointer" : "default";
       if (o && tooltip) {
@@ -810,11 +894,17 @@ export function initHerpMap(root: HTMLElement): void {
         tooltip.classList.add("hidden");
       }
     } else {
-      const abbr = stateAt(x, y);
-      const has = abbr && (counts().get(abbr) ?? 0) > 0;
-      canvas!.style.cursor = has ? "pointer" : "default";
-      if (has && tooltip) {
-        tooltip.textContent = `${STATE_NAME[abbr!]} · ${counts().get(abbr!)} obs`;
+      const key = regionAt(x, y);
+      const byKey =
+        view === "us" ? countBy((o) => o.state) : countBy((o) => o.country);
+      const n = key ? (byKey.get(key) ?? 0) : 0;
+      canvas!.style.cursor = n > 0 ? "pointer" : "default";
+      if (n > 0 && key && tooltip) {
+        const nm =
+          view === "us"
+            ? (STATE_NAME[key] ?? key)
+            : (GEO_COUNTRIES[key]?.name ?? key);
+        tooltip.textContent = `${nm} · ${n} obs`;
         tooltip.style.left = `${x}px`;
         tooltip.style.top = `${y}px`;
         tooltip.classList.remove("hidden");
@@ -827,12 +917,7 @@ export function initHerpMap(root: HTMLElement): void {
     if (tooltip) tooltip.classList.add("hidden");
   });
 
-  backBtn?.addEventListener("click", () => {
-    view = "overview";
-    selected = null;
-    render();
-    renderDetail();
-  });
+  backBtn?.addEventListener("click", goBack);
 
   for (const btn of toggleEls) {
     btn.addEventListener("click", () => {
@@ -844,12 +929,23 @@ export function initHerpMap(root: HTMLElement): void {
         b.classList.toggle("text-white", on);
         b.classList.toggle("border-lime-600", on);
       }
-      if (view === "state" && selected && !(counts().get(selected) ?? 0)) {
-        view = "overview";
-        selected = null;
+      // if the current detail region lost all data under the new filter, back out
+      if (
+        view === "state" &&
+        selState &&
+        !(countBy((o) => o.state).get(selState) ?? 0)
+      )
+        goBack();
+      else if (
+        view === "country" &&
+        selCountry &&
+        !(countBy((o) => o.country).get(selCountry) ?? 0)
+      )
+        goBack();
+      else {
+        render();
+        renderDetail();
       }
-      render();
-      renderDetail();
     });
   }
 
