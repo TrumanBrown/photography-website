@@ -781,6 +781,48 @@ export function initHerping(root: HTMLElement): void {
     rctx!.restore();
   }
 
+  function photoUrlFor(sp: HerpSpecies): string | undefined {
+    return sp.photo ?? PHOTOS[sp.id]?.photo;
+  }
+
+  // Warm every species' reveal photo in the background once the island is idle,
+  // so the first time you find each animal the image is already cached and the
+  // card shows it instantly (no per-reveal network round-trip). The browser caps
+  // concurrent requests per host, so firing them together self-throttles; kept
+  // refs are decoded early and prevent premature GC.
+  const warmed: HTMLImageElement[] = [];
+  let preloaded = false;
+  function preloadPhotos(): void {
+    if (preloaded) return;
+    preloaded = true;
+    const urls = Array.from(
+      new Set(
+        SPECIES.map(photoUrlFor).filter(
+          (u): u is string => typeof u === "string",
+        ),
+      ),
+    );
+    const run = () => {
+      for (const url of urls) {
+        const img = new Image();
+        img.decoding = "async";
+        img.src = url;
+        if (img.decode) img.decode().catch(() => {});
+        warmed.push(img);
+      }
+    };
+    const ric = (
+      window as unknown as {
+        requestIdleCallback?: (
+          cb: () => void,
+          opts?: { timeout: number },
+        ) => void;
+      }
+    ).requestIdleCallback;
+    if (ric) ric(run, { timeout: 2000 });
+    else setTimeout(run, 400);
+  }
+
   function showCard(sp: HerpSpecies, isNew: boolean): void {
     const override = PHOTOS[sp.id];
     const photo = sp.photo ?? override?.photo;
@@ -894,4 +936,5 @@ export function initHerping(root: HTMLElement): void {
   updateJournal();
   render();
   start();
+  preloadPhotos();
 }
