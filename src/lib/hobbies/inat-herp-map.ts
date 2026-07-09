@@ -345,6 +345,59 @@ export function initHerpMap(root: HTMLElement): void {
   let pinHits: { x: number; y: number; o: Obs }[] = [];
   let hiInset: { x: number; y: number; w: number; h: number } | null = null;
 
+  // Zoom + pan, applied on top of each view's base projection (zoom = 1 fits).
+  // Lets you blow up clustered areas (e.g. Puget Sound) on any device.
+  let zoom = 1;
+  let panX = 0;
+  let panY = 0;
+  const MIN_ZOOM = 1;
+  const MAX_ZOOM = 14;
+  let rafPending = false;
+
+  function scheduleRender(): void {
+    if (rafPending) return;
+    rafPending = true;
+    requestAnimationFrame(() => {
+      rafPending = false;
+      render();
+    });
+  }
+  /** Wrap a base projection with the current zoom + pan. */
+  function zoomedProject(base: Project): Project {
+    return (lon, lat) => {
+      const [x, y] = base(lon, lat);
+      return [x * zoom + panX, y * zoom + panY];
+    };
+  }
+  function clampPan(): void {
+    const minX = Math.min(0, W * (1 - zoom));
+    const minY = Math.min(0, H * (1 - zoom));
+    panX = Math.max(minX, Math.min(0, panX));
+    panY = Math.max(minY, Math.min(0, panY));
+  }
+  /** One-finger scroll on mobile until zoomed; then full drag/pan control. */
+  function updateTouchAction(): void {
+    canvas!.style.touchAction = zoom > 1.01 ? "none" : "pan-y";
+  }
+  function resetZoom(): void {
+    zoom = 1;
+    panX = 0;
+    panY = 0;
+    updateTouchAction();
+  }
+  /** Zoom to `nz` keeping the focal point (fx, fy) fixed on screen. */
+  function applyZoom(nz: number, fx: number, fy: number): void {
+    nz = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, nz));
+    if (Math.abs(nz - zoom) < 1e-3) return;
+    const k = nz / zoom;
+    panX = fx - (fx - panX) * k;
+    panY = fy - (fy - panY) * k;
+    zoom = nz;
+    clampPan();
+    updateTouchAction();
+    scheduleRender();
+  }
+
   function pool(): Obs[] {
     return active === "all" ? all : all.filter((o) => o.cls === active);
   }
@@ -507,7 +560,7 @@ export function initHerpMap(root: HTMLElement): void {
   function renderWorld(): void {
     clearFrame();
     const cnt = countBy((o) => o.country);
-    const project = makeProjection(WORLD_BBOX, W, H, 8);
+    const project = zoomedProject(makeProjection(WORLD_BBOX, W, H, 8));
     for (const [iso, g] of Object.entries(GEO_COUNTRIES)) {
       const n = cnt.get(iso) ?? 0;
       const fill = n > 0 ? "rgba(56,80,60,0.95)" : "rgba(28,38,54,0.9)";
@@ -536,7 +589,7 @@ export function initHerpMap(root: HTMLElement): void {
       conus[2] = Math.max(conus[2], g.bbox[2]);
       conus[3] = Math.max(conus[3], g.bbox[3]);
     }
-    const project = makeProjection(conus, W, H, 16);
+    const project = zoomedProject(makeProjection(conus, W, H, 16));
     for (const [abbr, g] of Object.entries(GEO_STATES)) {
       if (CONUS_SKIP.has(abbr)) continue;
       const n = cnt.get(abbr) ?? 0;
@@ -600,7 +653,7 @@ export function initHerpMap(root: HTMLElement): void {
     keep: (o: Obs) => boolean,
   ): void {
     clearFrame();
-    const project = makeProjection(g.bbox, W, H, 24);
+    const project = zoomedProject(makeProjection(g.bbox, W, H, 24));
     drawRings(g, project, "rgba(26,38,28,0.95)", "rgba(150,170,150,0.6)", 1.2);
     const { heat, pins } = projectedPoints(project, keep);
     drawHeat(heat, Math.max(16, W * 0.045));
@@ -660,6 +713,7 @@ export function initHerpMap(root: HTMLElement): void {
     else if (view === "us" || view === "country") view = "world";
     selState = null;
     if (view === "world") selCountry = null;
+    resetZoom();
     render();
     renderDetail();
   }
@@ -768,6 +822,7 @@ export function initHerpMap(root: HTMLElement): void {
       selState = key;
       view = "state";
     }
+    resetZoom();
     render();
     renderDetail();
   }
@@ -853,6 +908,7 @@ export function initHerpMap(root: HTMLElement): void {
         return;
       }
       fit();
+      updateTouchAction();
       render();
       renderDetail();
     } catch {
@@ -863,13 +919,31 @@ export function initHerpMap(root: HTMLElement): void {
   };
 
   // ---------------------------------------------------------------- wiring
-  function toCanvas(e: PointerEvent): [number, number] {
+  function toCanvas(e: { clientX: number; clientY: number }): [number, number] {
     const r = canvas!.getBoundingClientRect();
     return [e.clientX - r.left, e.clientY - r.top];
   }
 
-  canvas.addEventListener("pointerdown", (e) => {
-    const [x, y] = toCanvas(e);
+  const pointers = new Map<number, { x: number; y: number }>();
+  let pinchPrevDist = 0;
+  let pinchPrevMid = { x: 0, y: 0 };
+  let downX = 0;
+  let downY = 0;
+  let downT = 0;
+  let moved = false;
+
+  function midOfPointers(): { d: number; x: number; y: number } {
+    const pts = [...pointers.values()];
+    const dx = pts[0].x - pts[1].x;
+    const dy = pts[0].y - pts[1].y;
+    return {
+      d: Math.hypot(dx, dy),
+      x: (pts[0].x + pts[1].x) / 2,
+      y: (pts[0].y + pts[1].y) / 2,
+    };
+  }
+
+  function handleTap(x: number, y: number): void {
     if (view === "state" || view === "country") {
       const o = pinAt(x, y);
       if (o) window.open(o.uri, "_blank", "noopener");
@@ -877,14 +951,13 @@ export function initHerpMap(root: HTMLElement): void {
       const key = regionAt(x, y);
       if (key) openRegion(key);
     }
-  });
+  }
 
-  canvas.addEventListener("pointermove", (e) => {
-    if (e.pointerType === "touch") return;
-    const [x, y] = toCanvas(e);
+  function showHover(x: number, y: number): void {
+    const grab = zoom > 1.01 ? "grab" : "default";
     if (view === "state" || view === "country") {
       const o = pinAt(x, y);
-      canvas!.style.cursor = o ? "pointer" : "default";
+      canvas!.style.cursor = o ? "pointer" : grab;
       if (o && tooltip) {
         tooltip.textContent = `${o.name} · ${fmtDate(o.date)}${o.obscured ? " (approx.)" : ""}`;
         tooltip.style.left = `${x}px`;
@@ -898,7 +971,7 @@ export function initHerpMap(root: HTMLElement): void {
       const byKey =
         view === "us" ? countBy((o) => o.state) : countBy((o) => o.country);
       const n = key ? (byKey.get(key) ?? 0) : 0;
-      canvas!.style.cursor = n > 0 ? "pointer" : "default";
+      canvas!.style.cursor = n > 0 ? "pointer" : grab;
       if (n > 0 && key && tooltip) {
         const nm =
           view === "us"
@@ -912,10 +985,127 @@ export function initHerpMap(root: HTMLElement): void {
         tooltip.classList.add("hidden");
       }
     }
+  }
+
+  canvas.addEventListener("pointerdown", (e) => {
+    const [x, y] = toCanvas(e);
+    pointers.set(e.pointerId, { x, y });
+    if (pointers.size === 1) {
+      downX = x;
+      downY = y;
+      downT = performance.now();
+      moved = false;
+    } else if (pointers.size === 2) {
+      const m = midOfPointers();
+      pinchPrevDist = m.d;
+      pinchPrevMid = { x: m.x, y: m.y };
+      moved = true;
+      if (tooltip) tooltip.classList.add("hidden");
+    }
   });
+
+  canvas.addEventListener("pointermove", (e) => {
+    const [x, y] = toCanvas(e);
+    const p = pointers.get(e.pointerId);
+
+    // two-finger pinch: zoom around the midpoint + pan by its movement
+    if (pointers.size === 2) {
+      if (p) {
+        p.x = x;
+        p.y = y;
+      }
+      const m = midOfPointers();
+      if (pinchPrevDist > 0) {
+        const nz = Math.max(
+          MIN_ZOOM,
+          Math.min(MAX_ZOOM, zoom * (m.d / pinchPrevDist)),
+        );
+        const k = nz / zoom;
+        panX = m.x - (m.x - panX) * k;
+        panY = m.y - (m.y - panY) * k;
+        zoom = nz;
+        panX += m.x - pinchPrevMid.x;
+        panY += m.y - pinchPrevMid.y;
+        clampPan();
+        updateTouchAction();
+        scheduleRender();
+      }
+      pinchPrevDist = m.d;
+      pinchPrevMid = { x: m.x, y: m.y };
+      return;
+    }
+
+    // single-pointer drag: pan when zoomed in
+    if (p) {
+      const dx = x - p.x;
+      const dy = y - p.y;
+      p.x = x;
+      p.y = y;
+      if (Math.hypot(x - downX, y - downY) > 6) moved = true;
+      if (zoom > 1.01 && moved) {
+        panX += dx;
+        panY += dy;
+        clampPan();
+        scheduleRender();
+        if (tooltip) tooltip.classList.add("hidden");
+        canvas!.style.cursor = "grabbing";
+      }
+      return;
+    }
+
+    // hover (mouse only)
+    if (e.pointerType === "touch") return;
+    showHover(x, y);
+  });
+
+  function endPointer(e: PointerEvent): void {
+    const wasSize = pointers.size;
+    const p = pointers.get(e.pointerId);
+    pointers.delete(e.pointerId);
+    if (wasSize === 1 && p && !moved && performance.now() - downT < 500) {
+      handleTap(p.x, p.y);
+    }
+    if (pointers.size < 2) pinchPrevDist = 0;
+    if (pointers.size === 1) {
+      // one finger remains after a pinch — keep panning, don't treat as a tap
+      const rp = [...pointers.values()][0];
+      downX = rp.x;
+      downY = rp.y;
+      downT = performance.now();
+      moved = true;
+    }
+  }
+  canvas.addEventListener("pointerup", endPointer);
+  canvas.addEventListener("pointercancel", endPointer);
   canvas.addEventListener("pointerleave", () => {
     if (tooltip) tooltip.classList.add("hidden");
   });
+
+  // desktop scroll-wheel zoom, around the cursor
+  canvas.addEventListener(
+    "wheel",
+    (e) => {
+      e.preventDefault();
+      const [x, y] = toCanvas(e);
+      applyZoom(zoom * (e.deltaY < 0 ? 1.15 : 1 / 1.15), x, y);
+    },
+    { passive: false },
+  );
+
+  // +/- / reset zoom buttons (work on every device)
+  for (const zb of Array.from(
+    root.querySelectorAll<HTMLButtonElement>("[data-herpmap-zoom]"),
+  )) {
+    zb.addEventListener("click", () => {
+      const kind = zb.dataset.herpmapZoom;
+      if (kind === "reset") {
+        resetZoom();
+        render();
+      } else {
+        applyZoom(zoom * (kind === "in" ? 1.6 : 1 / 1.6), W / 2, H / 2);
+      }
+    });
+  }
 
   backBtn?.addEventListener("click", goBack);
 
@@ -952,6 +1142,7 @@ export function initHerpMap(root: HTMLElement): void {
   const ro = new ResizeObserver(() => {
     if (!started) return;
     fit();
+    clampPan();
     render();
   });
   ro.observe(canvas);

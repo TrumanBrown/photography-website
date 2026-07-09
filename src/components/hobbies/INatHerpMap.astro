@@ -88,14 +88,38 @@ const {
   >
     <canvas
       data-herpmap-canvas
-      class="block w-full touch-manipulation"
+      class="block w-full"
+      style="touch-action: pan-y"
       role="img"
-      aria-label="A world map showing a heat map of my reptile and amphibian observations. Tap a highlighted country (or the US, then a state) to zoom in and see individual observation pins."
+      aria-label="A world map showing a heat map of my reptile and amphibian observations. Tap a highlighted country (or the US, then a state) to zoom in and see individual observation pins. Pinch, scroll, or use the buttons to zoom, and drag to pan."
     ></canvas>
     <div
       data-herpmap-tip
       class="pointer-events-none absolute hidden -translate-x-1/2 -translate-y-full rounded bg-neutral-900/95 px-2 py-1 text-[11px] text-white shadow-lg"
     >
+    </div>
+    <div class="absolute right-2 top-2 flex flex-col gap-1">
+      <button
+        type="button"
+        data-herpmap-zoom="in"
+        aria-label="Zoom in"
+        class="flex h-8 w-8 items-center justify-center rounded-md border border-white/20 bg-neutral-900/70 text-lg leading-none text-white backdrop-blur hover:bg-neutral-900/90"
+        >+</button
+      >
+      <button
+        type="button"
+        data-herpmap-zoom="out"
+        aria-label="Zoom out"
+        class="flex h-8 w-8 items-center justify-center rounded-md border border-white/20 bg-neutral-900/70 text-lg leading-none text-white backdrop-blur hover:bg-neutral-900/90"
+        >−</button
+      >
+      <button
+        type="button"
+        data-herpmap-zoom="reset"
+        aria-label="Reset zoom"
+        class="flex h-8 w-8 items-center justify-center rounded-md border border-white/20 bg-neutral-900/70 text-xs leading-none text-white backdrop-blur hover:bg-neutral-900/90"
+        >⤢</button
+      >
     </div>
   </div>
 
@@ -103,6 +127,9 @@ const {
     data-herpmap-status
     class="mt-2 text-xs text-neutral-500 dark:text-neutral-500"
   >
+  </p>
+  <p class="mt-1 text-[11px] text-neutral-400 dark:text-neutral-600">
+    Pinch or scroll to zoom, drag to pan, or use the + / − buttons.
   </p>
   <div data-herpmap-detail class="mt-4"></div>
 </section>
