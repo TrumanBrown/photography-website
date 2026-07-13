@@ -1,7 +1,7 @@
 {
   "title": "Birding",
   "summary": "Take or upload a selfie and the page draws a little pixel bird based on your face. It all runs in your browser.",
-  "intro": "I've gotten into birding lately, so here's a fun version of it. Take or upload a selfie and the page turns you into a pixel bird. If you have wide eyes, your bird gets wide eyes; a rounder face gives a rounder bird, and your colors become its feathers.\nYour photo stays on your device. Nothing is uploaded.",
+  "intro": "Across the world, I've been spending more time looking for birds, photographing them, and learning about them. This page turns you into a pixel bird based on your selfie. It's based on your facial features, so for example, a rounder face gives a rounder bird, and your colors become its feathers. Your photo stays on your device. Nothing is uploaded, so feel free to snap away",
   "emoji": "🐦",
   "accent": "#0ea5e9",
   "order": 4,
