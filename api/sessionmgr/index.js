@@ -1,5 +1,6 @@
 let BlobServiceClient;
 let TableClient;
+const { allowedUsers, principalUserId } = require('./auth');
 
 const CONTAINER = 'originals';
 const SESSION_JSON = '_session.json';
@@ -11,9 +12,7 @@ const MAX_TITLE = 200;
 const MAX_LOCATION = 200;
 const MAX_DESCRIPTION = 1000;
 
-const ALLOWED_USERS = new Set(
-  (process.env.ADMIN_GITHUB_USERS || 'trumanbrown').toLowerCase().split(',').map(s => s.trim())
-);
+const ALLOWED_USERS = allowedUsers(process.env.ADMIN_GITHUB_USERS);
 
 const IMG_EXTS = new Set([
   '.jpg', '.jpeg', '.png', '.webp', '.avif',
@@ -202,9 +201,7 @@ async function handleGet(context) {
     return;
   }
 
-  var blobHost = process.env.AZURE_STORAGE_ACCOUNT
-    ? process.env.AZURE_STORAGE_ACCOUNT + '.blob.core.windows.net'
-    : 'stphotoprodnowiur.blob.core.windows.net';
+  var blobHost = new URL(service.url).host;
 
   // Preferred path: read the consolidated admin index written by prebuild. It
   // has the SAME resolved metadata as the public site (including EXIF-derived
@@ -300,7 +297,7 @@ async function handlePut(context, req) {
   if (order !== undefined && order !== null && (typeof order !== 'number' || !Number.isInteger(order))) {
     errors.push('order must be an integer or null.');
   }
-  if (slug && (/[\/\\]/.test(slug) || slug.indexOf('..') !== -1 || slug.charAt(0) === '.')) {
+  if (slug && (slug.includes('/') || slug.includes('\\') || slug.includes('..') || slug.startsWith('.'))) {
     errors.push('Invalid slug.');
   }
   if (errors.length) {
@@ -389,14 +386,7 @@ async function handlePost(context) {
 
 module.exports = async function (context, req) {
   try {
-    var header = req.headers['x-ms-client-principal'];
-    var userId = '';
-    if (header) {
-      try {
-        var decoded = JSON.parse(Buffer.from(header, 'base64').toString('utf8'));
-        userId = (decoded.userDetails || '').toLowerCase();
-      } catch (_) {}
-    }
+    var userId = principalUserId(req.headers['x-ms-client-principal']);
     if (!ALLOWED_USERS.has(userId)) {
       context.res = { status: 403, headers: json(), body: { ok: false, error: 'Not authorized.' } };
       return;

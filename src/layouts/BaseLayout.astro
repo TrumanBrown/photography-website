@@ -58,9 +58,9 @@ const ogImageAbsolute = ogImage
     <script is:inline set:html={themeBootstrap} />
   </head>
   <body class="min-h-screen">
-    <div class="flex min-h-screen lg:flex-row">
+    <div id="page-shell" class="flex min-h-screen lg:flex-row">
       {section === 'photography' && <SessionNav activeSlug={activeSlug} />}
-      <div class="flex min-h-screen min-w-0 flex-1 flex-col">
+      <div id="page-content" class="flex min-h-screen min-w-0 flex-1 flex-col">
         <Header section={section} />
         <main class="flex-1">
           <slot />

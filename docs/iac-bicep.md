@@ -41,11 +41,11 @@ infra/
 ├── main.bicep                # resource-group-scope: orchestrates the modules
 ├── main.parameters.json      # values passed into subscription.bicep
 └── modules/
-    ├── storage.bicep         # storage account + 3 containers + CORS
+    ├── storage.bicep         # storage account + 5 containers + tables + CORS
     ├── swa.bicep             # Static Web App + custom domains
     ├── identity.bicep        # managed identity + RBAC + GitHub OIDC
     ├── domain.bicep          # App Service Domain + DNS records
-    └── monitoring.bicep      # App Insights + Log Analytics workspace
+    └── monitoring.bicep      # optional Log Analytics workspace
 ```
 
 ### Why a separate `subscription.bicep`
@@ -67,21 +67,24 @@ A logical folder in Azure that holds every other resource. Created by `subscript
 Created by [`modules/storage.bicep`](../infra/modules/storage.bicep). Configured for safety + low cost:
 - `Standard_LRS` (cheapest redundancy, three copies in one datacenter)
 - `Hot` access tier (optimized for frequent reads)
-- `allowSharedKeyAccess: false`: disables the legacy "use this magic key to do anything" mode. All management must go through Entra (Azure AD) identities.
+- `allowSharedKeyAccess: true`: required for the connection string used by SWA Free managed Functions, which cannot use the build identity. The Infra workflow writes that credential directly to a masked SWA app setting. Build-time Blob access still uses Entra/OIDC.
 - `minimumTlsVersion: TLS1_2`, `supportsHttpsTrafficOnly: true`, never accept plaintext or old TLS.
 - 7-day blob soft-delete, accidental delete is undoable for a week.
 
-### 3. Three blob containers
+### 3. Five blob containers and three tables
 
 - `originals`, your uploads. Public-read on known URLs only (cannot be listed by anonymous users).
 - `derivatives`, RAW→JPEG sidecars written by the build pipeline. Same access.
-- `metadata`, fully private. Holds the build's manifest of file fingerprints and is reserved for future admin-app state.
+- `variants`, responsive WebP/JPEG build outputs plus admin thumbnails. Same access.
+- `hobby-media`, full/display hobby-gallery images kept out of the photography session scanner. Same access.
+- `metadata`, fully private. Holds the build manifest and consolidated admin index.
+- Tables are created or populated for `contactmessages`, `pageviews`, and `contactratelimit`.
 
 The choice of "Blob" public-access level (vs. "Container") is deliberate, see [security.md](security.md#blob-access).
 
 ### 4. CORS rule
 
-Lets browsers on `yoursite.com` make `fetch()` requests against the blob endpoint. **CORS = Cross-Origin Resource Sharing**, a browser security rule that by default blocks cross-origin requests. We don't actually need it today (the lightbox uses `<img>` tags, which don't trigger CORS) but it's pre-wired for a future admin upload UI.
+Lets browsers on `yoursite.com` make `GET`/`HEAD` requests against the Blob endpoint. **CORS = Cross-Origin Resource Sharing**, a browser security rule that blocks cross-origin `fetch()` by default. The lightbox's original-file download button uses this today.
 
 ### 5. Static Web App: `swa-photography-prod`
 
@@ -113,9 +116,12 @@ The domain registration itself. Bicep can manage it after first-time interactive
 - `CNAME` `www` → SWA hostname
 - `TXT` at apex → SWA validation token (proves to SWA that you own the domain)
 
-### 9. Application Insights + Log Analytics workspace
+### 9. Optional Log Analytics workspace
 
-Created by [`modules/monitoring.bicep`](../infra/modules/monitoring.bicep). App Insights is the pageview-and-performance monitor; Log Analytics is the underlying storage workspace. Free 5 GB/mo ingestion. Daily cap 0.1 GB on the workspace as a runaway-cost safety net.
+Created by [`modules/monitoring.bicep`](../infra/modules/monitoring.bicep) only
+when `enableDiagnostics=true`. It receives storage transaction metrics and has
+a 30-day retention period plus a 1 GB/day runaway-cost cap. Visitor analytics
+use the separate first-party Table Storage pipeline.
 
 ### 10. Outputs
 
@@ -123,9 +129,8 @@ The deployment emits values your scripts/workflows need:
 - `storageAccountName`, `blobEndpoint`
 - `swaName`, `swaDefaultHostname`
 - `managedIdentityClientId`, `managedIdentityPrincipalId`
-- `appInsightsConnectionString`
 
-The Infra workflow uses these to populate repo secrets (`AZURE_STATIC_WEB_APPS_API_TOKEN`, `AZURE_STORAGE_ACCOUNT`, etc.) so the build workflow can find them.
+The Infra workflow uses these to populate repo secrets (`AZURE_STATIC_WEB_APPS_API_TOKEN`, `AZURE_STORAGE_ACCOUNT`) and writes the runtime storage connection, analytics salt, and initial admin directly to SWA app settings.
 
 ---
 

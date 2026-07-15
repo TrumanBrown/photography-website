@@ -13,12 +13,6 @@
 
 set -euo pipefail
 
-# --- config: edit if your storage account or repo changes
-STORAGE_ACCOUNT="${AZURE_STORAGE_ACCOUNT:-stphotoprodnowiur}"
-CONTAINER="originals"
-GH_REPO="TrumanBrown/photography-website"
-# ---
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 STAGING_DIR="$ROOT/staging"
@@ -31,9 +25,11 @@ if [ -f "$ROOT/.env" ]; then
   set +a
 fi
 
-# Accepted extensions (lowercase). Anything else gets stripped from the upload.
-ACCEPTED='*.jpg;*.jpeg;*.png;*.webp;*.avif;*.tif;*.tiff;*.heic;*.heif;*.arw;*.nef;*.cr2;*.cr3;*.dng;*.raf;_session.json'
-EXCLUDE='.DS_Store;Thumbs.db;*.tmp;*.lrcat;*.xmp'
+# --- config: environment and .env can override these values
+STORAGE_ACCOUNT="${AZURE_STORAGE_ACCOUNT:-stphotoprodnowiur}"
+CONTAINER="originals"
+GH_REPO="${GITHUB_REPOSITORY:-TrumanBrown/photography-website}"
+# ---
 
 session=""
 trigger_build=false
@@ -71,6 +67,11 @@ if [ -z "$session" ]; then
   exit 2
 fi
 
+if [[ "$session" == "." || "$session" == ".." || "$session" == *"/"* || "$session" == *"\\"* ]]; then
+  echo "Session must be the name of one direct child folder under staging/: $session" >&2
+  exit 2
+fi
+
 SRC="$STAGING_DIR/$session"
 if [ ! -d "$SRC" ]; then
   echo "No such folder: $SRC" >&2
@@ -95,7 +96,10 @@ if [ -n "${AZURE_TENANT_ID:-}" ]; then
   fi
 fi
 if [ -n "${AZURE_SUBSCRIPTION_ID:-}" ]; then
-  az account set --subscription "$AZURE_SUBSCRIPTION_ID" 2>/dev/null || true
+  if ! az account set --subscription "$AZURE_SUBSCRIPTION_ID" 2>/dev/null; then
+    echo "Could not select Azure subscription $AZURE_SUBSCRIPTION_ID." >&2
+    exit 1
+  fi
 fi
 
 # Count files that would actually be uploaded (matches ACCEPTED extensions).
@@ -107,6 +111,13 @@ file_count=$(find "$SRC" -maxdepth 1 -type f \( \
   -o -iname "*.arw" -o -iname "*.nef" -o -iname "*.cr2" -o -iname "*.cr3" \
   -o -iname "*.dng" -o -iname "*.raf" \
   -o -iname "_session.json" \
+\) | wc -l)
+image_count=$(find "$SRC" -maxdepth 1 -type f \( \
+  -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.webp" \
+  -o -iname "*.avif" -o -iname "*.tif" -o -iname "*.tiff" \
+  -o -iname "*.heic" -o -iname "*.heif" \
+  -o -iname "*.arw" -o -iname "*.nef" -o -iname "*.cr2" -o -iname "*.cr3" \
+  -o -iname "*.dng" -o -iname "*.raf" \
 \) | wc -l)
 total_bytes=$(du -sb "$SRC" 2>/dev/null | awk '{print $1}' || echo 0)
 hr_size=$(numfmt --to=iec --suffix=B "$total_bytes" 2>/dev/null || echo "${total_bytes}B")
@@ -122,8 +133,8 @@ if [ "$trigger_build" = true ]; then
 fi
 echo
 
-if [ "$file_count" -eq 0 ]; then
-  echo "Nothing to upload (no accepted file types in this folder)." >&2
+if [ "$image_count" -eq 0 ]; then
+  echo "Nothing to upload (the session folder has no accepted image files)." >&2
   exit 1
 fi
 

@@ -35,8 +35,8 @@ module monitoring 'modules/monitoring.bicep' = {
   params: {
     location: location
     name: 'log-${namePrefix}'
-    appInsightsName: 'appi-${namePrefix}'
     tags: tags
+    enabled: enableDiagnostics
   }
 }
 
@@ -95,4 +95,3 @@ output swaDefaultHostname string = swa.outputs.defaultHostname
 output swaName string = swa.outputs.name
 output managedIdentityClientId string = identity.outputs.clientId
 output managedIdentityPrincipalId string = identity.outputs.principalId
-output appInsightsConnectionString string = monitoring.outputs.appInsightsConnectionString

@@ -15,7 +15,7 @@ export type BlobContainer = 'originals' | 'derivatives' | 'metadata';
 /**
  * Build a public URL for a blob in the given container.
  *
- * @param container - one of the three containers defined in Bicep
+ * @param container - a public Blob container defined in Bicep
  * @param path - blob name (e.g. "2025-china-trip/IMG_4421.jpg")
  */
 export function blobUrl(container: BlobContainer, path: string): string {

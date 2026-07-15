@@ -141,20 +141,92 @@ const totalCount = sorted.length;
     const closeBtn = document.getElementById('session-nav-close');
     const filter = document.getElementById('session-filter') as HTMLInputElement | null;
     const empty = document.getElementById('session-filter-empty');
+    const pageContent = document.getElementById('page-content');
+    const contactFab = document.getElementById('contact-fab');
+    const desktopMedia = window.matchMedia('(min-width: 1024px)');
+    let open = false;
+    let previousOverflow = '';
 
-    function setOpen(open: boolean) {
-      if (!nav || !backdrop) return;
+    function focusableElements(): HTMLElement[] {
+      if (!nav) return [];
+      return Array.from(
+        nav.querySelectorAll<HTMLElement>(
+          'button:not([disabled]):not([tabindex="-1"]), input:not([disabled]):not([tabindex="-1"]), a[href]:not([tabindex="-1"])',
+        ),
+      ).filter((element) => !element.hasAttribute('hidden'));
+    }
+
+    function setMobileAccessibility() {
+      if (!nav || desktopMedia.matches) return;
+      nav.toggleAttribute('inert', !open);
+      nav.setAttribute('aria-hidden', String(!open));
+      nav.setAttribute('role', open ? 'dialog' : 'complementary');
+      if (open) nav.setAttribute('aria-modal', 'true');
+      else nav.removeAttribute('aria-modal');
+      pageContent?.toggleAttribute('inert', open);
+      contactFab?.toggleAttribute('inert', open);
+    }
+
+    function setOpen(nextOpen: boolean) {
+      if (!nav || !backdrop || desktopMedia.matches || open === nextOpen) return;
+      open = nextOpen;
+      if (open) previousOverflow = document.documentElement.style.overflow;
       nav.classList.toggle('-translate-x-full', !open);
       backdrop.hidden = !open;
-      document.documentElement.style.overflow = open ? 'hidden' : '';
+      openBtn?.setAttribute('aria-expanded', String(open));
+      document.documentElement.style.overflow = open ? 'hidden' : previousOverflow;
+      setMobileAccessibility();
+      if (open) closeBtn?.focus();
+      else openBtn?.focus();
+    }
+
+    function syncViewport() {
+      if (!nav || !backdrop) return;
+      if (desktopMedia.matches) {
+        open = false;
+        nav.classList.add('-translate-x-full');
+        nav.removeAttribute('inert');
+        nav.removeAttribute('aria-hidden');
+        nav.removeAttribute('role');
+        nav.removeAttribute('aria-modal');
+        pageContent?.removeAttribute('inert');
+        contactFab?.removeAttribute('inert');
+        backdrop.hidden = true;
+        openBtn?.setAttribute('aria-expanded', 'false');
+        document.documentElement.style.overflow = previousOverflow;
+      } else {
+        setMobileAccessibility();
+      }
     }
 
     openBtn?.addEventListener('click', () => setOpen(true));
     closeBtn?.addEventListener('click', () => setOpen(false));
     backdrop?.addEventListener('click', () => setOpen(false));
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') setOpen(false);
+      if (!open || desktopMedia.matches) return;
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setOpen(false);
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const focusable = focusableElements();
+      if (focusable.length === 0) {
+        e.preventDefault();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && (document.activeElement === first || !nav?.contains(document.activeElement))) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && (document.activeElement === last || !nav?.contains(document.activeElement))) {
+        e.preventDefault();
+        first.focus();
+      }
     });
+    desktopMedia.addEventListener('change', syncViewport);
+    syncViewport();
 
     // Filtering: hide non-matching items + collapse empty year groups.
     if (filter) {

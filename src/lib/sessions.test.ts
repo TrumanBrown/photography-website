@@ -3,6 +3,8 @@ import type { CollectionEntry } from "astro:content";
 import {
   sortSessions,
   sessionSlug,
+  formatDate,
+  isIsoDate,
   formatExif,
   copyrightLine,
 } from "./sessions";
@@ -41,6 +43,19 @@ describe("sessionSlug", () => {
     expect(sessionSlug(mk("china-spring-2025.json", "2025-01-01"))).toBe(
       "china-spring-2025",
     );
+  });
+});
+
+describe("session dates", () => {
+  it("formats a date-only value without shifting calendar days", () => {
+    expect(formatDate("2026-04-18", "en-US")).toBe("April 18, 2026");
+  });
+
+  it("accepts only real ISO calendar dates", () => {
+    expect(isIsoDate("2024-02-29")).toBe(true);
+    expect(isIsoDate("2025-02-29")).toBe(false);
+    expect(isIsoDate("2026-04-18T12:00:00Z")).toBe(false);
+    expect(isIsoDate("April 18, 2026")).toBe(false);
   });
 });
 

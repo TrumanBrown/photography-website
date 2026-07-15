@@ -4,7 +4,7 @@
 
 ## The 30-second version
 
-Photos live in **cloud storage** (Azure Blob). The website is **pre-built into a folder of HTML/CSS/JS** by a tool called **Astro**, then served from a **CDN** (Azure Static Web Apps). When you upload new photos, a **scheduled job on GitHub** notices and rebuilds the site. No server, no database, ~$2–3/month.
+Photos live in **cloud storage** (Azure Blob). The website is **pre-built into a folder of HTML/CSS/JS** by a tool called **Astro**, then served from a **CDN** (Azure Static Web Apps). When you upload new photos, a **scheduled job on GitHub** notices and rebuilds the site. There is no always-on app server or CMS database; three managed Functions and small Table Storage records handle the dynamic features. Cost is ~$2–3/month.
 
 You drop a folder of photos. The site updates itself.
 
@@ -86,10 +86,10 @@ flowchart TB
             FCON["/api/contact"]
             FTRK["/api/track"]
             FMGR["/api/sessionmgr"]
-            AUTHN["Built-in auth<br/>(GitHub OAuth + roles)"]
+            AUTHN["Built-in auth<br/>(GitHub OAuth + API allowlist)"]
         end
         IDENT["Managed identity<br/>OIDC federation + RBAC"]
-        MON["App Insights + Log Analytics"]
+        MON["Log Analytics<br/>(optional storage diagnostics)"]
         DNS["App Service Domain + Azure DNS<br/>trumanbrown.com"]
     end
 
@@ -134,8 +134,7 @@ flowchart TB
     FMGR -- "read messages" --> TMSG
     FMGR -- "read analytics" --> TPV
     FMGR -. "Rebuild: repository_dispatch" .-> REPO
-    STATIC -. "JS telemetry" .-> MON
-    FCON -. "logs" .-> MON
+    SA -. "optional diagnostics" .-> MON
     DNS -. "DNS + TLS" .-> STATIC
 
     class CAM,STAGE,CODE author;
@@ -190,7 +189,7 @@ sequenceDiagram
 | Interactive hobbies | `src/components/hobbies/`, `src/lib/hobbies/` | [hobbies.md](hobbies.md) |
 | Admin auth | SWA built-in auth (GitHub OAuth), `staticwebapp.config.json` | [security.md](security.md) |
 | GitHub-to-Azure trust | OIDC federation on a managed identity, `infra/modules/identity.bicep` | [cicd.md](cicd.md) |
-| Monitoring | App Insights + Log Analytics, `infra/modules/monitoring.bicep` | [azure.md](azure.md) |
+| Optional storage diagnostics | Log Analytics, `infra/modules/monitoring.bicep` | [azure.md](azure.md) |
 | Domain + DNS | App Service Domain + Azure DNS, `infra/modules/domain.bicep` | [azure.md](azure.md) |
 
 ---
@@ -233,10 +232,10 @@ When someone visits `/sessions/china-2025`:
 - The browser parses, downloads images, done.
 - No JavaScript is required to display the page.
 
-**Pros:** absurdly fast, nearly free hosting, almost zero attack surface (there is no application code running per request), trivially scalable (it's just files).
+**Pros:** absurdly fast, nearly free hosting, a small runtime surface (most requests are just files), and trivial scaling for the public pages.
 **Cons:** content is as fresh as the last build, no per-visitor personalization.
 
-For a photo portfolio with no logins, era 3 is a perfect fit.
+For a mostly public photo portfolio with one owner-only admin tool, era 3 is a strong fit.
 
 ---
 
@@ -279,11 +278,11 @@ Full image-pipeline mechanics: [image-pipeline.md](image-pipeline.md).
 
 Terminology:
 - **Storage account** = your top-level Azure storage resource (one per project usually).
-- **Container** = a top-level "folder" inside a storage account. We have three: `originals/` (your uploads), `derivatives/` (auto-generated RAW→JPEG copies), `metadata/` (private state for the build pipeline).
+- **Container** = a top-level "folder" inside a storage account. We use five: `originals/`, `derivatives/`, `variants/`, `metadata/`, and `hobby-media/`.
 - **Blob** = a single file inside a container. Each blob has a public URL like `https://stphotographyprod.blob.core.windows.net/originals/china-2025/IMG_4421.jpg`.
 
 **Why split images out of the website's build folder?**
-1. Static Web Apps' free tier caps each deploy at 500 MB. With RAW files you'd hit that on day one.
+1. Static Web Apps' free tier caps each deploy at 250 MB. Generated variants are moved to Blob so the site stays below it.
 2. Git is terrible at binary files. After a few sessions, cloning the repo would be miserable.
 3. The whole "drop a folder, site updates itself" promise depends on photos being uploadable without a code change.
 
@@ -298,7 +297,8 @@ Full container layout and access rules: [image-pipeline.md](image-pipeline.md), 
 - Free custom domains.
 - Free preview environments, every pull request gets its own URL automatically.
 
-**There is no server.** There's nothing to SSH into, nothing to keep alive, nothing to scale. SWA is "files behind a CDN, plus some glue."
+**There is no always-on server.** There's nothing to SSH into or keep alive.
+SWA serves files from its CDN and invokes the managed Functions on demand.
 
 Full Azure detail: [azure.md](azure.md).
 
@@ -346,15 +346,15 @@ Full Bicep tour: [iac-bicep.md](iac-bicep.md).
 | Bicep (vs. Terraform, ARM, Pulumi) | One cloud, no state file, native Azure tooling | Terraform (state-file overhead); ARM (too verbose); Pulumi (extra runtime) |
 | OIDC federation (vs. service principal secrets) | No long-lived secrets in GitHub; rotation is automatic | Service principal with `client_secret` (works but leaks if exposed) |
 | Hourly cron rebuild (vs. Event Grid → webhook) | Simple, free, "good enough" for personal portfolio | Event Grid + Azure Function (works but adds parts; trigger already wired for future) |
-| No WAF / Front Door | Static site has no logins, no forms, no server code → no real attack surface to defend | WAF (~$35/mo), would cost more than everything else combined |
+| No WAF / Front Door | Bounded Functions use throttling and allowlisted auth; a ~$35/mo edge tier is disproportionate at personal traffic | WAF would cost more than everything else combined |
 
 ---
 
 ## What's not here (and why)
 
-- **No database.** Session metadata is JSON files in Blob, read at build time.
-- **No server.** SWA is "files behind a CDN."
-- **No login system.** Today the site is fully public. The architecture leaves room, Static Web Apps has built-in support for managed auth and serverless API functions for the day you want admin upload.
-- **No analytics tracker in your face.** Application Insights collects pageview metrics via a small snippet that respects Do Not Track. No third-party analytics service.
+- **No relational or CMS database.** Session metadata is JSON in Blob; small operational records (messages, rate limits, analytics) use Azure Table Storage.
+- **No always-on application server.** SWA serves files from a CDN and invokes three managed Functions only when requested.
+- **No custom account system.** Visitors are public; the owner-only admin uses SWA GitHub OAuth plus a server-side username allowlist.
+- **No third-party analytics SDK.** A small first-party beacon writes bounded, cookieless records to Table Storage.
 
 See [docs/azure.md](azure.md#future-extensibility) for what to preserve so admin upload and iCloud sync can land later without rework.

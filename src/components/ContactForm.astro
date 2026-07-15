@@ -35,6 +35,8 @@
   role="dialog"
   aria-label="Contact form"
   aria-modal="true"
+  aria-hidden="true"
+  inert
   class="fixed inset-y-0 right-0 z-50 flex w-full max-w-md translate-x-full flex-col bg-white shadow-2xl transition-transform duration-300 ease-out dark:bg-neutral-950"
 >
   {/* Header */}
@@ -133,30 +135,52 @@
   const feedback = document.getElementById('contact-feedback')!;
   const charCount = document.getElementById('char-count')!;
   const messageField = document.getElementById('contact-message') as HTMLTextAreaElement;
+  const pageShell = document.getElementById('page-shell')!;
 
   let isOpen = false;
+  let previousBodyOverflow = '';
+
+  function focusableElements(): HTMLElement[] {
+    return Array.from(
+      drawer.querySelectorAll<HTMLElement>(
+        'button:not([disabled]):not([tabindex="-1"]), input:not([disabled]):not([type="hidden"]):not([tabindex="-1"]), textarea:not([disabled]):not([tabindex="-1"]), select:not([disabled]):not([tabindex="-1"]), a[href]:not([tabindex="-1"]), [tabindex]:not([tabindex="-1"])',
+      ),
+    ).filter(
+      (element) => !element.hasAttribute('hidden') && !element.closest('[aria-hidden="true"]'),
+    );
+  }
 
   function openDrawer() {
+    if (isOpen) return;
     isOpen = true;
+    previousBodyOverflow = document.body.style.overflow;
+    drawer.removeAttribute('inert');
+    drawer.setAttribute('aria-hidden', 'false');
+    pageShell.setAttribute('inert', '');
+    fab.setAttribute('inert', '');
     drawer.classList.remove('translate-x-full');
     drawer.classList.add('translate-x-0');
     backdrop.classList.remove('opacity-0', 'pointer-events-none');
     backdrop.classList.add('opacity-100', 'pointer-events-auto');
     fab.setAttribute('aria-expanded', 'true');
     document.body.style.overflow = 'hidden';
-    // Focus first input after transition
-    setTimeout(() => document.getElementById('contact-name')?.focus(), 300);
+    document.getElementById('contact-name')?.focus();
   }
 
   function closeDrawer() {
+    if (!isOpen) return;
     isOpen = false;
     drawer.classList.remove('translate-x-0');
     drawer.classList.add('translate-x-full');
     backdrop.classList.remove('opacity-100', 'pointer-events-auto');
     backdrop.classList.add('opacity-0', 'pointer-events-none');
     fab.setAttribute('aria-expanded', 'false');
-    document.body.style.overflow = '';
+    document.body.style.overflow = previousBodyOverflow;
+    pageShell.removeAttribute('inert');
+    fab.removeAttribute('inert');
     fab.focus();
+    drawer.setAttribute('inert', '');
+    drawer.setAttribute('aria-hidden', 'true');
   }
 
   fab.addEventListener('click', openDrawer);
@@ -165,7 +189,28 @@
 
   // Close on Escape
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && isOpen) closeDrawer();
+    if (!isOpen) return;
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeDrawer();
+      return;
+    }
+    if (e.key !== 'Tab') return;
+
+    const focusable = focusableElements();
+    if (focusable.length === 0) {
+      e.preventDefault();
+      return;
+    }
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey && (document.activeElement === first || !drawer.contains(document.activeElement))) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && (document.activeElement === last || !drawer.contains(document.activeElement))) {
+      e.preventDefault();
+      first.focus();
+    }
   });
 
   // Character counter

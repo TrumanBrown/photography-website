@@ -35,7 +35,7 @@ The project started as a photography portfolio and has grown into a small person
 - **Dynamic API:** three Azure Functions bundled with SWA (contact form, admin session manager, analytics beacon), see [docs/architecture.md](docs/architecture.md)
 - **Admin + analytics:** browser `/admin` panel gated by GitHub sign-in, cookieless traffic metrics, see [docs/admin.md](docs/admin.md) and [docs/analytics.md](docs/analytics.md)
 - **Hosting:** Azure Static Web Apps (Free tier), see [docs/azure.md](docs/azure.md)
-- **Storage:** Azure Blob Storage across four containers (`originals`, `derivatives`, `variants`, `metadata`), see [docs/image-pipeline.md](docs/image-pipeline.md)
+- **Storage:** Azure Blob Storage across five containers (`originals`, `derivatives`, `variants`, `metadata`, `hobby-media`), see [docs/image-pipeline.md](docs/image-pipeline.md)
 - **Domain + DNS:** Azure App Service Domain + Azure DNS
 - **IaC:** Bicep, see [docs/iac-bicep.md](docs/iac-bicep.md)
 - **CI/CD:** GitHub Actions, OIDC federation (no long-lived secrets), see [docs/cicd.md](docs/cicd.md)
@@ -105,6 +105,8 @@ If you want the **Infra (Bicep)** workflow to auto-write `AZURE_STATIC_WEB_APPS_
 GitHub → **Actions** tab → **Infra (Bicep)** → **Run workflow** → environment `prod`.
 
 This deploys the whole Azure stack. Everything it creates is enumerated in [docs/iac-bicep.md](docs/iac-bicep.md#what-the-bicep-deploys-resource-by-resource).
+It also configures the SWA Functions with the storage connection, a private
+analytics salt, and the GitHub user who ran the workflow as the initial admin.
 
 ### 5. Register the domain (interactive, one-time)
 
@@ -146,6 +148,8 @@ cp ~/photos/japan/*.jpg staging/2026-japan/
 The script handles Azure auth (auto-switches tenant via `.env`), filters to
 accepted file types (JPG, HEIC, PNG, TIFF, RAW), uploads to the `originals`
 container, and optionally triggers the build. See [staging/README.md](staging/README.md).
+The argument must name one direct child of `staging/`; every session folder must
+map to a unique public slug and contain at least one image.
 
 ### Setting session metadata
 
@@ -166,6 +170,9 @@ Two options:
     "order": 5
   }
   ```
+
+`date` must be a real `YYYY-MM-DD` calendar date. Prebuild validates the whole
+sidecar and fails with the field path instead of publishing partial defaults.
 
 Changes go live on the next build, click **Run workflow** on `Build and Deploy`
 (or **Rebuild Site** in the admin panel) for a ~5 minute publish, or wait for the cron.

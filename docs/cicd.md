@@ -31,8 +31,9 @@ For this project we use it for two distinct purposes:
 **What it does:**
 1. Logs into Azure via OIDC (see below).
 2. Runs `azure/arm-deploy@v2` against `infra/subscription.bicep`. This creates or updates the resource group and everything inside it.
-3. Reads the deployment outputs (SWA deploy token, storage account name, App Insights connection string).
-4. Writes them into the repo's secrets via the `gh` CLI, if you've added a `GH_PAT_FOR_SECRETS` token. Without that, it prints them and you copy them manually once.
+3. Reads the deployment outputs (SWA name/token and storage account name).
+4. Writes the storage connection string and a derived private analytics salt directly to masked SWA app settings. It initializes `ADMIN_GITHUB_USERS` to the invoking user only when no allowlist exists, preserving later manual additions.
+5. Writes the deploy token and storage account name into repo secrets via `gh` if `GH_PAT_FOR_SECRETS` is configured. Otherwise use `scripts/bootstrap-swa-token.sh` once.
 
 **When to run it:**
 - First-time setup (after you've created the federated MI via `scripts/setup-federated-credential.sh`).
@@ -55,15 +56,16 @@ A `concurrency` block cancels older runs on the same branch when a new one arriv
 
 1. **Checkout** the repo, pulls the code into the runner's working directory.
 2. **Set up Node.js 22** with `actions/setup-node@v4`, caches npm by `package-lock.json` so subsequent runs are fast.
-3. **`npm ci`**: installs dependencies. `ci` (rather than `install`) is the CI-friendly version: it uses the exact versions in `package-lock.json` and fails if anything has drifted, so your local environment and CI are guaranteed to match. Full npm primer below. Immediately after, **`npm test`** runs the unit suite (stocking math, session sort, blob URLs, the visitor hash); a failure stops the run before anything is built or deployed.
+3. **`npm ci`**: installs dependencies from `package-lock.json`. Immediately after, **`npm test`** runs pure-logic coverage for session/date helpers, prebuild validation/cache keys, API auth/rate limiting/IP parsing, Blob URLs, HTML escaping, and hobby engines; a failure stops the run before build or deploy.
 4. **Install `libraw-bin`** via apt with cache, needed for Sony `.ARW` RAW conversion. See [image-pipeline.md](image-pipeline.md#raw-files-sony-arw-and-friends).
 5. **Azure login (OIDC)**: assumes the managed identity created in `infra/`. No password, no token in secrets. Explained below.
 6. **Restore prebuild cache**: `.cache/prebuild/` is a folder of already-downloaded images from previous runs, keyed by blob ETag. Lets incremental builds skip re-downloading unchanged photos.
 7. **Run `scripts/prebuild.mjs`**: scans Blob, downloads new photos, converts RAW, writes Astro content collection. Full mechanics: [image-pipeline.md](image-pipeline.md).
 8. **Restore Astro asset cache**: `.cache/astro/` holds Astro's build cache, including the optimized WebP/JPEG image variants. Persisting it across runs means only new or changed photos get re-encoded by sharp; unchanged variants are reused instead of regenerated from scratch every build.
-9. **`npm run build`**: runs `astro build`. Astro processes images through sharp into WebP/JPEG variants and outputs the `dist/` folder, reusing anything already in the asset cache.
-10. **Save prebuild + Astro caches** for the next run.
-11. **Deploy to SWA** via `Azure/static-web-apps-deploy@v1` with `skip_app_build: true` (we already built). The action uploads `dist/` to the SWA deployment endpoint using the deploy token.
+9. **`npm run build`**: verifies inline CSP hashes, then runs `astro build`. Astro processes images through sharp into WebP/JPEG variants and outputs `dist/`.
+10. **Sync variants to Blob**: `scripts/sync-variants.mjs` uploads generated photos to `variants/`, rewrites HTML URLs, and removes those large files from the SWA payload.
+11. **Stage `staticwebapp.config.json`**, save caches, and install the API package's locked dependencies.
+12. **Deploy to SWA** via `Azure/static-web-apps-deploy@v1` with `skip_app_build: true`.
 
 **PR previews:** when the trigger is a `pull_request`, SWA automatically spins up a preview environment at a unique URL (`pr-<n>-<random>.<region>.azurestaticapps.net`). Once you merge or close the PR, a separate `close_pr` job tears the preview down so it doesn't count against quotas.
 
@@ -76,7 +78,7 @@ A `concurrency` block cancels older runs on the same branch when a new one arriv
 2. **Unit tests** via `npm test` (the pure-logic suite; this one is blocking).
 3. Prettier check (non-blocking, flagged but doesn't fail the PR).
 4. Synthesizes fixture sessions via `scripts/generate-fixtures.mjs` (so Astro has content to type-check).
-5. Runs `npm run check` (which calls `astro check`, TypeScript on `.astro` files + content-collection Zod schema validation).
+5. Runs `npm run check` (CSP hash drift check plus `astro check`, TypeScript, and content schema validation).
 
 This catches broken templates and schema-violating session JSON **before** they hit `main` and break a real build.
 
@@ -129,7 +131,6 @@ The only "secrets" you ever put in GitHub are:
 - `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, these are IDs, not passwords. Knowing them does not grant access.
 - `AZURE_STATIC_WEB_APPS_API_TOKEN`, the one real secret. SWA insists on it for the deploy step; rotate by re-deploying the SWA module.
 - `AZURE_STORAGE_ACCOUNT`, just the account name.
-- `APPINSIGHTS_CONNECTION_STRING`, the AI instrumentation endpoint; not sensitive but tidier as a secret.
 
 ---
 
@@ -161,4 +162,7 @@ If you've used Node before, none of this is new. If you haven't:
 | `GH_PAT_FOR_SECRETS` | You generate it (optional) | Infra workflow auto-writes other secrets |
 | `AZURE_STATIC_WEB_APPS_API_TOKEN` | Bicep output | `Azure/static-web-apps-deploy@v1` step |
 | `AZURE_STORAGE_ACCOUNT` | Bicep output | `scripts/prebuild.mjs` (env var) |
-| `APPINSIGHTS_CONNECTION_STRING` | Bicep output | Astro layout (passed via `PUBLIC_APPINSIGHTS_CONNECTION_STRING`) |
+
+Runtime-only values (`AZURE_STORAGE_CONNECTION_STRING`, `ANALYTICS_SALT`, and
+`ADMIN_GITHUB_USERS`) live in SWA app settings, not GitHub Actions secrets. The
+Infra workflow initializes them without printing their values.

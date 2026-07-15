@@ -79,7 +79,7 @@ function bboxOf(pts) {
 function buildState(key, cfg, data, waters) {
   // state outline -> largest ring
   const f = data.states.features.find((x) => (x.properties.name || x.properties.NAME) === cfg.name);
-  let rings = f.geometry.type === 'Polygon' ? [f.geometry.coordinates[0]] : f.geometry.coordinates.map((p) => p[0]);
+  const rings = f.geometry.type === 'Polygon' ? [f.geometry.coordinates[0]] : f.geometry.coordinates.map((p) => p[0]);
   rings.sort((a, b) => b.length - a.length);
   const ring = rings[0];
 

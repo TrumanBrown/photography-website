@@ -4,11 +4,12 @@
 // visitor cannot be tracked across days). No cookies, no third parties.
 
 const { todayUtc, visitorHash } = require('../shared/visitor-hash');
+const { clientIp } = require('../shared/client-ip');
 
 let TableClient;
 const TABLE = 'pageviews';
 const MAX_PATH = 300;
-const SALT = process.env.ANALYTICS_SALT || 'tb-analytics';
+const SALT = process.env.ANALYTICS_SALT || process.env.AZURE_STORAGE_CONNECTION_STRING || '';
 
 function getTableClient() {
   const conn = process.env.AZURE_STORAGE_CONNECTION_STRING;
@@ -22,19 +23,13 @@ function getTableClient() {
 // Common bot/crawler user-agents we don't want inflating the numbers.
 const BOT_RE = /bot|crawl|spider|slurp|bingpreview|facebookexternalhit|embedly|quora|pinterest|vkshare|whatsapp|telegram|preview|monitor|curl|wget|python-requests|headless/i;
 
-function clientIp(req) {
-  const xff = req.headers['x-forwarded-for'] || '';
-  // SWA puts "ip:port" or comma-separated list; take the first IP.
-  return xff.split(',')[0].trim().split(':')[0] || 'unknown';
-}
-
 function refHost(referrer, ownHost) {
   if (!referrer) return '';
   try {
     const h = new URL(referrer).hostname;
     if (!h || h === ownHost) return '';
     return h.slice(0, 100);
-  } catch (_) {
+  } catch {
     return '';
   }
 }
@@ -55,7 +50,7 @@ module.exports = async function (context, req) {
 
     const client = getTableClient();
     if (!client) return;
-    await client.createTable().catch(() => {}); // no-op if it exists
+    await client.createTable();
 
     const date = todayUtc();
     const now = Date.now();

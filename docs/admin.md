@@ -61,8 +61,13 @@ The `/admin` page itself is accessible to everyone (it's just static HTML with a
 
 1. SWA automatically sets the `x-ms-client-principal` header on requests from authenticated users. This header cannot be forged by clients.
 2. The function decodes this header to get the GitHub username.
-3. It checks the username against an allowlist (defaults to `trumanbrown`, configurable via `ADMIN_GITHUB_USERS` SWA environment variable).
+3. It requires the principal's identity provider to be GitHub and checks the normalized username against `ADMIN_GITHUB_USERS`.
 4. Non-matching users get 403. Unauthenticated users (no header) get 403.
+
+The allowlist fails closed: a missing, empty, or malformed setting authorizes
+nobody. The Infra workflow initializes it to the GitHub user who first runs that
+workflow and preserves an existing allowlist on later runs; comma-separated
+entries can be configured in SWA app settings.
 
 ## Architecture
 
@@ -85,7 +90,7 @@ Browser ──GET /api/sessionmgr?type=messages──▶ SWA Functions ──▶
          ──▶ Table Storage (read contactmessages, newest first)
 ```
 
-The API function ([`api/sessionmgr/index.js`](../api/sessionmgr/index.js)) uses the same `AZURE_STORAGE_CONNECTION_STRING` env var as the contact form function. It accesses Blob Storage for sessions and Table Storage (`contactmessages`) for the read-only Messages tab.
+The API function ([`api/sessionmgr/index.js`](../api/sessionmgr/index.js)) uses the same `AZURE_STORAGE_CONNECTION_STRING` app setting as the contact form function. It derives the Blob hostname from that connection, accesses Blob Storage for sessions, and reads Table Storage (`contactmessages`) for the Messages tab.
 
 ### Thumbnail performance
 
@@ -93,12 +98,15 @@ The cover picker loads tiny thumbnails (120px wide, ~5KB each) from `variants/th
 
 ## Fresh deployment setup
 
-After deploying the SWA infrastructure (Bicep), do these steps once:
+The Infra workflow automatically sets `AZURE_STORAGE_CONNECTION_STRING`,
+`ANALYTICS_SALT`, and `ADMIN_GITHUB_USERS`. After the first deployment:
 
-1. **Set the `AZURE_STORAGE_CONNECTION_STRING` app setting** on the SWA resource if not already done (needed by both the contact form and admin API).
-2. Optionally set `ADMIN_GITHUB_USERS` to a comma-separated list of GitHub usernames (defaults to `trumanbrown`).
-3. **Set `GITHUB_TOKEN`** to a fine-grained GitHub PAT with `actions:write` scope on this repo. This enables the "Rebuild Site" button. If omitted, the button shows an error but everything else works.
-4. Visit `https://yourdomain.com/admin`, sign in with GitHub and you'll see the session manager.
+1. Optionally change `ADMIN_GITHUB_USERS` to a comma-separated list of GitHub usernames.
+2. **Set `GITHUB_TOKEN`** to a fine-grained GitHub PAT with `actions:write` scope on this repo. This enables the "Rebuild Site" button. If omitted, the button shows an error but everything else works.
+3. Visit `https://yourdomain.com/admin`, sign in with GitHub and you'll see the session manager.
+
+If you deploy Bicep manually instead of using the workflow, set the three
+automatic app settings yourself before using the Functions.
 
 ## What the admin panel cannot do
 

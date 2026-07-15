@@ -47,9 +47,9 @@ This follows the **cookieless, no-PII** approach used by privacy-first analytics
 - **No IP address is ever stored.** To count unique visitors, the `/api/track` function computes `sha256(ip + user-agent + date + salt)` and stores only the first 16 hex chars. The raw IP is used for the hash and immediately discarded.
 - **No cross-day tracking.** The hash includes the current date, so the same visitor produces a *different* hash tomorrow, by design. This means "unique visitors" is counted per-day; a visitor returning on a later day counts again. This is the privacy feature, not a bug.
 - **No cookies / no localStorage identifiers.** The only client state is an ephemeral `sessionStorage` session id used to correlate a pageview with its duration beacon; it's cleared when the tab closes.
-- **Referrers stored as hostname only** (e.g. `google.com`), never full URLs with query strings.
+- **Referrers stored as hostname only** (e.g. `google.com`, capped at 100 characters), never full URLs with query strings.
 - **Bots are filtered** by user-agent so they don't inflate the numbers.
-- **No consent banner required** because nothing personally identifying is stored.
+- **No cookie identifier or raw network address is retained.** Local legal requirements still depend on jurisdiction and site use.
 
 ## Storage
 
@@ -60,8 +60,8 @@ This follows the **cookieless, no-PII** approach used by privacy-first analytics
 
 ## Configuration
 
-- **`ANALYTICS_SALT`** (optional SWA env var), extra secret mixed into the visitor hash. Defaults to a constant if unset. Set it to make hashes unguessable; changing it resets unique-visitor correlation.
-- No other setup. `/api/track` uses the same `AZURE_STORAGE_CONNECTION_STRING` as the contact form.
+- **`ANALYTICS_SALT`** is set automatically by the Infra workflow and mixed into visitor hashes. Manual deployments may omit it; the Functions then derive a secret fallback from the required storage connection string rather than using a public constant. Changing either value can split unique-visitor counts for that day.
+- `/api/track` uses the same `AZURE_STORAGE_CONNECTION_STRING` app setting as the contact form.
 
 ## Files
 
@@ -78,4 +78,8 @@ This follows the **cookieless, no-PII** approach used by privacy-first analytics
 
 ## Alternative considered: Azure App Insights
 
-The CSP already allows the App Insights web SDK, and it would auto-collect sessions/duration. It was not used because surfacing the data in `/admin` would require querying the App Insights REST API with a separate API key and tolerating ~minutes of latency. The custom pipeline keeps everything in one place (Table Storage), shows data instantly, and stores no PII.
+App Insights would auto-collect sessions and duration, but surfacing that data in
+`/admin` would require another API credential and tolerate ingestion latency.
+The custom pipeline keeps everything in Table Storage, shows data immediately,
+and avoids loading a third-party telemetry SDK. App Insights is therefore not
+provisioned or allowlisted by the CSP.

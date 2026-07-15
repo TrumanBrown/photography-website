@@ -29,9 +29,10 @@
 import { mkdir, writeFile, readFile, rm, access, copyFile as fsCopyFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname, join, basename, extname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawn } from 'node:child_process';
 import { tmpdir } from 'node:os';
+import { createHash } from 'node:crypto';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -51,6 +52,9 @@ const ORIGINALS = 'originals';
 const DERIVATIVES = 'derivatives';
 const METADATA = 'metadata';
 const MANIFEST_BLOB = 'manifest.json';
+const MAX_TITLE = 200;
+const MAX_LOCATION = 200;
+const MAX_DESCRIPTION = 1000;
 
 const argv = new Set(process.argv.slice(2));
 const LOCAL_ONLY = argv.has('--local-only');
@@ -86,11 +90,13 @@ async function main() {
   const manifest = await loadManifest(metadataClient);
   const nextManifest = { blobs: {}, generatedAt: new Date().toISOString(), account };
 
-  // Clear sessions dir so removed sessions disappear. Keep .gitkeep.
-  await clearSessionsDir();
-
   const sessionPrefixes = await listSessionPrefixes(originalsClient);
+  validateSessionSlugs(sessionPrefixes);
   console.log(`Found ${sessionPrefixes.length} session(s) in originals/`);
+
+  // Clear sessions only after the remote inventory is known to be valid, so a
+  // naming error cannot destroy the last usable local build inputs.
+  await clearSessionsDir();
 
   const indexRecords = [];
   for (const prefix of sessionPrefixes) {
@@ -208,9 +214,11 @@ async function processSession({ prefix, originalsClient, derivativesClient, serv
   try {
     const sb = originalsClient.getBlobClient(sidecarPath);
     const buf = await sb.downloadToBuffer();
-    sidecar = JSON.parse(buf.toString('utf8'));
+    sidecar = validateSessionSidecar(JSON.parse(buf.toString('utf8')), sidecarPath);
   } catch (e) {
-    if (e.statusCode !== 404) console.warn(`Could not read ${sidecarPath}:`, e.message);
+    if (e.statusCode !== 404) {
+      throw new Error(`Invalid session metadata at ${sidecarPath}: ${e.message}`, { cause: e });
+    }
   }
 
   // Enumerate image blobs under this prefix.
@@ -228,6 +236,7 @@ async function processSession({ prefix, originalsClient, derivativesClient, serv
       contentLength: blob.properties.contentLength,
     });
   }
+  validateImageTargets(blobs, prefix);
 
   if (blobs.length === 0) {
     console.warn(`Session "${prefix}" has no images; skipping.`);
@@ -235,13 +244,14 @@ async function processSession({ prefix, originalsClient, derivativesClient, serv
   }
 
   const images = [];
+  const targetBySource = new Map(blobs.map((blob) => [blob.base, targetFileForBlob(blob)]));
   let earliestExifDate;
 
   for (const b of blobs) {
     const isRaw = RAW_EXTS.has(b.ext);
     const needsConvert = CONVERT_EXTS.has(b.ext);
     const willConvert = isRaw || needsConvert;
-    const targetFile = willConvert ? `${stripExt(b.base)}.jpg` : b.base;
+    const targetFile = targetFileForBlob(b);
     const localPath = join(imagesDir, targetFile);
     // Cache key includes targetFile so a format change (e.g. HEIC→jpg
     // conversion logic added) invalidates old cached bytes.
@@ -324,15 +334,19 @@ async function processSession({ prefix, originalsClient, derivativesClient, serv
 
   // Sort images by filename for stable ordering (override via sidecar.images if provided).
   const orderedImages = Array.isArray(sidecar.images)
-    ? reorderByList(images, sidecar.images)
+    ? reorderByList(images, sidecar.images, targetBySource)
     : images.sort((a, b) => a.file.localeCompare(b.file));
+
+  const cover = sidecar.cover
+    ? (targetBySource.get(sidecar.cover) ?? sidecar.cover)
+    : undefined;
 
   const sessionRecord = {
     title: sidecar.title ?? humanize(slug),
     date: sidecar.date ?? earliestExifDate?.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
     location: sidecar.location ?? '',
     description: sidecar.description ?? '',
-    ...(sidecar.cover ? { cover: sidecar.cover } : {}),
+    ...(cover ? { cover } : {}),
     ...(sidecar.order != null ? { order: sidecar.order } : {}),
     images: orderedImages,
   };
@@ -504,7 +518,7 @@ async function generateAdminThumbs({ slug, imagesDir, images, containerClient })
     try {
       await blobClient.getProperties();
       continue;
-    } catch (_) {}
+    } catch {}
     try {
       const buf = await sharp(src)
         .rotate() // apply EXIF orientation so portrait photos aren't sideways
@@ -522,13 +536,140 @@ async function generateAdminThumbs({ slug, imagesDir, images, containerClient })
   if (uploaded > 0) console.log(`  thumbs: ${uploaded} new for ${slug}`);
 }
 
-function sanitizeSlug(prefix) {
+export function sanitizeSlug(prefix) {
   return prefix
     .toLowerCase()
     .replace(/[^a-z0-9-_/]+/g, '-')
     .replace(/\/+/g, '-')
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '');
+}
+
+export function validateSessionSlugs(prefixes) {
+  const prefixBySlug = new Map();
+  const problems = [];
+
+  for (const prefix of prefixes) {
+    const slug = sanitizeSlug(prefix);
+    if (!slug) {
+      problems.push(`"${prefix}" does not contain any characters usable in a public URL`);
+      continue;
+    }
+    if (slug.length > 200) {
+      problems.push(`"${prefix}" maps to a ${slug.length}-character slug; the limit is 200`);
+      continue;
+    }
+
+    const existingPrefix = prefixBySlug.get(slug);
+    if (existingPrefix) {
+      problems.push(`"${existingPrefix}" and "${prefix}" both map to "${slug}"`);
+      continue;
+    }
+    prefixBySlug.set(slug, prefix);
+  }
+
+  if (problems.length > 0) {
+    throw new Error(`Invalid session folder names:\n- ${problems.join('\n- ')}\nRename the folders in originals/ so every session has a unique URL slug.`);
+  }
+}
+
+export function targetFileForBlob(blob) {
+  return RAW_EXTS.has(blob.ext) || CONVERT_EXTS.has(blob.ext)
+    ? `${stripExt(blob.base)}.jpg`
+    : blob.base;
+}
+
+export function validateImageTargets(blobs, prefix) {
+  const sourceByTarget = new Map();
+  const collisions = [];
+
+  for (const blob of blobs) {
+    const target = targetFileForBlob(blob);
+    const normalizedTarget = target.toLowerCase();
+    const existingSource = sourceByTarget.get(normalizedTarget);
+    if (existingSource) {
+      collisions.push(`"${existingSource}" and "${blob.base}" both produce "${target}"`);
+    } else {
+      sourceByTarget.set(normalizedTarget, blob.base);
+    }
+  }
+
+  if (collisions.length > 0) {
+    throw new Error(
+      `Session "${prefix}" has conflicting image filenames:\n- ${collisions.join('\n- ')}\nRename or remove one source image from each pair.`,
+    );
+  }
+}
+
+export function validateSessionSidecar(value, source = '_session.json') {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`${source} must contain a JSON object.`);
+  }
+
+  const problems = [];
+  validateOptionalString(value, 'title', MAX_TITLE, problems, { nonEmpty: true });
+  validateOptionalString(value, 'location', MAX_LOCATION, problems);
+  validateOptionalString(value, 'description', MAX_DESCRIPTION, problems);
+  validateOptionalString(value, 'cover', undefined, problems);
+
+  if (value.date !== undefined && (typeof value.date !== 'string' || !isIsoCalendarDate(value.date))) {
+    problems.push('date must be a real ISO calendar date (YYYY-MM-DD)');
+  }
+  if (value.order !== undefined && value.order !== null && !Number.isInteger(value.order)) {
+    problems.push('order must be an integer or null');
+  }
+  if (value.images !== undefined) {
+    if (!Array.isArray(value.images)) {
+      problems.push('images must be an array');
+    } else {
+      value.images.forEach((item, index) => {
+        if (typeof item === 'string') {
+          if (!item) problems.push(`images[${index}] must not be empty`);
+          return;
+        }
+        if (!item || typeof item !== 'object' || Array.isArray(item)) {
+          problems.push(`images[${index}] must be a filename or an object`);
+          return;
+        }
+        if (typeof item.file !== 'string' || !item.file) {
+          problems.push(`images[${index}].file must be a non-empty string`);
+        }
+        if (item.caption !== undefined && typeof item.caption !== 'string') {
+          problems.push(`images[${index}].caption must be a string`);
+        }
+      });
+    }
+  }
+
+  if (problems.length > 0) {
+    throw new Error(`${source} is invalid:\n- ${problems.join('\n- ')}`);
+  }
+  return value;
+}
+
+function validateOptionalString(value, field, maxLength, problems, options = {}) {
+  const fieldValue = value[field];
+  if (fieldValue === undefined) return;
+  if (typeof fieldValue !== 'string') {
+    problems.push(`${field} must be a string`);
+    return;
+  }
+  if (options.nonEmpty && !fieldValue.trim()) problems.push(`${field} must not be empty`);
+  if (maxLength && fieldValue.length > maxLength) {
+    problems.push(`${field} must be at most ${maxLength} characters`);
+  }
+}
+
+function isIsoCalendarDate(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return (
+    !Number.isNaN(date.getTime()) &&
+    date.getUTCFullYear() === Number(match[1]) &&
+    date.getUTCMonth() + 1 === Number(match[2]) &&
+    date.getUTCDate() === Number(match[3])
+  );
 }
 
 function humanize(slug) {
@@ -579,10 +720,8 @@ function buildExifSettings(exif) {
   return Object.keys(out).length ? out : undefined;
 }
 
-function hashKey(s) {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
-  return `${(h >>> 0).toString(16)}-${s.length}.bin`;
+export function hashKey(s) {
+  return `${createHash('sha256').update(s).digest('hex')}.bin`;
 }
 
 async function copyFile(src, dst) {
@@ -608,14 +747,18 @@ function runCmd(cmd, args) {
   });
 }
 
-function reorderByList(images, listed) {
+export function reorderByList(images, listed, targetBySource = new Map()) {
   const map = new Map(images.map((i) => [i.file, i]));
   const ordered = [];
   for (const item of listed) {
-    const file = typeof item === 'string' ? item : item.file;
+    const sourceFile = typeof item === 'string' ? item : item?.file;
+    if (typeof sourceFile !== 'string') continue;
+    const file = targetBySource.get(sourceFile) ?? sourceFile;
     const found = map.get(file);
     if (found) {
-      if (typeof item === 'object' && item.caption) found.caption = item.caption;
+      if (item && typeof item === 'object' && typeof item.caption === 'string' && item.caption) {
+        found.caption = item.caption;
+      }
       ordered.push(found);
       map.delete(file);
     }
@@ -627,7 +770,9 @@ function reorderByList(images, listed) {
   return ordered;
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}

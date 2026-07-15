@@ -4,19 +4,23 @@
 
 ## TL;DR
 
-The site has no public logins and no user database. An `/admin` panel exists but is gated by **SWA built-in auth** (GitHub OAuth + role invitation), see [docs/admin.md](admin.md). Its **runtime** attack surface is essentially "what bugs exist in Microsoft's CDN," which is Microsoft's problem to fix. What we focus on:
+The site has no visitor accounts or custom user database. An `/admin` panel uses
+**SWA built-in GitHub authentication** plus a server-side username allowlist,
+see [docs/admin.md](admin.md). Three small Functions handle contact messages,
+analytics, and admin operations, so the runtime surface is intentionally narrow
+but not zero. What we focus on:
 
 - Lock down the storage account so attackers can't enumerate or modify it.
 - Send strong HTTP security headers so visitors' browsers refuse to be misused.
-- Gate admin routes behind SWA role-based auth (GitHub OAuth, invite-only `admin` role).
-- Use short-lived, narrowly-scoped credentials everywhere (OIDC federation, no long-lived secrets).
-- Collect analytics **without storing any PII** (no IP, no cookies, see [docs/analytics.md](analytics.md)).
+- Gate every admin API operation with a fail-closed GitHub-principal allowlist.
+- Use short-lived OIDC credentials for CI and isolate the unavoidable runtime connection string in SWA app settings.
+- Collect analytics **without retaining raw IPs or cookie identifiers**, see [docs/analytics.md](analytics.md).
 - Be honest about what's worth defending vs. what would just inflate the bill.
 
 ### Analytics endpoint
 
 `/api/track` is an anonymous POST endpoint that records pageviews. It is hardened against abuse and privacy issues:
-- **No PII stored.** Unique visitors are counted via a daily-salted `sha256(ip + ua + date + salt)` hash; the raw IP is never persisted. No cookies or persistent client identifiers.
+- **No raw network identifier stored.** Unique visitors are counted via a daily-salted `sha256(ip + ua + date + salt)` hash; the raw IP and user-agent are never persisted. No cookies or persistent client identifiers.
 - **Input is bounded and sanitized** (path/referrer length caps, duration sanity range, bot-UA filtering). Referrers are reduced to hostname only.
 - **Fails silently**: the function always returns 204 and never surfaces errors to the page, so analytics can't break the site.
 - Worst-case abuse is a flood of fake pageview rows in the `pageviews` table (cosmetic, cheap to clear). No data exposure, no write access to anything else.
@@ -52,9 +56,9 @@ Delivered via [staticwebapp.config.json](../staticwebapp.config.json) `globalHea
 ```
 default-src 'self';
 img-src 'self' https://*.blob.core.windows.net https://static.inaturalist.org https://inaturalist-open-data.s3.amazonaws.com data: blob:;
-script-src 'self' 'wasm-unsafe-eval' https://js.monitor.azure.com;
+script-src 'self' 'wasm-unsafe-eval';
 worker-src 'self' blob:;
-connect-src 'self' https://*.blob.core.windows.net https://api.inaturalist.org https://*.in.applicationinsights.azure.com https://*.livediagnostics.monitor.azure.com;
+connect-src 'self' https://*.blob.core.windows.net https://api.inaturalist.org;
 style-src 'self' 'unsafe-inline';
 font-src 'self' data:;
 object-src 'none';
@@ -68,16 +72,19 @@ form-action 'self'
 Translation:
 - **`default-src 'self'`**: load resources only from the site's own origin unless overridden.
 - **`img-src ... data: blob:`**: also allow images from any Azure Blob endpoint (lightbox full-res, hobby photos), the iNaturalist photo CDNs (the tide-pooling observations grid and species photos), `data:` URIs (inlined SVG icons), and `blob:` object URLs (the Birding island's local selfie preview).
-- **`script-src 'self' 'wasm-unsafe-eval' https://js.monitor.azure.com`**: own origin + the App Insights SDK CDN. `'wasm-unsafe-eval'` lets the Birding island compile the self-hosted MediaPipe WASM; it permits WebAssembly only, **not** JavaScript `eval`.
+- **`script-src 'self' 'wasm-unsafe-eval'`**: own-origin scripts only. `'wasm-unsafe-eval'` lets the Birding island compile the self-hosted MediaPipe WASM; it permits WebAssembly only, **not** JavaScript `eval`.
 - **`worker-src 'self' blob:`**: the MediaPipe runtime spawns a same-origin worker (and a `blob:` worker) to run the landmark model off the main thread.
-- **`connect-src 'self' ...`**: own origin (the Birding model + WASM are fetched from `/birding/`, so `'self'` covers them), Blob (lightbox original download), the public iNaturalist API, and App Insights ingestion endpoints.
+- **`connect-src 'self' ...`**: own origin (the Birding model + WASM are fetched from `/birding/`, so `'self'` covers them), Blob (lightbox original download), and the public iNaturalist API.
 - **`style-src 'self' 'unsafe-inline'`**: `'unsafe-inline'` is required by Astro's scoped style blocks. Can be tightened later with hashes; modest risk.
 - **`object-src 'none'`**: no `<object>` / `<embed>` / Flash-era nonsense.
 - **`frame-ancestors 'none'`**: modern equivalent of `X-Frame-Options: DENY`.
 - **`base-uri 'self'`**: attackers can't inject a `<base>` tag pointing relative URLs elsewhere.
 - **`form-action 'self'`**: forms can only submit to the site's own origin (contact form, admin).
 
-If you ever add inline scripts, switch to per-script hashes rather than `'unsafe-inline'`. Astro can emit hash-based CSPs in a future iteration if needed.
+`npm run check:csp` verifies both inline theme scripts against the configured
+hashes. It runs as part of `npm run check` and `npm run build`, so changing an
+inline script without updating the policy fails before deployment. If you add
+another inline script, add its hash rather than enabling `'unsafe-inline'`.
 
 ### Contact form abuse
 
@@ -85,13 +92,13 @@ The public contact endpoint (`api/contact`) has layered protection:
 
 - **Honeypot field.** A hidden `website` input that humans never see. Bots that fill it get a fake success and are silently dropped.
 - **Server-side validation.** Name, email, and message are length-checked and the email is format-checked before anything is stored.
-- **Per-IP rate limit.** Each client is capped at a handful of messages per hour. The limiter stores only a salted, truncated hash of the IP (the same hashing the analytics beacon uses), never the raw IP, in a `contactratelimit` table. It fails open: if the limiter backend errors, a real message is never blocked.
+- **Per-IP rate limit.** Each client is capped at five messages per hour. The limiter stores only a secret-salted, truncated hash of the IP, never the raw IP, in a `contactratelimit` table. ETag-conditional updates prevent parallel requests from overwriting the count. It fails open on a storage outage so a legitimate message is not rejected solely because the limiter is unavailable.
 
 ### Blob storage access controls
 
 | Surface | Mitigation |
 |---|---|
-| Shared access keys leaking | `allowSharedKeyAccess: false`. There is no "master password" for the storage account. All management must go through Microsoft Entra (Azure AD) identities. |
+| Shared access keys leaking | Shared-key access is enabled because SWA Free managed Functions cannot use a managed identity for these data-plane calls. The connection string is stored only as a masked SWA app setting and is never emitted to git or GitHub secrets. Build-time access still uses short-lived OIDC credentials. Rotate storage keys and re-run Infra if exposure is suspected. |
 | Anonymous enumeration of all your photos | Containers use public-access level `Blob`, **not** `Container`. Anonymous users can `GET` a blob if they know its URL; they cannot list the container's contents. |
 | Pipeline credentials sitting in env vars | The build pipeline authenticates as a managed identity via OIDC federation. No keys, no PATs. The token is short-lived and scoped to one branch of one repo. See [cicd.md](cicd.md#oidc-federation-no-long-lived-secrets). |
 | Unauthorized writes to `originals/` | RBAC: only the managed identity has `Storage Blob Data Contributor`. Public users have read-only access to known URLs. |
@@ -118,19 +125,22 @@ The honest framing: for a public portfolio, the goal isn't making theft impossib
 
 Deliberately skipped. WAF in Azure requires either Azure Front Door or Application Gateway, both of which carry a ~$35+/month base fee.
 
-Worth it when you have:
+Worth it when you have substantially more traffic or higher-value operations:
 - Login / auth endpoints to brute-force
 - Forms that could be SQL-injected
 - Admin panels to defend
 - Server-side code with patchable vulnerabilities
 
-A static portfolio has none of those. Revisit if/when admin upload ships.
+This site has a contact form and allowlisted admin API, but their bounded inputs,
+rate limiting, and server-side authorization are proportionate at personal-site
+traffic. Revisit if admin upload or broader accounts ship.
 
 ### Secret hygiene
 
 - **No secrets in the repo, ever.** The only configurable values committed live in `site.config.ts` (display config) and `infra/main.parameters.json` (resource names + your GitHub username). Neither is sensitive.
 - **GitHub → Azure auth** is OIDC federation. No `client_secret` exists for an attacker to steal.
 - **One real secret in GitHub Actions:** `AZURE_STATIC_WEB_APPS_API_TOKEN`, the SWA deploy token. Rotated by re-running the Bicep deploy.
+- **Runtime secrets stay in SWA app settings:** the storage connection string and optional GitHub rebuild PAT. The Infra workflow masks the connection string before writing it.
 - **Domain registration contact info** (`contact.json`, contains your real address and phone) is gitignored.
 - **Dependabot** is enabled for the `npm` and `github-actions` ecosystems, auto-PRs when a dependency has a CVE.
 
@@ -144,9 +154,11 @@ A static portfolio has none of those. Revisit if/when admin upload ships.
 
 ### Data we collect
 
-- **No analytics on visitors** unless `APPINSIGHTS_CONNECTION_STRING` is set. Even then, the snippet respects `navigator.doNotTrack`.
-- **No cookies.** Theme preference uses `localStorage`, which is client-only.
-- **No user accounts, no PII.**
+- **Cookieless first-party analytics** records page path, referrer hostname,
+  duration, and a daily rotating secret-salted visitor hash. It never stores the
+  raw IP or user-agent. See [analytics.md](analytics.md).
+- **No cookies.** Theme preference uses `localStorage`; analytics correlation uses tab-scoped `sessionStorage`.
+- **Contact submissions contain the name, email, and message the sender chooses to provide.** They are stored privately in Table Storage and visible only through the allowlisted admin API.
 - **Birding selfies never leave the device.** The optional "you as a bird" island reads the selfie into a canvas and runs the MediaPipe landmark model entirely in the browser. The photo and the landmarks are never uploaded, stored, or logged; there is no server endpoint that receives them. The only network traffic is fetching the same-origin model + WASM, and the generated bird PNG is saved only if the visitor clicks Download.
 
 ---
@@ -174,6 +186,5 @@ Aim for an A or A+ on both securityheaders.com and ssllabs.com on first deploy.
 
 In rough order:
 1. **CSP `'unsafe-inline'` tightening** via Astro's hash mode, easy win once we stop iterating on styles.
-2. **Subresource Integrity (SRI)** on App Insights script tag, pinned hash so a CDN compromise can't inject malicious JS.
-3. **`Cross-Origin-Opener-Policy: same-origin`** + **`Cross-Origin-Embedder-Policy: require-corp`** if we ever need full cross-origin isolation.
-4. **WAF + rate limiting** the moment the site gets any kind of upload endpoint or login.
+2. **`Cross-Origin-Opener-Policy: same-origin`** + **`Cross-Origin-Embedder-Policy: require-corp`** if we ever need full cross-origin isolation.
+3. **WAF + stricter edge rate limiting** the moment the site gets an upload endpoint or broader login model.

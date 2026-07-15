@@ -376,7 +376,7 @@ export function initTidepool(root: HTMLElement): void {
   let dpr = 1;
   let stones: Stone[] = [];
   let sceneSalt = 0; // bumped by "New beach" so the layout reshuffles (but stays stable across resizes)
-  let hand = { x: -100, y: -100, show: false };
+  const hand = { x: -100, y: -100, show: false };
   let onscreen = true;
   let running = false;
   let raf = 0;

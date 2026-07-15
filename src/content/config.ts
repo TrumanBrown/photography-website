@@ -1,4 +1,5 @@
 import { defineCollection, z } from "astro:content";
+import { isIsoDate } from "@/lib/sessions";
 
 /**
  * Sessions collection — one entry per photography session.
@@ -12,8 +13,8 @@ const sessions = defineCollection({
   type: "data",
   schema: z.object({
     title: z.string(),
-    date: z.string().refine((v) => !Number.isNaN(Date.parse(v)), {
-      message: "date must be an ISO date string (YYYY-MM-DD)",
+    date: z.string().refine(isIsoDate, {
+      message: "date must be a real ISO calendar date (YYYY-MM-DD)",
     }),
     location: z.string().default(""),
     description: z.string().default(""),

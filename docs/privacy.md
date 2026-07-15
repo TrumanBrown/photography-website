@@ -51,14 +51,21 @@ These are real secrets. They're set in **GitHub → Settings → Secrets and var
 | `AZURE_SUBSCRIPTION_ID` | Identifier only | Your Azure subscription |
 | `AZURE_STATIC_WEB_APPS_API_TOKEN` | **Yes, real secret** | Bicep deploy output (`scripts/bootstrap-swa-token.sh` writes it) |
 | `AZURE_STORAGE_ACCOUNT` | Identifier only | Bicep deploy output |
-| `APPINSIGHTS_CONNECTION_STRING` | Mildly, includes a write key | Bicep deploy output |
 | `GH_PAT_FOR_SECRETS` (optional) | **Yes, real secret** | A fine-grained PAT you create manually |
 
 The three "identifier only" Azure IDs are technically not secrets in Microsoft's threat model, knowing them doesn't grant access. They're stored as secrets out of tidiness.
 
-The only true credentials with broad blast radius are:
+Additional runtime settings live in **Azure SWA app settings**, not GitHub:
+
+- `AZURE_STORAGE_CONNECTION_STRING`, a real storage-account credential written by the Infra workflow.
+- `ANALYTICS_SALT`, a derived secret used for one-way visitor/rate-limit hashes.
+- `ADMIN_GITHUB_USERS`, a non-secret comma-separated allowlist.
+- `GITHUB_TOKEN`, an optional fine-grained PAT for the admin rebuild button.
+
+The true credentials with meaningful blast radius are:
 - The SWA deploy token (rotated by re-running the Bicep deploy)
-- Optionally, your GH PAT (you decide whether to even create it)
+- The storage connection string (rotate the storage keys, then re-run Infra)
+- Optional fine-grained GitHub PATs (you decide whether to create them)
 
 ## What lives in **Azure** (not in this repo, not in GitHub)
 
@@ -82,7 +89,7 @@ The only true credentials with broad blast radius are:
 
 - No visitor IP addresses are stored. The analytics endpoint uses the IP only to compute a daily-salted hash for unique-visitor counting, then discards it; the raw IP is never persisted.
 - No visitor cookies (analytics uses an ephemeral `sessionStorage` id only, cleared when the tab closes).
-- No visitor accounts (there are no accounts).
+- No visitor accounts. The site owner's `/admin` access uses SWA GitHub OAuth and a server-side allowlist.
 - No third-party analytics scripts: analytics is self-hosted in your own Azure Table Storage, and nothing leaves your tenant.
 - No third-party ad networks.
 - No payment info.
@@ -92,6 +99,6 @@ The only true credentials with broad blast radius are:
 **Public:** your name, your domain, your GitHub username, your storage hostname.
 **Private (lives only on your machine):** your address, phone, email.
 **Private (lives only in GitHub vault):** the SWA deploy token.
-**Private (lives only in Azure):** your photos' file URLs (technically guessable if someone knows naming patterns; not enumerable).
+**Private (lives only in Azure):** contact messages, analytics rows, runtime credentials, and private metadata. Individual public photo URLs are intentionally readable when known, but their containers are not anonymously listable.
 
 If you ever change your mind about your name being visible, edit [site.config.ts](../site.config.ts), it's a one-line change → commit → next build redeploys with the new value.

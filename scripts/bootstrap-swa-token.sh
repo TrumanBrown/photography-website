@@ -2,7 +2,7 @@
 #
 # Fetch the SWA deployment token from Azure and copy it into the GitHub
 # repo's secrets as AZURE_STATIC_WEB_APPS_API_TOKEN. Also copies the storage
-# account name and App Insights connection string.
+# account name.
 #
 # Run after the Infra workflow has succeeded once, OR after manually deploying
 # the Bicep template from your laptop.
@@ -33,19 +33,8 @@ fi
 echo "Locating storage account in $RG…"
 STORAGE=$(az storage account list --resource-group "$RG" --query "[0].name" -o tsv)
 
-echo "Locating App Insights in $RG…"
-APPI_NAME=$(az resource list --resource-group "$RG" --resource-type "Microsoft.Insights/components" --query "[0].name" -o tsv)
-APPI_CONN=""
-if [ -n "$APPI_NAME" ]; then
-  # Use az resource show (no extension required, unlike `az monitor app-insights`).
-  APPI_CONN=$(az resource show --resource-group "$RG" --resource-type "Microsoft.Insights/components" --name "$APPI_NAME" --query "properties.ConnectionString" -o tsv)
-fi
-
 echo "Writing GitHub secrets to $REPO…"
 gh secret set AZURE_STATIC_WEB_APPS_API_TOKEN --repo "$REPO" --body "$TOKEN"
 gh secret set AZURE_STORAGE_ACCOUNT --repo "$REPO" --body "$STORAGE"
-if [ -n "$APPI_CONN" ]; then
-  gh secret set APPINSIGHTS_CONNECTION_STRING --repo "$REPO" --body "$APPI_CONN"
-fi
 
 echo "Done. The next push or scheduled run will deploy with the new token."

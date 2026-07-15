@@ -60,4 +60,3 @@ output swaDefaultHostname string = stack.outputs.swaDefaultHostname
 output swaName string = stack.outputs.swaName
 output managedIdentityClientId string = stack.outputs.managedIdentityClientId
 output managedIdentityPrincipalId string = stack.outputs.managedIdentityPrincipalId
-output appInsightsConnectionString string = stack.outputs.appInsightsConnectionString

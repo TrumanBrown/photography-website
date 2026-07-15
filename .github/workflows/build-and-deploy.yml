@@ -104,8 +104,6 @@ jobs:
             astro-cache-
 
       - name: Astro build
-        env:
-          PUBLIC_APPINSIGHTS_CONNECTION_STRING: ${{ secrets.APPINSIGHTS_CONNECTION_STRING }}
         run: npm run build
 
       - name: Sync image variants to Blob (keep SWA payload tiny)

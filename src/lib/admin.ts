@@ -1,3 +1,5 @@
+import { escapeHtml as esc } from './html';
+
 interface Session {
   slug: string;
   thumbSlug: string;
@@ -451,14 +453,8 @@ function showToast(msg: string) {
   setTimeout(() => toastEl.classList.add('hidden'), 6000);
 }
 
-function esc(s: string): string {
-  const d = document.createElement('div');
-  d.textContent = s;
-  return d.innerHTML;
-}
-
 function thumbUrl(host: string, slug: string, file: string): string {
   // Use tiny pre-generated thumbnails from variants/thumbs/ (120px wide, ~5KB).
   const base = file.slice(0, file.lastIndexOf('.'));
-  return `https://${host}/variants/thumbs/${slug}/${base}.jpg`;
+  return `https://${host}/variants/thumbs/${encodeURIComponent(slug)}/${encodeURIComponent(`${base}.jpg`)}`;
 }

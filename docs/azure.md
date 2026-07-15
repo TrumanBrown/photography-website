@@ -12,7 +12,7 @@ GitHub repo ──push / hourly cron──► GitHub Actions
                        ┌────────────────────────────────┐
                        │  Azure Blob Storage            │
                        │   originals/  derivatives/     │
-                       │   metadata/                    │
+                       │   variants/   metadata/        │
                        └──────────┬─────────────────────┘
                                   │ reads sources, writes derivatives
                                   ▼
@@ -31,7 +31,10 @@ GitHub repo ──push / hourly cron──► GitHub Actions
                           Azure Blob (originals/derivatives)
 ```
 
-Two paths to the visitor: optimized thumbnails ship inside SWA, full-resolution originals stay in Blob and load only when the lightbox opens.
+Two paths to the visitor: optimized responsive variants are generated during
+the Astro build and moved to Blob before deployment; full-resolution originals
+also stay in Blob and load only when the lightbox opens. SWA serves the HTML,
+CSS, JavaScript, and other small static assets.
 
 ---
 
@@ -41,18 +44,20 @@ All inside resource group `rg-photography-prod`.
 
 | Resource | Purpose |
 |---|---|
-| **Storage account** `stphoto<env><suffix>` | Holds photos + build state. LRS, hot tier, shared-key access disabled. |
+| **Storage account** `stphoto<env><suffix>` | Holds photos, variants, Table Storage, and build state. LRS, hot tier. Shared-key access is enabled only because SWA Free Functions require a connection string; CI uses OIDC. |
 | ↳ Container `originals` | Your uploads. Public-read by URL, no listing. |
 | ↳ Container `derivatives` | RAW→JPEG sidecars written by the build. Same access. |
+| ↳ Container `variants` | Responsive WebP/JPEG outputs and tiny admin thumbnails. Same access. |
+| ↳ Container `hobby-media` | Full/display hobby-gallery photos, kept separate from sessions. Same access. |
 | ↳ Container `metadata` | Private. Build manifest + future admin state. |
+| ↳ Tables | Contact messages, pageviews, and hashed contact rate-limit counters. |
 | **Static Web App** `swa-photography-prod` (Free SKU) | Hosting + global CDN + auto-TLS + PR previews. |
 | ↳ Custom domain bindings (apex + `www`) | Created only when `domainName` is set. |
 | **User-assigned managed identity** `id-photography-deploy-<env>` | Service account GitHub Actions assumes via OIDC. RBAC: `Storage Blob Data Contributor` on the storage account, `Reader` on the RG. |
 | ↳ Federated credentials `github-main`, `github-pull-request` | Trust JWTs from this specific repo + branch. No long-lived secrets. |
 | **App Service Domain** `yourdomain.com` | `.com` registration. Only created when `domainName` is set; first-time purchase needs `az appservice domain create --accept-terms` once. |
 | **Azure DNS zone** `yourdomain.com` | Holds `A` (apex → SWA), `CNAME` `www`, `TXT` (SWA ownership token). |
-| **Application Insights** `appi-photography-prod` | Pageview/perf monitoring. Respects DNT. |
-| **Log Analytics workspace** `log-photography-prod` | App Insights storage backend. 0.1 GB/day cap. |
+| **Log Analytics workspace** `log-photography-prod` | Created only when `enableDiagnostics=true`; receives storage transaction metrics with a 1 GB/day cap. |
 
 Full module-by-module breakdown: [iac-bicep.md#what-the-bicep-deploys-resource-by-resource](iac-bicep.md#what-the-bicep-deploys-resource-by-resource).
 
@@ -69,7 +74,7 @@ Assumes ~30 GB stored, ~5 GB egress, personal traffic. Region `westus3`.
 | Blob ops + egress | <1M reads; first 100 GB egress free | <$0.05 |
 | App Service Domain (`.com`) | $11.99/yr amortized | ~$1.00 |
 | Azure DNS zone | 1 zone @ $0.50 | $0.50 |
-| Application Insights + Log Analytics | First 5 GB/mo free, capped at 0.1 GB/day | $0.00 |
+| Log Analytics | Not created by default; free allowance covers optional storage diagnostics | $0.00 |
 | Bicep deployments | Always free | $0.00 |
 | **Total** | | **~$2.10 – $2.60** |
 
@@ -80,9 +85,9 @@ Even at 10× traffic and 100 GB stored, the bill stays under $6/mo, comfortably 
 | Skipped | Why |
 |---|---|
 | Front Door Standard (~$35/mo) | SWA's free CDN already does global edge caching. |
-| WAF | Needs Front Door. Static site has no logins/forms to defend. |
-| Plausible/Fathom (~$9/mo) | App Insights free tier covers it. |
-| Azure Key Vault | Effectively no runtime secrets. GitHub Actions secrets hold the few we have. |
+| WAF | Needs Front Door. Current bounded Functions already use throttling and allowlisted auth; the edge tier is disproportionate at personal traffic. |
+| Plausible/Fathom (~$9/mo) | The first-party Table Storage analytics pipeline covers the small metric set needed. |
+| Azure Key Vault | The few runtime credentials fit SWA's encrypted app settings; Key Vault would add cost and integration without reducing current privilege. |
 
 ---
 

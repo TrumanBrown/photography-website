@@ -8,7 +8,10 @@ function rand(): string {
 }
 
 function track() {
-  // Don't track the admin tool or non-browser contexts.
+  // Astro dev does not host the SWA Functions; avoid noisy local 404s.
+  if (import.meta.env.DEV) return;
+
+  // Don't track the admin tool or automated browser contexts.
   if (location.pathname.startsWith('/admin')) return;
   if (navigator.webdriver) return;
 
@@ -28,7 +31,7 @@ function track() {
       body: JSON.stringify({ type: 'pv', path: location.pathname, ref: document.referrer, sid, pvid }),
       keepalive: true,
     }).catch(() => {});
-  } catch (_) {}
+  } catch {}
 
   // Time-on-page when the tab is hidden/closed. sendBeacon is reliable here.
   let sent = false;
@@ -41,7 +44,7 @@ function track() {
         type: 'application/json',
       });
       navigator.sendBeacon('/api/track', blob);
-    } catch (_) {}
+    } catch {}
   }
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') sendDuration();

@@ -1,5 +1,8 @@
-const { TableClient, AzureSASCredential } = require('@azure/data-tables');
+const { randomUUID } = require('node:crypto');
+const { TableClient } = require('@azure/data-tables');
 const { visitorHash } = require('../shared/visitor-hash');
+const { clientIp } = require('../shared/client-ip');
+const { consumeRateLimit } = require('./rate-limit');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_NAME = 200;
@@ -8,12 +11,7 @@ const MAX_MESSAGE = 5000;
 const TABLE_NAME = 'contactmessages';
 const RL_TABLE = 'contactratelimit';
 const MAX_PER_HOUR = 5;
-const RL_SALT = process.env.ANALYTICS_SALT || 'tb-analytics';
-
-function clientIp(req) {
-  const xff = (req.headers && req.headers['x-forwarded-for']) || '';
-  return xff.split(',')[0].trim().split(':')[0] || 'unknown';
-}
+const RL_SALT = process.env.ANALYTICS_SALT || process.env.AZURE_STORAGE_CONNECTION_STRING || '';
 
 // Returns true if this client has exceeded the hourly cap. Fails OPEN: any
 // backend hiccup returns false, so a legitimate message is never blocked by the
@@ -24,23 +22,15 @@ async function isRateLimited(connectionString, req) {
     const hourBucket = new Date().toISOString().slice(0, 13); // YYYY-MM-DDTHH
     const ipHash = visitorHash(clientIp(req), '', 'contact', RL_SALT);
     const rl = TableClient.fromConnectionString(connectionString, RL_TABLE);
-    await rl.createTable().catch(() => {}); // no-op if it already exists
+    await rl.createTable();
 
-    let count = 0;
-    try {
-      const ent = await rl.getEntity(hourBucket, ipHash);
-      count = Number(ent.count) || 0;
-    } catch (_) {
-      count = 0; // first message from this client this hour
-    }
-    if (count >= MAX_PER_HOUR) return true;
-
-    await rl.upsertEntity(
-      { partitionKey: hourBucket, rowKey: ipHash, count: count + 1, updatedAt: new Date().toISOString() },
-      'Replace',
-    );
-    return false;
-  } catch (_) {
+    return await consumeRateLimit(rl, {
+      partitionKey: hourBucket,
+      rowKey: ipHash,
+      maxCount: MAX_PER_HOUR,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch {
     return false; // fail open: never block a real message on a limiter error
   }
 }
@@ -109,7 +99,7 @@ module.exports = async function (context, req) {
     // so newest messages sort first in Storage Explorer.
     const now = new Date();
     const partitionKey = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
-    const rowKey = `${String(9999999999999 - now.getTime()).padStart(13, '0')}`;
+    const rowKey = `${String(9999999999999 - now.getTime()).padStart(13, '0')}-${randomUUID()}`;
 
     await client.createEntity({
       partitionKey,

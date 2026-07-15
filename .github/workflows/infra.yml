@@ -46,6 +46,41 @@ jobs:
           echo "SWA hostname: ${{ steps.deploy.outputs.swaDefaultHostname }}"
           echo "MI client id: ${{ steps.deploy.outputs.managedIdentityClientId }}"
 
+      - name: Configure SWA API runtime
+        env:
+          RESOURCE_GROUP: ${{ steps.deploy.outputs.resourceGroupName }}
+          STORAGE_ACCOUNT: ${{ steps.deploy.outputs.storageAccountName }}
+          SWA_NAME: ${{ steps.deploy.outputs.swaName }}
+          INITIAL_ADMIN_GITHUB_USER: ${{ github.actor }}
+        run: |
+          STORAGE_CONNECTION_STRING=$(az storage account show-connection-string \
+            --name "$STORAGE_ACCOUNT" \
+            --resource-group "$RESOURCE_GROUP" \
+            --query connectionString -o tsv)
+          if [[ -z "$STORAGE_CONNECTION_STRING" ]]; then
+            echo "Failed to fetch the storage connection string." >&2
+            exit 1
+          fi
+          echo "::add-mask::$STORAGE_CONNECTION_STRING"
+
+          ANALYTICS_SALT=$(printf 'photography-analytics:%s' "$STORAGE_CONNECTION_STRING" | sha256sum | cut -d' ' -f1)
+          echo "::add-mask::$ANALYTICS_SALT"
+
+          ADMIN_GITHUB_USERS=$(az staticwebapp appsettings list \
+            --name "$SWA_NAME" \
+            --resource-group "$RESOURCE_GROUP" \
+            --query properties.ADMIN_GITHUB_USERS -o tsv)
+          ADMIN_GITHUB_USERS="${ADMIN_GITHUB_USERS:-$INITIAL_ADMIN_GITHUB_USER}"
+
+          az staticwebapp appsettings set \
+            --name "$SWA_NAME" \
+            --resource-group "$RESOURCE_GROUP" \
+            --setting-names \
+              "AZURE_STORAGE_CONNECTION_STRING=$STORAGE_CONNECTION_STRING" \
+              "ANALYTICS_SALT=$ANALYTICS_SALT" \
+              "ADMIN_GITHUB_USERS=$ADMIN_GITHUB_USERS" \
+            --output none
+
       - name: Fetch SWA deployment token
         id: swa-token
         run: |
@@ -66,7 +101,7 @@ jobs:
         run: |
           if [ -z "${GH_TOKEN:-}" ]; then
             echo "::warning::GH_PAT_FOR_SECRETS not set; cannot auto-update AZURE_STATIC_WEB_APPS_API_TOKEN."
-            echo "Copy this token manually into repo secret AZURE_STATIC_WEB_APPS_API_TOKEN."
+            echo "Run ./scripts/bootstrap-swa-token.sh '${{ steps.deploy.outputs.resourceGroupName }}' '${{ steps.deploy.outputs.swaName }}' '${{ github.repository }}' from an authenticated machine."
             exit 0
           fi
           gh secret set AZURE_STATIC_WEB_APPS_API_TOKEN \
@@ -75,6 +110,3 @@ jobs:
           gh secret set AZURE_STORAGE_ACCOUNT \
             --repo "${{ github.repository }}" \
             --body "${{ steps.deploy.outputs.storageAccountName }}"
-          gh secret set APPINSIGHTS_CONNECTION_STRING \
-            --repo "${{ github.repository }}" \
-            --body "${{ steps.deploy.outputs.appInsightsConnectionString }}"

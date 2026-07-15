@@ -8,7 +8,7 @@ A reference for picking up the project on a new machine, in a new chat, or after
 
 ## Architecture in one paragraph
 
-Static Astro site deployed to **Azure Static Web Apps** (Free tier). Photos in **Azure Blob Storage** across four containers (`originals` / `derivatives` / `variants` / `metadata`). Build is a **GitHub Actions** workflow: hourly cron + push + manual. Auth between GitHub and Azure is **OIDC federation** on a user-assigned managed identity, no long-lived secrets. Infra defined in **Bicep**, applied via a separate manual workflow. Custom domain registered through **Azure App Service Domain**, bound to SWA via a post-deploy script. Realistic cost: ~$2/mo recurring + $12/yr domain.
+Static Astro site deployed to **Azure Static Web Apps** (Free tier). Photos in **Azure Blob Storage** across five containers (`originals` / `derivatives` / `variants` / `metadata` / `hobby-media`). Build is a **GitHub Actions** workflow: hourly cron + push + manual. Auth between GitHub and Azure is **OIDC federation** on a user-assigned managed identity, no long-lived CI secret. Infra defined in **Bicep**, applied via a separate manual workflow. Custom domain registered through **Azure App Service Domain**, bound to SWA via a post-deploy script. Realistic cost: ~$2/mo recurring + $12/yr domain.
 
 ## Container roles
 
@@ -18,6 +18,7 @@ Static Astro site deployed to **Azure Static Web Apps** (Free tier). Photos in *
 | `derivatives/` | Blob | JPEG sidecars from RAW/HEIC sources, written by prebuild with a `source-etag` metadata tag for cache invalidation. |
 | `variants/` | Blob | Astro responsive WebP/JPEG outputs, moved here by [scripts/sync-variants.mjs](../scripts/sync-variants.mjs) after each build. Also stores admin thumbnails under `thumbs/<slug>/`. **Critical for staying under SWA Free's 250 MB app cap**: without this, ~50-photo sessions blow the limit. |
 | `metadata/` | Private | Prebuild's `manifest.json` (blob name → etag + target) and `admin-index.json` (resolved session metadata the admin panel reads, see lesson 19). |
+| `hobby-media/` | Blob | Full-resolution and display-size photos used only by hobby galleries. |
 
 ## GitHub Actions secrets
 
@@ -26,19 +27,20 @@ Set in the repo (Settings → Secrets and variables → Actions):
 - `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, OIDC pointers (technically identifiers, not secrets).
 - `AZURE_STATIC_WEB_APPS_API_TOKEN`, real secret; rotated by re-running the Bicep deploy.
 - `AZURE_STORAGE_ACCOUNT`, storage account name.
-- `APPINSIGHTS_CONNECTION_STRING`, App Insights ingestion endpoint.
 
 GitHub-side billing note: the **Actions account budget must be > $0 with stop-usage on**. The default $0 budget blocks all Actions runs, even on free public repos. Card-on-file is also required regardless.
 
 ## SWA environment variables
 
-Set in Azure Portal → Static Web App → Environment variables:
+The Infra workflow initializes these SWA app settings:
 
-- `AZURE_STORAGE_ACCOUNT`, storage account name (same as GH Actions secret).
 - `AZURE_STORAGE_CONNECTION_STRING`, storage connection string (used by contact form + admin API).
+- `ADMIN_GITHUB_USERS`, comma-separated GitHub usernames allowed to use the admin API; initialized to the first workflow actor, preserved on later Infra runs, and fail-closed if absent.
+- `ANALYTICS_SALT`, private input for privacy-friendly visitor/rate-limit hashes.
+
+Set manually only when needed:
+
 - `GITHUB_TOKEN`, fine-grained GitHub PAT with `actions:write` scope. Enables the "Rebuild Site" button in the admin panel. Optional.
-- `ADMIN_GITHUB_USERS`, comma-separated GitHub usernames allowed to use the admin API. Defaults to `trumanbrown`. Optional.
-- `ANALYTICS_SALT`, extra secret mixed into the privacy-friendly visitor hash for analytics. Optional (defaults to a constant). See [docs/analytics.md](analytics.md).
 
 ## Hard-won lessons (in the order they bit us)
 
@@ -47,12 +49,12 @@ Set in Azure Portal → Static Web App → Environment variables:
 3. **SWA custom-domain bindings + Bicep don't mix.** The apex binding's validation needs a TXT record containing a token only available AFTER the binding HTTP call starts. Bicep tries to do both in the same deployment and deadlocks. Bindings now done by [scripts/bind-domain.sh](../scripts/bind-domain.sh) after `infra` deploy, using `az rest` to PUT bindings async and poll for `status=Ready`.
 4. **Azure rejects concurrent federated-credential writes** on the same MI. Bicep needs `dependsOn` between them, see [infra/modules/identity.bicep](../infra/modules/identity.bicep).
 5. **Storage account "Owner" doesn't grant data-plane access.** You need `Storage Blob Data Owner` (or Reader/Contributor) on the storage account scope. Bicep doesn't grant this to your user. Do it manually after first deploy.
-6. **`az monitor app-insights component show` requires a preview CLI extension** that prompts interactively (hangs scripts). Use `az resource show --resource-type Microsoft.Insights/components` instead. Fixed in [scripts/bootstrap-swa-token.sh](../scripts/bootstrap-swa-token.sh).
+6. **SWA Free managed Functions need a storage connection string.** The build identity can use OIDC, but the runtime cannot use that identity. The Infra workflow masks the connection string and writes it directly to SWA app settings; never put it in git or a GitHub secret.
 7. **SWA action's `app_location` + `skip_app_build: true`** makes the action ignore `output_location` and treat `app_location` as the deploy root. Set `app_location: dist` directly.
 8. **`az storage blob upload-batch --pattern` doesn't support brace expansion.** Silently matches zero files when given `{*.jpg,*.png}`. Use `find` + per-file `az storage blob upload` instead. Fixed in [scripts/upload-session.sh](../scripts/upload-session.sh).
 9. **iPhone HEIC files use HDR tone-mapping** (ftyp brands `tmap` / `MiHE` / `MiHB`) that Ubuntu's `heif-convert` + ImageMagick libheif delegate both fail to decode with "Metadata not correctly assigned to image." **`pillow-heif` handles them cleanly.** [scripts/heic-to-jpeg.py](../scripts/heic-to-jpeg.py) wraps it; workflow apt-installs `python3-pip` + pip-installs `pillow pillow-heif --break-system-packages`.
 10. **Prebuild cache key must include the target filename**, not just source name+etag. When HEIC→jpg conversion was added later, the cache key (source name+etag) was unchanged so the prebuild reused HEIC bytes for a .jpg local file, breaking Astro's image pipeline.
-11. **CSP `script-src` blocks inline scripts** unless you add `'unsafe-inline'` or per-script hashes. Dark mode + theme toggle were inline `<script>` tags being silently blocked. Added SHA-256 hashes to CSP in [staticwebapp.config.json](../staticwebapp.config.json); helper at [scripts/csp-hash.mjs](../scripts/csp-hash.mjs) recomputes if the inline content changes.
+11. **CSP `script-src` blocks inline scripts** unless you add `'unsafe-inline'` or per-script hashes. Dark mode + theme toggle use SHA-256 hashes in [staticwebapp.config.json](../staticwebapp.config.json); `npm run check:csp` verifies both hashes during check and build.
 12. **SWA Free has a 250 MB app-size limit** (Standard is 500 MB; both insufficient for many photos). Solution: [scripts/sync-variants.mjs](../scripts/sync-variants.mjs) runs after `astro build`, moves all responsive image variants from `dist/_astro/` to the `variants/` blob container, rewrites HTML refs to point at Blob. dist drops from 539 MB → ~330 KB regardless of photo count.
 13. **`upload-session.sh` only uploaded 1 file** because the `while read` loop fed the file list via stdin, but `az storage blob upload` also reads stdin, consuming remaining entries after the first iteration. Fixed by reading from file descriptor 3 (`read <&3 ... done 3< "$TMPLIST"`).
 14. **Windows `az` CLI under WSL appends `\r`** to query output. The tenant-switching comparison (`$current_tenant != $AZURE_TENANT_ID`) always failed, triggering a login prompt every run. Fixed with `tr -d '\r'`.
@@ -67,13 +69,15 @@ Set in Azure Portal → Static Web App → Environment variables:
 The site has an admin page at `/admin` for editing session metadata (title, cover, location, description, display order) from the browser. See [docs/admin.md](admin.md) for full details.
 
 **Key points:**
-- Auth: any GitHub user can view `/admin`, but the API function checks `x-ms-client-principal` server-side and only allows `TrumanBrown` (configurable via `ADMIN_GITHUB_USERS` env var).
+- Auth: anyone can view the static `/admin` shell, but the API requires a GitHub `x-ms-client-principal` whose normalized username appears in `ADMIN_GITHUB_USERS`. Missing/malformed settings and principals fail closed.
 - Cover picker shows visual thumbnails (120px JPEG, ~5KB each) generated by prebuild and stored in `variants/thumbs/<slug>/`.
 - Three tabs: **Sessions** (edit metadata), **Messages** (read contact submissions), **Analytics** (privacy-friendly traffic metrics, see [docs/analytics.md](analytics.md)).
 - Writes a `_session.json` sidecar to Blob Storage; next build picks up the changes.
 - Cannot upload/delete images, delete sessions, or modify code.
 
-**Setup on a new deployment:** The API defaults to allowing `trumanbrown`. To change, set `ADMIN_GITHUB_USERS` env var on the SWA (comma-separated GitHub usernames). Set `GITHUB_TOKEN` (fine-grained PAT, `actions:write` scope) to enable the "Rebuild Site" button.
+**Setup on a new deployment:** Run the Infra workflow to initialize runtime
+storage, salt, and admin settings. Set `GITHUB_TOKEN` (fine-grained PAT,
+`actions:write` scope) only if the "Rebuild Site" button should be enabled.
 
 ## Scripts and when to use each
 
@@ -86,14 +90,14 @@ The site has an admin page at `/admin` for editing session metadata (title, cove
 | [scripts/prebuild.mjs](../scripts/prebuild.mjs) | Runs in CI; locally with `AZURE_STORAGE_ACCOUNT=... node scripts/prebuild.mjs`. |
 | [scripts/sync-variants.mjs](../scripts/sync-variants.mjs) | Runs in CI between `astro build` and SWA deploy. |
 | [scripts/heic-to-jpeg.py](../scripts/heic-to-jpeg.py) | Called by prebuild; not invoked directly. |
-| [scripts/csp-hash.mjs](../scripts/csp-hash.mjs) | After editing `src/lib/theme.ts`, recompute CSP hashes for inline script. |
+| [scripts/csp-hash.mjs](../scripts/csp-hash.mjs) | `npm run check:csp`: verify all inline theme-script hashes against the SWA policy. |
 | [scripts/generate-fixtures.mjs](../scripts/generate-fixtures.mjs) | Local dev only; `--many` makes 40 fake sessions. |
 
 ## Workflow triggers (current)
 
 - [build-and-deploy.yml](../.github/workflows/build-and-deploy.yml), push to main, hourly cron, manual dispatch, `repository_dispatch: blob-changed`. Concurrency-grouped per ref so newer pushes cancel older runs.
 - [infra.yml](../.github/workflows/infra.yml), manual only. Re-run when Bicep changes.
-- [lint.yml](../.github/workflows/lint.yml), PRs only.
+- [lint.yml](../.github/workflows/lint.yml), pushes to main and PRs targeting main.
 
 ## Setting up on a new machine
 

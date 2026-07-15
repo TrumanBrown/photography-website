@@ -80,7 +80,7 @@ A configuration on a managed identity that says "trust JWT tokens issued by an e
 
 ### Free tier
 
-Most Azure services have a tier that costs $0 up to certain limits. SWA Free gives 100 GB/month bandwidth, App Insights gives 5 GB/month ingestion, etc. We deliberately stay inside free tiers wherever possible.
+Most Azure services have a tier that costs $0 up to certain limits. SWA Free gives 100 GB/month bandwidth, and the small Blob/Table Storage workload costs pennies. We deliberately stay inside free tiers wherever possible.
 
 ### GitHub Actions
 

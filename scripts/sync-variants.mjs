@@ -38,7 +38,6 @@ if (!STORAGE) {
 const BLOB_HOST = `${STORAGE}.blob.core.windows.net`;
 const CONTAINER = 'variants';
 const BLOB_PREFIX = `https://${BLOB_HOST}/${CONTAINER}/`;
-const LOCAL_PREFIX = '/_astro/';
 const IMAGE_EXTS = new Set(['.avif', '.webp', '.jpeg', '.jpg']);
 const CONTENT_TYPE = {
   '.avif': 'image/avif',
