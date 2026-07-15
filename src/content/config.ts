@@ -30,7 +30,7 @@ const sessions = defineCollection({
           /** Intrinsic pixel height as read by sharp. */
           height: z.number().int().positive(),
           /** Optional caption from EXIF or sidecar. */
-          caption: z.string().optional(),
+          caption: z.string().max(500).optional(),
           /**
            * Public URL of the full-resolution image (original JPEG/HEIC or
            * RAW-derived JPEG sidecar). Used by the lightbox. Empty in local

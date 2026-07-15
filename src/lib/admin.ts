@@ -10,6 +10,7 @@ interface Session {
   cover: string;
   order: number | null;
   images: string[];
+  captions: Record<string, string>;
 }
 
 const listEl = document.getElementById('admin-list')!;
@@ -21,6 +22,8 @@ const toastEl = document.getElementById('toast')!;
 
 let sessions: Session[] = [];
 let blobHost = '';
+let editTrigger: HTMLElement | null = null;
+let previousBodyOverflow = '';
 
 const signinEl = document.getElementById('admin-signin')!;
 const authedEl = document.getElementById('admin-authed')!;
@@ -72,19 +75,21 @@ const panelMessages = document.getElementById('panel-messages')!;
 const panelAnalytics = document.getElementById('panel-analytics')!;
 const activeTabClass = 'border-neutral-900 dark:border-white';
 const inactiveTabClass = 'border-transparent text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200';
+const tabs = [
+  { name: 'sessions' as const, el: tabSessions, panel: panelSessions },
+  { name: 'messages' as const, el: tabMessages, panel: panelMessages },
+  { name: 'analytics' as const, el: tabAnalytics, panel: panelAnalytics },
+];
 let messagesLoaded = false;
 let analyticsLoaded = false;
 
 function selectTab(tab: 'sessions' | 'messages' | 'analytics') {
-  const tabs = [
-    { name: 'sessions', el: tabSessions, panel: panelSessions },
-    { name: 'messages', el: tabMessages, panel: panelMessages },
-    { name: 'analytics', el: tabAnalytics, panel: panelAnalytics },
-  ];
   for (const t of tabs) {
     const active = t.name === tab;
     t.panel.classList.toggle('hidden', !active);
     t.el.className = 'border-b-2 px-4 py-2 text-sm font-medium ' + (active ? activeTabClass : inactiveTabClass);
+    t.el.setAttribute('aria-selected', String(active));
+    t.el.setAttribute('tabindex', active ? '0' : '-1');
   }
   if (tab === 'messages' && !messagesLoaded) {
     messagesLoaded = true;
@@ -99,6 +104,19 @@ function selectTab(tab: 'sessions' | 'messages' | 'analytics') {
 tabSessions.addEventListener('click', () => selectTab('sessions'));
 tabMessages.addEventListener('click', () => selectTab('messages'));
 tabAnalytics.addEventListener('click', () => selectTab('analytics'));
+tabs.forEach((tab, index) => {
+  tab.el.addEventListener('keydown', (event) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    let nextIndex = index;
+    if (event.key === 'ArrowLeft') nextIndex = (index - 1 + tabs.length) % tabs.length;
+    if (event.key === 'ArrowRight') nextIndex = (index + 1) % tabs.length;
+    if (event.key === 'Home') nextIndex = 0;
+    if (event.key === 'End') nextIndex = tabs.length - 1;
+    selectTab(tabs[nextIndex].name);
+    tabs[nextIndex].el.focus();
+  });
+});
 
 document.getElementById('analytics-range')!.addEventListener('change', () => loadAnalytics());
 
@@ -265,7 +283,10 @@ async function loadSessions() {
       throw new Error(`Unexpected response (HTTP ${res.status}): ${text.slice(0, 200)}`);
     }
     if (!data.ok) throw new Error(data.error || 'Failed to load sessions.');
-    sessions = data.sessions;
+    sessions = (data.sessions as Session[]).map((session) => ({
+      ...session,
+      captions: session.captions || {},
+    }));
     blobHost = data.blobHost || '';
     renderList();
   } catch (err: any) {
@@ -298,6 +319,7 @@ function renderList() {
   });
 
   for (const s of ordered) {
+    const captionCount = Object.keys(s.captions).length;
     const li = document.createElement('li');
     li.className =
       'flex items-center justify-between gap-4 rounded-lg border border-neutral-200 p-4 dark:border-neutral-700';
@@ -307,6 +329,7 @@ function renderList() {
         <p class="mt-0.5 truncate text-sm text-neutral-500 dark:text-neutral-400">
           ${esc(s.slug)}${s.date ? ' · ' + esc(s.date) : ''}${s.location ? ' · ' + esc(s.location) : ''}
           · ${s.images.length} image${s.images.length !== 1 ? 's' : ''}
+          · ${captionCount}/${s.images.length} captioned
           ${s.cover ? ' · cover: ' + esc(s.cover) : ''}
           ${s.order != null ? ' · order: ' + s.order : ''}
         </p>
@@ -320,13 +343,15 @@ function renderList() {
   }
 
   listEl.querySelectorAll('.admin-edit').forEach((btn) => {
-    btn.addEventListener('click', () => openEdit((btn as HTMLElement).dataset.slug!));
+    btn.addEventListener('click', () => openEdit((btn as HTMLElement).dataset.slug!, btn as HTMLElement));
   });
 }
 
-function openEdit(slug: string) {
+function openEdit(slug: string, trigger?: HTMLElement) {
   const s = sessions.find((x) => x.slug === slug);
   if (!s) return;
+  editTrigger = trigger ?? (document.activeElement as HTMLElement | null);
+  previousBodyOverflow = document.body.style.overflow;
 
   (document.getElementById('edit-slug') as HTMLInputElement).value = s.slug;
   (document.getElementById('edit-title') as HTMLInputElement).value = s.title;
@@ -378,15 +403,74 @@ function openEdit(slug: string) {
 
   coverInput.value = s.cover;
 
+  const captionDetails = document.getElementById('edit-captions') as HTMLDetailsElement;
+  const captionList = document.getElementById('edit-caption-list')!;
+  const captionCount = document.getElementById('edit-caption-count')!;
+  captionList.textContent = '';
+
+  const updateCaptionCount = () => {
+    const completed = captionList.querySelectorAll<HTMLInputElement>('input[data-caption-file]');
+    const count = [...completed].filter((input) => input.value.trim()).length;
+    captionCount.textContent = `${count}/${s.images.length}`;
+  };
+
+  for (const img of s.images) {
+    const label = document.createElement('label');
+    label.className = 'grid grid-cols-[4rem_minmax(0,1fr)] items-center gap-3';
+
+    const thumbnail = document.createElement('img');
+    thumbnail.src = thumbUrl(blobHost, s.thumbSlug, img);
+    thumbnail.alt = '';
+    thumbnail.loading = 'lazy';
+    thumbnail.className = 'h-12 w-16 rounded object-cover';
+
+    const field = document.createElement('span');
+    field.className = 'min-w-0';
+    const filename = document.createElement('span');
+    filename.className = 'mb-1 block truncate text-xs text-neutral-500 dark:text-neutral-400';
+    filename.textContent = img;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.maxLength = 500;
+    input.value = s.captions[img] || '';
+    input.dataset.captionFile = img;
+    input.placeholder = 'Optional caption';
+    input.className = 'w-full rounded border border-neutral-300 bg-white px-2 py-1.5 text-sm focus:border-neutral-500 focus:outline-none dark:border-neutral-600 dark:bg-neutral-800';
+    input.addEventListener('input', updateCaptionCount);
+
+    field.append(filename, input);
+    label.append(thumbnail, field);
+    captionList.appendChild(label);
+  }
+  captionDetails.open = Object.keys(s.captions).length > 0;
+  updateCaptionCount();
+
   document.getElementById('edit-error')!.classList.add('hidden');
+  modal.setAttribute('aria-hidden', 'false');
   modal.classList.remove('hidden');
   modal.classList.add('flex');
+  document.body.style.overflow = 'hidden';
   (document.getElementById('edit-title') as HTMLInputElement).focus();
 }
 
 function closeEdit() {
+  if (modal.classList.contains('hidden')) return;
   modal.classList.add('hidden');
   modal.classList.remove('flex');
+  modal.setAttribute('aria-hidden', 'true');
+  document.body.style.overflow = previousBodyOverflow;
+  const slug = (document.getElementById('edit-slug') as HTMLInputElement).value;
+  const replacement = listEl.querySelector<HTMLElement>(`.admin-edit[data-slug="${CSS.escape(slug)}"]`);
+  (editTrigger?.isConnected ? editTrigger : replacement)?.focus();
+  editTrigger = null;
+}
+
+function modalFocusableElements(): HTMLElement[] {
+  return Array.from(
+    modal.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), summary, [href], [tabindex]:not([tabindex="-1"])',
+    ),
+  ).filter((element) => element.getClientRects().length > 0);
 }
 
 document.getElementById('edit-cancel')!.addEventListener('click', closeEdit);
@@ -394,7 +478,27 @@ modal.addEventListener('click', (e) => {
   if (e.target === modal) closeEdit();
 });
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeEdit();
+  if (modal.classList.contains('hidden')) return;
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    closeEdit();
+    return;
+  }
+  if (e.key !== 'Tab') return;
+  const focusable = modalFocusableElements();
+  if (focusable.length === 0) {
+    e.preventDefault();
+    return;
+  }
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (e.shiftKey && (document.activeElement === first || !modal.contains(document.activeElement))) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && (document.activeElement === last || !modal.contains(document.activeElement))) {
+    e.preventDefault();
+    first.focus();
+  }
 });
 
 form.addEventListener('submit', async (e) => {
@@ -407,6 +511,15 @@ form.addEventListener('submit', async (e) => {
 
   const slug = (document.getElementById('edit-slug') as HTMLInputElement).value;
   const orderRaw = (document.getElementById('edit-order') as HTMLInputElement).value.trim();
+  const activeSession = sessions.find((session) => session.slug === slug);
+  const captionValues = new Map(
+    [...document.querySelectorAll<HTMLInputElement>('#edit-caption-list input[data-caption-file]')]
+      .map((input) => [input.dataset.captionFile!, input.value.trim()]),
+  );
+  const images = activeSession?.images.map((file) => ({
+    file,
+    caption: captionValues.get(file) || '',
+  }));
 
   const body = {
     slug,
@@ -415,6 +528,7 @@ form.addEventListener('submit', async (e) => {
     description: (document.getElementById('edit-description') as HTMLTextAreaElement).value.trim(),
     cover: (document.getElementById('edit-cover') as HTMLInputElement).value,
     order: orderRaw === '' ? null : parseInt(orderRaw, 10),
+    images,
   };
 
   try {
@@ -434,6 +548,13 @@ form.addEventListener('submit', async (e) => {
       if (body.order !== undefined) s.order = body.order;
       if (body.location !== undefined) s.location = body.location;
       if (body.description !== undefined) s.description = body.description;
+      if (body.images !== undefined) {
+        s.captions = Object.fromEntries(
+          body.images
+            .filter((image) => image.caption)
+            .map((image) => [image.file, image.caption]),
+        );
+      }
     }
     renderList();
     closeEdit();

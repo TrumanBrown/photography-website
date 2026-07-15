@@ -55,6 +55,7 @@ const MANIFEST_BLOB = 'manifest.json';
 const MAX_TITLE = 200;
 const MAX_LOCATION = 200;
 const MAX_DESCRIPTION = 1000;
+const MAX_CAPTION = 500;
 
 const argv = new Set(process.argv.slice(2));
 const LOCAL_ONLY = argv.has('--local-only');
@@ -373,6 +374,11 @@ async function processSession({ prefix, originalsClient, derivativesClient, serv
     cover: sessionRecord.cover ?? '',
     order: sessionRecord.order ?? null,
     images: orderedImages.map((i) => i.file),
+    captions: Object.fromEntries(
+      orderedImages
+        .filter((image) => image.caption)
+        .map((image) => [image.file, image.caption]),
+    ),
   };
 }
 
@@ -636,6 +642,8 @@ export function validateSessionSidecar(value, source = '_session.json') {
         }
         if (item.caption !== undefined && typeof item.caption !== 'string') {
           problems.push(`images[${index}].caption must be a string`);
+        } else if (typeof item.caption === 'string' && item.caption.length > MAX_CAPTION) {
+          problems.push(`images[${index}].caption must be at most ${MAX_CAPTION} characters`);
         }
       });
     }

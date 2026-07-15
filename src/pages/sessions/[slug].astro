@@ -4,21 +4,41 @@ import { Picture } from 'astro:assets';
 import type { ImageMetadata } from 'astro';
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import Lightbox from '@/components/Lightbox.astro';
-import { sessionSlug, formatDate, formatExif } from '@/lib/sessions';
+import { sessionSlug, formatDate, formatExif, sortSessions } from '@/lib/sessions';
+import { siteConfig } from '../../../site.config';
+
+type SessionLink = {
+  slug: string;
+  title: string;
+  date: string;
+  location: string;
+};
 
 export async function getStaticPaths() {
-  const sessions = await getCollection('sessions');
-  return sessions.map((entry) => ({
+  const sessions = sortSessions(await getCollection('sessions'));
+  const toLink = (entry: CollectionEntry<'sessions'>): SessionLink => ({
+    slug: sessionSlug(entry),
+    title: entry.data.title,
+    date: entry.data.date,
+    location: entry.data.location,
+  });
+  return sessions.map((entry, index) => ({
     params: { slug: sessionSlug(entry) },
-    props: { entry },
+    props: {
+      entry,
+      previousSession: index > 0 ? toLink(sessions[index - 1]) : undefined,
+      nextSession: index < sessions.length - 1 ? toLink(sessions[index + 1]) : undefined,
+    },
   }));
 }
 
 interface Props {
   entry: CollectionEntry<'sessions'>;
+  previousSession?: SessionLink;
+  nextSession?: SessionLink;
 }
 
-const { entry } = Astro.props;
+const { entry, previousSession, nextSession } = Astro.props;
 const slug = sessionSlug(entry);
 const { title, date, location, description, images: imageList } = entry.data;
 
@@ -54,9 +74,16 @@ const resolved: Resolved[] = imageList.map((img) => {
 const coverFile = entry.data.cover ?? imageList[0]?.file;
 const coverResolved = resolved.find((r) => r.file === coverFile) ?? resolved[0];
 const ogImage = coverResolved?.fullUrl;
+const pageDescription = description || `${title}${location ? ` in ${location}` : ''}: ${imageList.length} photographs by ${siteConfig.ownerName}.`;
 ---
 
-<BaseLayout title={title} description={description || `${title}: photography session`} ogImage={ogImage} activeSlug={slug}>
+<BaseLayout
+  title={title}
+  description={pageDescription}
+  ogImage={ogImage}
+  ogImageAlt={coverResolved?.caption ?? `${title} cover photograph`}
+  activeSlug={slug}
+>
   <article class="mx-auto max-w-6xl px-4 py-10 sm:px-6">
     <header class="mb-8 space-y-2">
       <a href="/" class="text-xs text-neutral-600 no-underline hover:underline dark:text-neutral-400">← All sessions</a>
@@ -73,7 +100,7 @@ const ogImage = coverResolved?.fullUrl;
       class="columns-1 gap-4 space-y-4 sm:columns-2 lg:columns-3"
     >
       {
-        resolved.map((img) => (
+        resolved.map((img, index) => (
           <li class="break-inside-avoid">
             <a
               href={img.fullUrl}
@@ -83,7 +110,7 @@ const ogImage = coverResolved?.fullUrl;
               data-pswp-exif={img.exif}
               data-pswp-filename={img.file}
               class="block overflow-hidden rounded-lg bg-neutral-100 no-underline dark:bg-neutral-900"
-              aria-label={img.caption ?? img.file}
+              aria-label={img.caption ?? `${title}, photo ${index + 1} of ${resolved.length}`}
             >
               <Picture
                 src={img.src}
@@ -92,7 +119,8 @@ const ogImage = coverResolved?.fullUrl;
                 sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
                 formats={['webp']}
                 fallbackFormat="jpeg"
-                loading="lazy"
+                loading={index === 0 ? 'eager' : 'lazy'}
+                fetchpriority={index === 0 ? 'high' : 'auto'}
                 class="h-auto w-full"
               />
             </a>
@@ -102,5 +130,30 @@ const ogImage = coverResolved?.fullUrl;
     </ul>
 
     <Lightbox gallerySelector="#gallery" />
+
+    {
+      (previousSession || nextSession) && (
+        <nav aria-label="More photography sessions" class="mt-12 border-t border-neutral-200 pt-6 dark:border-neutral-800">
+          <p class="mb-3 text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">Keep exploring</p>
+          <div class="grid gap-4 sm:grid-cols-2">
+            {previousSession && (
+              <a href={`/sessions/${previousSession.slug}`} class="group no-underline">
+                <span class="block text-xs text-neutral-500 dark:text-neutral-400">← Previous in archive</span>
+                <span class="mt-1 block font-medium group-hover:underline">{previousSession.title}</span>
+              </a>
+            )}
+            {nextSession && (
+              <a
+                href={`/sessions/${nextSession.slug}`}
+                class="group no-underline sm:col-start-2 sm:text-right"
+              >
+                <span class="block text-xs text-neutral-500 dark:text-neutral-400">Next in archive →</span>
+                <span class="mt-1 block font-medium group-hover:underline">{nextSession.title}</span>
+              </a>
+            )}
+          </div>
+        </nav>
+      )
+    }
   </article>
 </BaseLayout>

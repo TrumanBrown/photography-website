@@ -12,6 +12,10 @@ interface Props {
   description?: string;
   /** Open Graph image URL (absolute). */
   ogImage?: string;
+  /** Accessible description for the social preview image. */
+  ogImageAlt?: string;
+  /** Keep private utility pages out of search results. */
+  noindex?: boolean;
   /** Slug of the current session, for nav highlight. */
   activeSlug?: string;
   /**
@@ -21,10 +25,19 @@ interface Props {
   section?: 'photography' | 'hobbies';
 }
 
-const { title, description, ogImage, activeSlug, section = 'photography' } = Astro.props;
+const {
+  title,
+  description,
+  ogImage,
+  ogImageAlt,
+  noindex = false,
+  activeSlug,
+  section = 'photography',
+} = Astro.props;
 const pageTitle = title ? `${title} | ${siteConfig.siteTitle}` : siteConfig.siteTitle;
 const pageDescription = description ?? siteConfig.siteDescription;
 const siteOrigin = Astro.site ?? `https://${siteConfig.domain}`;
+const blobOrigin = `https://${siteConfig.blobHost}`;
 const canonical = new URL(Astro.url.pathname, siteOrigin).toString();
 // Open Graph images must be absolute URLs so crawlers can fetch them. Blob
 // URLs already are; resolve any relative local asset path against the site.
@@ -41,18 +54,24 @@ const ogImageAbsolute = ogImage
     <meta name="generator" content={Astro.generator} />
     <meta name="author" content={siteConfig.ownerName} />
     <meta name="description" content={pageDescription} />
+    {noindex && <meta name="robots" content="noindex, nofollow" />}
     <link rel="canonical" href={canonical} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href={blobOrigin} />
 
     <meta property="og:type" content="website" />
+    <meta property="og:site_name" content={siteConfig.siteTitle} />
+    <meta property="og:locale" content={siteConfig.defaultLocale.replace('-', '_')} />
     <meta property="og:title" content={pageTitle} />
     <meta property="og:description" content={pageDescription} />
     <meta property="og:url" content={canonical} />
     {ogImageAbsolute && <meta property="og:image" content={ogImageAbsolute} />}
+    {ogImageAbsolute && <meta property="og:image:alt" content={ogImageAlt ?? pageTitle} />}
     <meta name="twitter:card" content={ogImageAbsolute ? 'summary_large_image' : 'summary'} />
     <meta name="twitter:title" content={pageTitle} />
     <meta name="twitter:description" content={pageDescription} />
     {ogImageAbsolute && <meta name="twitter:image" content={ogImageAbsolute} />}
+    {ogImageAbsolute && <meta name="twitter:image:alt" content={ogImageAlt ?? pageTitle} />}
 
     <title>{pageTitle}</title>
     <script is:inline set:html={themeBootstrap} />

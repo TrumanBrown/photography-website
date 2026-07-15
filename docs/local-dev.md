@@ -113,3 +113,18 @@ A future iteration may add a `.vscode/extensions.json` recommending these automa
 - **Image not found errors during build** → the JSON references a file that isn't in `src/content/sessions/<slug>/images/`. Either fix the JSON's `images` array or re-run the fixtures/prebuild.
 - **CSP violations in browser console (production only)** → run `npm run check:csp`, then check the relevant directive in `staticwebapp.config.json`. Don't bypass with `'unsafe-inline'` for scripts.
 - **Hot reload not picking up changes** → kill the dev server and restart; Astro's content collection HMR is a little flaky on schema edits.
+
+## Responsive product check
+
+The representative local fixtures validate component behavior, but production
+contains many more sessions and photographs. Before a product-facing release:
+
+1. Check the homepage, both local sessions, Hobbies landing/detail pages,
+  Admin's signed-out state, and a missing route at desktop, tablet, and mobile.
+2. Confirm the homepage has one H1 and no horizontal overflow.
+3. Confirm only the first card/gallery image has `loading="eager"` and
+  `fetchpriority="high"`; later images remain lazy.
+4. Test session/contact drawers and the Admin edit dialog with Tab, Shift+Tab,
+  Escape, and focus restoration.
+5. Use production only for representative content/network measurements; local
+  fixtures intentionally contain just two small synthetic sessions.

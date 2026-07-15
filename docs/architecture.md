@@ -180,6 +180,7 @@ sequenceDiagram
 
 | Component | Where it lives | Deep dive |
 | --- | --- | --- |
+| Product experience principles + roadmap | Public pages/components and Admin metadata workflow | [product-experience.md](product-experience.md) |
 | Photo portfolio (static pages) | `src/pages/`, `src/components/`, built by Astro into `dist/` | this doc |
 | Build pipeline | `.github/workflows/build-and-deploy.yml`, `scripts/prebuild.mjs`, `scripts/sync-variants.mjs` | [cicd.md](cicd.md), [image-pipeline.md](image-pipeline.md) |
 | Blob containers (`originals`, `derivatives`, `variants`, `metadata`, `hobby-media`) | Azure Storage, defined in `infra/modules/storage.bicep` | [image-pipeline.md](image-pipeline.md) |

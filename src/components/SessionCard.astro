@@ -7,11 +7,13 @@ import { sessionSlug, formatDate } from '@/lib/sessions';
 interface Props {
   entry: CollectionEntry<'sessions'>;
   cover: ImageMetadata;
+  /** Reserve eager/high-priority loading for the first visible card only. */
+  priority?: boolean;
 }
 
-const { entry, cover } = Astro.props;
+const { entry, cover, priority = false } = Astro.props;
 const slug = sessionSlug(entry);
-const { title, date, location, images } = entry.data;
+const { title, date, location, description, images } = entry.data;
 const photoCount = images.length;
 const hasMultiple = photoCount > 1;
 ---
@@ -43,7 +45,8 @@ const hasMultiple = photoCount > 1;
         sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
         formats={['webp']}
         fallbackFormat="jpeg"
-        loading="lazy"
+        loading={priority ? 'eager' : 'lazy'}
+        fetchpriority={priority ? 'high' : 'auto'}
         class="aspect-[4/3] w-full object-cover transition-opacity duration-300 group-hover:opacity-90"
       />
 
@@ -81,5 +84,6 @@ const hasMultiple = photoCount > 1;
       {location && <span> · {location}</span>}
       {hasMultiple && <span class="text-neutral-500"> · {photoCount} photos</span>}
     </p>
+    {description && <p class="line-clamp-2 text-sm leading-relaxed text-neutral-600 dark:text-neutral-400">{description}</p>}
   </div>
 </a>

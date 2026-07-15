@@ -76,6 +76,7 @@ The true credentials with meaningful blast radius are:
 | Your actual photos | The `originals` + `derivatives` containers in Blob Storage. **Anyone who knows the URL can read individual blobs.** The container itself cannot be listed by anonymous users, there's no directory index, so URLs cannot be enumerated. |
 | Site analytics (pageviews) | Custom privacy-friendly pipeline → `pageviews` table in Table Storage. No IP and no cookies stored; unique visitors counted via a daily-rotating salted hash. See [docs/analytics.md](analytics.md). |
 | Contact form submissions | `contactmessages` table in Table Storage (the name, email, and message a sender chose to send you). Rate limiting uses a separate `contactratelimit` table that stores only a salted hash of the sender's IP plus a count, never the raw IP. |
+| Session descriptions and image captions | `_session.json` in the private-to-listing `originals` container. They become public text on the next site build because they describe public photographs. |
 
 ## What is published to **the public website**
 

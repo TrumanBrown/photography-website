@@ -97,6 +97,12 @@ If `images` is provided as an array of objects, each can carry a `caption` that 
 ]
 ```
 
+Captions are limited to 500 characters. They can also be edited from `/admin`;
+Admin writes the same ordered `images` array back to `_session.json`. A caption
+becomes the photograph's accessible name. Without one, the gallery uses a
+contextual fallback such as “Session title, photo 4 of 20” rather than exposing
+the camera filename.
+
 Use the source filename in `cover` and `images`, including `.ARW`, `.HEIC`, or
 other converted extensions. Prebuild maps it to the generated `.jpg`. The
 sidecar is validated before image processing; malformed JSON, invalid dates,
@@ -181,6 +187,7 @@ Once `src/content/sessions/` is populated, Astro's `astro build` does the rest:
   - Two formats per width: WebP (broadly supported, small) and JPEG (universal fallback). AVIF is intentionally **not** generated: its encoder is several times slower than WebP and would dominate build time for little extra savings.
 - **Static HTML**: every page is pre-rendered to a `.html` file. The `<picture>` tags contain `srcset` listing every variant; the browser picks the right one.
 - **Lightbox URL.** Each image's full-res URL (either the original or the RAW-derived sidecar) is baked into the rendered HTML as `data-pswp-*` attributes. The lightbox loads it on click, never on initial page render.
+- **Loading priority.** The first homepage cover and first photograph on each session page are eager/high priority because they are the likely LCP elements. All remaining photographs stay lazy. Pages preconnect to the Blob origin so DNS/TLS negotiation can begin before the browser discovers the first image in the body.
 
 The output starts as a `dist/` folder containing static files and generated
 variants. `scripts/sync-variants.mjs` then uploads photo variants to Blob,

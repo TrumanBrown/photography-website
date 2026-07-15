@@ -1,6 +1,7 @@
 let BlobServiceClient;
 let TableClient;
 const { allowedUsers, principalUserId } = require('./auth');
+const { captionsFromImages, normalizeSessionImages } = require('./session-images');
 
 const CONTAINER = 'originals';
 const SESSION_JSON = '_session.json';
@@ -222,6 +223,7 @@ async function handleGet(context) {
         cover: s.cover || '',
         order: s.order != null ? s.order : null,
         images: s.images || [],
+        captions: s.captions || {},
       };
     });
     context.res = { status: 200, headers: json(), body: { ok: true, sessions: sessions, blobHost: blobHost } };
@@ -269,6 +271,7 @@ async function handleGet(context) {
       cover: sidecar.cover || '',
       order: sidecar.order != null ? sidecar.order : null,
       images: images,
+      captions: captionsFromImages(sidecar.images),
     });
   }
 
@@ -283,6 +286,7 @@ async function handlePut(context, req) {
   var order = body.order;
   var location = body.location;
   var description = body.description;
+  var normalizedImages = normalizeSessionImages(body.images);
 
   var errors = [];
   if (!slug || typeof slug !== 'string') errors.push('slug is required.');
@@ -297,6 +301,7 @@ async function handlePut(context, req) {
   if (order !== undefined && order !== null && (typeof order !== 'number' || !Number.isInteger(order))) {
     errors.push('order must be an integer or null.');
   }
+  errors.push(...normalizedImages.errors);
   if (slug && (slug.includes('/') || slug.includes('\\') || slug.includes('..') || slug.startsWith('.'))) {
     errors.push('Invalid slug.');
   }
@@ -331,6 +336,7 @@ async function handlePut(context, req) {
   }
   if (location !== undefined) sidecar.location = location;
   if (description !== undefined) sidecar.description = description;
+  if (normalizedImages.images !== undefined) sidecar.images = normalizedImages.images;
 
   var data = JSON.stringify(sidecar, null, 2);
   var blockBlob = container.getBlockBlobClient(slug + '/' + SESSION_JSON);

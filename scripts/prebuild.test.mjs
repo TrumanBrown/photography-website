@@ -122,4 +122,12 @@ describe("session sidecar validation", () => {
       "must contain a JSON object",
     );
   });
+
+  it("rejects captions longer than the public content limit", () => {
+    expect(() =>
+      validateSessionSidecar({
+        images: [{ file: "DSC0123.jpg", caption: "x".repeat(501) }],
+      }),
+    ).toThrow("caption must be at most 500 characters");
+  });
 });

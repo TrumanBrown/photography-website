@@ -5,7 +5,8 @@
 <button
   id="theme-toggle"
   type="button"
-  aria-label="Toggle dark mode"
+  aria-label="Toggle color theme"
+  aria-pressed="false"
   class="rounded border border-neutral-300 px-2 py-1 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-900"
 >
   <span class="hidden dark:inline">Light</span>
@@ -16,13 +17,20 @@
   (function () {
     var btn = document.getElementById('theme-toggle');
     if (!btn) return;
+    var root = document.documentElement;
+    function syncState() {
+      var isDark = root.classList.contains('dark');
+      btn.setAttribute('aria-label', isDark ? 'Use light theme' : 'Use dark theme');
+      btn.setAttribute('aria-pressed', String(isDark));
+    }
+    syncState();
     btn.addEventListener('click', function () {
-      var root = document.documentElement;
       var nextDark = !root.classList.contains('dark');
       root.classList.toggle('dark', nextDark);
       try {
         localStorage.setItem('theme', nextDark ? 'dark' : 'light');
       } catch {}
+      syncState();
     });
   })();
 </script>

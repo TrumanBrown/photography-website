@@ -13,6 +13,7 @@ The project started as a photography portfolio and has grown into a small person
 
 | Topic | Doc |
 |---|---|
+| Product experience, measured baseline, design decisions, and roadmap | [docs/product-experience.md](docs/product-experience.md) |
 | What is Astro, SWA, Blob, CDN, and why each one | [docs/architecture.md](docs/architecture.md) |
 | What Azure resources exist and what each costs | [docs/azure.md](docs/azure.md) |
 | What Infrastructure-as-Code (Bicep) is and what each `.bicep` file does | [docs/iac-bicep.md](docs/iac-bicep.md) |
