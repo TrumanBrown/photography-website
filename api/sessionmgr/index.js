@@ -2,6 +2,7 @@ let BlobServiceClient;
 let TableClient;
 const { allowedUsers, principalUserId } = require('./auth');
 const { captionsFromImages, normalizeSessionImages } = require('./session-images');
+const { analyticsDayKeys, buildAnalytics } = require('./analytics');
 
 const CONTAINER = 'originals';
 const SESSION_JSON = '_session.json';
@@ -65,44 +66,33 @@ async function handleGetAnalytics(context, req) {
 
   let days = parseInt((req.query && req.query.days) || '30', 10);
   if (!Number.isFinite(days) || days < 1) days = 30;
-  if (days > 365) days = 365;
+  if (days > 90) days = 90;
 
-  // Build the inclusive set of date-partition keys for the range.
-  const dayKeys = [];
-  for (let i = 0; i < days; i++) {
-    const d = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
-    dayKeys.push('pv-' + d);
-  }
-  const minKey = dayKeys[dayKeys.length - 1];
-  const maxKey = dayKeys[0];
-
-  let totalPageviews = 0;
-  const visitors = new Set();
-  const byDay = {};
-  const byPath = {};
-  const byRef = {};
-  let durSum = 0;
-  let durCount = 0;
+  // Query the selected period plus the immediately preceding period so the
+  // dashboard can show meaningful comparisons without another storage scan.
+  const dayKeys = analyticsDayKeys(days);
+  const minKey = 'pv-' + dayKeys.previous[0];
+  const maxKey = 'pv-' + dayKeys.current[dayKeys.current.length - 1];
+  const entities = [];
 
   try {
     const filter = `PartitionKey ge '${minKey}' and PartitionKey le '${maxKey}'`;
     for await (const e of client.listEntities({ queryOptions: { filter } })) {
-      const day = (e.partitionKey || '').replace(/^pv-/, '');
-      if (e.type === 'dur') {
-        if (typeof e.dur === 'number') { durSum += e.dur; durCount++; }
-        continue;
-      }
-      // pageview row
-      totalPageviews++;
-      byDay[day] = (byDay[day] || 0) + 1;
-      if (e.vh) visitors.add(e.vh);
-      const p = e.path || '/';
-      byPath[p] = (byPath[p] || 0) + 1;
-      if (e.ref) byRef[e.ref] = (byRef[e.ref] || 0) + 1;
+      entities.push(e);
     }
   } catch (e) {
     if (e.statusCode === 404) {
-      context.res = { status: 200, headers: json(), body: { ok: true, analytics: emptyAnalytics(dayKeys) } };
+      context.res = {
+        status: 200,
+        headers: json(),
+        body: {
+          ok: true,
+          analytics: buildAnalytics([], {
+            dayKeys,
+            ownHost: (req.headers && req.headers.host) || '',
+          }),
+        },
+      };
       return;
     }
     context.log.error('analytics query failed:', e.message);
@@ -110,49 +100,16 @@ async function handleGetAnalytics(context, req) {
     return;
   }
 
-  // Time series oldest -> newest.
-  const series = dayKeys
-    .map((k) => k.replace(/^pv-/, ''))
-    .reverse()
-    .map((d) => ({ date: d, views: byDay[d] || 0 }));
-
-  const topPages = Object.entries(byPath)
-    .map(([path, count]) => ({ path, count }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 10);
-
-  const topReferrers = Object.entries(byRef)
-    .map(([ref, count]) => ({ ref, count }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 10);
-
   context.res = {
     status: 200,
     headers: json(),
     body: {
       ok: true,
-      analytics: {
-        days,
-        totalPageviews,
-        uniqueVisitors: visitors.size,
-        avgTimeOnPageMs: durCount ? Math.round(durSum / durCount) : 0,
-        series,
-        topPages,
-        topReferrers,
-      },
+      analytics: buildAnalytics(entities, {
+        dayKeys,
+        ownHost: (req.headers && req.headers.host) || '',
+      }),
     },
-  };
-}
-
-function emptyAnalytics(dayKeys) {
-  return {
-    days: dayKeys.length,
-    totalPageviews: 0,
-    uniqueVisitors: 0,
-    avgTimeOnPageMs: 0,
-    series: dayKeys.map((k) => k.replace(/^pv-/, '')).reverse().map((d) => ({ date: d, views: 0 })),
-    topPages: [],
-    topReferrers: [],
   };
 }
 

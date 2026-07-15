@@ -3,7 +3,7 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
 ---
 
 <BaseLayout title="Admin" noindex>
-  <section class="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+  <section class="mx-auto max-w-6xl px-4 py-10 sm:px-6">
     <!-- Sign-in screen (shown when not authenticated) -->
     <div id="admin-signin" class="hidden py-20 text-center">
       <h1 class="mb-3 text-2xl font-semibold tracking-tight">Session Manager</h1>
@@ -90,32 +90,84 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
           Loading analytics…
         </div>
         <div id="analytics-error" class="hidden rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-300"></div>
-        <div id="analytics-content" class="hidden space-y-6">
-          <div class="flex items-center justify-end">
+        <div id="analytics-content" class="hidden space-y-8">
+          <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 class="text-lg font-semibold">Traffic overview</h2>
+              <p id="analytics-period" class="mt-1 text-sm text-neutral-500 dark:text-neutral-400"></p>
+            </div>
             <label class="text-sm text-neutral-500 dark:text-neutral-400">
               Range:
-              <select id="analytics-range" class="ml-2 rounded border border-neutral-300 bg-white px-2 py-1 text-sm dark:border-neutral-600 dark:bg-neutral-800">
+              <select id="analytics-range" class="ml-2 rounded border border-neutral-300 bg-white px-2 py-1.5 text-sm dark:border-neutral-600 dark:bg-neutral-800">
                 <option value="7">Last 7 days</option>
                 <option value="30" selected>Last 30 days</option>
                 <option value="90">Last 90 days</option>
               </select>
             </label>
           </div>
-          <div id="analytics-cards" class="grid grid-cols-1 gap-3 sm:grid-cols-3"></div>
-          <div>
-            <h3 class="mb-2 text-sm font-semibold text-neutral-500 dark:text-neutral-400">Pageviews per day</h3>
-            <div id="analytics-chart" class="flex h-32 items-end gap-0.5 rounded border border-neutral-200 p-2 dark:border-neutral-700"></div>
-          </div>
-          <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
-            <div>
-              <h3 class="mb-2 text-sm font-semibold text-neutral-500 dark:text-neutral-400">Top pages</h3>
-              <ul id="analytics-pages" class="space-y-1 text-sm"></ul>
+          <div id="analytics-cards" class="grid grid-cols-2 gap-3 lg:grid-cols-4"></div>
+
+          <section aria-labelledby="analytics-trend-title">
+            <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <h3 id="analytics-trend-title" class="text-sm font-semibold">Traffic over time</h3>
+              <div class="flex items-center gap-4 text-xs text-neutral-500 dark:text-neutral-400" aria-hidden="true">
+                <span class="inline-flex items-center gap-1.5"><span class="h-0.5 w-5 bg-neutral-900 dark:bg-neutral-100"></span>Pageviews</span>
+                <span class="inline-flex items-center gap-1.5"><span class="h-0.5 w-5 bg-teal-600 dark:bg-teal-400"></span>Daily visitors</span>
+              </div>
             </div>
-            <div>
-              <h3 class="mb-2 text-sm font-semibold text-neutral-500 dark:text-neutral-400">Top referrers</h3>
-              <ul id="analytics-referrers" class="space-y-1 text-sm"></ul>
+            <div id="analytics-chart-frame" class="relative overflow-hidden rounded border border-neutral-200 bg-white p-2 dark:border-neutral-700 dark:bg-neutral-950">
+              <div
+                id="analytics-tooltip"
+                class="pointer-events-none absolute z-10 hidden min-w-40 rounded border border-neutral-200 bg-white px-3 py-2 text-xs shadow-lg dark:border-neutral-700 dark:bg-neutral-900"
+                role="status"
+                aria-live="polite"
+              ></div>
+              <div id="analytics-chart" class="overflow-x-auto"></div>
             </div>
-          </div>
+          </section>
+
+          <div id="analytics-quality" class="grid grid-cols-1 divide-y divide-neutral-200 border-y border-neutral-200 dark:divide-neutral-800 dark:border-neutral-800 sm:grid-cols-3 sm:divide-x sm:divide-y-0"></div>
+
+          <section aria-labelledby="analytics-pages-title">
+            <div class="mb-3">
+              <h3 id="analytics-pages-title" class="text-sm font-semibold">Page performance</h3>
+              <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">Views, audience, entry traffic, and measured engagement for every viewed route.</p>
+            </div>
+            <div class="overflow-x-auto rounded border border-neutral-200 dark:border-neutral-700">
+              <table class="w-full min-w-[46rem] text-left text-sm">
+                <thead class="bg-neutral-50 text-xs text-neutral-500 dark:bg-neutral-900 dark:text-neutral-400">
+                  <tr>
+                    <th scope="col" class="px-3 py-2 font-medium">Page</th>
+                    <th scope="col" class="px-3 py-2 text-right font-medium">Views</th>
+                    <th scope="col" class="px-3 py-2 text-right font-medium">Daily visitors</th>
+                    <th scope="col" class="px-3 py-2 text-right font-medium">Entries</th>
+                    <th scope="col" class="px-3 py-2 text-right font-medium">Avg. time</th>
+                    <th scope="col" class="px-3 py-2 text-right font-medium">Measured</th>
+                  </tr>
+                </thead>
+                <tbody id="analytics-pages" class="divide-y divide-neutral-200 dark:divide-neutral-800"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section aria-labelledby="analytics-referrers-title">
+            <div class="mb-3">
+              <h3 id="analytics-referrers-title" class="text-sm font-semibold">Acquisition</h3>
+              <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">Where pageviews originated; same-site navigation is grouped with direct traffic.</p>
+            </div>
+            <div class="overflow-hidden rounded border border-neutral-200 dark:border-neutral-700">
+              <table class="w-full text-left text-sm">
+                <thead class="bg-neutral-50 text-xs text-neutral-500 dark:bg-neutral-900 dark:text-neutral-400">
+                  <tr>
+                    <th scope="col" class="px-3 py-2 font-medium">Source</th>
+                    <th scope="col" class="px-3 py-2 text-right font-medium">Views</th>
+                    <th scope="col" class="px-3 py-2 text-right font-medium">Share</th>
+                  </tr>
+                </thead>
+                <tbody id="analytics-referrers" class="divide-y divide-neutral-200 dark:divide-neutral-800"></tbody>
+              </table>
+            </div>
+          </section>
         </div>
       </div>
     </div>

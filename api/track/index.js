@@ -5,6 +5,7 @@
 
 const { todayUtc, visitorHash } = require('../shared/visitor-hash');
 const { clientIp } = require('../shared/client-ip');
+const { externalReferrerHost } = require('../shared/referrer');
 
 let TableClient;
 const TABLE = 'pageviews';
@@ -22,17 +23,6 @@ function getTableClient() {
 
 // Common bot/crawler user-agents we don't want inflating the numbers.
 const BOT_RE = /bot|crawl|spider|slurp|bingpreview|facebookexternalhit|embedly|quora|pinterest|vkshare|whatsapp|telegram|preview|monitor|curl|wget|python-requests|headless/i;
-
-function refHost(referrer, ownHost) {
-  if (!referrer) return '';
-  try {
-    const h = new URL(referrer).hostname;
-    if (!h || h === ownHost) return '';
-    return h.slice(0, 100);
-  } catch {
-    return '';
-  }
-}
 
 module.exports = async function (context, req) {
   // Always return 204 quickly; analytics must never break the page.
@@ -58,7 +48,10 @@ module.exports = async function (context, req) {
 
     if (type === 'pv') {
       const path = typeof body.path === 'string' ? body.path.slice(0, MAX_PATH) : '/';
-      const ref = refHost(typeof body.ref === 'string' ? body.ref : '', req.headers['host'] || '');
+      const ref = externalReferrerHost(
+        typeof body.ref === 'string' ? body.ref : '',
+        req.headers['host'] || '',
+      );
       await client.createEntity({
         partitionKey: `pv-${date}`,
         rowKey,

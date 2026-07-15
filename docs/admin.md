@@ -23,7 +23,7 @@ Read-only view of messages submitted through the contact form, newest first. Sho
 
 ### Analytics tab: privacy-friendly traffic metrics
 
-Read-only view of site traffic: pageviews, unique visitors, average time on page, a pageviews-per-day chart, top pages, and top referrers (last 7/30/90 days). No cookies, no third parties, no IP stored. See [docs/analytics.md](analytics.md) for the full privacy model and how it works.
+Read-only view of site traffic with same-length prior-period comparisons, a labeled daily pageview/visitor chart, visit quality, page-level engagement, entry pages, timing coverage, and acquisition share (last 7/30/90 days). The chart supports hover and keyboard focus and has an equivalent screen-reader table. No cookies, no third parties, no IP stored. See [docs/analytics.md](analytics.md) for metric definitions, limitations, and the full privacy model.
 
 ## How to use it
 

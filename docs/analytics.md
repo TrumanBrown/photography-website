@@ -8,11 +8,14 @@ A lightweight, self-hosted analytics pipeline that records pageviews and time-on
 
 Metrics shown:
 - **Pageviews**: total page loads in the selected range.
-- **Unique visitors**: distinct visitors per day (see privacy note below).
-- **Avg. time on page**: how long visitors stay.
-- **Pageviews per day**: a simple bar chart over the range.
-- **Top pages**: most-viewed pages.
-- **Top referrers**: where visitors came from (hostname only).
+- **Daily unique visitors**: the sum of each day's distinct privacy hashes (see privacy note below).
+- **Visits**: distinct tab-scoped browsing sessions in the selected range.
+- **Avg. measured time**: average duration among pageviews whose leave beacon arrived.
+- **Period comparison**: each headline metric is compared with the immediately preceding range of the same length.
+- **Traffic over time**: labeled pageview and daily-visitor lines. Hover or focus a day to inspect pageviews, visitors, visits, average measured time, and timing coverage. A screen-reader table contains the same data.
+- **Visit quality**: pages per visit, single-page visit rate, and measured-time coverage.
+- **Page performance**: views, daily visitors, entry visits, measured time, and timing coverage for every viewed route.
+- **Acquisition**: pageview share by external referrer; direct traffic and same-site navigation are grouped together.
 
 Range is selectable: last 7, 30, or 90 days.
 
@@ -36,8 +39,10 @@ navigator.sendBeacon → POST /api/track { type:'dur', sid, pvid, dur }
   ↓
 /admin Analytics tab:
   GET /api/sessionmgr?type=analytics&days=30  (admin-only)
-  - reads the date-partitioned rows, aggregates in memory
-  - returns totals, unique count, avg duration, time series, top lists
+  - reads the selected date partitions plus the preceding comparison period
+  - pairs duration rows to pageviews by pageview id
+  - returns totals, daily trends, visit quality, page engagement, acquisition,
+    measurement coverage, and previous-period summaries
 ```
 
 ## Privacy model
@@ -56,7 +61,7 @@ This follows the **cookieless, no-PII** approach used by privacy-first analytics
 - Table: `pageviews` (auto-created on first write).
 - Partition key: `pv-YYYY-MM-DD` (one partition per day → efficient range queries).
 - Row types: `pv` (pageview: path, ref, visitor hash, session id) and `dur` (duration in ms).
-- Volume is tiny for a personal site; the admin aggregation fetches the range and computes in memory.
+- The largest dashboard request is 90 days plus the preceding 90-day comparison period. Volume is currently small enough for one bounded in-memory aggregation; revisit daily rollups if traffic grows by orders of magnitude.
 
 ## Configuration
 
@@ -73,7 +78,12 @@ This follows the **cookieless, no-PII** approach used by privacy-first analytics
 ## Reading the numbers honestly
 
 - **Unique visitors** is per-day-unique. Over a 30-day range it's the sum of daily-distinct hashes, so a person who visits 5 different days counts as 5. It's a consistent relative measure, not a deduplicated headcount.
-- **Avg. time on page** depends on the leave beacon firing; some browsers drop it (e.g. hard crashes), so it's a good estimate, not exact.
+- **Visits** are tab-scoped, not an identity. A new tab starts a new visit; a tab kept open can span multiple pages and, rarely, midnight. This is intentionally less persistent than cookie-based sessions.
+- **Entries** identify the earliest recorded page in each visit within the queried data. They are useful directionally, not as an advertising-attribution model.
+- **Avg. measured time** depends on the leave beacon firing; some browsers drop it (for example, a hard crash). Always read it together with **Measured time coverage**.
+- **Single-page visits** means a tab-scoped visit with one recorded pageview. It is not automatically bad: a visitor may find one photograph or page and leave satisfied.
+- **Comparisons** use the immediately preceding period of the same length. “Last 7 days” compares with the prior 7 days; “Last 90 days” scans 180 daily partitions in total.
+- **Acquisition** counts pageviews by stored referrer host. New events drop apex/www self-referrals at ingestion, and the dashboard reclassifies historical self-referrals as `Direct / internal`.
 - Numbers exclude bots and `/admin` views.
 
 ## Alternative considered: Azure App Insights
