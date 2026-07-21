@@ -1460,6 +1460,159 @@ function drawLakeFeature(
   }
 }
 
+function drawDetailedLakeFeature(
+  ctx: CanvasRenderingContext2D,
+  state: HikeState,
+  feature: PlacedFeature,
+  colors: SceneColors,
+  width: number,
+  height: number,
+  scale: number,
+): void {
+  const random = makeRng(state.seed + feature.id.length * 101 + 1889);
+  const radius = 0.052 * Math.max(0.72, worldObjectScale(state));
+  const samples = Array.from({ length: 41 }, (_, index) => {
+    const x = feature.x - radius + (index / 40) * radius * 2;
+    return { normalizedX: x, ...pointOnTrail(state, x, width, height) };
+  });
+  const centerIndex = 20;
+  const center = samples[centerIndex];
+  const lowerRimY = Math.max(samples[2].y, samples[samples.length - 3].y);
+  const basinFloorY = Math.max(...samples.map((sample) => sample.y));
+  const availableDepth = Math.max(8 * scale, basinFloorY - lowerRimY);
+  const waterY = Math.min(
+    basinFloorY - 3 * scale,
+    lowerRimY + availableDepth * 0.28,
+  );
+
+  let leftIndex = centerIndex;
+  let rightIndex = centerIndex;
+  while (leftIndex > 1 && samples[leftIndex - 1].y >= waterY) leftIndex -= 1;
+  while (
+    rightIndex < samples.length - 2 &&
+    samples[rightIndex + 1].y >= waterY
+  ) {
+    rightIndex += 1;
+  }
+  if (rightIndex - leftIndex < 8) {
+    leftIndex = Math.max(2, centerIndex - 6);
+    rightIndex = Math.min(samples.length - 3, centerIndex + 6);
+  }
+
+  const left = samples[leftIndex];
+  const right = samples[rightIndex];
+  const waterDepth = Math.max(
+    4 * scale,
+    Math.min(14 * scale, (basinFloorY - waterY) * 0.38),
+  );
+
+  ctx.save();
+  const basinShadow = ctx.createRadialGradient(
+    center.x,
+    waterY,
+    0,
+    center.x,
+    waterY,
+    Math.max(20, right.x - left.x),
+  );
+  basinShadow.addColorStop(0, "rgba(7,18,17,0.42)");
+  basinShadow.addColorStop(0.62, "rgba(10,24,20,0.18)");
+  basinShadow.addColorStop(1, "rgba(10,24,20,0)");
+  ctx.fillStyle = basinShadow;
+  ctx.beginPath();
+  ctx.ellipse(
+    center.x,
+    waterY + waterDepth * 0.5,
+    (right.x - left.x) * 0.65,
+    waterDepth * 2.4,
+    0,
+    0,
+    Math.PI * 2,
+  );
+  ctx.fill();
+
+  const water = ctx.createLinearGradient(0, waterY, 0, waterY + waterDepth);
+  water.addColorStop(0, shade(colors.water, 0.42));
+  water.addColorStop(0.42, colors.water);
+  water.addColorStop(1, shade(colors.water, -0.32));
+  ctx.fillStyle = water;
+  ctx.beginPath();
+  ctx.moveTo(left.x, waterY + 1 * scale);
+  ctx.bezierCurveTo(
+    center.x - (right.x - left.x) * 0.2,
+    waterY - 1.5 * scale,
+    center.x + (right.x - left.x) * 0.22,
+    waterY + 1.2 * scale,
+    right.x,
+    waterY,
+  );
+  ctx.bezierCurveTo(
+    right.x - (right.x - left.x) * 0.18,
+    waterY + waterDepth,
+    left.x + (right.x - left.x) * 0.25,
+    waterY + waterDepth * 1.18,
+    left.x,
+    waterY + 1 * scale,
+  );
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(left.x, waterY - 2 * scale, right.x - left.x, waterDepth * 1.5);
+  ctx.clip();
+  ctx.strokeStyle = "rgba(240,246,231,0.42)";
+  ctx.lineWidth = Math.max(1, 0.8 * scale);
+  for (let index = 0; index < 7; index += 1) {
+    const y = waterY + (index / 7) * waterDepth;
+    const inset = (index % 3) * (right.x - left.x) * 0.07;
+    ctx.beginPath();
+    ctx.moveTo(left.x + inset + random() * 6 * scale, y);
+    ctx.lineTo(right.x - inset - random() * 8 * scale, y + random() * scale);
+    ctx.stroke();
+  }
+  ctx.fillStyle = "rgba(225,237,221,0.16)";
+  const reflectionWidth = (right.x - left.x) * 0.16;
+  ctx.beginPath();
+  ctx.moveTo(center.x - reflectionWidth * 0.35, waterY);
+  ctx.lineTo(center.x + reflectionWidth, waterY + waterDepth);
+  ctx.lineTo(center.x - reflectionWidth, waterY + waterDepth);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  ctx.strokeStyle = rgba(shade(colors.ground, -0.32), 0.9);
+  ctx.lineWidth = Math.max(2, 2.2 * scale);
+  ctx.beginPath();
+  ctx.moveTo(left.x - 4 * scale, waterY + 1 * scale);
+  ctx.quadraticCurveTo(
+    center.x,
+    waterY - 3 * scale,
+    right.x + 4 * scale,
+    waterY,
+  );
+  ctx.stroke();
+
+  const bankCount = 11;
+  for (let index = 0; index < bankCount; index += 1) {
+    const progress = index / (bankCount - 1);
+    const x = lerp(left.x - 5 * scale, right.x + 5 * scale, progress);
+    const foreground = index % 2 === 0;
+    const y = waterY + (foreground ? waterDepth * 0.72 : -1.5 * scale);
+    const size = (2.8 + random() * 5.2) * scale;
+    drawRock(
+      ctx,
+      x + (random() - 0.5) * 4 * scale,
+      y + random() * 2 * scale,
+      size,
+      index % 3 === 0
+        ? shade(colors.groundLight, 0.08)
+        : shade(colors.ground, -0.16),
+    );
+  }
+  ctx.restore();
+}
+
 function drawWaterfallFeature(
   ctx: CanvasRenderingContext2D,
   point: Point,
@@ -1626,6 +1779,152 @@ function drawSnowfieldFeature(
   }
 }
 
+function traceSnowPatch(
+  ctx: CanvasRenderingContext2D,
+  top: readonly Point[],
+  bottom: readonly Point[],
+): void {
+  ctx.beginPath();
+  ctx.moveTo(top[0].x, top[0].y);
+  for (let index = 1; index < top.length; index += 1) {
+    ctx.lineTo(top[index].x, top[index].y);
+  }
+  for (let index = bottom.length - 1; index >= 0; index -= 1) {
+    ctx.lineTo(bottom[index].x, bottom[index].y);
+  }
+  ctx.closePath();
+}
+
+function drawDetailedSnowfieldFeature(
+  ctx: CanvasRenderingContext2D,
+  state: HikeState,
+  feature: PlacedFeature,
+  colors: SceneColors,
+  width: number,
+  height: number,
+  scale: number,
+): void {
+  const random = makeRng(state.seed + feature.id.length * 137 + 4217);
+  const radius = 0.052 * Math.max(0.7, worldObjectScale(state));
+  const count = 17;
+  const top = Array.from({ length: count }, (_, index) => {
+    const progress = index / (count - 1);
+    const normalizedX = feature.x - radius + progress * radius * 2;
+    const point = pointOnTrail(state, normalizedX, width, height);
+    return {
+      x: point.x,
+      y: point.y + (2 + Math.sin(progress * Math.PI * 3) * 1.3) * scale,
+    };
+  });
+  const bottom = top.map((point, index) => {
+    const progress = index / (count - 1);
+    const envelope = Math.pow(Math.sin(progress * Math.PI), 0.72);
+    const depth =
+      envelope *
+      height *
+      (0.045 + random() * 0.035) *
+      Math.max(0.72, worldObjectScale(state));
+    return {
+      x:
+        point.x +
+        Math.sin(progress * Math.PI * 4 + state.seed * 0.01) * 3 * scale,
+      y: point.y + depth,
+    };
+  });
+
+  ctx.save();
+  ctx.translate(0, 3 * scale);
+  traceSnowPatch(ctx, top, bottom);
+  ctx.fillStyle = "rgba(19,31,31,0.34)";
+  ctx.fill();
+  ctx.translate(0, -3 * scale);
+
+  traceSnowPatch(ctx, top, bottom);
+  const snow = ctx.createLinearGradient(
+    0,
+    Math.min(...top.map((point) => point.y)),
+    0,
+    Math.max(...bottom.map((point) => point.y)),
+  );
+  snow.addColorStop(0, shade(colors.snow, 0.04));
+  snow.addColorStop(0.46, colors.snow);
+  snow.addColorStop(1, mix(colors.snow, "#7895a0", 0.42));
+  ctx.fillStyle = snow;
+  ctx.fill();
+
+  ctx.save();
+  traceSnowPatch(ctx, top, bottom);
+  ctx.clip();
+
+  ctx.strokeStyle = "rgba(84,114,126,0.42)";
+  ctx.lineWidth = Math.max(1.2, 1.3 * scale);
+  for (let index = 0; index < 9; index += 1) {
+    const progress = 0.1 + (index / 10) * 0.8;
+    const sampleIndex = Math.min(count - 2, Math.round(progress * (count - 1)));
+    const start = top[sampleIndex];
+    const end = bottom[sampleIndex];
+    const midX = lerp(start.x, end.x, 0.5) + (random() - 0.5) * 12 * scale;
+    ctx.beginPath();
+    ctx.moveTo(start.x + (random() - 0.5) * 5 * scale, start.y + 2 * scale);
+    ctx.quadraticCurveTo(
+      midX,
+      lerp(start.y, end.y, 0.55),
+      end.x + (random() - 0.5) * 7 * scale,
+      end.y - 2 * scale,
+    );
+    ctx.stroke();
+  }
+
+  ctx.fillStyle = rgba(shade(colors.ground, -0.18), 0.88);
+  for (let index = 0; index < 12; index += 1) {
+    const progress = 0.08 + random() * 0.84;
+    const sampleIndex = Math.min(count - 1, Math.round(progress * (count - 1)));
+    const start = top[sampleIndex];
+    const end = bottom[sampleIndex];
+    const x = lerp(start.x, end.x, random() * 0.9);
+    const y = lerp(start.y, end.y, 0.2 + random() * 0.68);
+    const rockWidth = (2 + random() * 5) * scale;
+    const rockHeight = (1.5 + random() * 4) * scale;
+    ctx.beginPath();
+    ctx.moveTo(x - rockWidth, y + rockHeight);
+    ctx.lineTo(x - rockWidth * 0.2, y - rockHeight);
+    ctx.lineTo(x + rockWidth, y + rockHeight * 0.45);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  ctx.strokeStyle = "rgba(255,255,255,0.46)";
+  ctx.lineWidth = Math.max(1, scale);
+  ctx.beginPath();
+  for (let index = 1; index < top.length - 1; index += 1) {
+    const point = top[index];
+    if (index === 1) ctx.moveTo(point.x, point.y + 1 * scale);
+    else ctx.lineTo(point.x, point.y + 1 * scale);
+  }
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.fillStyle = "rgba(57,52,44,0.68)";
+  for (let index = 0; index < 8; index += 1) {
+    const progress = 0.2 + (index / 8) * 0.58;
+    const sampleIndex = Math.round(progress * (count - 1));
+    const start = top[sampleIndex];
+    const end = bottom[sampleIndex];
+    ctx.beginPath();
+    ctx.ellipse(
+      lerp(start.x, end.x, 0.38 + index * 0.035),
+      lerp(start.y, end.y, 0.35 + index * 0.045),
+      1.7 * scale,
+      3.4 * scale,
+      0.35,
+      0,
+      Math.PI * 2,
+    );
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
 function drawCampFeature(
   ctx: CanvasRenderingContext2D,
   point: Point,
@@ -1750,8 +2049,21 @@ function drawFeature(
     drawForestFeature(ctx, point, scale, colors, state.season === "winter");
   else if (feature.type === "meadow")
     drawMeadowFeature(ctx, point, scale, colors);
-  else if (feature.type === "lake") drawLakeFeature(ctx, point, scale, colors);
-  else if (feature.type === "waterfall")
+  else if (feature.type === "lake") {
+    if (detailed) {
+      drawDetailedLakeFeature(
+        ctx,
+        state,
+        feature,
+        colors,
+        width,
+        height,
+        scale,
+      );
+    } else {
+      drawLakeFeature(ctx, point, scale, colors);
+    }
+  } else if (feature.type === "waterfall")
     drawWaterfallFeature(ctx, point, scale, colors);
   else if (feature.type === "wildflowers")
     drawWildflowersFeature(
@@ -1761,9 +2073,22 @@ function drawFeature(
       colors,
       state.seed + feature.id.length * 31,
     );
-  else if (feature.type === "snowfield")
-    drawSnowfieldFeature(ctx, point, scale, colors);
-  else if (feature.type === "camp") drawCampFeature(ctx, point, scale, colors);
+  else if (feature.type === "snowfield") {
+    if (detailed) {
+      drawDetailedSnowfieldFeature(
+        ctx,
+        state,
+        feature,
+        colors,
+        width,
+        height,
+        scale,
+      );
+    } else {
+      drawSnowfieldFeature(ctx, point, scale, colors);
+    }
+  } else if (feature.type === "camp")
+    drawCampFeature(ctx, point, scale, colors);
   else drawLookoutFeature(ctx, point, scale, colors);
 }
 
