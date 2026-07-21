@@ -1,0 +1,827 @@
+---
+/**
+ * Interactive hike builder and postcard studio. The controls are static and
+ * accessible; @/lib/hobbies/hiking owns the scene state and canvas behavior.
+ */
+import {
+  Binoculars,
+  CloudFog,
+  CloudSun,
+  Download,
+  Droplets,
+  Flower2,
+  Footprints,
+  Image,
+  Mountain,
+  Play,
+  RotateCcw,
+  Route,
+  Share2,
+  Shuffle,
+  Snowflake,
+  Sparkles,
+  SunMedium,
+  Tent,
+  Trees,
+  TrendingUp,
+  Undo2,
+  WavesHorizontal,
+  X,
+} from "@lucide/astro";
+
+const hikerColors = ["#d5523f", "#e1a13a", "#247d72", "#355f9b", "#7d4f8f"];
+---
+
+<section data-pixel-hike aria-label="Build an imaginary hike" class="not-prose">
+  <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
+    <div>
+      <p
+        class="text-xs font-semibold uppercase text-emerald-800 dark:text-emerald-300"
+      >
+        Trail studio
+      </p>
+      <h2 class="mt-1 text-xl font-semibold">Build a hike worth remembering</h2>
+    </div>
+    <p data-hike-save-state class="text-xs text-neutral-500" aria-live="polite">
+      Saved on this device
+    </p>
+  </div>
+
+  <div
+    class="relative isolate overflow-hidden rounded-lg border border-neutral-300 bg-neutral-100 shadow-[0_18px_60px_-35px_rgba(15,23,42,0.65)] dark:border-neutral-700 dark:bg-neutral-900"
+  >
+    <canvas
+      data-hike-canvas
+      class="block h-[clamp(18rem,58vw,38rem)] w-full select-none"
+      style="touch-action:none"
+      tabindex="0"
+      role="img"
+      aria-label="An editable mountain landscape with five draggable terrain points"
+    ></canvas>
+    <div
+      class="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-3 p-3 sm:p-4"
+    >
+      <span
+        data-hike-region-label
+        class="rounded bg-black/55 px-2.5 py-1 text-[11px] font-semibold uppercase text-white backdrop-blur-sm"
+        >Cascades</span
+      >
+      <span
+        data-hike-stage-stat
+        class="rounded bg-white/85 px-2.5 py-1 text-xs font-medium text-neutral-800 shadow-sm backdrop-blur-sm dark:bg-neutral-950/75 dark:text-neutral-100"
+        >9.2 mi · 6,000 ft</span
+      >
+    </div>
+  </div>
+
+  <div class="mt-5 grid gap-7 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-9">
+    <div class="min-w-0">
+      <fieldset>
+        <legend
+          class="text-xs font-semibold uppercase text-neutral-500 dark:text-neutral-400"
+        >
+          Landscape
+        </legend>
+        <div class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <button
+            type="button"
+            data-hike-biome="cascades"
+            aria-pressed="true"
+            class="hike-choice"
+          >
+            <Mountain size={17} aria-hidden="true" />
+            <span>Cascades</span>
+          </button>
+          <button
+            type="button"
+            data-hike-biome="fjord"
+            aria-pressed="false"
+            class="hike-choice"
+          >
+            <WavesHorizontal size={17} aria-hidden="true" />
+            <span>Fjords</span>
+          </button>
+          <button
+            type="button"
+            data-hike-biome="karst"
+            aria-pressed="false"
+            class="hike-choice"
+          >
+            <Trees size={17} aria-hidden="true" />
+            <span>Karst</span>
+          </button>
+          <button
+            type="button"
+            data-hike-biome="himalaya"
+            aria-pressed="false"
+            class="hike-choice"
+          >
+            <TrendingUp size={17} aria-hidden="true" />
+            <span>Himalaya</span>
+          </button>
+        </div>
+      </fieldset>
+
+      <fieldset class="mt-6">
+        <legend
+          class="text-xs font-semibold uppercase text-neutral-500 dark:text-neutral-400"
+        >
+          Trail moments
+        </legend>
+        <div class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <button
+            type="button"
+            data-hike-feature="forest"
+            aria-pressed="false"
+            class="hike-choice"
+          >
+            <Trees size={17} aria-hidden="true" />
+            <span>Forest</span>
+          </button>
+          <button
+            type="button"
+            data-hike-feature="meadow"
+            aria-pressed="false"
+            class="hike-choice"
+          >
+            <Sparkles size={17} aria-hidden="true" />
+            <span>Meadow</span>
+          </button>
+          <button
+            type="button"
+            data-hike-feature="lake"
+            aria-pressed="false"
+            class="hike-choice"
+          >
+            <WavesHorizontal size={17} aria-hidden="true" />
+            <span>Alpine lake</span>
+          </button>
+          <button
+            type="button"
+            data-hike-feature="waterfall"
+            aria-pressed="false"
+            class="hike-choice"
+          >
+            <Droplets size={17} aria-hidden="true" />
+            <span>Waterfall</span>
+          </button>
+          <button
+            type="button"
+            data-hike-feature="wildflowers"
+            aria-pressed="false"
+            class="hike-choice"
+          >
+            <Flower2 size={17} aria-hidden="true" />
+            <span>Wildflowers</span>
+          </button>
+          <button
+            type="button"
+            data-hike-feature="snowfield"
+            aria-pressed="false"
+            class="hike-choice"
+          >
+            <Snowflake size={17} aria-hidden="true" />
+            <span>Snowfield</span>
+          </button>
+          <button
+            type="button"
+            data-hike-feature="camp"
+            aria-pressed="false"
+            class="hike-choice"
+          >
+            <Tent size={17} aria-hidden="true" />
+            <span>Camp</span>
+          </button>
+          <button
+            type="button"
+            data-hike-feature="lookout"
+            aria-pressed="false"
+            class="hike-choice"
+          >
+            <Binoculars size={17} aria-hidden="true" />
+            <span>Lookout</span>
+          </button>
+        </div>
+      </fieldset>
+
+      <div
+        class="mt-5 border-y border-neutral-200 py-4 dark:border-neutral-800"
+      >
+        <div class="flex items-center justify-between gap-3">
+          <h3 class="text-sm font-medium">On your trail</h3>
+          <span
+            data-hike-feature-count
+            class="text-xs tabular-nums text-neutral-500">3 / 10 moments</span
+          >
+        </div>
+        <div data-hike-itinerary class="mt-2 flex min-h-8 flex-wrap gap-2">
+        </div>
+      </div>
+
+      <details class="mt-4 group">
+        <summary
+          class="cursor-pointer text-sm font-medium marker:text-neutral-400"
+        >
+          Fine-tune the terrain
+        </summary>
+        <div class="mt-3 grid gap-3 sm:grid-cols-5">
+          <label class="hike-terrain-control">
+            <span>Trailhead</span>
+            <input
+              data-hike-terrain="0"
+              type="range"
+              min="8"
+              max="96"
+              value="10"
+            />
+          </label>
+          <label class="hike-terrain-control">
+            <span>First summit</span>
+            <input
+              data-hike-terrain="1"
+              type="range"
+              min="8"
+              max="96"
+              value="82"
+            />
+          </label>
+          <label class="hike-terrain-control">
+            <span>Saddle</span>
+            <input
+              data-hike-terrain="2"
+              type="range"
+              min="8"
+              max="96"
+              value="40"
+            />
+          </label>
+          <label class="hike-terrain-control">
+            <span>High point</span>
+            <input
+              data-hike-terrain="3"
+              type="range"
+              min="8"
+              max="96"
+              value="96"
+            />
+          </label>
+          <label class="hike-terrain-control">
+            <span>Finish</span>
+            <input
+              data-hike-terrain="4"
+              type="range"
+              min="8"
+              max="96"
+              value="13"
+            />
+          </label>
+        </div>
+      </details>
+    </div>
+
+    <aside
+      class="min-w-0 border-t border-neutral-200 pt-6 lg:border-l lg:border-t-0 lg:pl-7 lg:pt-0 dark:border-neutral-800"
+    >
+      <label class="block">
+        <span
+          class="text-xs font-semibold uppercase text-neutral-500 dark:text-neutral-400"
+          >Route name</span
+        >
+        <input
+          data-hike-name
+          type="text"
+          maxlength="48"
+          value="A Trail Above the Trees"
+          class="mt-2 w-full border-0 border-b border-neutral-300 bg-transparent px-0 pb-2 text-lg font-semibold outline-none focus:border-emerald-700 focus:ring-0 dark:border-neutral-700 dark:focus:border-emerald-400"
+        />
+      </label>
+
+      <dl
+        class="mt-5 grid grid-cols-3 divide-x divide-neutral-200 border-y border-neutral-200 py-3 dark:divide-neutral-800 dark:border-neutral-800"
+      >
+        <div class="pr-2">
+          <dt
+            class="flex items-center gap-1 text-[10px] uppercase text-neutral-500"
+          >
+            <Route size={12} aria-hidden="true" /> Miles
+          </dt>
+          <dd
+            data-hike-distance-stat
+            class="mt-1 text-sm font-semibold tabular-nums"
+          >
+            9.2
+          </dd>
+        </div>
+        <div class="px-2">
+          <dt
+            class="flex items-center gap-1 text-[10px] uppercase text-neutral-500"
+          >
+            <TrendingUp size={12} aria-hidden="true" /> Gain
+          </dt>
+          <dd
+            data-hike-gain-stat
+            class="mt-1 text-sm font-semibold tabular-nums"
+          >
+            6,000
+          </dd>
+        </div>
+        <div class="pl-2">
+          <dt
+            class="flex items-center gap-1 text-[10px] uppercase text-neutral-500"
+          >
+            <Footprints size={12} aria-hidden="true" /> Feel
+          </dt>
+          <dd data-hike-effort-stat class="mt-1 truncate text-sm font-semibold">
+            Epic
+          </dd>
+        </div>
+      </dl>
+      <p class="mt-2 text-[11px] text-neutral-500">
+        A playful estimate, not trail guidance.
+      </p>
+
+      <label class="mt-5 block">
+        <span
+          class="flex items-center justify-between gap-3 text-sm font-medium"
+        >
+          Route length
+          <span data-hike-distance-label class="tabular-nums text-neutral-500"
+            >9.2 mi</span
+          >
+        </span>
+        <input
+          data-hike-distance
+          type="range"
+          min="3"
+          max="18"
+          step="0.1"
+          value="9.2"
+          class="mt-2 w-full accent-emerald-700 dark:accent-emerald-400"
+        />
+      </label>
+
+      <div class="mt-5 grid grid-cols-2 gap-3">
+        <label class="block text-sm font-medium">
+          Season
+          <select data-hike-season class="hike-select">
+            <option value="spring">Spring</option>
+            <option value="summer" selected>Summer</option>
+            <option value="autumn">Autumn</option>
+            <option value="winter">Winter</option>
+          </select>
+        </label>
+        <label class="block text-sm font-medium">
+          Weather
+          <select data-hike-weather class="hike-select">
+            <option value="clear">Clear</option>
+            <option value="clouds" selected>Clouds</option>
+            <option value="mist">Mist</option>
+          </select>
+        </label>
+      </div>
+
+      <fieldset class="mt-5">
+        <legend class="text-sm font-medium">Light</legend>
+        <div
+          class="mt-2 grid grid-cols-3 overflow-hidden rounded border border-neutral-300 dark:border-neutral-700"
+        >
+          <button
+            type="button"
+            data-hike-light="dawn"
+            aria-pressed="false"
+            class="hike-segment"
+            title="Dawn"
+          >
+            <CloudSun size={16} aria-hidden="true" />
+            <span>Dawn</span>
+          </button>
+          <button
+            type="button"
+            data-hike-light="day"
+            aria-pressed="false"
+            class="hike-segment"
+            title="Daylight"
+          >
+            <SunMedium size={16} aria-hidden="true" />
+            <span>Day</span>
+          </button>
+          <button
+            type="button"
+            data-hike-light="golden"
+            aria-pressed="true"
+            class="hike-segment"
+            title="Golden hour"
+          >
+            <CloudFog size={16} aria-hidden="true" />
+            <span>Gold</span>
+          </button>
+        </div>
+      </fieldset>
+
+      <fieldset class="mt-5">
+        <legend class="text-sm font-medium">Hiker jacket</legend>
+        <div class="mt-2 flex gap-2">
+          {
+            hikerColors.map((color, index) => (
+              <button
+                type="button"
+                data-hike-color={color}
+                aria-label={`Jacket color ${index + 1}`}
+                aria-pressed={index === 0 ? "true" : "false"}
+                class="hike-swatch"
+                style={`--hike-swatch:${color}`}
+              >
+                <span class="sr-only">Jacket color {index + 1}</span>
+              </button>
+            ))
+          }
+        </div>
+      </fieldset>
+    </aside>
+  </div>
+
+  <div
+    class="mt-7 flex flex-col-reverse gap-3 border-t border-neutral-200 pt-5 sm:flex-row sm:items-center sm:justify-between dark:border-neutral-800"
+  >
+    <div class="flex items-center gap-1">
+      <button
+        type="button"
+        data-hike-undo
+        class="hike-tool"
+        aria-label="Undo"
+        title="Undo"
+        disabled
+      >
+        <Undo2 size={18} aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        data-hike-shuffle
+        class="hike-tool"
+        aria-label="Make another trail"
+        title="Make another trail"
+      >
+        <Shuffle size={18} aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        data-hike-reset
+        class="hike-tool"
+        aria-label="Reset trail"
+        title="Reset trail"
+      >
+        <RotateCcw size={18} aria-hidden="true" />
+      </button>
+    </div>
+    <div class="flex flex-col gap-2 sm:flex-row">
+      <button
+        type="button"
+        data-hike-walk
+        class="hike-action hike-action-secondary"
+      >
+        <Play size={17} aria-hidden="true" />
+        <span>Walk the trail</span>
+      </button>
+      <button
+        type="button"
+        data-hike-develop
+        class="hike-action hike-action-primary"
+      >
+        <Image size={17} aria-hidden="true" />
+        <span>Develop postcard</span>
+      </button>
+    </div>
+  </div>
+
+  <dialog data-hike-dialog class="hike-dialog">
+    <div
+      class="flex items-center justify-between gap-4 border-b border-neutral-200 px-4 py-3 sm:px-5 dark:border-neutral-800"
+    >
+      <div>
+        <p
+          class="text-xs font-semibold uppercase text-emerald-800 dark:text-emerald-300"
+        >
+          Your postcard
+        </p>
+        <h2 data-hike-dialog-title class="mt-0.5 text-lg font-semibold">
+          A Trail Above the Trees
+        </h2>
+      </div>
+      <button
+        type="button"
+        data-hike-close
+        class="hike-tool"
+        aria-label="Close postcard"
+        title="Close postcard"
+      >
+        <X size={19} aria-hidden="true" />
+      </button>
+    </div>
+    <div class="bg-neutral-200 p-3 sm:p-5 dark:bg-neutral-950">
+      <canvas
+        data-hike-postcard
+        width="1800"
+        height="1200"
+        class="block aspect-[3/2] w-full bg-white shadow-xl"
+        role="img"
+        aria-label="Your generated hiking postcard"></canvas>
+    </div>
+    <div
+      class="flex flex-col gap-3 border-t border-neutral-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5 dark:border-neutral-800"
+    >
+      <p
+        data-hike-export-status
+        class="text-xs text-neutral-500"
+        aria-live="polite"
+      >
+        Rendered on your device at 1800 × 1200.
+      </p>
+      <div class="flex flex-wrap gap-2">
+        <button
+          type="button"
+          data-hike-share
+          class="hike-action hike-action-secondary"
+          hidden
+        >
+          <Share2 size={17} aria-hidden="true" />
+          <span>Share</span>
+        </button>
+        <button
+          type="button"
+          data-hike-download
+          class="hike-action hike-action-primary"
+        >
+          <Download size={17} aria-hidden="true" />
+          <span>Download PNG</span>
+        </button>
+      </div>
+    </div>
+  </dialog>
+</section>
+
+<style>
+  .hike-choice {
+    display: flex;
+    min-height: 2.75rem;
+    align-items: center;
+    gap: 0.5rem;
+    border: 1px solid rgb(212 212 212);
+    border-radius: 0.375rem;
+    padding: 0.625rem 0.75rem;
+    text-align: left;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: rgb(64 64 64);
+    transition:
+      border-color 150ms ease,
+      background-color 150ms ease,
+      color 150ms ease;
+  }
+
+  .hike-choice:hover {
+    border-color: rgb(63 111 82);
+    background: rgb(240 253 244);
+    color: rgb(20 83 45);
+  }
+
+  .hike-choice[aria-pressed="true"] {
+    border-color: rgb(22 101 52);
+    background: rgb(220 252 231);
+    color: rgb(20 83 45);
+    box-shadow: inset 0 0 0 1px rgb(22 101 52 / 0.12);
+  }
+
+  .hike-terrain-control {
+    display: grid;
+    gap: 0.25rem;
+    font-size: 0.6875rem;
+    color: rgb(115 115 115);
+  }
+
+  .hike-terrain-control input {
+    width: 100%;
+    accent-color: rgb(21 128 61);
+  }
+
+  .hike-select {
+    margin-top: 0.5rem;
+    width: 100%;
+    border: 1px solid rgb(212 212 212);
+    border-radius: 0.375rem;
+    background: transparent;
+    padding: 0.5rem 0.625rem;
+    font-size: 0.8125rem;
+  }
+
+  .hike-segment {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    border-right: 1px solid rgb(212 212 212);
+    padding: 0.5rem 0.25rem;
+    font-size: 0.6875rem;
+    color: rgb(82 82 82);
+  }
+
+  .hike-segment:last-child {
+    border-right: 0;
+  }
+
+  .hike-segment[aria-pressed="true"] {
+    background: rgb(23 78 55);
+    color: white;
+  }
+
+  .hike-swatch {
+    width: 1.75rem;
+    height: 1.75rem;
+    border: 3px solid white;
+    border-radius: 50%;
+    background: var(--hike-swatch);
+    box-shadow: 0 0 0 1px rgb(163 163 163);
+  }
+
+  .hike-swatch[aria-pressed="true"] {
+    box-shadow:
+      0 0 0 2px rgb(23 78 55),
+      0 0 0 4px white;
+  }
+
+  .hike-tool {
+    display: inline-flex;
+    width: 2.5rem;
+    height: 2.5rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.375rem;
+    color: rgb(82 82 82);
+  }
+
+  .hike-tool:hover:not(:disabled) {
+    background: rgb(245 245 245);
+    color: rgb(23 23 23);
+  }
+
+  .hike-tool:disabled {
+    cursor: not-allowed;
+    opacity: 0.35;
+  }
+
+  .hike-action {
+    display: inline-flex;
+    min-height: 2.625rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 0.375rem;
+    padding: 0.625rem 1rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+  }
+
+  .hike-action-primary {
+    background: rgb(23 78 55);
+    color: white;
+  }
+
+  .hike-action-primary:hover {
+    background: rgb(20 65 46);
+  }
+
+  .hike-action-secondary {
+    border: 1px solid rgb(212 212 212);
+    color: rgb(64 64 64);
+  }
+
+  .hike-action-secondary:hover {
+    border-color: rgb(115 115 115);
+    background: rgb(250 250 250);
+  }
+
+  .hike-dialog {
+    width: min(64rem, calc(100vw - 1.5rem));
+    max-height: calc(100dvh - 1.5rem);
+    margin: auto;
+    overflow: auto;
+    border: 1px solid rgb(212 212 212);
+    border-radius: 0.5rem;
+    background: white;
+    padding: 0;
+    color: rgb(23 23 23);
+    box-shadow: 0 24px 80px rgb(0 0 0 / 0.35);
+  }
+
+  .hike-dialog::backdrop {
+    background: rgb(10 16 14 / 0.78);
+    backdrop-filter: blur(5px);
+  }
+
+  [data-hike-canvas][data-placement="true"] {
+    cursor: crosshair;
+  }
+
+  [data-hike-canvas][data-dragging="true"] {
+    cursor: ns-resize;
+  }
+
+  [data-pixel-hike] [hidden] {
+    display: none !important;
+  }
+
+  :global(.dark) .hike-choice {
+    border-color: rgb(64 64 64);
+    color: rgb(212 212 212);
+  }
+
+  :global(.dark) .hike-choice:hover {
+    border-color: rgb(74 222 128);
+    background: rgb(20 83 45 / 0.24);
+    color: rgb(187 247 208);
+  }
+
+  :global(.dark) .hike-choice[aria-pressed="true"] {
+    border-color: rgb(74 222 128);
+    background: rgb(20 83 45 / 0.42);
+    color: rgb(220 252 231);
+  }
+
+  :global(.dark) .hike-select {
+    border-color: rgb(64 64 64);
+    color: rgb(229 229 229);
+  }
+
+  :global(.dark) .hike-select option {
+    background: rgb(23 23 23);
+  }
+
+  :global(.dark) .hike-segment {
+    border-color: rgb(64 64 64);
+    color: rgb(212 212 212);
+  }
+
+  :global(.dark) .hike-segment[aria-pressed="true"] {
+    background: rgb(187 247 208);
+    color: rgb(20 83 45);
+  }
+
+  :global(.dark) .hike-swatch {
+    border-color: rgb(23 23 23);
+  }
+
+  :global(.dark) .hike-swatch[aria-pressed="true"] {
+    box-shadow:
+      0 0 0 2px rgb(134 239 172),
+      0 0 0 4px rgb(10 10 10);
+  }
+
+  :global(.dark) .hike-tool {
+    color: rgb(212 212 212);
+  }
+
+  :global(.dark) .hike-tool:hover:not(:disabled) {
+    background: rgb(38 38 38);
+    color: white;
+  }
+
+  :global(.dark) .hike-action-primary {
+    background: rgb(187 247 208);
+    color: rgb(20 83 45);
+  }
+
+  :global(.dark) .hike-action-primary:hover {
+    background: rgb(134 239 172);
+  }
+
+  :global(.dark) .hike-action-secondary {
+    border-color: rgb(64 64 64);
+    color: rgb(229 229 229);
+  }
+
+  :global(.dark) .hike-action-secondary:hover {
+    border-color: rgb(115 115 115);
+    background: rgb(38 38 38);
+  }
+
+  :global(.dark) .hike-dialog {
+    border-color: rgb(64 64 64);
+    background: rgb(23 23 23);
+    color: rgb(245 245 245);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hike-choice,
+    .hike-action {
+      transition: none;
+    }
+  }
+</style>
+
+<script>
+  import { initHikeBuilder } from "@/lib/hobbies/hiking";
+
+  document
+    .querySelectorAll<HTMLElement>("[data-pixel-hike]")
+    .forEach((root) => initHikeBuilder(root));
+</script>

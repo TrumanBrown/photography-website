@@ -6,6 +6,7 @@ import TidePool from "@/components/hobbies/TidePool.astro";
 import Fishing from "@/components/hobbies/Fishing.astro";
 import Birding from "@/components/hobbies/Birding.astro";
 import HerpingNight from "@/components/hobbies/HerpingNight.astro";
+import PixelHike from "@/components/hobbies/PixelHike.astro";
 import BirdingSpark from "@/components/hobbies/BirdingSpark.astro";
 import BirdingLifeList from "@/components/hobbies/BirdingLifeList.astro";
 import INatObservations from "@/components/hobbies/INatObservations.astro";
@@ -64,6 +65,7 @@ const galleryItems = media?.gallery ?? [];
     {interactive === "fishing" && <Fishing />}
     {interactive === "birding" && <Birding />}
     {interactive === "roadcruise" && <HerpingNight />}
+    {interactive === "pixel-hike" && <PixelHike />}
 
     {
       spark && (

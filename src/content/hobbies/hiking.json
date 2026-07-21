@@ -1,0 +1,9 @@
+{
+  "title": "Hiking",
+  "summary": "Shape an imaginary trail, walk it, and develop the landscape into a postcard.",
+  "intro": "I keep returning to mountain trails, from the Cascades to China, Norway, and the Himalaya. Build a trail of your own, then turn the journey into a postcard.",
+  "emoji": "🥾",
+  "accent": "#3f6f52",
+  "order": 6,
+  "interactive": "pixel-hike"
+}
