@@ -656,6 +656,289 @@ function drawTerrainTexture(
   ctx.restore();
 }
 
+interface TerrainSurfaceSample extends Point {
+  normalizedX: number;
+  elevation: number;
+  steepness: number;
+  noise: number;
+}
+
+interface TerrainMaterials {
+  alpineLine: number;
+  rockLine: number;
+  alpineTop: string;
+  alpineBottom: string;
+  soil: string;
+}
+
+function terrainMaterialsForBiome(
+  state: HikeState,
+  colors: SceneColors,
+): TerrainMaterials {
+  if (state.biome === "fjord") {
+    return {
+      alpineLine: 0.24,
+      rockLine: 0.43,
+      alpineTop: mix("#6d8067", colors.groundLight, 0.24),
+      alpineBottom: mix("#425b4f", colors.ground, 0.2),
+      soil: "#3e4238",
+    };
+  }
+  if (state.biome === "karst") {
+    return {
+      alpineLine: 0.2,
+      rockLine: 0.5,
+      alpineTop: mix("#607c50", colors.groundLight, 0.34),
+      alpineBottom: mix("#365b42", colors.ground, 0.16),
+      soil: "#474638",
+    };
+  }
+  if (state.biome === "himalaya") {
+    return {
+      alpineLine: 0.16,
+      rockLine: 0.32,
+      alpineTop: mix("#878064", colors.groundLight, 0.18),
+      alpineBottom: mix("#5f5b4e", colors.ground, 0.16),
+      soil: "#514941",
+    };
+  }
+  return {
+    alpineLine: 0.27,
+    rockLine: 0.49,
+    alpineTop: mix("#7d874f", colors.groundLight, 0.2),
+    alpineBottom: mix("#4d6242", colors.ground, 0.14),
+    soil: "#51483b",
+  };
+}
+
+function traceSurfaceRun(
+  ctx: CanvasRenderingContext2D,
+  samples: readonly TerrainSurfaceSample[],
+  depth: (sample: TerrainSurfaceSample, index: number) => number,
+): void {
+  ctx.beginPath();
+  ctx.moveTo(samples[0].x, samples[0].y);
+  for (let index = 1; index < samples.length; index += 1) {
+    ctx.lineTo(samples[index].x, samples[index].y);
+  }
+  for (let index = samples.length - 1; index >= 0; index -= 1) {
+    ctx.lineTo(
+      samples[index].x,
+      samples[index].y + depth(samples[index], index),
+    );
+  }
+  ctx.closePath();
+}
+
+function drawSurfaceRuns(
+  samples: readonly TerrainSurfaceSample[],
+  visible: (sample: TerrainSurfaceSample) => boolean,
+  draw: (run: readonly TerrainSurfaceSample[]) => void,
+): void {
+  let run: TerrainSurfaceSample[] = [];
+  const flush = (): void => {
+    if (run.length >= 2) draw(run);
+    run = [];
+  };
+  for (const sample of samples) {
+    if (visible(sample)) run.push(sample);
+    else flush();
+  }
+  flush();
+}
+
+function drawTerrainMaterialZones(
+  ctx: CanvasRenderingContext2D,
+  state: HikeState,
+  colors: SceneColors,
+  width: number,
+  height: number,
+  detailed: boolean,
+): void {
+  const material = terrainMaterialsForBiome(state, colors);
+  const geology = geologyForBiome(state, colors);
+  const sampleCount = detailed ? 220 : 110;
+  const objectScale = worldObjectScale(state);
+  const samples = Array.from({ length: sampleCount + 1 }, (_, index) => {
+    const normalizedX = 0.02 + (index / sampleCount) * 0.96;
+    const point = pointOnTrail(state, normalizedX, width, height);
+    const before = ridgeElevationAt(state, Math.max(0.02, normalizedX - 0.004));
+    const after = ridgeElevationAt(state, Math.min(0.98, normalizedX + 0.004));
+    const steepness = clamp(Math.abs(after - before) / 0.08, 0, 1);
+    const noise =
+      Math.sin(normalizedX * Math.PI * 13 + state.seed * 0.013) * 0.55 +
+      Math.sin(normalizedX * Math.PI * 31 + state.seed * 0.007) * 0.3 +
+      Math.sin(normalizedX * Math.PI * 67 + state.seed * 0.003) * 0.15;
+    return {
+      normalizedX,
+      ...point,
+      elevation: ridgeElevationAt(state, normalizedX),
+      steepness,
+      noise,
+    };
+  });
+
+  ctx.save();
+  traceGroundFill(ctx, state, width, height);
+  ctx.clip();
+
+  drawSurfaceRuns(
+    samples,
+    (sample) => sample.elevation + sample.noise * 0.055 > material.alpineLine,
+    (run) => {
+      const minY = Math.min(...run.map((sample) => sample.y));
+      const maxY = Math.max(...run.map((sample) => sample.y));
+      const gradient = ctx.createLinearGradient(
+        0,
+        minY,
+        0,
+        maxY + height * 0.18,
+      );
+      gradient.addColorStop(0, rgba(material.alpineTop, 0.92));
+      gradient.addColorStop(0.58, rgba(material.alpineBottom, 0.78));
+      gradient.addColorStop(1, rgba(colors.ground, 0.08));
+      ctx.fillStyle = gradient;
+      traceSurfaceRun(ctx, run, (sample) => {
+        const altitude = clamp(
+          (sample.elevation - material.alpineLine) /
+            Math.max(0.1, 1 - material.alpineLine),
+          0,
+          1,
+        );
+        return (
+          height *
+          (0.055 + altitude * 0.12 + sample.steepness * 0.025) *
+          objectScale
+        );
+      });
+      ctx.fill();
+    },
+  );
+
+  drawSurfaceRuns(
+    samples,
+    (sample) =>
+      sample.elevation + sample.steepness * 0.2 + sample.noise * 0.085 >
+      material.rockLine,
+    (run) => {
+      const minY = Math.min(...run.map((sample) => sample.y));
+      const maxY = Math.max(...run.map((sample) => sample.y));
+      const gradient = ctx.createLinearGradient(
+        0,
+        minY,
+        0,
+        maxY + height * 0.24,
+      );
+      gradient.addColorStop(0, rgba(geology.sun, detailed ? 0.96 : 0.88));
+      gradient.addColorStop(0.38, rgba(geology.mid, detailed ? 0.94 : 0.82));
+      gradient.addColorStop(1, rgba(geology.shade, detailed ? 0.74 : 0.62));
+      ctx.fillStyle = gradient;
+      traceSurfaceRun(ctx, run, (sample) => {
+        const exposure = clamp(
+          (sample.elevation - material.rockLine) * 1.8 +
+            sample.steepness * 0.8 +
+            sample.noise * 0.1,
+          0,
+          1,
+        );
+        return height * (0.115 + exposure * 0.265) * objectScale;
+      });
+      ctx.fill();
+
+      ctx.strokeStyle = rgba(geology.seam, detailed ? 0.24 : 0.14);
+      ctx.lineWidth = detailed ? 1.35 : 0.8;
+      ctx.beginPath();
+      ctx.moveTo(run[0].x, run[0].y + height * 0.025);
+      for (let index = 1; index < run.length; index += 1) {
+        const sample = run[index];
+        ctx.lineTo(
+          sample.x,
+          sample.y +
+            height *
+              (0.022 + Math.sin(sample.normalizedX * Math.PI * 29) * 0.004),
+        );
+      }
+      ctx.stroke();
+    },
+  );
+
+  const random = makeRng(state.seed + 5431);
+  const screeCount = detailed ? 380 : 105;
+  for (let index = 0; index < screeCount; index += 1) {
+    const sample = samples[Math.floor(random() * samples.length)];
+    const rockExposure =
+      sample.elevation + sample.steepness * 0.2 + sample.noise * 0.085;
+    if (rockExposure < material.rockLine - 0.08) continue;
+    const depth = height * (0.035 + random() * 0.18) * objectScale;
+    const x = sample.x + (random() - 0.5) * width * 0.012;
+    const y = sample.y + depth;
+    const size = (detailed ? 0.8 : 0.55) + random() * (detailed ? 3.4 : 2.1);
+    ctx.fillStyle =
+      index % 5 === 0
+        ? rgba(geology.sun, detailed ? 0.42 : 0.3)
+        : rgba(geology.shade, detailed ? 0.6 : 0.4);
+    ctx.beginPath();
+    ctx.moveTo(x - size, y + size * 0.4);
+    ctx.lineTo(x + size * 0.15, y - size);
+    ctx.lineTo(x + size, y + size * 0.5);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  const ledgeCount = detailed ? 115 : 38;
+  for (let index = 0; index < ledgeCount; index += 1) {
+    const sample = samples[Math.floor(random() * samples.length)];
+    if (
+      sample.elevation < material.alpineLine - 0.02 ||
+      sample.elevation > material.rockLine + 0.3 ||
+      sample.steepness > 0.82
+    ) {
+      continue;
+    }
+    const depth =
+      height *
+      (0.018 + random() * (0.07 + sample.steepness * 0.04)) *
+      objectScale;
+    const ledgeWidth = width * (0.0025 + random() * (detailed ? 0.009 : 0.006));
+    const ledgeHeight =
+      height * (0.0012 + random() * (detailed ? 0.003 : 0.002));
+    ctx.fillStyle = rgba(
+      index % 3 === 0 ? material.alpineTop : material.alpineBottom,
+      detailed ? 0.52 : 0.38,
+    );
+    ctx.beginPath();
+    ctx.ellipse(
+      sample.x + (random() - 0.5) * width * 0.012,
+      sample.y + depth,
+      ledgeWidth,
+      ledgeHeight,
+      slopeAt(state, sample.normalizedX, width, height),
+      0,
+      Math.PI * 2,
+    );
+    ctx.fill();
+  }
+
+  ctx.fillStyle = rgba(material.soil, detailed ? 0.2 : 0.12);
+  const soilPatches = detailed ? 80 : 26;
+  for (let index = 0; index < soilPatches; index += 1) {
+    const sample = samples[Math.floor(random() * samples.length)];
+    if (sample.elevation < material.alpineLine - 0.08) continue;
+    ctx.beginPath();
+    ctx.ellipse(
+      sample.x + (random() - 0.5) * width * 0.016,
+      sample.y + height * (0.018 + random() * 0.12),
+      width * (0.002 + random() * 0.008),
+      height * (0.0015 + random() * 0.004),
+      random() * 0.5 - 0.25,
+      0,
+      Math.PI * 2,
+    );
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
 function drawPostcardTerrainDetail(
   ctx: CanvasRenderingContext2D,
   state: HikeState,
@@ -834,19 +1117,63 @@ function peakIndices(state: HikeState): number[] {
   return peaks;
 }
 
+interface GeologyPalette {
+  sun: string;
+  mid: string;
+  shade: string;
+  seam: string;
+}
+
+function geologyForBiome(
+  state: HikeState,
+  colors: SceneColors,
+): GeologyPalette {
+  if (state.biome === "fjord") {
+    return {
+      sun: mix("#9ca7a4", colors.groundLight, 0.24),
+      mid: mix("#596a68", colors.ground, 0.18),
+      shade: mix("#2d4142", colors.ground, 0.16),
+      seam: "#c0c6bc",
+    };
+  }
+  if (state.biome === "karst") {
+    return {
+      sun: mix("#8b927d", colors.groundLight, 0.28),
+      mid: mix("#526354", colors.ground, 0.16),
+      shade: mix("#263c35", colors.ground, 0.18),
+      seam: "#c1bda2",
+    };
+  }
+  if (state.biome === "himalaya") {
+    return {
+      sun: mix("#aaa298", colors.groundLight, 0.2),
+      mid: mix("#716b68", colors.ground, 0.14),
+      shade: mix("#353a40", colors.ground, 0.12),
+      seam: "#d0c3ad",
+    };
+  }
+  return {
+    sun: mix("#9b9488", colors.groundLight, 0.1),
+    mid: mix("#686a64", colors.ground, 0.08),
+    shade: mix("#3d4544", colors.ground, 0.08),
+    seam: "#c7baa5",
+  };
+}
+
 function drawMountainFacets(
   ctx: CanvasRenderingContext2D,
   state: HikeState,
   colors: SceneColors,
   width: number,
   height: number,
+  detailed: boolean,
 ): void {
   const lightFromLeft = state.light === "dawn";
   ctx.save();
   traceGroundFill(ctx, state, width, height);
   ctx.clip();
   const positions = terrainPositions(state);
-  const objectScale = worldObjectScale(state);
+  const geology = geologyForBiome(state, colors);
 
   for (const index of peakIndices(state)) {
     const peak = terrainAnchorPoint(state, index, width, height);
@@ -865,12 +1192,21 @@ function drawMountainFacets(
     const faceDepth = Math.min(height * 0.34, height * 0.86 - peak.y);
     const faceBottom = peak.y + faceDepth;
 
-    ctx.fillStyle = rgba(
-      lightFromLeft
-        ? shade(colors.groundLight, 0.13)
-        : shade(colors.ground, -0.28),
-      0.22,
+    const leftFace = ctx.createLinearGradient(
+      peak.x,
+      peak.y,
+      leftShoulder.x,
+      faceBottom,
     );
+    leftFace.addColorStop(
+      0,
+      rgba(lightFromLeft ? geology.sun : geology.shade, detailed ? 0.4 : 0.18),
+    );
+    leftFace.addColorStop(
+      1,
+      rgba(lightFromLeft ? geology.mid : geology.shade, detailed ? 0.3 : 0.13),
+    );
+    ctx.fillStyle = leftFace;
     ctx.beginPath();
     ctx.moveTo(peak.x, peak.y);
     ctx.lineTo(leftShoulder.x, leftShoulder.y);
@@ -879,12 +1215,21 @@ function drawMountainFacets(
     ctx.closePath();
     ctx.fill();
 
-    ctx.fillStyle = rgba(
-      lightFromLeft
-        ? shade(colors.ground, -0.3)
-        : shade(colors.groundLight, 0.14),
-      0.27,
+    const rightFace = ctx.createLinearGradient(
+      peak.x,
+      peak.y,
+      rightShoulder.x,
+      faceBottom,
     );
+    rightFace.addColorStop(
+      0,
+      rgba(lightFromLeft ? geology.shade : geology.sun, detailed ? 0.42 : 0.19),
+    );
+    rightFace.addColorStop(
+      1,
+      rgba(lightFromLeft ? geology.shade : geology.mid, detailed ? 0.31 : 0.14),
+    );
+    ctx.fillStyle = rightFace;
     ctx.beginPath();
     ctx.moveTo(peak.x, peak.y);
     ctx.lineTo(rightShoulder.x, rightShoulder.y);
@@ -893,43 +1238,29 @@ function drawMountainFacets(
     ctx.closePath();
     ctx.fill();
 
-    const snowAllowed =
-      state.season === "winter" ||
-      state.biome === "himalaya" ||
-      (state.biome === "cascades" && state.terrain[index] > 0.8) ||
-      (state.biome === "fjord" && state.terrain[index] > 0.88);
-    if (snowAllowed) {
-      const snowDepth = height * (0.065 + state.terrain[index] * 0.035);
-      const snowWidth = width * 0.035 * objectScale;
-      ctx.fillStyle = rgba(
-        colors.snow,
-        state.season === "winter" ? 0.94 : 0.84,
-      );
-      ctx.beginPath();
-      ctx.moveTo(peak.x, peak.y);
-      ctx.lineTo(peak.x - snowWidth, peak.y + snowDepth * 0.52);
-      ctx.lineTo(peak.x - snowWidth * 0.46, peak.y + snowDepth * 0.44);
-      ctx.lineTo(peak.x - snowWidth * 0.2, peak.y + snowDepth * 0.86);
-      ctx.lineTo(peak.x + snowWidth * 0.02, peak.y + snowDepth * 0.55);
-      ctx.lineTo(peak.x + snowWidth * 0.2, peak.y + snowDepth);
-      ctx.lineTo(peak.x + snowWidth * 0.44, peak.y + snowDepth * 0.46);
-      ctx.lineTo(peak.x + snowWidth, peak.y + snowDepth * 0.5);
-      ctx.closePath();
-      ctx.fill();
-    }
-
     const random = makeRng(state.seed + index * 617);
-    for (let line = 0; line < 13; line += 1) {
+    const lineCount = detailed ? 22 : 8;
+    for (let line = 0; line < lineCount; line += 1) {
       const side = random() < 0.48 ? -1 : 1;
       const startX = peak.x + side * width * (0.003 + random() * 0.018);
       const startY = peak.y + height * (0.025 + random() * 0.07);
-      const endX = startX + side * width * (0.025 + random() * 0.065);
+      const geologyLean =
+        state.biome === "fjord" || state.biome === "karst"
+          ? 0.32
+          : state.biome === "himalaya"
+            ? 0.72
+            : 1;
+      const endX =
+        startX + side * width * (0.018 + random() * 0.062) * geologyLean;
       const endY = startY + height * (0.055 + random() * 0.13);
       ctx.strokeStyle =
         side === (lightFromLeft ? -1 : 1)
-          ? rgba(shade(colors.groundLight, 0.38), 0.34)
-          : "rgba(15,22,20,0.26)";
-      ctx.lineWidth = Math.max(1, width * (0.0007 + random() * 0.0006));
+          ? rgba(geology.seam, detailed ? 0.28 : 0.14)
+          : rgba(geology.shade, detailed ? 0.42 : 0.2);
+      ctx.lineWidth = Math.max(
+        detailed ? 1 : 0.7,
+        width * (0.00055 + random() * 0.00055),
+      );
       ctx.beginPath();
       ctx.moveTo(startX, startY);
       ctx.lineTo(
@@ -943,38 +1274,354 @@ function drawMountainFacets(
   ctx.restore();
 }
 
+function drawSummerSnowCouloirs(
+  ctx: CanvasRenderingContext2D,
+  state: HikeState,
+  colors: SceneColors,
+  geology: GeologyPalette,
+  width: number,
+  height: number,
+  detailed: boolean,
+  peakIndex: number,
+  peakX: number,
+  radius: number,
+): void {
+  const random = makeRng(state.seed + peakIndex * 2017 + 313);
+  const objectScale = worldObjectScale(state);
+  const count =
+    state.biome === "himalaya" ? (detailed ? 3 : 2) : detailed ? 2 : 1;
+  const depthBase =
+    height *
+    (state.biome === "himalaya"
+      ? 0.075
+      : state.biome === "cascades"
+        ? 0.045
+        : 0.038) *
+    objectScale;
+
+  for (let tongue = 0; tongue < count; tongue += 1) {
+    const distribution = count === 1 ? 0 : tongue / (count - 1) - 0.5;
+    const centerX =
+      peakX + distribution * radius * 0.88 + (random() - 0.5) * radius * 0.28;
+    const halfWidth = radius * (0.11 + random() * 0.08);
+    const leftX = centerX - halfWidth;
+    const rightX = centerX + halfWidth;
+    const left = pointOnTrail(state, leftX, width, height);
+    const center = pointOnTrail(state, centerX, width, height);
+    const right = pointOnTrail(state, rightX, width, height);
+    const depth = depthBase * (0.62 + random() * 0.46);
+    const drift = (random() - 0.5) * halfWidth * width * 1.5;
+    const waist = halfWidth * width * (0.58 + random() * 0.42);
+    const tip = {
+      x: center.x + drift,
+      y: center.y + depth,
+    };
+
+    const traceTongue = (): void => {
+      ctx.beginPath();
+      ctx.moveTo(left.x, left.y + 1.5 * objectScale);
+      ctx.quadraticCurveTo(
+        center.x,
+        center.y - 1.5 * objectScale,
+        right.x,
+        right.y + 1.5 * objectScale,
+      );
+      ctx.bezierCurveTo(
+        tip.x + waist,
+        lerp(center.y, tip.y, 0.5),
+        tip.x + waist * 0.45,
+        lerp(center.y, tip.y, 0.82),
+        tip.x,
+        tip.y,
+      );
+      ctx.bezierCurveTo(
+        tip.x - waist * 0.42,
+        lerp(center.y, tip.y, 0.8),
+        tip.x - waist,
+        lerp(center.y, tip.y, 0.5),
+        left.x,
+        left.y + 1.5 * objectScale,
+      );
+      ctx.closePath();
+    };
+
+    ctx.save();
+    ctx.translate(0, (detailed ? 3 : 2) * objectScale);
+    traceTongue();
+    ctx.fillStyle = "rgba(19,29,33,0.34)";
+    ctx.fill();
+    ctx.translate(0, -(detailed ? 3 : 2) * objectScale);
+
+    traceTongue();
+    const snow = ctx.createLinearGradient(0, center.y, 0, tip.y);
+    snow.addColorStop(0, shade(colors.snow, 0.04));
+    snow.addColorStop(0.48, colors.snow);
+    snow.addColorStop(1, mix(colors.snow, "#8299a3", 0.48));
+    ctx.fillStyle = snow;
+    ctx.fill();
+
+    ctx.save();
+    traceTongue();
+    ctx.clip();
+    ctx.strokeStyle = "rgba(74,101,114,0.38)";
+    ctx.lineWidth = detailed ? 1.5 : 1;
+    ctx.beginPath();
+    ctx.moveTo(center.x, center.y + 2 * objectScale);
+    ctx.bezierCurveTo(
+      center.x + (random() - 0.5) * 7 * objectScale,
+      lerp(center.y, tip.y, 0.38),
+      tip.x + (random() - 0.5) * 8 * objectScale,
+      lerp(center.y, tip.y, 0.74),
+      tip.x,
+      tip.y,
+    );
+    ctx.stroke();
+
+    const rockCount = detailed ? 5 : 2;
+    ctx.fillStyle = rgba(geology.shade, 0.82);
+    for (let rock = 0; rock < rockCount; rock += 1) {
+      const progress = 0.2 + random() * 0.65;
+      const x =
+        lerp(center.x, tip.x, progress) + (random() - 0.5) * waist * 1.35;
+      const y = lerp(center.y, tip.y, progress);
+      const size = (1.2 + random() * 3) * objectScale;
+      ctx.beginPath();
+      ctx.moveTo(x - size, y + size * 0.5);
+      ctx.lineTo(x, y - size);
+      ctx.lineTo(x + size, y + size * 0.45);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+
+    ctx.strokeStyle = "rgba(255,255,255,0.42)";
+    ctx.lineWidth = detailed ? 1.2 : 0.8;
+    ctx.beginPath();
+    ctx.moveTo(left.x, left.y + 1.5 * objectScale);
+    ctx.quadraticCurveTo(
+      center.x,
+      center.y,
+      right.x,
+      right.y + 1.5 * objectScale,
+    );
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
 function drawSnowCaps(
   ctx: CanvasRenderingContext2D,
   state: HikeState,
   colors: SceneColors,
   width: number,
   height: number,
+  detailed: boolean,
 ): void {
-  if (state.season !== "winter" && state.biome !== "himalaya") return;
-  ctx.save();
-  traceGroundFill(ctx, state, width, height);
-  ctx.clip();
-  ctx.fillStyle = rgba(colors.snow, state.season === "winter" ? 0.9 : 0.82);
+  const hasSeasonalSnow =
+    state.season === "winter" ||
+    state.biome === "himalaya" ||
+    state.biome === "cascades" ||
+    state.biome === "fjord";
+  if (!hasSeasonalSnow) return;
+
+  const positions = terrainPositions(state);
+  const geology = geologyForBiome(state, colors);
   const objectScale = worldObjectScale(state);
-  for (let index = 0; index < state.terrain.length; index += 1) {
-    if (state.terrain[index] < (state.biome === "himalaya" ? 0.55 : 0.72))
+  const threshold =
+    state.season === "winter"
+      ? 0.48
+      : state.biome === "himalaya"
+        ? 0.54
+        : state.biome === "cascades"
+          ? 0.8
+          : 0.86;
+  const coverage = 0.9;
+
+  for (const index of peakIndices(state)) {
+    if (state.terrain[index] < threshold) continue;
+    const random = makeRng(state.seed + index * 1229 + 811);
+    if (
+      state.season !== "winter" &&
+      (state.biome === "cascades" || state.biome === "fjord") &&
+      random() < 0.42
+    ) {
       continue;
-    const point = terrainAnchorPoint(state, index, width, height);
-    const capWidth =
-      width * (0.055 + state.terrain[index] * 0.035) * objectScale;
-    const capHeight = height * 0.06 * objectScale;
-    ctx.beginPath();
-    ctx.moveTo(point.x - capWidth, point.y + capHeight);
-    ctx.lineTo(point.x - capWidth * 0.45, point.y + capHeight * 0.2);
-    ctx.lineTo(point.x - capWidth * 0.15, point.y + capHeight * 0.55);
-    ctx.lineTo(point.x, point.y);
-    ctx.lineTo(point.x + capWidth * 0.25, point.y + capHeight * 0.45);
-    ctx.lineTo(point.x + capWidth * 0.58, point.y + capHeight * 0.18);
-    ctx.lineTo(point.x + capWidth, point.y + capHeight);
-    ctx.closePath();
+    }
+    const peakX = positions[index];
+    const leftSpan = peakX - positions[index - 1];
+    const rightSpan = positions[index + 1] - peakX;
+    if (state.season !== "winter") {
+      drawSummerSnowCouloirs(
+        ctx,
+        state,
+        colors,
+        geology,
+        width,
+        height,
+        detailed,
+        index,
+        peakX,
+        Math.min(leftSpan, rightSpan) *
+          (state.biome === "himalaya" ? 0.72 : 0.48),
+      );
+      continue;
+    }
+    const radius = Math.min(leftSpan, rightSpan) * coverage;
+    const sampleCount = detailed ? 27 : 15;
+    const top = Array.from({ length: sampleCount }, (_, sampleIndex) => {
+      const progress = sampleIndex / (sampleCount - 1);
+      const normalizedX = peakX - radius + progress * radius * 2;
+      return pointOnTrail(state, normalizedX, width, height);
+    });
+    const baseDepth = height * 0.12 * objectScale;
+    const bottom = top.map((point, sampleIndex) => {
+      const progress = sampleIndex / (sampleCount - 1);
+      const envelope = Math.pow(Math.sin(progress * Math.PI), 0.64);
+      const rib =
+        0.62 +
+        Math.sin(progress * Math.PI * (4 + (index % 3)) + state.seed * 0.01) *
+          0.16 +
+        random() * 0.22;
+      return {
+        x:
+          point.x +
+          Math.sin(progress * Math.PI * 5 + index) *
+            (detailed ? 4 : 2) *
+            objectScale,
+        y: point.y + baseDepth * envelope * rib,
+      };
+    });
+
+    ctx.save();
+    ctx.translate(0, (detailed ? 4 : 2) * objectScale);
+    traceSnowPatch(ctx, top, bottom);
+    ctx.fillStyle = "rgba(20,29,32,0.34)";
     ctx.fill();
+    ctx.translate(0, -(detailed ? 4 : 2) * objectScale);
+
+    traceSnowPatch(ctx, top, bottom);
+    const snow = ctx.createLinearGradient(
+      0,
+      Math.min(...top.map((point) => point.y)),
+      0,
+      Math.max(...bottom.map((point) => point.y)),
+    );
+    snow.addColorStop(0, shade(colors.snow, 0.05));
+    snow.addColorStop(0.38, colors.snow);
+    snow.addColorStop(
+      0.78,
+      mix(
+        colors.snow,
+        state.biome === "himalaya" ? "#8ca1aa" : "#8da4aa",
+        0.34,
+      ),
+    );
+    snow.addColorStop(1, mix(colors.snow, geology.shade, 0.48));
+    ctx.fillStyle = snow;
+    ctx.fill();
+
+    ctx.save();
+    traceSnowPatch(ctx, top, bottom);
+    ctx.clip();
+
+    const ribCount = detailed ? 3 : 1;
+    for (let rib = 0; rib < ribCount; rib += 1) {
+      const progress = 0.16 + (rib / Math.max(1, ribCount - 1)) * 0.68;
+      const sampleIndex = Math.min(
+        sampleCount - 2,
+        Math.max(1, Math.round(progress * (sampleCount - 1))),
+      );
+      const start = top[sampleIndex];
+      const end = bottom[sampleIndex];
+      const topWidth = (1.4 + random() * 2.8) * objectScale;
+      const bottomWidth =
+        (state.biome === "himalaya" ? 8 + random() * 13 : 4 + random() * 7) *
+        objectScale;
+      ctx.fillStyle = rgba(
+        rib % 2 === 0 ? geology.mid : geology.shade,
+        state.season === "winter" ? 0.72 : 0.94,
+      );
+      ctx.beginPath();
+      ctx.moveTo(start.x - topWidth, start.y - 1 * objectScale);
+      ctx.bezierCurveTo(
+        start.x - bottomWidth * 0.45,
+        lerp(start.y, end.y, 0.42),
+        end.x - bottomWidth,
+        lerp(start.y, end.y, 0.78),
+        end.x - bottomWidth * 0.55,
+        end.y + 2 * objectScale,
+      );
+      ctx.lineTo(end.x + bottomWidth * 0.55, end.y + 2 * objectScale);
+      ctx.bezierCurveTo(
+        end.x + bottomWidth,
+        lerp(start.y, end.y, 0.76),
+        start.x + bottomWidth * 0.4,
+        lerp(start.y, end.y, 0.4),
+        start.x + topWidth,
+        start.y - 1 * objectScale,
+      );
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    const gullyCount = detailed ? 13 : 5;
+    ctx.strokeStyle = "rgba(77,103,117,0.38)";
+    ctx.lineWidth = detailed ? 1.7 : 1;
+    for (let gully = 0; gully < gullyCount; gully += 1) {
+      const progress = 0.08 + random() * 0.84;
+      const sampleIndex = Math.min(
+        sampleCount - 1,
+        Math.round(progress * (sampleCount - 1)),
+      );
+      const start = top[sampleIndex];
+      const end = bottom[sampleIndex];
+      ctx.beginPath();
+      ctx.moveTo(start.x, start.y + 2 * objectScale);
+      ctx.bezierCurveTo(
+        start.x + (random() - 0.5) * 12 * objectScale,
+        lerp(start.y, end.y, 0.38),
+        end.x + (random() - 0.5) * 15 * objectScale,
+        lerp(start.y, end.y, 0.72),
+        end.x,
+        end.y,
+      );
+      ctx.stroke();
+    }
+
+    const rockCount = detailed ? 22 : 7;
+    ctx.fillStyle = rgba(geology.shade, 0.88);
+    for (let rock = 0; rock < rockCount; rock += 1) {
+      const progress = 0.08 + random() * 0.84;
+      const sampleIndex = Math.min(
+        sampleCount - 1,
+        Math.round(progress * (sampleCount - 1)),
+      );
+      const start = top[sampleIndex];
+      const end = bottom[sampleIndex];
+      const x = lerp(start.x, end.x, random() * 0.92);
+      const y = lerp(start.y, end.y, 0.22 + random() * 0.7);
+      const rockWidth = (1.5 + random() * (detailed ? 6 : 3.5)) * objectScale;
+      const rockHeight = (1.2 + random() * (detailed ? 5 : 3)) * objectScale;
+      ctx.beginPath();
+      ctx.moveTo(x - rockWidth, y + rockHeight);
+      ctx.lineTo(x - rockWidth * 0.2, y - rockHeight);
+      ctx.lineTo(x + rockWidth, y + rockHeight * 0.5);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+
+    ctx.strokeStyle = "rgba(255,255,255,0.48)";
+    ctx.lineWidth = detailed ? 1.5 : 1;
+    ctx.beginPath();
+    for (let sampleIndex = 1; sampleIndex < top.length - 1; sampleIndex += 1) {
+      const point = top[sampleIndex];
+      if (sampleIndex === 1) ctx.moveTo(point.x, point.y + 1);
+      else ctx.lineTo(point.x, point.y + 1);
+    }
+    ctx.stroke();
+    ctx.restore();
   }
-  ctx.restore();
 }
 
 function slopeAt(
@@ -1972,108 +2619,297 @@ function drawDetailedLakeFeature(
 
 function drawWaterfallFeature(
   ctx: CanvasRenderingContext2D,
-  point: Point,
-  scale: number,
+  state: HikeState,
+  feature: PlacedFeature,
   colors: SceneColors,
+  width: number,
+  height: number,
+  scale: number,
+  detailed: boolean,
 ): void {
-  ctx.fillStyle = shade(colors.ground, -0.18);
-  ctx.beginPath();
-  ctx.moveTo(point.x - 25 * scale, point.y + 8 * scale);
-  ctx.lineTo(point.x - 21 * scale, point.y - 53 * scale);
-  ctx.lineTo(point.x + 13 * scale, point.y - 44 * scale);
-  ctx.lineTo(point.x + 24 * scale, point.y + 8 * scale);
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = rgba(shade(colors.groundLight, 0.2), 0.48);
-  ctx.lineWidth = 1.5 * scale;
-  for (let index = 0; index < 5; index += 1) {
-    ctx.beginPath();
-    ctx.moveTo(point.x - 18 * scale, point.y - (4 + index * 10) * scale);
-    ctx.lineTo(
-      point.x + (6 + index * 2) * scale,
-      point.y - (10 + index * 7) * scale,
-    );
-    ctx.stroke();
-  }
-  ctx.strokeStyle = shade(colors.water, 0.42);
-  ctx.lineWidth = 8 * scale;
-  ctx.lineCap = "round";
-  ctx.beginPath();
-  ctx.moveTo(point.x - 5 * scale, point.y - 43 * scale);
-  ctx.bezierCurveTo(
-    point.x + 4 * scale,
-    point.y - 30 * scale,
-    point.x - 4 * scale,
-    point.y - 16 * scale,
-    point.x + 2 * scale,
-    point.y + 3 * scale,
+  const random = makeRng(state.seed + feature.id.length * 211 + 3001);
+  const delta = 0.012;
+  const before = pointOnTrail(
+    state,
+    Math.max(0.04, feature.x - delta),
+    width,
+    height,
   );
+  const after = pointOnTrail(
+    state,
+    Math.min(0.96, feature.x + delta),
+    width,
+    height,
+  );
+  const center = pointOnTrail(state, feature.x, width, height);
+  const slopeY = after.y - before.y;
+  const downhill = slopeY >= 0 ? 1 : -1;
+  const grade = clamp(Math.abs(slopeY) / Math.max(1, after.x - before.x), 0, 2);
+  const quality = detailed ? 1 : 0.55;
+  const length =
+    Math.min(width, height) *
+    (0.075 + grade * 0.045) *
+    Math.max(0.72, worldObjectScale(state));
+  const horizontal = length * lerp(0.62, 0.18, clamp(grade, 0, 1));
+  const segments = detailed ? 9 : 6;
+  const path: Point[] = [];
+
+  for (let index = 0; index <= segments; index += 1) {
+    const progress = index / segments;
+    const step = progress * progress;
+    path.push({
+      x:
+        center.x +
+        downhill * horizontal * progress +
+        Math.sin(progress * Math.PI * 4 + state.seed * 0.01) * 2.5 * scale,
+      y:
+        center.y +
+        length * step +
+        Math.sin(progress * Math.PI * 3 + feature.id.length) * 1.5 * scale,
+    });
+  }
+
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  const rockWidth = (detailed ? 15 : 11) * scale;
+  ctx.strokeStyle = rgba(shade(colors.ground, -0.28), 0.9);
+  ctx.lineWidth = rockWidth;
+  ctx.beginPath();
+  ctx.moveTo(path[0].x, path[0].y);
+  for (let index = 1; index < path.length; index += 1) {
+    ctx.lineTo(path[index].x, path[index].y);
+  }
   ctx.stroke();
-  ctx.strokeStyle = "rgba(255,255,255,0.65)";
-  ctx.lineWidth = 2.5 * scale;
+
+  const ledgeCount = detailed ? 7 : 4;
+  for (let index = 1; index <= ledgeCount; index += 1) {
+    const progress = index / (ledgeCount + 1);
+    const sampleIndex = Math.min(
+      path.length - 2,
+      Math.round(progress * (path.length - 1)),
+    );
+    const point = path[sampleIndex];
+    const ledgeWidth = (8 + random() * 13) * scale;
+    ctx.fillStyle =
+      index % 2
+        ? shade(colors.groundLight, -0.18)
+        : shade(colors.ground, -0.08);
+    ctx.beginPath();
+    ctx.moveTo(point.x - ledgeWidth, point.y + 2 * scale);
+    ctx.lineTo(point.x - ledgeWidth * 0.2, point.y - 4 * scale);
+    ctx.lineTo(point.x + ledgeWidth, point.y + 1 * scale);
+    ctx.lineTo(point.x + ledgeWidth * 0.65, point.y + 6 * scale);
+    ctx.lineTo(point.x - ledgeWidth * 0.55, point.y + 7 * scale);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  const waterGradient = ctx.createLinearGradient(
+    path[0].x,
+    path[0].y,
+    path[path.length - 1].x,
+    path[path.length - 1].y,
+  );
+  waterGradient.addColorStop(0, shade(colors.water, 0.48));
+  waterGradient.addColorStop(0.58, colors.water);
+  waterGradient.addColorStop(1, shade(colors.water, -0.12));
+  ctx.strokeStyle = waterGradient;
+  ctx.lineWidth = (detailed ? 6.5 : 4.5) * scale;
+  ctx.beginPath();
+  ctx.moveTo(path[0].x, path[0].y);
+  for (let index = 1; index < path.length; index += 1) {
+    const previous = path[index - 1];
+    const point = path[index];
+    ctx.quadraticCurveTo(
+      previous.x + (point.x - previous.x) * 0.65,
+      previous.y + (point.y - previous.y) * 0.38,
+      point.x,
+      point.y,
+    );
+  }
   ctx.stroke();
-  ctx.fillStyle = rgba(colors.water, 0.65);
+
+  ctx.strokeStyle = "rgba(244,249,238,0.7)";
+  ctx.lineWidth = (detailed ? 1.8 : 1.25) * scale;
+  ctx.stroke();
+
+  const pool = path[path.length - 1];
+  const poolWidth = (16 + grade * 9) * scale;
+  const poolDepth = (4.5 + grade * 2.5) * scale;
+  const poolGradient = ctx.createLinearGradient(
+    0,
+    pool.y - poolDepth,
+    0,
+    pool.y + poolDepth,
+  );
+  poolGradient.addColorStop(0, shade(colors.water, 0.38));
+  poolGradient.addColorStop(1, shade(colors.water, -0.26));
+  ctx.fillStyle = poolGradient;
   ctx.beginPath();
   ctx.ellipse(
-    point.x + 2 * scale,
-    point.y + 7 * scale,
-    25 * scale,
-    7 * scale,
-    0,
+    pool.x + downhill * 2 * scale,
+    pool.y + 2 * scale,
+    poolWidth,
+    poolDepth,
+    downhill * 0.08,
     0,
     Math.PI * 2,
   );
   ctx.fill();
-  ctx.fillStyle = "rgba(244,250,246,0.55)";
-  for (let index = 0; index < 7; index += 1) {
+
+  const foamCount = Math.max(5, Math.round(13 * quality));
+  ctx.fillStyle = "rgba(244,249,240,0.62)";
+  for (let index = 0; index < foamCount; index += 1) {
     ctx.beginPath();
     ctx.arc(
-      point.x + (-14 + index * 5) * scale,
-      point.y + (4 + (index % 2) * 5) * scale,
-      (1.5 + (index % 3)) * scale,
+      pool.x + (random() - 0.5) * poolWidth * 1.45,
+      pool.y + (random() - 0.35) * poolDepth,
+      (0.7 + random() * 1.6) * scale,
       0,
       Math.PI * 2,
     );
     ctx.fill();
   }
+
+  if (detailed) {
+    ctx.fillStyle = "rgba(239,247,239,0.25)";
+    for (let index = 0; index < 18; index += 1) {
+      const progress = random();
+      const sampleIndex = Math.min(
+        path.length - 1,
+        Math.round(progress * (path.length - 1)),
+      );
+      const point = path[sampleIndex];
+      ctx.beginPath();
+      ctx.arc(
+        point.x + (random() - 0.5) * 12 * scale,
+        point.y + (random() - 0.5) * 9 * scale,
+        (0.5 + random() * 1.4) * scale,
+        0,
+        Math.PI * 2,
+      );
+      ctx.fill();
+    }
+  }
+  ctx.restore();
 }
 
 function drawWildflowersFeature(
   ctx: CanvasRenderingContext2D,
-  point: Point,
-  scale: number,
+  state: HikeState,
+  feature: PlacedFeature,
   colors: SceneColors,
-  seed: number,
+  width: number,
+  height: number,
+  scale: number,
+  detailed: boolean,
 ): void {
-  const random = makeRng(seed);
-  const flowers = ["#f6d365", "#f08b78", "#d9c3ef", "#f5f0e0"];
-  ctx.fillStyle = rgba(shade(colors.groundLight, 0.14), 0.7);
-  ctx.beginPath();
-  ctx.ellipse(
-    point.x,
-    point.y + 7 * scale,
-    65 * scale,
-    16 * scale,
+  const random = makeRng(state.seed + feature.id.length * 227 + 1613);
+  const quality = detailed ? 1 : 0.48;
+  const radius = 0.066 * Math.max(0.72, worldObjectScale(state));
+  const surface = Array.from({ length: 33 }, (_, index) => {
+    const normalizedX = feature.x - radius + (index / 32) * radius * 2;
+    return pointOnTrail(state, normalizedX, width, height);
+  });
+  const depth = 24 * scale;
+
+  ctx.save();
+  drawTerrainBand(ctx, surface, depth);
+  const ground = ctx.createLinearGradient(
     0,
+    Math.min(...surface.map((sample) => sample.y)),
     0,
-    Math.PI * 2,
+    Math.max(...surface.map((sample) => sample.y)) + depth,
   );
+  ground.addColorStop(0, rgba(shade(colors.groundLight, 0.28), 0.78));
+  ground.addColorStop(
+    0.52,
+    rgba(mix(colors.groundLight, "#718950", 0.38), 0.58),
+  );
+  ground.addColorStop(1, rgba(colors.ground, 0.08));
+  ctx.fillStyle = ground;
   ctx.fill();
-  ctx.strokeStyle = shade(colors.groundLight, 0.12);
-  ctx.lineWidth = Math.max(1, scale * 0.8);
-  for (let index = 0; index < 42; index += 1) {
-    const x = point.x + (random() - 0.5) * 116 * scale;
-    const stem = (5 + random() * 8) * scale;
-    const y = point.y + (random() - 0.3) * 8 * scale;
+
+  ctx.save();
+  drawTerrainBand(ctx, surface, depth);
+  ctx.clip();
+  const palette = [
+    "#f4ce52",
+    "#ea7a78",
+    "#9eacd9",
+    "#d8b2df",
+    "#f0eee0",
+    "#e79c4a",
+    "#80b5cb",
+  ];
+  const clusterCount = detailed ? 9 : 5;
+  for (let cluster = 0; cluster < clusterCount; cluster += 1) {
+    const centerX = feature.x - radius * 0.82 + random() * radius * 1.64;
+    const centerDepth = random() * depth * 0.68;
+    const flowers = detailed ? 13 : 7;
+    for (let index = 0; index < flowers; index += 1) {
+      const normalizedX = centerX + (random() - 0.5) * radius * 0.18;
+      const point = pointOnTrail(state, normalizedX, width, height);
+      const downSlope = centerDepth + (random() - 0.5) * 7 * scale;
+      const stem = (3.5 + random() * 8) * scale;
+      ctx.strokeStyle = rgba(mix(colors.treeLight, "#4c6b3d", 0.42), 0.8);
+      ctx.lineWidth = Math.max(0.7, 0.65 * scale);
+      ctx.beginPath();
+      ctx.moveTo(point.x, point.y + downSlope + 1.5 * scale);
+      ctx.quadraticCurveTo(
+        point.x + (random() - 0.5) * 2 * scale,
+        point.y + downSlope - stem * 0.55,
+        point.x + (random() - 0.5) * 4 * scale,
+        point.y + downSlope - stem,
+      );
+      ctx.stroke();
+      const color = palette[(cluster * 2 + index) % palette.length];
+      ctx.fillStyle = rgba(color, 0.88);
+      const petal = (0.9 + random() * 1.35) * scale;
+      const flowerX = point.x + (random() - 0.5) * 4 * scale;
+      const flowerY = point.y + downSlope - stem;
+      for (let petalIndex = 0; petalIndex < 4; petalIndex += 1) {
+        const angle = (petalIndex / 4) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.ellipse(
+          flowerX + Math.cos(angle) * petal,
+          flowerY + Math.sin(angle) * petal,
+          petal,
+          petal * 0.62,
+          angle,
+          0,
+          Math.PI * 2,
+        );
+        ctx.fill();
+      }
+      ctx.fillStyle = "rgba(76,58,28,0.76)";
+      ctx.beginPath();
+      ctx.arc(flowerX, flowerY, petal * 0.48, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  ctx.fillStyle = rgba(shade(colors.groundLight, -0.1), 0.2);
+  const heatherCount = Math.max(18, Math.round(42 * quality));
+  for (let index = 0; index < heatherCount; index += 1) {
+    const normalizedX = feature.x - radius * 0.93 + random() * radius * 1.86;
+    const point = pointOnTrail(state, normalizedX, width, height);
     ctx.beginPath();
-    ctx.moveTo(x, y + 4 * scale);
-    ctx.lineTo(x, y - stem);
-    ctx.stroke();
-    ctx.fillStyle = flowers[index % flowers.length];
-    ctx.beginPath();
-    ctx.arc(x, y - stem, 2.2 * scale, 0, Math.PI * 2);
+    ctx.ellipse(
+      point.x,
+      point.y + random() * depth * 0.74,
+      (2 + random() * 5) * scale,
+      (1 + random() * 2.8) * scale,
+      slopeAt(state, normalizedX, width, height),
+      0,
+      Math.PI * 2,
+    );
     ctx.fill();
   }
+  ctx.restore();
+  ctx.restore();
 }
 
 function drawSnowfieldFeature(
@@ -2249,10 +3085,36 @@ function drawDetailedSnowfieldFeature(
 
 function drawCampFeature(
   ctx: CanvasRenderingContext2D,
-  point: Point,
-  scale: number,
+  state: HikeState,
+  feature: PlacedFeature,
   colors: SceneColors,
+  width: number,
+  height: number,
+  scale: number,
 ): void {
+  const point = pointOnTrail(state, feature.x, width, height);
+  const slope = slopeAt(state, feature.x, width, height);
+  const radius = 0.035 * Math.max(0.72, worldObjectScale(state));
+  const surface = Array.from({ length: 19 }, (_, index) => {
+    const normalizedX = feature.x - radius + (index / 18) * radius * 2;
+    return pointOnTrail(state, normalizedX, width, height);
+  });
+  ctx.save();
+  drawTerrainBand(ctx, surface, 12 * scale);
+  ctx.fillStyle = rgba(mix(colors.groundLight, "#665944", 0.34), 0.56);
+  ctx.fill();
+  ctx.fillStyle = "rgba(8,15,12,0.3)";
+  ctx.beginPath();
+  ctx.ellipse(
+    point.x,
+    point.y + 3 * scale,
+    32 * scale,
+    6 * scale,
+    slope,
+    0,
+    Math.PI * 2,
+  );
+  ctx.fill();
   ctx.fillStyle = shade(colors.accent, -0.08);
   ctx.beginPath();
   ctx.moveTo(point.x - 25 * scale, point.y + 4 * scale);
@@ -2298,59 +3160,99 @@ function drawCampFeature(
     13 * scale,
     shade(colors.groundLight, -0.18),
   );
+  ctx.restore();
 }
 
 function drawLookoutFeature(
   ctx: CanvasRenderingContext2D,
-  point: Point,
-  scale: number,
+  state: HikeState,
+  feature: PlacedFeature,
   colors: SceneColors,
+  width: number,
+  height: number,
+  scale: number,
 ): void {
+  const point = pointOnTrail(state, feature.x, width, height);
+  const footOffset = 0.012 * Math.max(0.72, worldObjectScale(state));
+  const leftFoot = pointOnTrail(
+    state,
+    Math.max(0.04, feature.x - footOffset),
+    width,
+    height,
+  );
+  const rightFoot = pointOnTrail(
+    state,
+    Math.min(0.96, feature.x + footOffset),
+    width,
+    height,
+  );
+  const platformY = Math.min(leftFoot.y, rightFoot.y) - 20 * scale;
+  ctx.save();
+  ctx.fillStyle = "rgba(7,15,12,0.28)";
+  ctx.beginPath();
+  ctx.ellipse(
+    point.x,
+    Math.max(leftFoot.y, rightFoot.y) + 3 * scale,
+    34 * scale,
+    5 * scale,
+    slopeAt(state, feature.x, width, height),
+    0,
+    Math.PI * 2,
+  );
+  ctx.fill();
   ctx.strokeStyle = shade(colors.ground, -0.15);
   ctx.lineWidth = 3 * scale;
   ctx.beginPath();
-  ctx.moveTo(point.x - 15 * scale, point.y + 6 * scale);
-  ctx.lineTo(point.x - 10 * scale, point.y - 23 * scale);
-  ctx.moveTo(point.x + 15 * scale, point.y + 6 * scale);
-  ctx.lineTo(point.x + 10 * scale, point.y - 23 * scale);
+  ctx.moveTo(leftFoot.x, leftFoot.y + 4 * scale);
+  ctx.lineTo(point.x - 10 * scale, platformY);
+  ctx.moveTo(rightFoot.x, rightFoot.y + 4 * scale);
+  ctx.lineTo(point.x + 10 * scale, platformY);
+  ctx.moveTo(leftFoot.x, leftFoot.y + 4 * scale);
+  ctx.lineTo(point.x + 10 * scale, platformY);
+  ctx.moveTo(rightFoot.x, rightFoot.y + 4 * scale);
+  ctx.lineTo(point.x - 10 * scale, platformY);
   ctx.stroke();
   ctx.fillStyle = shade(colors.accent, -0.22);
   ctx.fillRect(
     point.x - 22 * scale,
-    point.y - 45 * scale,
+    platformY - 24 * scale,
     44 * scale,
     24 * scale,
   );
   ctx.fillStyle = "#f2c978";
   ctx.fillRect(
     point.x - 15 * scale,
-    point.y - 39 * scale,
+    platformY - 18 * scale,
     12 * scale,
     8 * scale,
   );
   ctx.fillRect(
     point.x + 4 * scale,
-    point.y - 39 * scale,
+    platformY - 18 * scale,
     12 * scale,
     8 * scale,
   );
   ctx.fillStyle = shade(colors.ground, -0.3);
   ctx.beginPath();
-  ctx.moveTo(point.x - 28 * scale, point.y - 45 * scale);
-  ctx.lineTo(point.x, point.y - 58 * scale);
-  ctx.lineTo(point.x + 28 * scale, point.y - 45 * scale);
+  ctx.moveTo(point.x - 28 * scale, platformY - 24 * scale);
+  ctx.lineTo(point.x, platformY - 37 * scale);
+  ctx.lineTo(point.x + 28 * scale, platformY - 24 * scale);
   ctx.closePath();
   ctx.fill();
   ctx.strokeStyle = shade(colors.ground, -0.34);
   ctx.lineWidth = 2 * scale;
   ctx.beginPath();
-  ctx.moveTo(point.x - 36 * scale, point.y - 19 * scale);
-  ctx.lineTo(point.x + 36 * scale, point.y - 19 * scale);
+  ctx.moveTo(point.x - 36 * scale, platformY);
+  ctx.lineTo(point.x + 36 * scale, platformY);
   for (let index = -3; index <= 3; index += 2) {
-    ctx.moveTo(point.x + index * 10 * scale, point.y - 19 * scale);
-    ctx.lineTo(point.x + index * 10 * scale, point.y + 4 * scale);
+    ctx.moveTo(point.x + index * 10 * scale, platformY);
+    ctx.lineTo(
+      point.x + index * 10 * scale,
+      lerp(leftFoot.y, rightFoot.y, (index + 3) / 6),
+    );
   }
   ctx.stroke();
+  ctx.restore();
 }
 
 function drawFeature(
@@ -2362,7 +3264,6 @@ function drawFeature(
   height: number,
   detailed: boolean,
 ): void {
-  const point = pointOnTrail(state, feature.x, width, height);
   const scale =
     Math.min(width / 900, height / 600) *
     (detailed ? 1.1 : 0.9) *
@@ -2410,14 +3311,26 @@ function drawFeature(
       drawLakeFeature(ctx, state, feature, colors, width, height, scale);
     }
   } else if (feature.type === "waterfall")
-    drawWaterfallFeature(ctx, point, scale, colors);
+    drawWaterfallFeature(
+      ctx,
+      state,
+      feature,
+      colors,
+      width,
+      height,
+      scale,
+      detailed,
+    );
   else if (feature.type === "wildflowers")
     drawWildflowersFeature(
       ctx,
-      point,
-      scale,
+      state,
+      feature,
       colors,
-      state.seed + feature.id.length * 31,
+      width,
+      height,
+      scale,
+      detailed,
     );
   else if (feature.type === "snowfield") {
     if (detailed) {
@@ -2434,8 +3347,8 @@ function drawFeature(
       drawSnowfieldFeature(ctx, state, feature, colors, width, height, scale);
     }
   } else if (feature.type === "camp")
-    drawCampFeature(ctx, point, scale, colors);
-  else drawLookoutFeature(ctx, point, scale, colors);
+    drawCampFeature(ctx, state, feature, colors, width, height, scale);
+  else drawLookoutFeature(ctx, state, feature, colors, width, height, scale);
 }
 
 function drawFeatureHandle(
@@ -2619,10 +3532,11 @@ function drawScene(
   ground.addColorStop(1, shade(colors.ground, -0.28));
   ctx.fillStyle = ground;
   ctx.fill();
-  if (detailed) drawMountainFacets(ctx, state, colors, width, height);
+  drawTerrainMaterialZones(ctx, state, colors, width, height, detailed);
+  drawMountainFacets(ctx, state, colors, width, height, detailed);
   if (detailed) drawPostcardTerrainDetail(ctx, state, colors, width, height);
   drawTerrainTexture(ctx, state, colors, width, height, detailed);
-  drawSnowCaps(ctx, state, colors, width, height);
+  drawSnowCaps(ctx, state, colors, width, height, detailed);
   drawVegetation(ctx, state, colors, width, height, detailed);
   drawTrail(ctx, state, colors, width, height, detailed);
   if (detailed) drawPostcardTrailDetail(ctx, state, colors, width, height);
