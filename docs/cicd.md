@@ -45,7 +45,8 @@ For this project we use it for two distinct purposes:
 
 **When it runs:**
 - `push` to `main` → code changed
-- `pull_request` to `main` → preview deploy
+- trusted, same-repo `pull_request` to `main` → validation + preview deploy
+- Dependabot or fork `pull_request` to `main` → validation build without Azure secrets
 - `schedule: '0 * * * *'` → hourly cron, picks up new photos in Blob
 - `workflow_dispatch` → manual button for impatience
 - `repository_dispatch: blob-changed` → reserved for future Event Grid → webhook hookup; harmless to leave wired
@@ -57,17 +58,14 @@ A `concurrency` block cancels older runs on the same branch when a new one arriv
 1. **Checkout** the repo, pulls the code into the runner's working directory.
 2. **Set up Node.js 22** with `actions/setup-node@v4`, caches npm by `package-lock.json` so subsequent runs are fast.
 3. **`npm ci`**: installs dependencies from `package-lock.json`. Immediately after, **`npm test`** runs pure-logic coverage for session/date helpers, prebuild validation/cache keys, API auth/rate limiting/IP parsing, Blob URLs, HTML escaping, and hobby engines; a failure stops the run before build or deploy.
-4. **Install `libraw-bin`** via apt with cache, needed for Sony `.ARW` RAW conversion. See [image-pipeline.md](image-pipeline.md#raw-files-sony-arw-and-friends).
-5. **Azure login (OIDC)**: assumes the managed identity created in `infra/`. No password, no token in secrets. Explained below.
-6. **Restore prebuild cache**: `.cache/prebuild/` is a folder of already-downloaded images from previous runs, keyed by blob ETag. Lets incremental builds skip re-downloading unchanged photos.
-7. **Run `scripts/prebuild.mjs`**: scans Blob, downloads new photos, converts RAW, writes Astro content collection. Full mechanics: [image-pipeline.md](image-pipeline.md).
-8. **Restore Astro asset cache**: `.cache/astro/` holds Astro's build cache, including the optimized WebP/JPEG image variants. Persisting it across runs means only new or changed photos get re-encoded by sharp; unchanged variants are reused instead of regenerated from scratch every build.
-9. **`npm run build`**: verifies inline CSP hashes, then runs `astro build`. Astro processes images through sharp into WebP/JPEG variants and outputs `dist/`.
-10. **Sync variants to Blob**: `scripts/sync-variants.mjs` uploads generated photos to `variants/`, rewrites HTML URLs, and removes those large files from the SWA payload.
-11. **Stage `staticwebapp.config.json`**, save caches, and install the API package's locked dependencies.
-12. **Deploy to SWA** via `Azure/static-web-apps-deploy@v1` with `skip_app_build: true`.
+4. **Choose the content path.** Trusted events install `libraw-bin`, log into Azure via OIDC, restore the prebuild cache, and run `scripts/prebuild.mjs` against Blob. Dependabot and fork PRs cannot receive those secrets, so they run `scripts/generate-fixtures.mjs` instead. Both paths produce schema-valid session content for the same production build command.
+5. **Restore Astro asset cache**: `.cache/astro/` holds Astro's build cache, including the optimized WebP/JPEG image variants. Persisting it across runs means only new or changed photos get re-encoded by sharp; unchanged variants are reused instead of regenerated from scratch every build.
+6. **`npm run build`**: verifies inline CSP hashes, then runs `astro build`. Astro processes images through sharp into WebP/JPEG variants and outputs `dist/`.
+7. **Sync variants to Blob (trusted events only)**: `scripts/sync-variants.mjs` uploads generated photos to `variants/`, rewrites HTML URLs, and removes those large files from the SWA payload.
+8. **Stage `staticwebapp.config.json`**, save caches, and install the API package's locked dependencies.
+9. **Deploy to SWA (trusted events only)** via `Azure/static-web-apps-deploy@v1` with `skip_app_build: true`.
 
-**PR previews:** when the trigger is a `pull_request`, SWA automatically spins up a preview environment at a unique URL (`pr-<n>-<random>.<region>.azurestaticapps.net`). Once you merge or close the PR, a separate `close_pr` job tears the preview down so it doesn't count against quotas.
+**PR previews:** trusted same-repo pull requests receive an SWA preview at a unique URL (`pr-<n>-<random>.<region>.azurestaticapps.net`). Dependabot and fork PRs still install, test, build, and validate API dependencies, but skip Azure login, Blob writes, preview deployment, and preview cleanup because GitHub intentionally withholds repository secrets from those events. Once a trusted PR merges or closes, a separate `close_pr` job tears its preview down so it doesn't count against quotas.
 
 ### [`lint.yml`](../.github/workflows/lint.yml): PR quality gate
 
@@ -81,6 +79,8 @@ A `concurrency` block cancels older runs on the same branch when a new one arriv
 5. Runs `npm run check` (CSP hash drift check plus `astro check`, TypeScript, and content schema validation).
 
 This catches broken templates and schema-violating session JSON **before** they hit `main` and break a real build.
+
+Dependabot groups npm minor/patch releases into monthly PRs. Semver-major updates are ignored by automation and handled as explicit migrations, so tightly coupled packages such as Astro, its Tailwind integration, and Tailwind itself are upgraded and tested together instead of producing known-invalid peer dependency combinations.
 
 ---
 

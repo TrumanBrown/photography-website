@@ -1,5 +1,6 @@
-# Dependabot keeps dependencies current with low noise: one grouped PR per
-# ecosystem per month. See docs/cicd.md for how these fit the workflows.
+# Dependabot keeps compatible dependencies current with low noise: one grouped
+# minor/patch PR per ecosystem per month. Major upgrades are deliberate
+# migrations because framework packages often need to move together.
 version: 2
 updates:
   # Site dependencies (Astro, Tailwind, sharp, etc.)
@@ -15,6 +16,10 @@ updates:
         update-types:
           - minor
           - patch
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - version-update:semver-major
 
   # Azure Functions API dependencies
   - package-ecosystem: npm
@@ -29,6 +34,10 @@ updates:
         update-types:
           - minor
           - patch
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - version-update:semver-major
 
   # GitHub Actions used by the workflows
   - package-ecosystem: github-actions

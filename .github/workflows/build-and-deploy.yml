@@ -35,6 +35,11 @@ jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
     name: Build and deploy
+    env:
+      # Dependabot and fork PRs do not receive repository/Azure secrets. They
+      # still run a complete fixture-backed build, but cannot sync photos or
+      # create an SWA preview environment.
+      CAN_USE_AZURE: ${{ github.event_name != 'pull_request' || (github.event.pull_request.user.login != 'dependabot[bot]' && github.event.pull_request.head.repo.fork == false) }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -53,6 +58,7 @@ jobs:
         run: npm test
 
       - name: Cache apt packages (libraw-bin)
+        if: env.CAN_USE_AZURE == 'true'
         id: apt-cache
         uses: actions/cache@v4
         with:
@@ -60,6 +66,7 @@ jobs:
           key: apt-libraw-bin-v2
 
       - name: Install image conversion tools
+        if: env.CAN_USE_AZURE == 'true'
         # libraw-bin: dcraw_emu for Sony/Nikon/Canon RAW
         # python3-pillow-heif: handles iPhone HDR HEIC (which heif-convert
         #   and ImageMagick's libheif delegate both fail to decode)
@@ -73,6 +80,7 @@ jobs:
           sudo pip install --break-system-packages --quiet pillow pillow-heif
 
       - name: Azure login (OIDC)
+        if: env.CAN_USE_AZURE == 'true'
         uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -80,6 +88,7 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Restore prebuild cache
+        if: env.CAN_USE_AZURE == 'true'
         uses: actions/cache@v4
         with:
           path: .cache/prebuild
@@ -88,9 +97,14 @@ jobs:
             prebuild-cache-
 
       - name: Run prebuild (sync from Blob)
+        if: env.CAN_USE_AZURE == 'true'
         env:
           AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
         run: node scripts/prebuild.mjs
+
+      - name: Generate local fixtures (secretless PR)
+        if: env.CAN_USE_AZURE != 'true'
+        run: node scripts/generate-fixtures.mjs
 
       - name: Restore Astro asset cache
         # .cache/astro holds Astro's optimized image variants. Persisting it
@@ -107,6 +121,7 @@ jobs:
         run: npm run build
 
       - name: Sync image variants to Blob (keep SWA payload tiny)
+        if: env.CAN_USE_AZURE == 'true'
         # Moves dist/_astro/*.{avif,webp,jpeg,jpg} to the `variants/` blob
         # container, rewrites HTML refs to the blob URL, and deletes the
         # variants from local dist. SWA deploy stays under 5 MB regardless
@@ -122,7 +137,7 @@ jobs:
         run: cp staticwebapp.config.json dist/
 
       - name: Save prebuild cache
-        if: always()
+        if: always() && env.CAN_USE_AZURE == 'true'
         uses: actions/cache/save@v4
         with:
           path: .cache/prebuild
@@ -139,6 +154,7 @@ jobs:
         run: cd api && npm ci
 
       - name: Deploy to Azure Static Web Apps
+        if: env.CAN_USE_AZURE == 'true'
         id: swa
         uses: Azure/static-web-apps-deploy@v1
         with:
@@ -150,7 +166,7 @@ jobs:
           skip_app_build: true
 
   close_pr:
-    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.user.login != 'dependabot[bot]' && github.event.pull_request.head.repo.fork == false
     runs-on: ubuntu-latest
     name: Close PR preview
     steps:
