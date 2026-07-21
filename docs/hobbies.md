@@ -79,23 +79,27 @@ Markup lives in a `.astro` component under `src/components/hobbies/`; non-trivia
 
 ## Reference implementation: the hiking trail studio
 
-A creative **build → walk → develop** experience. Visitors sculpt a two-summit route, place up to ten trail moments, change landscape, season, weather, light, distance, and jacket color, then watch a tiny hiker traverse it. The same scene recipe develops into a more detailed `1800 × 1200` postcard for local download or the device share sheet.
+A creative **build → walk → develop** experience. Visitors shape a route, add up to ten trail moments, change landscape, season, weather, light, distance, and jacket color, then watch a tiny hiker traverse it. Route length controls the scale of the world: a 3-mile outing is an intimate single mountain, while an 18-mile route expands into a seven-mountain chain with smaller, denser scenery. The same scene recipe develops into a more detailed `2400 × 1600` postcard for local download or the device share sheet.
 
 **Files**
 
 - [src/components/hobbies/PixelHike.astro](../src/components/hobbies/PixelHike.astro), the accessible controls, responsive canvas, action bar, and postcard dialog.
-- [src/lib/hobbies/hiking-model.ts](../src/lib/hobbies/hiking-model.ts), the validated state, four biome presets, trail moments, deterministic randomizer, interpolation, and playful effort estimate.
+- [src/lib/hobbies/hiking-model.ts](../src/lib/hobbies/hiking-model.ts), the validated state, four biome morphology profiles, variable mountain generator, moment-driven terrain deformation, smart moment placement, distance-based profile resizing, and playful effort estimate.
 - [src/lib/hobbies/hiking-renderer.ts](../src/lib/hobbies/hiking-renderer.ts), the shared Canvas 2D renderer. Builder mode stays visually simple and exposes draggable terrain handles; postcard mode adds mountain facets, snow gullies, crag linework, a physical footpath, atmospheric light, birds, denser vegetation, rocks, grasses, and foreground depth.
 - [src/lib/hobbies/hiking.ts](../src/lib/hobbies/hiking.ts), DOM binding, undo, pointer/keyboard editing, local persistence, animation lifecycle, responsive sizing, and PNG/share export.
-- [src/lib/hobbies/hiking-model.test.ts](../src/lib/hobbies/hiking-model.test.ts), pure model coverage including deterministic twin-summit generation and untrusted saved-state normalization.
+- [src/lib/hobbies/hiking-model.test.ts](../src/lib/hobbies/hiking-model.test.ts), pure model coverage including variable mountain counts, silhouette variety, moment deformation and placement, distance resizing, legacy migration, and untrusted saved-state normalization.
 
 The control icons use the small build-time `@lucide/astro` package. The model, animation, both canvas renderers, persistence, and export path remain dependency-free and make no runtime network requests.
 
-**One scene recipe, two renderers.** Both canvases consume the same `HikeState`, so the developed image cannot silently invent a different route. The editor renders responsively at device pixel ratio (capped at 2×); the export canvas is created only on request at a fixed `1800 × 1200`. Generation uses only the visitor's CPU/GPU and browser memory. It makes no API calls, uploads nothing, and incurs no per-generation Azure cost.
+**Variety is deterministic, not a fixed template.** Mileage determines a target of one through seven mountains. Seeded generation then chooses nonuniform horizontal spacing, height progression, and a form for every mountain: narrow spire, one-sided shoulder, broad massif, or near-plateau, weighted differently for Cascades, fjord, karst, and Himalayan terrain. Shuffle changes both seed and mileage; changing landscape regenerates the current route using that biome's morphology. Dragging the length slider resamples the authored profile into a larger or smaller world instead of merely changing a number.
 
-**Persistence and sharing.** The normalized scene is saved under `trail-studio-v1` in `localStorage`. Export uses `canvas.toBlob()` rather than a base64 data URL. Browsers supporting file sharing receive a real PNG through `navigator.share`; other browsers always retain the download action.
+**Trail moments change the route.** Clicking a moment adds it immediately at a sensible location: lakes seek low basins and carve them deeper, lookouts seek high points and raise a spur, waterfalls prefer steep faces and cut a drop, camps flatten sheltered ground, and meadows/wildflowers create broad benches. Forests clear and repopulate a corridor, while snowfields create a high crossing. Every placed moment has a visible route handle and can be dragged horizontally; terrain, effort, artwork, and the eventual postcard update together.
 
-**Input parity.** Terrain handles support direct pointer dragging, arrow-key editing on the focusable canvas, and native range controls under “Fine-tune the terrain.” Every visual option is also a real button, select, or slider, and reduced-motion users get an immediate completed walk instead of a forced animation.
+**One scene recipe, two renderers.** Both canvases consume the same `HikeState`, so the developed image cannot silently invent a different route. The editor renders responsively at device pixel ratio (capped at 2×); the export canvas is created only on request at a fixed `2400 × 1600`. Postcard mode adds contour bands, cloud shadows, hundreds of scree marks, gullies, ledges, biome-specific waterfalls/vines/snow streaks, trail stones, footprints, denser vegetation, and foreground depth. Generation uses only the visitor's CPU/GPU and browser memory. It makes no API calls, uploads nothing, and incurs no per-generation Azure cost.
+
+**Persistence and sharing.** The normalized scene is saved under `trail-studio-v2` in `localStorage`; a saved v1 five-point route is migrated and blended into the new distance-scaled profile on first load. Export uses `canvas.toBlob()` rather than a base64 data URL. Browsers supporting file sharing receive a real PNG through `navigator.share`; other browsers always retain the download action.
+
+**Input parity.** Every generated terrain point has a visible canvas handle and a dynamically generated native range control under “Fine-tune the terrain”; points support direct pointer dragging and arrow-key editing on the focusable canvas. Moment buttons are immediate commands; moment handles support pointer dragging and itinerary chips support removal. Every visual option is a real button, select, or slider, and reduced-motion users get an immediate completed walk instead of a forced animation.
 
 ---
 

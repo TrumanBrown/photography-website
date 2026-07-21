@@ -56,7 +56,7 @@ const hikerColors = ["#d5523f", "#e1a13a", "#247d72", "#355f9b", "#7d4f8f"];
       style="touch-action:none"
       tabindex="0"
       role="img"
-      aria-label="An editable mountain landscape with five draggable terrain points"
+      aria-label="An editable mountain route with draggable ridgeline and trail moments"
     ></canvas>
     <div
       class="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-3 p-3 sm:p-4"
@@ -69,7 +69,7 @@ const hikerColors = ["#d5523f", "#e1a13a", "#247d72", "#355f9b", "#7d4f8f"];
       <span
         data-hike-stage-stat
         class="rounded bg-white/85 px-2.5 py-1 text-xs font-medium text-neutral-800 shadow-sm backdrop-blur-sm dark:bg-neutral-950/75 dark:text-neutral-100"
-        >9.2 mi · 6,000 ft</span
+        >9.2 mi · 3 mountains · 3,050 ft</span
       >
     </div>
   </div>
@@ -132,8 +132,8 @@ const hikerColors = ["#d5523f", "#e1a13a", "#247d72", "#355f9b", "#7d4f8f"];
           <button
             type="button"
             data-hike-feature="forest"
-            aria-pressed="false"
             class="hike-choice"
+            title="Add a dense forest corridor"
           >
             <Trees size={17} aria-hidden="true" />
             <span>Forest</span>
@@ -141,8 +141,8 @@ const hikerColors = ["#d5523f", "#e1a13a", "#247d72", "#355f9b", "#7d4f8f"];
           <button
             type="button"
             data-hike-feature="meadow"
-            aria-pressed="false"
             class="hike-choice"
+            title="Add an open meadow bench"
           >
             <Sparkles size={17} aria-hidden="true" />
             <span>Meadow</span>
@@ -150,8 +150,8 @@ const hikerColors = ["#d5523f", "#e1a13a", "#247d72", "#355f9b", "#7d4f8f"];
           <button
             type="button"
             data-hike-feature="lake"
-            aria-pressed="false"
             class="hike-choice"
+            title="Carve an alpine lake basin"
           >
             <WavesHorizontal size={17} aria-hidden="true" />
             <span>Alpine lake</span>
@@ -159,8 +159,8 @@ const hikerColors = ["#d5523f", "#e1a13a", "#247d72", "#355f9b", "#7d4f8f"];
           <button
             type="button"
             data-hike-feature="waterfall"
-            aria-pressed="false"
             class="hike-choice"
+            title="Cut a waterfall crossing"
           >
             <Droplets size={17} aria-hidden="true" />
             <span>Waterfall</span>
@@ -168,8 +168,8 @@ const hikerColors = ["#d5523f", "#e1a13a", "#247d72", "#355f9b", "#7d4f8f"];
           <button
             type="button"
             data-hike-feature="wildflowers"
-            aria-pressed="false"
             class="hike-choice"
+            title="Add a flowering trail bench"
           >
             <Flower2 size={17} aria-hidden="true" />
             <span>Wildflowers</span>
@@ -177,8 +177,8 @@ const hikerColors = ["#d5523f", "#e1a13a", "#247d72", "#355f9b", "#7d4f8f"];
           <button
             type="button"
             data-hike-feature="snowfield"
-            aria-pressed="false"
             class="hike-choice"
+            title="Add a high snow crossing"
           >
             <Snowflake size={17} aria-hidden="true" />
             <span>Snowfield</span>
@@ -186,8 +186,8 @@ const hikerColors = ["#d5523f", "#e1a13a", "#247d72", "#355f9b", "#7d4f8f"];
           <button
             type="button"
             data-hike-feature="camp"
-            aria-pressed="false"
             class="hike-choice"
+            title="Flatten a sheltered campsite"
           >
             <Tent size={17} aria-hidden="true" />
             <span>Camp</span>
@@ -195,8 +195,8 @@ const hikerColors = ["#d5523f", "#e1a13a", "#247d72", "#355f9b", "#7d4f8f"];
           <button
             type="button"
             data-hike-feature="lookout"
-            aria-pressed="false"
             class="hike-choice"
+            title="Raise a lookout spur"
           >
             <Binoculars size={17} aria-hidden="true" />
             <span>Lookout</span>
@@ -222,59 +222,12 @@ const hikerColors = ["#d5523f", "#e1a13a", "#247d72", "#355f9b", "#7d4f8f"];
         <summary
           class="cursor-pointer text-sm font-medium marker:text-neutral-400"
         >
-          Fine-tune the terrain
+          <span data-hike-terrain-summary>Fine-tune 13 terrain points</span>
         </summary>
-        <div class="mt-3 grid gap-3 sm:grid-cols-5">
-          <label class="hike-terrain-control">
-            <span>Trailhead</span>
-            <input
-              data-hike-terrain="0"
-              type="range"
-              min="8"
-              max="96"
-              value="10"
-            />
-          </label>
-          <label class="hike-terrain-control">
-            <span>First summit</span>
-            <input
-              data-hike-terrain="1"
-              type="range"
-              min="8"
-              max="96"
-              value="82"
-            />
-          </label>
-          <label class="hike-terrain-control">
-            <span>Saddle</span>
-            <input
-              data-hike-terrain="2"
-              type="range"
-              min="8"
-              max="96"
-              value="40"
-            />
-          </label>
-          <label class="hike-terrain-control">
-            <span>High point</span>
-            <input
-              data-hike-terrain="3"
-              type="range"
-              min="8"
-              max="96"
-              value="96"
-            />
-          </label>
-          <label class="hike-terrain-control">
-            <span>Finish</span>
-            <input
-              data-hike-terrain="4"
-              type="range"
-              min="8"
-              max="96"
-              value="13"
-            />
-          </label>
+        <div
+          data-hike-terrain-controls
+          class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6"
+        >
         </div>
       </details>
     </div>
@@ -322,7 +275,7 @@ const hikerColors = ["#d5523f", "#e1a13a", "#247d72", "#355f9b", "#7d4f8f"];
             data-hike-gain-stat
             class="mt-1 text-sm font-semibold tabular-nums"
           >
-            6,000
+            3,050
           </dd>
         </div>
         <div class="pl-2">
@@ -332,7 +285,7 @@ const hikerColors = ["#d5523f", "#e1a13a", "#247d72", "#355f9b", "#7d4f8f"];
             <Footprints size={12} aria-hidden="true" /> Feel
           </dt>
           <dd data-hike-effort-stat class="mt-1 truncate text-sm font-semibold">
-            Epic
+            Big day
           </dd>
         </div>
       </dl>
@@ -520,8 +473,8 @@ const hikerColors = ["#d5523f", "#e1a13a", "#247d72", "#355f9b", "#7d4f8f"];
     <div class="bg-neutral-200 p-3 sm:p-5 dark:bg-neutral-950">
       <canvas
         data-hike-postcard
-        width="1800"
-        height="1200"
+        width="2400"
+        height="1600"
         class="block aspect-[3/2] w-full bg-white shadow-xl"
         role="img"
         aria-label="Your generated hiking postcard"></canvas>
@@ -534,7 +487,7 @@ const hikerColors = ["#d5523f", "#e1a13a", "#247d72", "#355f9b", "#7d4f8f"];
         class="text-xs text-neutral-500"
         aria-live="polite"
       >
-        Rendered on your device at 1800 × 1200.
+        Rendered on your device at 2400 × 1600.
       </p>
       <div class="flex flex-wrap gap-2">
         <button
@@ -589,18 +542,6 @@ const hikerColors = ["#d5523f", "#e1a13a", "#247d72", "#355f9b", "#7d4f8f"];
     background: rgb(220 252 231);
     color: rgb(20 83 45);
     box-shadow: inset 0 0 0 1px rgb(22 101 52 / 0.12);
-  }
-
-  .hike-terrain-control {
-    display: grid;
-    gap: 0.25rem;
-    font-size: 0.6875rem;
-    color: rgb(115 115 115);
-  }
-
-  .hike-terrain-control input {
-    width: 100%;
-    accent-color: rgb(21 128 61);
   }
 
   .hike-select {
@@ -718,11 +659,15 @@ const hikerColors = ["#d5523f", "#e1a13a", "#247d72", "#355f9b", "#7d4f8f"];
     backdrop-filter: blur(5px);
   }
 
-  [data-hike-canvas][data-placement="true"] {
-    cursor: crosshair;
+  [data-hike-canvas][data-moment="true"] {
+    cursor: grab;
   }
 
-  [data-hike-canvas][data-dragging="true"] {
+  [data-hike-canvas][data-dragging="moment"] {
+    cursor: grabbing;
+  }
+
+  [data-hike-canvas][data-dragging="terrain"] {
     cursor: ns-resize;
   }
 

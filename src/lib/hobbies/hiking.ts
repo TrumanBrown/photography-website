@@ -1,11 +1,13 @@
 import {
   BIOMES,
-  TERRAIN_X,
   calculateHikeStats,
   cloneHike,
   createDefaultHike,
+  generateTerrainProfile,
   normalizeHikeState,
   randomizeHike,
+  resizeTerrainForDistance,
+  suggestFeaturePosition,
   trailFeatureById,
   type BiomeId,
   type FeatureId,
@@ -15,13 +17,15 @@ import {
   type WeatherId,
 } from "./hiking-model";
 import {
+  pointOnTrail,
   renderHikePostcard,
   renderHikeScene,
   terrainElevationFromCanvasY,
   terrainAnchorPoint,
 } from "./hiking-renderer";
 
-const STORAGE_KEY = "trail-studio-v1";
+const STORAGE_KEY = "trail-studio-v2";
+const LEGACY_STORAGE_KEY = "trail-studio-v1";
 const MAX_HISTORY = 32;
 
 function required<T extends Element>(root: ParentNode, selector: string): T {
@@ -32,7 +36,9 @@ function required<T extends Element>(root: ParentNode, selector: string): T {
 
 function loadState(): HikeState {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY);
+    const saved =
+      localStorage.getItem(STORAGE_KEY) ??
+      localStorage.getItem(LEGACY_STORAGE_KEY);
     return saved ? normalizeHikeState(JSON.parse(saved)) : createDefaultHike();
   } catch {
     return createDefaultHike();
@@ -61,6 +67,14 @@ export function initHikeBuilder(root: HTMLElement): void {
   const saveState = required<HTMLElement>(root, "[data-hike-save-state]");
   const itinerary = required<HTMLElement>(root, "[data-hike-itinerary]");
   const featureCount = required<HTMLElement>(root, "[data-hike-feature-count]");
+  const terrainControls = required<HTMLElement>(
+    root,
+    "[data-hike-terrain-controls]",
+  );
+  const terrainSummary = required<HTMLElement>(
+    root,
+    "[data-hike-terrain-summary]",
+  );
   const nameInput = required<HTMLInputElement>(root, "[data-hike-name]");
   const distanceInput = required<HTMLInputElement>(
     root,
@@ -110,9 +124,6 @@ export function initHikeBuilder(root: HTMLElement): void {
   const featureButtons = root.querySelectorAll<HTMLButtonElement>(
     "[data-hike-feature]",
   );
-  const terrainInputs = root.querySelectorAll<HTMLInputElement>(
-    "[data-hike-terrain]",
-  );
   const lightButtons =
     root.querySelectorAll<HTMLButtonElement>("[data-hike-light]");
   const colorButtons =
@@ -122,9 +133,10 @@ export function initHikeBuilder(root: HTMLElement): void {
   ).matches;
 
   let state = loadState();
-  let activeFeature: FeatureId | null = null;
   let activeAnchor: number | null = null;
   let hoveredAnchor: number | null = null;
+  let activePlacedFeatureId: string | null = null;
+  let hoveredPlacedFeatureId: string | null = null;
   let dragSnapshot: HikeState | null = null;
   let continuousSnapshot: HikeState | null = null;
   let hikerProgress: number | null = null;
@@ -137,6 +149,13 @@ export function initHikeBuilder(root: HTMLElement): void {
   let lastFrame = 0;
   let onscreen = true;
   const undoStack: HikeState[] = [];
+
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    localStorage.removeItem(LEGACY_STORAGE_KEY);
+  } catch {
+    saveState.textContent = "Local save unavailable";
+  }
 
   function remember(snapshot: HikeState): void {
     if (statesMatch(snapshot, state)) return;
@@ -151,6 +170,7 @@ export function initHikeBuilder(root: HTMLElement): void {
     saveTimer = window.setTimeout(() => {
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        localStorage.removeItem(LEGACY_STORAGE_KEY);
         saveState.textContent = "Saved on this device";
       } catch {
         saveState.textContent = "Local save unavailable";
@@ -177,6 +197,8 @@ export function initHikeBuilder(root: HTMLElement): void {
       hikerProgress,
       activeAnchor,
       hoveredAnchor,
+      activeFeatureId: activePlacedFeatureId,
+      hoveredFeatureId: hoveredPlacedFeatureId,
     });
   }
 
@@ -184,7 +206,14 @@ export function initHikeBuilder(root: HTMLElement): void {
     const biome = BIOMES.find((item) => item.id === state.biome) ?? BIOMES[0];
     const stats = calculateHikeStats(state);
     regionLabel.textContent = biome.label;
-    stageStat.textContent = `${stats.distanceMiles.toFixed(1)} mi · ${stats.elevationFeet.toLocaleString("en-US")} ft`;
+    const peaks = state.terrain.filter(
+      (height, index) =>
+        index > 0 &&
+        index < state.terrain.length - 1 &&
+        height > state.terrain[index - 1] &&
+        height > state.terrain[index + 1],
+    ).length;
+    stageStat.textContent = `${stats.distanceMiles.toFixed(1)} mi · ${peaks} ${peaks === 1 ? "mountain" : "mountains"} · ${stats.elevationFeet.toLocaleString("en-US")} ft`;
     distanceLabel.textContent = `${stats.distanceMiles.toFixed(1)} mi`;
     distanceStat.textContent = stats.distanceMiles.toFixed(1);
     gainStat.textContent = stats.elevationFeet.toLocaleString("en-US");
@@ -208,6 +237,7 @@ export function initHikeBuilder(root: HTMLElement): void {
       button.className =
         "inline-flex items-center gap-1.5 rounded-full border border-neutral-300 bg-white px-2.5 py-1 text-xs text-neutral-700 hover:border-red-300 hover:text-red-700 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:border-red-700 dark:hover:text-red-300";
       button.setAttribute("aria-label", `Remove ${details.label}`);
+      button.title = `${details.effect}. Click to remove.`;
       const label = document.createElement("span");
       label.textContent = details.label;
       const remove = document.createElement("span");
@@ -230,17 +260,71 @@ export function initHikeBuilder(root: HTMLElement): void {
     featureCount.textContent = `${state.features.length} / 10 moments`;
   }
 
+  function terrainControlLabel(index: number): string {
+    if (index === 0) return "Trailhead";
+    if (index === state.terrain.length - 1) return "Finish";
+    const before = state.terrain[index - 1];
+    const current = state.terrain[index];
+    const after = state.terrain[index + 1];
+    if (current > before && current > after) {
+      const summit = state.terrain
+        .slice(1, index + 1)
+        .filter((height, position) => {
+          const absolute = position + 1;
+          return (
+            height > state.terrain[absolute - 1] &&
+            height > state.terrain[absolute + 1]
+          );
+        }).length;
+      return `Summit ${summit}`;
+    }
+    if (current < before && current < after) return "Saddle";
+    return index < state.terrain.length / 2 ? "Approach" : "Descent";
+  }
+
+  function syncTerrainControls(): HTMLInputElement[] {
+    terrainSummary.textContent = `Fine-tune ${state.terrain.length} terrain points`;
+    const existing = terrainControls.querySelectorAll<HTMLInputElement>(
+      "[data-hike-terrain]",
+    );
+    if (existing.length !== state.terrain.length) {
+      terrainControls.replaceChildren();
+      state.terrain.forEach((height, index) => {
+        const label = document.createElement("label");
+        label.className =
+          "grid gap-1 text-[11px] text-neutral-500 dark:text-neutral-400";
+        const name = document.createElement("span");
+        name.textContent = terrainControlLabel(index);
+        const input = document.createElement("input");
+        input.type = "range";
+        input.min = "8";
+        input.max = "96";
+        input.value = String(Math.round(height * 100));
+        input.className = "w-full accent-emerald-700 dark:accent-emerald-400";
+        input.dataset.hikeTerrain = String(index);
+        input.setAttribute("aria-label", name.textContent);
+        label.append(name, input);
+        terrainControls.append(label);
+      });
+    }
+    const inputs = Array.from(
+      terrainControls.querySelectorAll<HTMLInputElement>("[data-hike-terrain]"),
+    );
+    inputs.forEach((input, index) => {
+      input.value = String(Math.round(state.terrain[index] * 100));
+      const label = input.previousElementSibling;
+      const controlLabel = terrainControlLabel(index);
+      if (label) label.textContent = controlLabel;
+      input.setAttribute("aria-label", controlLabel);
+    });
+    return inputs;
+  }
+
   function syncUI(): void {
     biomeButtons.forEach((button) => {
       button.setAttribute(
         "aria-pressed",
         String(button.dataset.hikeBiome === state.biome),
-      );
-    });
-    featureButtons.forEach((button) => {
-      button.setAttribute(
-        "aria-pressed",
-        String(button.dataset.hikeFeature === activeFeature),
       );
     });
     lightButtons.forEach((button) => {
@@ -255,15 +339,11 @@ export function initHikeBuilder(root: HTMLElement): void {
         String(button.dataset.hikeColor === state.hikerColor),
       );
     });
-    terrainInputs.forEach((input) => {
-      const index = Number(input.dataset.hikeTerrain);
-      input.value = String(Math.round(state.terrain[index] * 100));
-    });
+    syncTerrainControls();
     if (document.activeElement !== nameInput) nameInput.value = state.routeName;
     distanceInput.value = String(state.distance);
     seasonSelect.value = state.season;
     weatherSelect.value = state.weather;
-    canvas.dataset.placement = activeFeature ? "true" : "false";
     undoButton.disabled = undoStack.length === 0;
     syncComputed();
     syncItinerary();
@@ -305,12 +385,26 @@ export function initHikeBuilder(root: HTMLElement): void {
   function nearestAnchor(x: number, y: number): number | null {
     let nearest: number | null = null;
     let distance = 30;
-    for (let index = 0; index < TERRAIN_X.length; index += 1) {
+    for (let index = 0; index < state.terrain.length; index += 1) {
       const point = terrainAnchorPoint(state, index, cssWidth, cssHeight);
       const candidate = Math.hypot(point.x - x, point.y - y);
       if (candidate < distance) {
         distance = candidate;
         nearest = index;
+      }
+    }
+    return nearest;
+  }
+
+  function nearestPlacedFeature(x: number, y: number): string | null {
+    let nearest: string | null = null;
+    let distance = 34;
+    for (const feature of state.features) {
+      const point = pointOnTrail(state, feature.x, cssWidth, cssHeight);
+      const candidate = Math.hypot(point.x - x, point.y - y);
+      if (candidate < distance) {
+        distance = candidate;
+        nearest = feature.id;
       }
     }
     return nearest;
@@ -323,7 +417,7 @@ export function initHikeBuilder(root: HTMLElement): void {
 
   function updateDraggedAnchor(y: number): void {
     if (activeAnchor == null) return;
-    const elevation = terrainElevationFromCanvasY(y, cssHeight);
+    const elevation = terrainElevationFromCanvasY(state, y, cssHeight);
     state.terrain[activeAnchor] = elevation;
     state = normalizeHikeState(state);
     resetWalk();
@@ -332,20 +426,36 @@ export function initHikeBuilder(root: HTMLElement): void {
     render();
   }
 
-  function placeFeature(x: number): void {
-    if (!activeFeature) return;
+  function updateDraggedFeature(x: number): void {
+    if (!activePlacedFeatureId) return;
+    const feature = state.features.find(
+      (item) => item.id === activePlacedFeatureId,
+    );
+    if (!feature) return;
+    feature.x = Math.min(0.93, Math.max(0.07, x / cssWidth));
+    resetWalk();
+    syncComputed();
+    scheduleSave();
+    render();
+  }
+
+  function addFeature(type: FeatureId, x?: number): void {
     if (state.features.length >= 10) {
       saveState.textContent = "Trail has ten moments already";
       return;
     }
-    const normalizedX = Math.min(0.93, Math.max(0.07, x / cssWidth));
+    const normalizedX =
+      x == null
+        ? suggestFeaturePosition(state, type)
+        : Math.min(0.93, Math.max(0.07, x / cssWidth));
     const next = cloneHike(state);
     next.features.push({
-      id: `${activeFeature}-${state.seed.toString(36)}-${Date.now().toString(36)}`,
-      type: activeFeature,
+      id: `${type}-${state.seed.toString(36)}-${Date.now().toString(36)}`,
+      type,
       x: normalizedX,
     });
     applyState(next);
+    saveState.textContent = `${trailFeatureById(type).label} added. Drag it in the scene to move it.`;
   }
 
   biomeButtons.forEach((button) => {
@@ -356,9 +466,7 @@ export function initHikeBuilder(root: HTMLElement): void {
       const newBiome = BIOMES.find((item) => item.id === id) ?? BIOMES[0];
       const next = cloneHike(state);
       next.biome = id;
-      next.terrain = next.terrain.map(
-        (height, index) => height * 0.62 + newBiome.terrain[index] * 0.38,
-      );
+      next.terrain = generateTerrainProfile(id, next.distance, next.seed);
       if (next.routeName === oldBiome.defaultTitle)
         next.routeName = newBiome.defaultTitle;
       applyState(next);
@@ -368,9 +476,7 @@ export function initHikeBuilder(root: HTMLElement): void {
   featureButtons.forEach((button) => {
     button.addEventListener("click", () => {
       const selected = button.dataset.hikeFeature as FeatureId;
-      activeFeature = activeFeature === selected ? null : selected;
-      syncUI();
-      render();
+      addFeature(selected);
     });
   });
 
@@ -402,36 +508,40 @@ export function initHikeBuilder(root: HTMLElement): void {
     applyState(next);
   });
 
-  for (const input of [distanceInput, ...terrainInputs]) {
-    input.addEventListener("pointerdown", beginContinuous);
-    input.addEventListener("focus", beginContinuous);
-    input.addEventListener("blur", () => {
-      if (continuousSnapshot) finishContinuous();
-    });
-  }
+  distanceInput.addEventListener("pointerdown", beginContinuous);
+  distanceInput.addEventListener("focus", beginContinuous);
+  distanceInput.addEventListener("blur", () => {
+    if (continuousSnapshot) finishContinuous();
+  });
 
   distanceInput.addEventListener("input", () => {
-    state.distance = Number(distanceInput.value);
-    state = normalizeHikeState(state);
+    state = resizeTerrainForDistance(state, Number(distanceInput.value));
     resetWalk();
-    syncComputed();
+    syncUI();
     scheduleSave();
     render();
   });
   distanceInput.addEventListener("change", finishContinuous);
 
-  terrainInputs.forEach((input) => {
-    input.addEventListener("input", () => {
-      const index = Number(input.dataset.hikeTerrain);
-      state.terrain[index] = Number(input.value) / 100;
-      state = normalizeHikeState(state);
-      resetWalk();
-      syncComputed();
-      scheduleSave();
-      render();
-    });
-    input.addEventListener("change", finishContinuous);
+  terrainControls.addEventListener("pointerdown", (event) => {
+    if (event.target instanceof HTMLInputElement) beginContinuous();
   });
+  terrainControls.addEventListener("focusin", (event) => {
+    if (event.target instanceof HTMLInputElement) beginContinuous();
+  });
+  terrainControls.addEventListener("focusout", () => {
+    if (continuousSnapshot) finishContinuous();
+  });
+  terrainControls.addEventListener("input", (event) => {
+    if (!(event.target instanceof HTMLInputElement)) return;
+    const index = Number(event.target.dataset.hikeTerrain);
+    state.terrain[index] = Number(event.target.value) / 100;
+    resetWalk();
+    syncComputed();
+    scheduleSave();
+    render();
+  });
+  terrainControls.addEventListener("change", finishContinuous);
 
   nameInput.addEventListener("focus", beginContinuous);
   nameInput.addEventListener("input", () => {
@@ -449,36 +559,55 @@ export function initHikeBuilder(root: HTMLElement): void {
 
   canvas.addEventListener("pointerdown", (event) => {
     const point = pointerPosition(event);
+    const feature = nearestPlacedFeature(point.x, point.y);
+    if (feature) {
+      activePlacedFeatureId = feature;
+      dragSnapshot = cloneHike(state);
+      canvas.dataset.dragging = "moment";
+      canvas.setPointerCapture(event.pointerId);
+      updateDraggedFeature(point.x);
+      return;
+    }
     const anchor = nearestAnchor(point.x, point.y);
     if (anchor != null) {
       activeAnchor = anchor;
       dragSnapshot = cloneHike(state);
-      canvas.dataset.dragging = "true";
+      canvas.dataset.dragging = "terrain";
       canvas.setPointerCapture(event.pointerId);
       updateDraggedAnchor(point.y);
       return;
     }
-    placeFeature(point.x);
   });
 
   canvas.addEventListener("pointermove", (event) => {
     const point = pointerPosition(event);
+    if (activePlacedFeatureId) {
+      updateDraggedFeature(point.x);
+      return;
+    }
     if (activeAnchor != null) {
       updateDraggedAnchor(point.y);
       return;
     }
-    const nextHover = nearestAnchor(point.x, point.y);
-    if (nextHover !== hoveredAnchor) {
-      hoveredAnchor = nextHover;
+    const nextFeature = nearestPlacedFeature(point.x, point.y);
+    const nextAnchor = nextFeature ? null : nearestAnchor(point.x, point.y);
+    if (
+      nextAnchor !== hoveredAnchor ||
+      nextFeature !== hoveredPlacedFeatureId
+    ) {
+      hoveredAnchor = nextAnchor;
+      hoveredPlacedFeatureId = nextFeature;
+      canvas.dataset.moment = nextFeature ? "true" : "false";
       render();
     }
   });
 
   function finishDrag(event?: PointerEvent): void {
-    if (activeAnchor == null) return;
+    if (activeAnchor == null && !activePlacedFeatureId) return;
     if (event && canvas.hasPointerCapture(event.pointerId))
       canvas.releasePointerCapture(event.pointerId);
     activeAnchor = null;
+    activePlacedFeatureId = null;
     delete canvas.dataset.dragging;
     if (dragSnapshot) remember(dragSnapshot);
     dragSnapshot = null;
@@ -489,8 +618,14 @@ export function initHikeBuilder(root: HTMLElement): void {
   canvas.addEventListener("pointerup", finishDrag);
   canvas.addEventListener("pointercancel", finishDrag);
   canvas.addEventListener("pointerleave", () => {
-    if (activeAnchor == null && hoveredAnchor != null) {
+    if (
+      activeAnchor == null &&
+      !activePlacedFeatureId &&
+      (hoveredAnchor != null || hoveredPlacedFeatureId)
+    ) {
       hoveredAnchor = null;
+      hoveredPlacedFeatureId = null;
+      delete canvas.dataset.moment;
       render();
     }
   });
@@ -512,7 +647,7 @@ export function initHikeBuilder(root: HTMLElement): void {
     const current = hoveredAnchor ?? 2;
     if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
       hoveredAnchor = Math.min(
-        TERRAIN_X.length - 1,
+        state.terrain.length - 1,
         Math.max(0, current + (event.key === "ArrowLeft" ? -1 : 1)),
       );
       render();
@@ -546,7 +681,8 @@ export function initHikeBuilder(root: HTMLElement): void {
   });
 
   resetButton.addEventListener("click", () => {
-    activeFeature = null;
+    activePlacedFeatureId = null;
+    hoveredPlacedFeatureId = null;
     applyState(createDefaultHike());
   });
 
@@ -564,12 +700,12 @@ export function initHikeBuilder(root: HTMLElement): void {
   });
 
   function createPostcard(): void {
-    exportStatus.textContent = "Developing at 1800 × 1200...";
+    exportStatus.textContent = "Developing at 2400 × 1600...";
     dialogTitle.textContent = state.routeName;
     if (!dialog.open) dialog.showModal();
     requestAnimationFrame(() => {
       renderHikePostcard(postcard, state);
-      exportStatus.textContent = "Rendered on your device at 1800 × 1200.";
+      exportStatus.textContent = "Rendered on your device at 2400 × 1600.";
     });
   }
 
