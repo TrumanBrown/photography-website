@@ -102,6 +102,19 @@ jobs:
           AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
         run: node scripts/prebuild.mjs
 
+      - name: Save prebuild cache
+        if: always() && env.CAN_USE_AZURE == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .cache/prebuild
+          key: prebuild-cache-${{ github.run_id }}
+
+      - name: Release prebuild cache disk space
+        if: env.CAN_USE_AZURE == 'true'
+        # Prebuild has copied these files into src/content; retaining both
+        # copies exhausts the hosted runner while Astro populates dist/.
+        run: rm -rf .cache/prebuild
+
       - name: Generate local fixtures (secretless PR)
         if: env.CAN_USE_AZURE != 'true'
         run: node scripts/generate-fixtures.mjs
@@ -135,13 +148,6 @@ jobs:
         # root. Astro doesn't copy non-public configs into dist/, so we put
         # the config alongside the built site here.
         run: cp staticwebapp.config.json dist/
-
-      - name: Save prebuild cache
-        if: always() && env.CAN_USE_AZURE == 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: .cache/prebuild
-          key: prebuild-cache-${{ github.run_id }}
 
       - name: Save Astro asset cache
         if: always()
