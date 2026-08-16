@@ -88,7 +88,7 @@ storage, salt, and admin settings. Set `GITHUB_TOKEN` (fine-grained PAT,
 | [scripts/setup-federated-credential.sh](../scripts/setup-federated-credential.sh) | One-time, creates the bootstrap MI used by CI. |
 | [scripts/bootstrap-swa-token.sh](../scripts/bootstrap-swa-token.sh) | After Bicep deploy, populates GH secrets. |
 | [scripts/bind-domain.sh](../scripts/bind-domain.sh) | Once, after `infra` workflow + domain registered. |
-| [scripts/upload-session.sh](../scripts/upload-session.sh) `<slug> [--build]` | Routine: ship a session from `staging/<slug>/` to Blob. |
+| [scripts/upload-session.sh](../scripts/upload-session.sh) `<slug>... \| --all [--build]` | Routine: ship one, several, or every staged session from `staging/` to Blob. |
 | [scripts/prebuild.mjs](../scripts/prebuild.mjs) | Runs in CI; locally with `AZURE_STORAGE_ACCOUNT=... node scripts/prebuild.mjs`. |
 | [scripts/sync-variants.mjs](../scripts/sync-variants.mjs) | Runs in CI between `astro build` and SWA deploy. |
 | [scripts/heic-to-jpeg.py](../scripts/heic-to-jpeg.py) | Called by prebuild; not invoked directly. |

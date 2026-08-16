@@ -1,17 +1,27 @@
 #!/usr/bin/env bash
 #
-# Upload a single session folder from staging/ to the originals/ container in
-# Azure Blob Storage. Optionally trigger a build afterward.
+# Upload session folders from staging/ to the originals/ container in Azure
+# Blob Storage. Optionally trigger a build afterward.
 #
 # Usage:
-#   ./scripts/upload-session.sh <session-folder> [--build] [--yes]
+#   ./scripts/upload-session.sh <session-folder>... [--build] [--yes]
+#   ./scripts/upload-session.sh --all [--build] [--yes]
 #
 # Examples:
 #   ./scripts/upload-session.sh 2026-mexico
-#   ./scripts/upload-session.sh 2026-mexico --build
-#   ./scripts/upload-session.sh 2026-mexico --yes        # skip confirmation
+#   ./scripts/upload-session.sh 2026-mexico tidepools-spring-2026
+#   ./scripts/upload-session.sh --all --build
+#   ./scripts/upload-session.sh --all --yes              # skip confirmation
+#
+# --all uploads every direct child folder of staging/, except hobby-* folders,
+# names listed in UPLOAD_SKIP_DIRS, and folders with no accepted image files.
 
 set -euo pipefail
+
+# Print the comment header above as usage text.
+usage() {
+  awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "$0"
+}
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -29,17 +39,52 @@ fi
 STORAGE_ACCOUNT="${AZURE_STORAGE_ACCOUNT:-stphotoprodnowiur}"
 CONTAINER="originals"
 GH_REPO="${GITHUB_REPOSITORY:-TrumanBrown/photography-website}"
+# Space-separated staging folders that --all must never treat as a session.
+SKIP_DIRS="${UPLOAD_SKIP_DIRS:-fishing}"
 # ---
 
-session=""
+# Extension filter shared by every scan below (case-insensitive).
+IMAGE_EXPR=( '(' -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \
+  -o -iname '*.avif' -o -iname '*.tif' -o -iname '*.tiff' \
+  -o -iname '*.heic' -o -iname '*.heif' \
+  -o -iname '*.arw' -o -iname '*.nef' -o -iname '*.cr2' -o -iname '*.cr3' \
+  -o -iname '*.dng' -o -iname '*.raf' ')' )
+
+list_images() {
+  find "$1" -maxdepth 1 -type f "${IMAGE_EXPR[@]}"
+}
+
+list_uploadable() {
+  find "$1" -maxdepth 1 -type f '(' "${IMAGE_EXPR[@]}" -o -iname '_session.json' ')'
+}
+
+human_size() {
+  numfmt --to=iec --suffix=B "$1" 2>/dev/null || echo "${1}B"
+}
+
+# True for staging folders that hold hobby media or converted source photos
+# rather than a photography session.
+is_skipped() {
+  case "$1" in
+    hobby-*) return 0 ;;
+  esac
+  for skip in $SKIP_DIRS; do
+    if [ "$1" = "$skip" ]; then return 0; fi
+  done
+  return 1
+}
+
+sessions=()
 trigger_build=false
 auto_yes=false
+upload_all=false
 for arg in "$@"; do
   case "$arg" in
+    --all) upload_all=true ;;
     --build) trigger_build=true ;;
     --yes|-y) auto_yes=true ;;
     --help|-h)
-      head -n 12 "$0" | tail -n 11
+      usage
       exit 0
       ;;
     -*)
@@ -47,19 +92,20 @@ for arg in "$@"; do
       exit 2
       ;;
     *)
-      if [ -z "$session" ]; then
-        session="$arg"
-      else
-        echo "Multiple session names given: '$session' and '$arg'" >&2
-        exit 2
-      fi
+      sessions+=("$arg")
       ;;
   esac
 done
 
-if [ -z "$session" ]; then
-  echo "Usage: $0 <session-folder> [--build] [--yes]" >&2
-  echo
+if [ "$upload_all" = true ] && [ "${#sessions[@]}" -gt 0 ]; then
+  echo "--all cannot be combined with session names." >&2
+  exit 2
+fi
+
+if [ "$upload_all" != true ] && [ "${#sessions[@]}" -eq 0 ]; then
+  echo "Usage: $0 <session-folder>... [--build] [--yes]" >&2
+  echo "       $0 --all [--build] [--yes]" >&2
+  echo >&2
   echo "Sessions available under staging/:" >&2
   if [ -d "$STAGING_DIR" ]; then
     find "$STAGING_DIR" -maxdepth 1 -mindepth 1 -type d -printf "  %f\n" 2>&1 | sort >&2 || true
@@ -67,16 +113,34 @@ if [ -z "$session" ]; then
   exit 2
 fi
 
-if [[ "$session" == "." || "$session" == ".." || "$session" == *"/"* || "$session" == *"\\"* ]]; then
-  echo "Session must be the name of one direct child folder under staging/: $session" >&2
-  exit 2
+if [ "$upload_all" = true ]; then
+  if [ ! -d "$STAGING_DIR" ]; then
+    echo "No such folder: $STAGING_DIR" >&2
+    exit 1
+  fi
+  while IFS= read -r name; do
+    if is_skipped "$name"; then
+      echo "Skipping $name (not a photography session)"
+      continue
+    fi
+    sessions+=("$name")
+  done < <(find "$STAGING_DIR" -maxdepth 1 -mindepth 1 -type d -printf "%f\n" | sort)
+  if [ "${#sessions[@]}" -eq 0 ]; then
+    echo "No session folders to upload under $STAGING_DIR." >&2
+    exit 1
+  fi
 fi
 
-SRC="$STAGING_DIR/$session"
-if [ ! -d "$SRC" ]; then
-  echo "No such folder: $SRC" >&2
-  exit 1
-fi
+for session in "${sessions[@]}"; do
+  if [[ "$session" == "." || "$session" == ".." || "$session" == *"/"* || "$session" == *"\\"* ]]; then
+    echo "Session must be the name of one direct child folder under staging/: $session" >&2
+    exit 2
+  fi
+  if [ ! -d "$STAGING_DIR/$session" ]; then
+    echo "No such folder: $STAGING_DIR/$session" >&2
+    exit 1
+  fi
+done
 
 # Sanity-check Azure auth before doing anything destructive.
 if ! az account show >/dev/null 2>&1; then
@@ -103,40 +167,48 @@ if [ -n "${AZURE_SUBSCRIPTION_ID:-}" ]; then
 fi
 
 # Count files that would actually be uploaded (matches ACCEPTED extensions).
-echo "Scanning $SRC..."
-file_count=$(find "$SRC" -maxdepth 1 -type f \( \
-  -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.webp" \
-  -o -iname "*.avif" -o -iname "*.tif" -o -iname "*.tiff" \
-  -o -iname "*.heic" -o -iname "*.heif" \
-  -o -iname "*.arw" -o -iname "*.nef" -o -iname "*.cr2" -o -iname "*.cr3" \
-  -o -iname "*.dng" -o -iname "*.raf" \
-  -o -iname "_session.json" \
-\) | wc -l)
-image_count=$(find "$SRC" -maxdepth 1 -type f \( \
-  -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.webp" \
-  -o -iname "*.avif" -o -iname "*.tif" -o -iname "*.tiff" \
-  -o -iname "*.heic" -o -iname "*.heif" \
-  -o -iname "*.arw" -o -iname "*.nef" -o -iname "*.cr2" -o -iname "*.cr3" \
-  -o -iname "*.dng" -o -iname "*.raf" \
-\) | wc -l)
-total_bytes=$(du -sb "$SRC" 2>/dev/null | awk '{print $1}' || echo 0)
-hr_size=$(numfmt --to=iec --suffix=B "$total_bytes" 2>/dev/null || echo "${total_bytes}B")
+echo "Scanning $STAGING_DIR..."
+planned=()
+planned_files=()
+planned_size=()
+total_files=0
+total_bytes=0
+for session in "${sessions[@]}"; do
+  src="$STAGING_DIR/$session"
+  image_count=$(list_images "$src" | wc -l)
+  if [ "$image_count" -eq 0 ]; then
+    if [ "$upload_all" = true ]; then
+      echo "  Skipping $session (no accepted image files)"
+      continue
+    fi
+    echo "Nothing to upload for $session (the session folder has no accepted image files)." >&2
+    exit 1
+  fi
+  file_count=$(list_uploadable "$src" | wc -l)
+  bytes=$(du -sb "$src" 2>/dev/null | awk '{print $1}' || echo 0)
+  planned+=("$session")
+  planned_files+=("$file_count")
+  planned_size+=("$bytes")
+  total_files=$((total_files + file_count))
+  total_bytes=$((total_bytes + bytes))
+done
+
+if [ "${#planned[@]}" -eq 0 ]; then
+  echo "Nothing to upload (no staging folder has accepted image files)." >&2
+  exit 1
+fi
 
 echo
-echo "About to upload:"
-echo "  Source:      $SRC"
-echo "  Destination: https://${STORAGE_ACCOUNT}.blob.core.windows.net/${CONTAINER}/${session}/"
-echo "  Files:       $file_count (filtered to accepted extensions)"
-echo "  Total size:  $hr_size"
+echo "About to upload ${#planned[@]} session(s):"
+echo "  Destination: https://${STORAGE_ACCOUNT}.blob.core.windows.net/${CONTAINER}/"
+for i in "${!planned[@]}"; do
+  printf '    %-42s %5s files  %10s\n' "${planned[$i]}/" "${planned_files[$i]}" "$(human_size "${planned_size[$i]}")"
+done
+printf '    %-42s %5s files  %10s\n' "(total, filtered to accepted extensions)" "$total_files" "$(human_size "$total_bytes")"
 if [ "$trigger_build" = true ]; then
   echo "  After:       trigger Build and Deploy workflow"
 fi
 echo
-
-if [ "$image_count" -eq 0 ]; then
-  echo "Nothing to upload (the session folder has no accepted image files)." >&2
-  exit 1
-fi
 
 if [ "$auto_yes" != true ]; then
   read -r -p "Proceed? [y/N] " ans
@@ -146,41 +218,38 @@ if [ "$auto_yes" != true ]; then
   esac
 fi
 
-echo "Uploading..."
 # az storage blob upload-batch's --pattern doesn't support brace expansion,
 # so we stage a file list with `find` (extension match is case-insensitive),
 # then upload each. Single connection per file is plenty fast for personal
 # session sizes and gives clear per-file output.
 TMPLIST=$(mktemp)
 trap 'rm -f "$TMPLIST"' EXIT
-find "$SRC" -maxdepth 1 -type f \( \
-  -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.webp" \
-  -o -iname "*.avif" -o -iname "*.tif" -o -iname "*.tiff" \
-  -o -iname "*.heic" -o -iname "*.heif" \
-  -o -iname "*.arw" -o -iname "*.nef" -o -iname "*.cr2" -o -iname "*.cr3" \
-  -o -iname "*.dng" -o -iname "*.raf" \
-  -o -iname "_session.json" \
-\) > "$TMPLIST"
 
 uploaded=0
 failed=0
-while IFS= read -r f <&3; do
-  rel="${f#$SRC/}"
-  echo "  → $rel"
-  if az storage blob upload \
-    --account-name "$STORAGE_ACCOUNT" \
-    --auth-mode login \
-    --container-name "$CONTAINER" \
-    --name "$session/$rel" \
-    --file "$f" \
-    --overwrite true \
-    --output none 2>/dev/null; then
-    uploaded=$((uploaded + 1))
-  else
-    echo "    [FAILED] $rel" >&2
-    failed=$((failed + 1))
-  fi
-done 3< "$TMPLIST"
+for session in "${planned[@]}"; do
+  src="$STAGING_DIR/$session"
+  echo
+  echo "Uploading $session..."
+  list_uploadable "$src" > "$TMPLIST"
+  while IFS= read -r f <&3; do
+    rel="${f#"$src/"}"
+    echo "  → $rel"
+    if az storage blob upload \
+      --account-name "$STORAGE_ACCOUNT" \
+      --auth-mode login \
+      --container-name "$CONTAINER" \
+      --name "$session/$rel" \
+      --file "$f" \
+      --overwrite true \
+      --output none 2>/dev/null; then
+      uploaded=$((uploaded + 1))
+    else
+      echo "    [FAILED] $rel" >&2
+      failed=$((failed + 1))
+    fi
+  done 3< "$TMPLIST"
+done
 
 echo
 echo "Upload summary: $uploaded succeeded, $failed failed"
@@ -216,6 +285,6 @@ else
   echo
   echo "The next build will pick this up. Either:"
   echo "  - wait up to ~1 hour for the cron"
-  echo "  - run '$0 $session --build' next time"
+  echo "  - re-run with --build next time"
   echo "  - or go to https://github.com/$GH_REPO/actions/workflows/build-and-deploy.yml and click 'Run workflow'"
 fi

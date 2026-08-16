@@ -48,9 +48,20 @@ After dropping photos in `staging/<session>/`:
 # Upload one session (prompts before transfer, prints progress)
 ./scripts/upload-session.sh 2026-mexico
 
+# Upload several at once
+./scripts/upload-session.sh 2026-mexico tidepools-spring-2026
+
+# Upload every staged session
+./scripts/upload-session.sh --all
+
 # Upload + trigger a build immediately
-./scripts/upload-session.sh 2026-mexico --build
+./scripts/upload-session.sh --all --build
 ```
+
+`--all` takes every direct child folder of `staging/` except `hobby-*` folders,
+anything named in `UPLOAD_SKIP_DIRS` (defaults to `fishing`), and folders with no
+accepted image files. It prints the full plan with per-session file counts and
+sizes, and asks once before transferring anything.
 
 The script requires at least one accepted image, uploads to `originals` under
 the matching prefix, and honors Azure overrides from `.env`. The site picks it
