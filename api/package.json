@@ -4,6 +4,6 @@
   "private": true,
   "dependencies": {
     "@azure/data-tables": "^13.3.0",
-    "@azure/storage-blob": "^12.26.0"
+    "@azure/storage-blob": "^12.33.0"
   }
 }
