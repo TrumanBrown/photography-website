@@ -23,6 +23,55 @@ staging/
 └── README.md                  (this file; only file kept in git)
 ```
 
+### Nested folders are flattened
+
+iCloud bulk downloads wrap everything in a generic `iCloud Photos` folder. Drop
+the whole thing in as-is — the uploader recurses into any subfolder, at any
+depth, and uploads each photo to the session root, so the parent folder name
+still supplies the location and date:
+
+```
+staging/
+└── costa-rica-tapir-valley-august-2026/
+    └── iCloud Photos/
+        ├── DSC06858.JPEG      → costa-rica-tapir-valley-august-2026/DSC06858.JPEG
+        └── DSC06866.JPEG      → costa-rica-tapir-valley-august-2026/DSC06866.JPEG
+```
+
+If flattening would produce two identical filenames, the subfolder path is kept
+as a prefix so neither photo is lost (`Day 2/DSC06858.JPEG` becomes
+`Day-2-DSC06858.JPEG`). A `_session.json` found anywhere under the session
+folder is uploaded to the session root; the shallowest one wins.
+
+macOS zip cruft (`__MACOSX/`, `._NAME` resource forks, `.DS_Store`) is dropped
+without comment.
+
+### Zips work too — no need to extract first
+
+A `.zip` is a session. Name the zip for the session and leave it in `staging/`:
+
+```
+staging/
+└── costa-rica-tapir-valley-august-2026.zip     → session costa-rica-tapir-valley-august-2026
+```
+
+If the zip has a generic name (iCloud often hands back `iCloud Photos.zip`), put
+it in a session folder instead and let the folder carry the location + date:
+
+```
+staging/
+└── costa-rica-tapir-valley-august-2026/
+    └── iCloud Photos.zip
+```
+
+Either way the archive is unpacked to a scratch folder under `staging/` that is
+deleted when the run ends; your zip is never modified. Extraction verifies every
+entry's CRC, so a bad or truncated archive aborts the whole run instead of
+uploading half a session. **Nothing is re-encoded or resampled** — the exact
+bytes from the archive are what land in Blob. Needs `unzip` or `python3`.
+
+If both `<name>/` and `<name>.zip` exist, the folder wins and the script says so.
+
 ## Optional `_session.json`
 
 ```json
@@ -48,6 +97,9 @@ After dropping photos in `staging/<session>/`:
 # Upload one session (prompts before transfer, prints progress)
 ./scripts/upload-session.sh 2026-mexico
 
+# A zip works the same way, with or without the .zip on the end
+./scripts/upload-session.sh costa-rica-tapir-valley-august-2026.zip
+
 # Upload several at once
 ./scripts/upload-session.sh 2026-mexico tidepools-spring-2026
 
@@ -58,10 +110,11 @@ After dropping photos in `staging/<session>/`:
 ./scripts/upload-session.sh --all --build
 ```
 
-`--all` takes every direct child folder of `staging/` except `hobby-*` folders,
-anything named in `UPLOAD_SKIP_DIRS` (defaults to `fishing`), and folders with no
-accepted image files. It prints the full plan with per-session file counts and
-sizes, and asks once before transferring anything.
+`--all` takes every direct child folder and top-level `.zip` of `staging/` except
+`hobby-*` entries, anything named in `UPLOAD_SKIP_DIRS` (defaults to `fishing`),
+and anything with no accepted image files. It prints the full plan with
+per-session file counts and sizes, notes any folders it flattened, lists what it
+is skipping, and asks once before transferring anything.
 
 The script requires at least one accepted image, uploads to `originals` under
 the matching prefix, and honors Azure overrides from `.env`. The site picks it
@@ -94,6 +147,7 @@ You can leave files in `staging/` (they stay gitignored — your call whether to
 
 ```bash
 rm -rf staging/2026-mexico
+rm -f staging/costa-rica-tapir-valley-august-2026.zip
 ```
 
 Originals stay safe in Blob with 7-day soft-delete in case of accident.
@@ -103,4 +157,6 @@ Originals stay safe in Blob with 7-day soft-delete in case of accident.
 - JPG / JPEG / PNG / WebP / AVIF / TIFF / HEIC / HEIF
 - Sony `.ARW`, Nikon `.NEF`, Canon `.CR2` / `.CR3`, Adobe `.DNG`, Fuji `.RAF`
 
-Anything else is silently skipped by the upload + prebuild.
+Anything else is skipped by the upload + prebuild. Videos (`.mov`, `.mp4`, …)
+and iCloud `.aae` edit sidecars are harmless: the uploader counts them, tells you
+what it left behind, and carries on with the photos.
