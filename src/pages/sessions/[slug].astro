@@ -108,23 +108,19 @@ const resolved: Resolved[] = await Promise.all(
   }),
 );
 
-// The session opens on one photograph at full width, then the rest of the roll
-// is laid out as justified rows: a row's photographs share a height and their
-// widths stay proportional to their own shape, so nothing is cropped and both
-// edges of the grid stay flush. Rows are grouped here rather than in the
-// browser so the page needs no layout script and never reflows after load.
-const lead = resolved[0];
-const rest = resolved.slice(1);
-
-// Roughly how many landscape frames sit across one row. Portraits count for
-// less, so a row of them packs more in.
+// The session opens on a wide banner crop of its cover photograph, then the
+// whole roll is laid out as justified rows: a row's photographs share a height
+// and their widths stay proportional to their own shape, so nothing is cropped
+// and both edges of the grid stay flush. Rows are grouped here rather than in
+// the browser so the page needs no layout script and never reflows after load.
+// The banner is a crop, so the cover still appears whole in the grid below.
 const TARGET_ROW_RATIO = 3.1;
 
-type Row = { items: typeof rest; sum: number; pad: number };
+type Row = { items: Resolved[]; sum: number; pad: number };
 const rows: Row[] = [];
-let current: typeof rest = [];
+let current: Resolved[] = [];
 let sum = 0;
-for (const img of rest) {
+for (const img of resolved) {
   current.push(img);
   sum += img.ratio;
   if (sum >= TARGET_ROW_RATIO) {
@@ -148,6 +144,22 @@ if (current.length) {
 const coverFile = entry.data.cover ?? imageList[0]?.file;
 const coverResolved = resolved.find((r) => r.file === coverFile) ?? resolved[0];
 const ogImage = coverResolved?.fullUrl;
+
+// The banner is a wide crop. A landscape photograph survives that; a portrait
+// one gets most of its height cut away, which decapitates a bird as readily as
+// it trims a mountain. So the banner uses the cover when the cover is wide
+// enough, and otherwise falls back to the widest photograph in the session.
+// The cover still represents the session everywhere else, including shares.
+const BANNER_MIN_RATIO = 1.2;
+const bannerImage =
+  coverResolved.ratio >= BANNER_MIN_RATIO
+    ? coverResolved
+    : resolved.reduce((widest, img) =>
+        img.ratio > widest.ratio ? img : widest,
+      );
+// Even a wide photograph can want nudging; bannerFocus takes any CSS
+// object-position, e.g. "center 30%".
+const bannerFocus = entry.data.bannerFocus ?? "center";
 // Skip the location when the title already names it, so auto-generated copy
 // doesn't read "Mt Everest May 2026 in Tibet side of Mt Everest".
 const locationSuffix =
@@ -214,9 +226,22 @@ const structuredData = {
   />
 
   <article class="session">
-    <header class="shead">
-      <a class="back u-label" href="/">← All sessions</a>
-      <div class="row">
+    <header class="banner">
+      <Picture
+        src={bannerImage.src}
+        alt={bannerImage.caption || fallbackAlt}
+        widths={[600, 1000, 1600, 2000]}
+        width={Math.min(2000, bannerImage.src.width)}
+        sizes="(min-width: 900px) 78vw, 100vw"
+        formats={["webp"]}
+        fallbackFormat="jpeg"
+        loading="eager"
+        fetchpriority="high"
+        class="banner-img"
+        style={`object-position:${bannerFocus}`}
+      />
+      <div class="banner-text">
+        <a class="back u-label" href="/">← All sessions</a>
         <h1>{splitSessionTitle(title).label}</h1>
         <span class="meta u-label">
           <time datetime={date}>{formatDate(date)}</time>
@@ -228,48 +253,11 @@ const structuredData = {
           >
         </span>
       </div>
-      {description && <p class="note">{description}</p>}
     </header>
 
+    {description && <p class="note">{description}</p>}
+
     <ul id="gallery" class="photos">
-      {
-        lead && (
-          <li class="lead-shot">
-            <figure>
-              <a
-                href={lead.viewUrl}
-                data-pswp-full={lead.fullUrl}
-                data-pswp-width={lead.src.width}
-                data-pswp-height={lead.src.height}
-                data-pswp-caption={lead.caption ?? ""}
-                data-pswp-exif={lead.exif}
-                data-pswp-filename={lead.file}
-                class="frame"
-                aria-label={
-                  lead.caption ?? `${title}, photo 1 of ${resolved.length}`
-                }
-              >
-                <Picture
-                  src={lead.src}
-                  alt={lead.caption || fallbackAlt}
-                  widths={[480, 800, 1200, 1600]}
-                  width={Math.min(1600, lead.src.width)}
-                  sizes="(min-width: 900px) 72vw, 100vw"
-                  formats={["webp"]}
-                  fallbackFormat="jpeg"
-                  loading="eager"
-                  fetchpriority="high"
-                  class="photo"
-                />
-              </a>
-              <figcaption class="u-label">
-                <span>01 / {resolved.length}</span>
-                {lead.exif && <span class="exif">{lead.exif}</span>}
-              </figcaption>
-            </figure>
-          </li>
-        )
-      }
       {
         rows.map((row, rowIndex) => (
           <li class="band" style={`--pad:${row.pad.toFixed(4)}`}>
@@ -279,9 +267,7 @@ const structuredData = {
                 const index =
                   rows
                     .slice(0, rowIndex)
-                    .reduce((n, r) => n + r.items.length, 0) +
-                  itemIndex +
-                  1;
+                    .reduce((n, r) => n + r.items.length, 0) + itemIndex;
                 return (
                   <li style={`--ar:${img.ratio.toFixed(4)}`}>
                     <figure>
@@ -364,33 +350,70 @@ const structuredData = {
     display: block;
   }
 
-  .shead {
-    padding: 26px var(--gutter) 0;
+  /* A wide crop of the cover photograph, with the session's name over it. The
+     photograph itself still appears whole further down the page, so nothing is
+     only ever seen cropped. */
+  .banner {
+    position: relative;
+    margin: 0 var(--gutter);
+    height: clamp(260px, 52vh, 560px);
+    overflow: hidden;
+    display: flex;
+    align-items: flex-end;
+    background: var(--band);
+  }
+  .banner :global(.banner-img) {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  /* Type sits on a photograph, so it needs its own ground to stand on. The
+     shade is weighted to the bottom and stops well short of the subject. */
+  .banner::after {
+    content: "";
+    position: absolute;
+    inset: auto 0 0;
+    height: 62%;
+    background: linear-gradient(
+      to top,
+      rgb(0 0 0 / 0.72),
+      rgb(0 0 0 / 0.42) 38%,
+      transparent
+    );
+    pointer-events: none;
+  }
+  .banner-text {
+    position: relative;
+    z-index: 1;
+    padding: 0 clamp(18px, 3vw, 34px) clamp(16px, 2.6vw, 28px);
+    color: #fff;
     max-width: 70ch;
   }
-  .back {
+  .banner-text .back,
+  .banner-text .meta {
+    color: rgb(255 255 255 / 0.82);
+  }
+  .banner-text .back {
     text-decoration: none;
+    display: inline-block;
+    margin-bottom: 10px;
   }
-  .back:hover {
-    color: var(--ink);
+  .banner-text .back:hover {
+    color: #fff;
   }
-  .shead .row {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 18px;
-    flex-wrap: wrap;
-    margin-top: 12px;
-  }
-  .shead h1 {
-    font-size: clamp(20px, 2.2vw, 27px);
+  .banner-text h1 {
+    font-size: clamp(23px, 3vw, 38px);
     font-weight: 300;
-    margin: 0;
-    line-height: 1.12;
-    letter-spacing: -0.012em;
+    margin: 0 0 8px;
+    line-height: 1.08;
+    letter-spacing: -0.014em;
+    color: #fff;
   }
-  .shead .note {
-    margin: 14px 0 0;
+  .note {
+    margin: 20px var(--gutter) 0;
+    max-width: 70ch;
     color: var(--ink-3);
     font-size: 15px;
     line-height: 1.6;
@@ -407,9 +430,6 @@ const structuredData = {
   }
   .photos li {
     margin: 0;
-  }
-  .lead-shot {
-    margin-bottom: 3vh;
   }
   .band-inner {
     list-style: none;
@@ -443,8 +463,11 @@ const structuredData = {
     background: var(--band);
     cursor: zoom-in;
   }
-  .lead-shot :global(.photo) {
-    max-height: 78vh;
+  /* The <picture> wrapper is the flex item inside .frame and would otherwise
+     size to the photograph's intrinsic width, leaving short rows ragged. */
+  .band-inner .frame,
+  .band-inner :global(picture) {
+    width: 100%;
   }
   .band-inner :global(.photo) {
     width: 100%;
@@ -498,21 +521,17 @@ const structuredData = {
     }
   }
   @media (max-width: 899px) {
-    .shead {
-      padding-top: 18px;
-    }
-    .shead .row {
-      flex-direction: column;
-      gap: 4px;
+    /* Edge to edge on a phone, and shorter so the first photographs are
+       reachable without a long scroll. */
+    .banner {
+      margin-inline: 0;
+      height: clamp(210px, 38vh, 320px);
     }
     .frame :global(.photo) {
       max-height: 70vh;
     }
     .photos {
       gap: 4vh;
-    }
-    .lead-shot {
-      margin-bottom: 1vh;
     }
     /* A three-up row would put each photograph at about 120px on a phone.
        Stack them instead and let the lightbox do the close looking. */
@@ -525,6 +544,10 @@ const structuredData = {
     }
     .band-inner > li.pad {
       display: none;
+    }
+    .band-inner .frame,
+    .band-inner :global(picture) {
+      width: auto;
     }
     .band-inner :global(.photo) {
       width: auto;

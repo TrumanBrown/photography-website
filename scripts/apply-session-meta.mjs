@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
- * Push session titles, locations and descriptions from scripts/session-meta.json
- * into each session's `_session.json` sidecar in the `originals` container.
+ * Push session titles, locations, descriptions and banner focus from
+ * scripts/session-meta.json into each session's `_session.json` sidecar in the
+ * `originals` container.
  *
  * Usage:
  *   AZURE_STORAGE_ACCOUNT=<account> node scripts/apply-session-meta.mjs [options]
@@ -35,7 +36,7 @@ const META_FILE = join(ROOT, "scripts/session-meta.json");
 const CONTAINER = "originals";
 const SESSION_JSON = "_session.json";
 /** Fields this script owns. Everything else in a sidecar is left alone. */
-const MANAGED = ["title", "location", "description"];
+const MANAGED = ["title", "location", "description", "bannerFocus"];
 
 function parseArgs(argv) {
   const only = [];

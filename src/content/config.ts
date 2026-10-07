@@ -19,6 +19,12 @@ const sessions = defineCollection({
     location: z.string().default(""),
     description: z.string().default(""),
     cover: z.string().optional(),
+    /**
+     * Where to anchor the cover photograph inside the session banner, which is
+     * a wide crop. Any CSS object-position value; defaults to the centre.
+     * Set per session when the centre cuts the subject badly.
+     */
+    bannerFocus: z.string().max(40).optional(),
     order: z.number().int().nullable().optional(),
     /**
      * Filenames chosen in the admin panel to rotate in the lead box on the

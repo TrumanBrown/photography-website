@@ -426,6 +426,7 @@ async function processSession({ prefix, originalsClient, derivativesClient, serv
     location: sidecar.location ?? '',
     description: sidecar.description ?? '',
     ...(cover ? { cover } : {}),
+    ...(sidecar.bannerFocus ? { bannerFocus: sidecar.bannerFocus } : {}),
     ...(sidecar.order != null ? { order: sidecar.order } : {}),
     ...(showcase.length ? { showcase } : {}),
     ...(sessionCoords ? { coords: sessionCoords } : {}),
@@ -786,6 +787,7 @@ export function validateSessionSidecar(value, source = '_session.json') {
   validateOptionalString(value, 'location', MAX_LOCATION, problems);
   validateOptionalString(value, 'description', MAX_DESCRIPTION, problems);
   validateOptionalString(value, 'cover', undefined, problems);
+  validateOptionalString(value, 'bannerFocus', 40, problems);
 
   if (value.date !== undefined && (typeof value.date !== 'string' || !isIsoCalendarDate(value.date))) {
     problems.push('date must be a real ISO calendar date (YYYY-MM-DD)');
