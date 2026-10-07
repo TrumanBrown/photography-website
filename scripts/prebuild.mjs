@@ -253,6 +253,8 @@ async function processSession({ prefix, originalsClient, derivativesClient, serv
   const images = [];
   const targetBySource = new Map(blobs.map((blob) => [blob.base, targetFileForBlob(blob)]));
   let earliestExifDate;
+  /** First GPS fix found in the session's photographs, if any. */
+  let sessionCoords;
 
   for (const b of blobs) {
     const isRaw = RAW_EXTS.has(b.ext);
@@ -311,8 +313,7 @@ async function processSession({ prefix, originalsClient, derivativesClient, serv
     const width = meta.width ?? 0;
     const height = meta.height ?? 0;
 
-    let sessionCoords;
-  let captureDate;
+    let captureDate;
     let exifSettings;
     try {
       const { default: exifr } = await import('exifr');

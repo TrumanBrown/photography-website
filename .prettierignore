@@ -6,3 +6,6 @@ package-lock.json
 public/birding/wasm
 src/content/sessions
 *.task
+
+# Generated coastline data for the globe — one long line on purpose.
+src/lib/geo-land.json

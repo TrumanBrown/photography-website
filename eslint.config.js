@@ -73,5 +73,12 @@ export default tseslint.config(
     languageOptions: {
       globals: { ...globals.node },
     },
+    rules: {
+      // These files are plain JavaScript, so `astro check` never looks at them
+      // and nothing else catches a typo or an out-of-scope variable before it
+      // reaches the build. Turning the rule back on here is the only guard
+      // they get — it is off globally because it misfires on typed code.
+      'no-undef': 'error',
+    },
   },
 );
