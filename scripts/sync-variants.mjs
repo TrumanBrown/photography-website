@@ -21,7 +21,7 @@
  * Env: AZURE_STORAGE_ACCOUNT must be set.
  */
 import { readFile, writeFile, readdir, stat, rm } from 'node:fs/promises';
-import { join, extname } from 'node:path';
+import { join, extname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
@@ -30,10 +30,6 @@ const DIST = join(ROOT, 'dist');
 const ASTRO_DIR = join(DIST, '_astro');
 
 const STORAGE = process.env.AZURE_STORAGE_ACCOUNT;
-if (!STORAGE) {
-  console.error('AZURE_STORAGE_ACCOUNT env var is required.');
-  process.exit(2);
-}
 
 const BLOB_HOST = `${STORAGE}.blob.core.windows.net`;
 const CONTAINER = 'variants';
@@ -48,6 +44,13 @@ const CONTENT_TYPE = {
 const UPLOAD_CONCURRENCY = 12;
 
 async function main() {
+  // Checked here rather than at module scope so the rewriter below can be
+  // imported by its unit test without the script exiting on load.
+  if (!STORAGE) {
+    console.error('AZURE_STORAGE_ACCOUNT env var is required.');
+    process.exit(2);
+  }
+
   // 1. List candidate files to migrate.
   const allFiles = await readdir(ASTRO_DIR);
   const imageFiles = allFiles.filter((f) => IMAGE_EXTS.has(extname(f).toLowerCase()));
@@ -127,6 +130,25 @@ async function main() {
   console.log(`Final dist/ size: ${formatBytes(newSize)}`);
 }
 
+/**
+ * Matches a built image variant reference.
+ *
+ * Deliberately limited to the characters Astro actually puts in a hashed
+ * filename. A looser pattern runs past the end of the URL whenever one is
+ * written inside an HTML attribute that holds JSON, because the quotes around
+ * it are escaped as `&#34;` — so the "filename" picked up a trailing
+ * `&#34;,&#34;srcset&#34;:…`, missed the lookup, and the reference was left
+ * pointing at a file that had already been deleted from dist.
+ */
+const ASTRO_REF = /\/_astro\/([A-Za-z0-9._-]+\.(?:avif|webp|jpeg|jpg))/g;
+
+export function rewriteAstroRefs(text, imageFiles, blobPrefix = BLOB_PREFIX) {
+  const set = imageFiles instanceof Set ? imageFiles : new Set(imageFiles);
+  return text.replace(ASTRO_REF, (match, filename) =>
+    set.has(filename) ? `${blobPrefix}${filename}` : match,
+  );
+}
+
 async function walkAndRewrite(dir, imageFiles, onRewrite) {
   // Build a Set for fast membership test.
   const set = new Set(imageFiles);
@@ -142,13 +164,7 @@ async function walkAndRewrite(dir, imageFiles, onRewrite) {
     let text = await readFile(p, 'utf8');
     const original = text;
 
-    text = text.replace(
-      /\/_astro\/([^\s"'(),?]+)/g,
-      (match, filename) => {
-        if (set.has(filename)) return `${BLOB_PREFIX}${filename}`;
-        return match;
-      },
-    );
+    text = rewriteAstroRefs(text, set);
 
     if (text !== original) {
       await writeFile(p, text);
@@ -192,7 +208,12 @@ function formatBytes(n) {
   return `${n.toFixed(2)} ${units[i]}`;
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+const invokedDirectly =
+  process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (invokedDirectly) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}
