@@ -1,6 +1,7 @@
 ---
 import { getImage } from "astro:assets";
 import type { LeadItem } from "@/lib/archive";
+import { splitSessionTitle } from "@/lib/sessions";
 
 interface Props {
   items: LeadItem[];
@@ -19,11 +20,11 @@ const resolved = await Promise.all(
       getImage({ src: item.image, width: 900, format: "webp" }),
       getImage({ src: item.image, width: 1600, format: "webp" }),
     ]);
-    const [place, when] = item.title.split(" — ");
+    const { label, period } = splitSessionTitle(item.title);
     return {
       slug: item.slug,
-      label: place?.trim() || item.title,
-      when: when?.trim() ?? "",
+      label,
+      when: period,
       location: item.location,
       alt: item.alt,
       src: large.src,

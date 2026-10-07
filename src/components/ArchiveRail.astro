@@ -1,6 +1,6 @@
 ---
 import { getCollection } from "astro:content";
-import { sortSessions, sessionSlug } from "@/lib/sessions";
+import { sortSessions, sessionSlug, splitSessionTitle } from "@/lib/sessions";
 import { buildPlaces } from "@/lib/archive";
 import { siteConfig } from "../../site.config";
 
@@ -57,7 +57,7 @@ for (const entry of sessions) {
 function railLabel(entry: (typeof sessions)[number]): string {
   const location = entry.data.location?.trim();
   if (location) return location;
-  return entry.data.title.split(" — ")[0];
+  return splitSessionTitle(entry.data.title).label;
 }
 ---
 

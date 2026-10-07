@@ -10,6 +10,7 @@ import {
   formatExif,
   sortSessions,
   copyrightLine,
+  splitSessionTitle,
 } from "@/lib/sessions";
 import { siteConfig } from "../../../site.config";
 
@@ -156,7 +157,7 @@ const structuredData = {
     <header class="shead">
       <a class="back u-label" href="/">← All sessions</a>
       <div class="row">
-        <h1>{title.split(" — ")[0]}</h1>
+        <h1>{splitSessionTitle(title).label}</h1>
         <span class="meta u-label">
           <time datetime={date}>{formatDate(date)}</time>
           {location && <span> · {location}</span>}
@@ -223,13 +224,13 @@ const structuredData = {
             {previousSession && (
               <a href={`/sessions/${previousSession.slug}/`} class="keep-link">
                 <span class="u-label">← Previous in archive</span>
-                <span class="kt">{previousSession.title.split(" — ")[0]}</span>
+                <span class="kt">{splitSessionTitle(previousSession.title).label}</span>
               </a>
             )}
             {nextSession && (
               <a href={`/sessions/${nextSession.slug}/`} class="keep-link next">
                 <span class="u-label">Next in archive →</span>
-                <span class="kt">{nextSession.title.split(" — ")[0]}</span>
+                <span class="kt">{splitSessionTitle(nextSession.title).label}</span>
               </a>
             )}
           </div>

@@ -6,6 +6,7 @@ import {
   formatDate,
   isIsoDate,
   formatExif,
+  splitSessionTitle,
   copyrightLine,
 } from "./sessions";
 import { siteConfig } from "../../site.config";
@@ -80,5 +81,32 @@ describe("copyrightLine", () => {
     expect(line.startsWith("©")).toBe(true);
     expect(line).toContain(siteConfig.ownerName);
     expect(line).toContain("All rights reserved");
+  });
+});
+
+describe('splitSessionTitle', () => {
+  it('separates the period from a comma-written title', () => {
+    expect(splitSessionTitle('El Zota Biological Station, Costa Rica, September 2026')).toEqual({
+      label: 'El Zota Biological Station, Costa Rica',
+      period: 'September 2026',
+    });
+  });
+
+  it('still understands the older em-dashed titles', () => {
+    expect(splitSessionTitle('Gunn Peak, Washington — June 2026')).toEqual({
+      label: 'Gunn Peak, Washington',
+      period: 'June 2026',
+    });
+  });
+
+  it('leaves a title alone when it does not end in a month and year', () => {
+    expect(splitSessionTitle('Tidepools, Spring 2026')).toEqual({
+      label: 'Tidepools, Spring 2026',
+      period: '',
+    });
+    expect(splitSessionTitle('Olympic winter')).toEqual({
+      label: 'Olympic winter',
+      period: '',
+    });
   });
 });

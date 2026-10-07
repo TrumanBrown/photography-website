@@ -5,7 +5,7 @@ import BaseLayout from "@/layouts/BaseLayout.astro";
 import SessionCard from "@/components/SessionCard.astro";
 import LeadPhoto from "@/components/LeadPhoto.astro";
 import HobbyBand from "@/components/HobbyBand.astro";
-import { sortSessions, sessionSlug } from "@/lib/sessions";
+import { sortSessions, sessionSlug, splitSessionTitle } from "@/lib/sessions";
 import { buildLeadFrames, coverFileOf, type LeadItem } from "@/lib/archive";
 import { siteConfig } from "../../site.config";
 
@@ -52,7 +52,7 @@ const lead: LeadItem[] = buildLeadFrames(sessions).map((frame) => ({
   title: frame.title,
   location: frame.location,
   image: resolveImage(frame.slug, frame.file),
-  alt: frame.caption ?? `${frame.title.split(" — ")[0]} — photograph`,
+  alt: frame.caption ?? `${splitSessionTitle(frame.title).label} — photograph`,
 }));
 
 const first = sessions[0];

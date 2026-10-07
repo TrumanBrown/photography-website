@@ -2,7 +2,7 @@
 import { Picture } from "astro:assets";
 import type { CollectionEntry } from "astro:content";
 import type { ImageMetadata } from "astro";
-import { sessionSlug } from "@/lib/sessions";
+import { sessionSlug, splitSessionTitle } from "@/lib/sessions";
 
 interface Props {
   entry: CollectionEntry<"sessions">;
@@ -16,11 +16,9 @@ const slug = sessionSlug(entry);
 const { title, location, images } = entry.data;
 const count = images.length;
 
-/* Titles are written "Place — Month Year". The card shows the place and moves
-   the period into the line underneath, so neither is printed twice. */
-const [place, when] = title.split(" — ");
-const label = place?.trim() || title;
-const period = when?.trim() ?? "";
+/* The card shows the place and moves the period into the line underneath, so
+   neither is printed twice. */
+const { label, period } = splitSessionTitle(title);
 ---
 
 <a

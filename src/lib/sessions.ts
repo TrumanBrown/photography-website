@@ -79,3 +79,22 @@ export function formatExif(exif: ImageExif | undefined): string {
     .filter((v): v is string => Boolean(v))
     .join(' · ');
 }
+
+const MONTHS =
+  '(?:January|February|March|April|May|June|July|August|September|October|November|December)';
+/** "Somewhere, Costa Rica, September 2026" or the older em-dashed form. */
+const TITLE_PERIOD = new RegExp(`^(.*?)(?:\\s+\u2014\\s*|,\\s*)(${MONTHS}\\s+\\d{4})$`);
+
+/**
+ * Split a session title into the place and the period it names.
+ *
+ * Titles are written "Place, Region, Month Year". Showing the whole string and
+ * then printing the date again underneath reads as a stutter, so the two parts
+ * are separated here and laid out apart. Titles that don't end in a month are
+ * returned whole, with no period.
+ */
+export function splitSessionTitle(title: string): { label: string; period: string } {
+  const match = TITLE_PERIOD.exec(title.trim());
+  if (!match) return { label: title.trim(), period: '' };
+  return { label: match[1].trim(), period: match[2].trim() };
+}
