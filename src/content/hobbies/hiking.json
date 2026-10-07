@@ -5,6 +5,5 @@
   "emoji": "🥾",
   "accent": "#3f6f52",
   "order": 6,
-  "interactive": "pixel-hike",
-  "iconSrc": "/hobbies/hiking-icon.svg"
+  "interactive": "pixel-hike"
 }

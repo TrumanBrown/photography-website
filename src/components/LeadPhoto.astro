@@ -110,6 +110,9 @@ const first = resolved[0];
     overflow: hidden;
     width: min(100%, calc(64vh * 1.5));
     margin-inline: auto;
+    /* Let the page scroll vertically while horizontal drags reach the swipe
+       handler in the script below. */
+    touch-action: pan-y;
   }
   .plate img {
     position: absolute;
@@ -265,24 +268,95 @@ const first = resolved[0];
       }
     }
 
+    const seconds = Number(root!.dataset.interval ?? 6) * 1000;
+
     function start() {
       if (reduced || frames.length < 2 || timer) return;
-      const seconds = Number(root!.dataset.interval ?? 6);
       timer = window.setInterval(() => {
         if (!paused && !document.hidden) show(index + 1);
-      }, seconds * 1000);
+      }, seconds);
+    }
+
+    /** Restart the clock after a manual move, so it doesn't jump straight on. */
+    function restart() {
+      if (timer) window.clearInterval(timer);
+      timer = undefined;
+      start();
+    }
+
+    function step(by: number) {
+      show(index + by);
+      restart();
     }
 
     document
       .getElementById("lead-next")
-      ?.addEventListener("click", () => show(index + 1));
+      ?.addEventListener("click", () => step(1));
     document
       .getElementById("lead-prev")
-      ?.addEventListener("click", () => show(index - 1));
-    root.addEventListener("pointerenter", () => (paused = true));
-    root.addEventListener("pointerleave", () => (paused = false));
+      ?.addEventListener("click", () => step(-1));
+
+    /* Hovering pauses over the caption only, not the photograph. The plate
+       fills most of the window, so pausing on it made the rotation look broken
+       whenever the pointer happened to rest near the middle of the page. Touch
+       is excluded outright: pointerenter fires on a tap and the matching
+       pointerleave often never arrives, which left it paused for good on a
+       phone. */
+    const cap = root.querySelector(".cap");
+    cap?.addEventListener("pointerenter", (event) => {
+      if ((event as PointerEvent).pointerType === "mouse") paused = true;
+    });
+    cap?.addEventListener("pointerleave", (event) => {
+      if ((event as PointerEvent).pointerType === "mouse") paused = false;
+    });
     root.addEventListener("focusin", () => (paused = true));
     root.addEventListener("focusout", () => (paused = false));
+
+    /* Swipe across the photograph to move between sessions. */
+    const plate = root.querySelector(".plate");
+    let swipeId: number | null = null;
+    let swipeX = 0;
+    let swipeY = 0;
+    let swiped = false;
+    const SWIPE_MIN = 40;
+
+    plate?.addEventListener("pointerdown", (event) => {
+      const e = event as PointerEvent;
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      swipeId = e.pointerId;
+      swipeX = e.clientX;
+      swipeY = e.clientY;
+      swiped = false;
+    });
+    plate?.addEventListener("pointerup", (event) => {
+      const e = event as PointerEvent;
+      if (swipeId !== e.pointerId) return;
+      swipeId = null;
+      const dx = e.clientX - swipeX;
+      const dy = e.clientY - swipeY;
+      // Only a mostly-horizontal drag counts, so this never fights a scroll.
+      if (Math.abs(dx) < SWIPE_MIN || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+      swiped = true;
+      step(dx < 0 ? 1 : -1);
+    });
+    plate?.addEventListener("pointercancel", () => {
+      swipeId = null;
+    });
+    /* Dragging an image or a link starts a native drag in desktop browsers,
+       which cancels the pointer stream mid-gesture. */
+    plate?.addEventListener("dragstart", (event) => event.preventDefault());
+
+    /* A swipe finishes on the link covering the plate, so swallow that click. */
+    root.querySelector(".plate-link")?.addEventListener("click", (event) => {
+      if (swiped) {
+        event.preventDefault();
+        swiped = false;
+      }
+    });
+
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) restart();
+    });
 
     /* Announce the first frame so the globe starts in the right place. */
     if (frames[0]) {

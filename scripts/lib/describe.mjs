@@ -130,6 +130,19 @@ Rules that matter most:
 - Identify the actual place if the photographs make it recognisable (a named park, trail, peak, landmark, city). Use the real proper noun. This is the single most useful thing you can do, because these are the words people search for.
 ${speciesRule(species)}
 - Never invent numbers, distances, elevations, dates or conservation status.
+- Describe only what is visible in the photographs, plus the name of the place.
+  Everything else is a guess, and a guess printed as fact is worse than saying
+  nothing. In particular, never state:
+  - what an organisation, reserve, station or facility does, funds, breeds,
+    protects or was founded for, even when its name hints at it;
+  - the history of a site, what it used to be, or how it came to be that way;
+  - trail length, difficulty, route-finding, gear or any advice about going there;
+  - people who are not in the frame, including guides, companions and what
+    anyone said or pointed at;
+  - why an animal or plant behaves the way it does, what season it is typical
+    of, or how common or rare it is.
+- No superlatives about places you cannot verify ("the best spot for", "the
+  only place where").
 - If you cannot tell where it is, return an empty string for location rather than guessing.
 - Description: 2-4 sentences, roughly 200-350 characters. Concrete nouns, specific subjects, what is actually in the frames.
 - Title: sentence case, in the shape "Place, Region, Month Year".

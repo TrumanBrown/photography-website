@@ -24,6 +24,5 @@
     "blurb": "Every bird species I've logged on iNaturalist, each shown with one of my own photos, pulled live. The most globally uncommon ones I've found are featured up top, with a fact about each.",
     "iconicTaxa": "Aves",
     "featured": 6
-  },
-  "iconSrc": "/hobbies/birding-icon.svg"
+  }
 }

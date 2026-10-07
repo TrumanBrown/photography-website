@@ -15,45 +15,53 @@ interface Props {
   gallerySelector?: string;
 }
 
-const { gallerySelector = '#gallery' } = Astro.props;
+const { gallerySelector = "#gallery" } = Astro.props;
 ---
 
 <script>
   // @ts-ignore - photoswipe ships its own types under subpaths
-  import PhotoSwipeLightbox from 'photoswipe/lightbox';
-  import 'photoswipe/style.css';
+  import PhotoSwipeLightbox from "photoswipe/lightbox";
+  import "photoswipe/style.css";
 
   // Read the per-page selector from the marker element below.
-  const marker = document.querySelector<HTMLElement>('[data-lightbox-marker]');
-  const selector = marker?.dataset.gallery ?? '#gallery';
+  const marker = document.querySelector<HTMLElement>("[data-lightbox-marker]");
+  const selector = marker?.dataset.gallery ?? "#gallery";
 
   const lightbox = new PhotoSwipeLightbox({
     gallery: selector,
-    children: 'a',
-    pswpModule: () => import('photoswipe'),
-    showHideAnimationType: 'fade',
+    children: "a",
+    pswpModule: () => import("photoswipe"),
+    showHideAnimationType: "fade",
     bgOpacity: 0.95,
+    // Fetch a couple of neighbours ahead so moving through a session doesn't
+    // wait on the network at every step.
+    preload: [2, 3],
   });
 
-  lightbox.on('uiRegister', function () {
+  lightbox.on("uiRegister", function () {
     // Download full-resolution button in the top toolbar.
     lightbox.pswp?.ui?.registerElement({
-      name: 'download-button',
+      name: "download-button",
       order: 8,
       isButton: true,
-      tagName: 'button',
+      tagName: "button",
       html: '<svg aria-hidden="true" class="pswp__icn" viewBox="0 0 32 32" width="32" height="32"><path fill="currentColor" d="M16 19l-6-6h4V5h4v8h4l-6 6zm-7 4h14v2H9z"/></svg>',
       onInit: (el, instance) => {
-        el.setAttribute('title', 'Download full-resolution photo');
-        el.setAttribute('aria-label', 'Download full-resolution photo');
-        el.addEventListener('click', async () => {
-          const slideEl = instance.currSlide?.data?.element as HTMLElement | undefined;
-          const url = slideEl?.getAttribute('href');
+        el.setAttribute("title", "Download full-resolution photo");
+        el.setAttribute("aria-label", "Download full-resolution photo");
+        el.addEventListener("click", async () => {
+          const slideEl = instance.currSlide?.data?.element as
+            | HTMLElement
+            | undefined;
+          // The anchor points at a size-capped view so the lightbox opens
+          // quickly; the download button still hands over the original.
+          const url =
+            slideEl?.dataset?.pswpFull || slideEl?.getAttribute("href");
           if (!url) return;
           const name =
             slideEl?.dataset?.pswpFilename ||
-            url.split('/').pop()?.split('?')[0] ||
-            'photo.jpg';
+            url.split("/").pop()?.split("?")[0] ||
+            "photo.jpg";
           const btn = el as HTMLButtonElement;
           btn.disabled = true;
           try {
@@ -61,7 +69,7 @@ const { gallerySelector = '#gallery' } = Astro.props;
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const blob = await res.blob();
             const objUrl = URL.createObjectURL(blob);
-            const a = document.createElement('a');
+            const a = document.createElement("a");
             a.href = objUrl;
             a.download = name;
             document.body.appendChild(a);
@@ -71,7 +79,7 @@ const { gallerySelector = '#gallery' } = Astro.props;
           } catch {
             // Cross-origin fetch blocked or failed — open in a new tab so the
             // viewer can still save the file manually.
-            window.open(url, '_blank', 'noopener');
+            window.open(url, "_blank", "noopener");
           } finally {
             btn.disabled = false;
           }
@@ -81,28 +89,30 @@ const { gallerySelector = '#gallery' } = Astro.props;
 
     // Caption + EXIF capture settings beneath the photo.
     lightbox.pswp?.ui?.registerElement({
-      name: 'caption',
+      name: "caption",
       order: 9,
       isButton: false,
-      appendTo: 'root',
-      html: '',
+      appendTo: "root",
+      html: "",
       onInit: (el, instance) => {
-        instance.on('change', () => {
-          const slideEl = instance.currSlide?.data?.element as HTMLElement | undefined;
-          const caption = slideEl?.dataset?.pswpCaption ?? '';
-          const exif = slideEl?.dataset?.pswpExif ?? '';
+        instance.on("change", () => {
+          const slideEl = instance.currSlide?.data?.element as
+            | HTMLElement
+            | undefined;
+          const caption = slideEl?.dataset?.pswpCaption ?? "";
+          const exif = slideEl?.dataset?.pswpExif ?? "";
           // Build via textContent (not innerHTML) so caption/EXIF strings can
           // never inject markup.
-          el.textContent = '';
+          el.textContent = "";
           if (caption) {
-            const c = document.createElement('span');
-            c.className = 'pswp__caption-text';
+            const c = document.createElement("span");
+            c.className = "pswp__caption-text";
             c.textContent = caption;
             el.appendChild(c);
           }
           if (exif) {
-            const e = document.createElement('span');
-            e.className = 'pswp__caption-exif';
+            const e = document.createElement("span");
+            e.className = "pswp__caption-exif";
             e.textContent = exif;
             el.appendChild(e);
           }

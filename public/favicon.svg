@@ -1,6 +1,26 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
-  <rect width="64" height="64" rx="10" fill="#111"/>
-  <circle cx="32" cy="34" r="14" stroke="#fff" stroke-width="3"/>
-  <circle cx="32" cy="34" r="6" fill="#fff"/>
-  <rect x="22" y="14" width="20" height="6" rx="2" fill="#fff"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Mountains above a lake at sunset">
+  <defs>
+    <linearGradient id="sky" x1="12" y1="4" x2="54" y2="49" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#EE6C63"/>
+      <stop offset="1" stop-color="#F4BB61"/>
+    </linearGradient>
+    <linearGradient id="water" x1="32" y1="43" x2="32" y2="64" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#5BD1CF"/>
+      <stop offset="1" stop-color="#177B91"/>
+    </linearGradient>
+    <clipPath id="frame">
+      <rect width="64" height="64" rx="13"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#frame)">
+    <rect width="64" height="64" fill="url(#sky)"/>
+    <circle cx="48" cy="15" r="7" fill="#FFF1B8"/>
+    <path d="M-5 48 17 21l13 17 9-11 30 30v9H-5Z" fill="#2D7C78"/>
+    <path d="m10 29 7-8 6 8-6-3Z" fill="#D8EAD8"/>
+    <path d="m33 34 6-7 8 8-8-4Z" fill="#D8EAD8"/>
+    <path d="M-6 55 15 33l14 15 9-10 31 25v4H-6Z" fill="#164B58"/>
+    <path d="M0 47h64v17H0Z" fill="url(#water)"/>
+    <path d="M7 51h23M37 56h20M14 61h31" stroke="#BFF3E8" stroke-width="2" stroke-linecap="round" opacity=".9"/>
+  </g>
+  <rect x="1" y="1" width="62" height="62" rx="12" fill="none" stroke="#123844" stroke-width="2"/>
 </svg>

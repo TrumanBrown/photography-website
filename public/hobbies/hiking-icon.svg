@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none" role="img" aria-label="Mountain and trail">
-  <path d="M34 51 L47 28 L62 51 Z" fill="#1e1c16" opacity="0.45"/>
-  <path fill-rule="evenodd" fill="#1e1c16" d="M2 51 L23 13 L44 51 Z
-  M23 22.5 L14.5 38 L31.5 38 Z"/>
-  <path d="M8 51 L17 44 L11 37 L21 31 L18 25 L23 20" stroke="#1e1c16" stroke-width="2.4"
-        stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-</svg>
