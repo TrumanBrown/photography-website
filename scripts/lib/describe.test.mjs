@@ -7,6 +7,7 @@ import {
   captionsEnabledFor,
   activeProvider,
   isEnabled,
+  inatSpecies,
 } from "./describe.mjs";
 
 describe("sampleEvenly", () => {
@@ -298,5 +299,48 @@ describe("captionsEnabledFor", () => {
     expect(captionsEnabledFor(SLUG)).toBe(true);
     expect(captionsEnabledFor("tibet-spring-2026")).toBe(true);
     expect(captionsEnabledFor("olympic-winter-2026")).toBe(false);
+  });
+});
+
+describe("inatSpecies", () => {
+  it("returns an empty list when no user is configured", async () => {
+    expect(await inatSpecies("")).toEqual([]);
+  });
+
+  it("returns an empty list rather than throwing when the lookup fails", async () => {
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = async () => {
+      throw new Error("network down");
+    };
+    try {
+      // Accuracy aid, not a dependency: a failed lookup must not break a build.
+      expect(await inatSpecies("someone")).toEqual([]);
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
+
+  it("collects common names across pages and stops on a short page", async () => {
+    const realFetch = globalThis.fetch;
+    let calls = 0;
+    globalThis.fetch = async () => {
+      calls++;
+      return {
+        ok: true,
+        json: async () => ({
+          results: [
+            { taxon: { preferred_common_name: `Species ${calls}` } },
+            { taxon: {} }, // no common name, skipped
+          ],
+        }),
+      };
+    };
+    try {
+      const out = await inatSpecies("someone");
+      expect(out).toEqual(["Species 1"]);
+      expect(calls).toBe(1);
+    } finally {
+      globalThis.fetch = realFetch;
+    }
   });
 });

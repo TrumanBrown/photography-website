@@ -11,6 +11,11 @@
  *   OPENAI_API_KEY      + optional OPENAI_BASE_URL, OPENAI_MODEL
  *   ANTHROPIC_API_KEY   + optional ANTHROPIC_MODEL
  *   DESCRIBE_PROVIDER   force a provider instead of inferring from the keys
+ *
+ * Azure OpenAI works through the OpenAI path without code changes, since its v1
+ * endpoint is OpenAI-compatible. Point OPENAI_BASE_URL at
+ * https://<resource>.openai.azure.com/openai/v1 and set OPENAI_MODEL to the
+ * deployment name rather than the model name.
  */
 import { readFile, readdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
@@ -104,6 +109,7 @@ function buildPrompt({
   imageCount,
   samples,
   voiceRules,
+  species = [],
 }) {
   const captions = samples
     .filter((s) => s.caption)
@@ -122,7 +128,8 @@ Write a title, location and description for this session.
 
 Rules that matter most:
 - Identify the actual place if the photographs make it recognisable (a named park, trail, peak, landmark, city). Use the real proper noun. This is the single most useful thing you can do, because these are the words people search for.
-- Name species only when you are confident. "a heron" beats a wrong species name. Never invent numbers, distances, elevations, dates or conservation status.
+${speciesRule(species)}
+- Never invent numbers, distances, elevations, dates or conservation status.
 - If you cannot tell where it is, return an empty string for location rather than guessing.
 - Description: 2-4 sentences, roughly 200-350 characters. Concrete nouns, specific subjects, what is actually in the frames.
 - Title: sentence case. Lead with the place or the subject, not the date.
@@ -280,7 +287,10 @@ export async function describeSession({
   const encoded = await encodeSamples({ imagesDir, images, samples });
   if (encoded.length === 0) throw new Error("no readable images to sample");
 
-  const voiceRules = await loadVoiceRules();
+  const [voiceRules, species] = await Promise.all([
+    loadVoiceRules(),
+    inatSpecies(),
+  ]);
   const prompt = buildPrompt({
     slug,
     title,
@@ -289,6 +299,7 @@ export async function describeSession({
     imageCount: images.length,
     samples: encoded,
     voiceRules,
+    species,
   });
   return {
     ...parseModelJson(await call(prompt, encoded)),
@@ -299,7 +310,13 @@ export async function describeSession({
 const CAPTION_BATCH = 10;
 const MAX_CAPTION = 500;
 
-function buildCaptionPrompt({ title, location, batch, voiceRules }) {
+function buildCaptionPrompt({
+  title,
+  location,
+  batch,
+  voiceRules,
+  species = [],
+}) {
   return `You are writing one short caption per photograph for a gallery on Truman Brown's personal photography site.
 
 Session: ${title}${location ? ` (${location})` : ""}
@@ -311,9 +328,8 @@ and by search engines. Accuracy matters more than flair.
 Rules:
 - One caption per photograph, 5-15 words. No trailing full stop.
 - Say what is actually visible. Lead with the subject.
-- Name a species, peak, or landmark ONLY if you are confident. If you are not
-  sure, describe it plainly instead: "a small green tree frog" is correct and
-  useful, a wrong species name is worse than no name at all.
+${speciesRule(species)}
+- Name a peak or landmark only if you are sure. Otherwise describe it plainly.
 - Never invent numbers, elevations, distances, dates or conservation status.
 - No marketing words (stunning, breathtaking, vibrant). No "a photo of".
 - Do not repeat the session title in every caption.
@@ -377,7 +393,10 @@ export async function captionImages({
   const pending = images.filter((img) => !img.caption);
   if (pending.length === 0) return new Map();
 
-  const voiceRules = await loadVoiceRules();
+  const [voiceRules, species] = await Promise.all([
+    loadVoiceRules(),
+    inatSpecies(),
+  ]);
   const captions = new Map();
 
   for (let i = 0; i < pending.length; i += batchSize) {
@@ -386,7 +405,13 @@ export async function captionImages({
     if (batch.length === 0) continue;
 
     try {
-      const prompt = buildCaptionPrompt({ title, location, batch, voiceRules });
+      const prompt = buildCaptionPrompt({
+        title,
+        location,
+        batch,
+        voiceRules,
+        species,
+      });
       // "high" detail here, unlike the session summary: a caption has to resolve
       // the actual subject, and 512px is not enough to tell two frogs apart.
       const raw = await call(prompt, batch, {
@@ -437,4 +462,52 @@ export function captionsEnabledFor(slug) {
     .map((s) => s.trim())
     .filter(Boolean)
     .includes(slug);
+}
+
+const INAT_USER = process.env.INATURALIST_USER || "";
+const INAT_PAGE = 200;
+const INAT_MAX_PAGES = 6;
+
+/**
+ * The species this photographer has actually recorded on iNaturalist.
+ *
+ * Used as an allowlist in the prompts. A vision model asked to name a frog will
+ * happily produce a plausible-but-wrong species; constraining it to a list of
+ * things the photographer has genuinely observed and had reviewed by other
+ * naturalists removes most of that failure mode, and the identifications are
+ * community-verified rather than guessed from one frame.
+ *
+ * Returns an empty list when no user is configured or iNat is unreachable, in
+ * which case the prompts fall back to telling the model to stay generic.
+ */
+export async function inatSpecies(user = INAT_USER) {
+  if (!user) return [];
+  const names = [];
+  try {
+    for (let page = 1; page <= INAT_MAX_PAGES; page++) {
+      const url =
+        `https://api.inaturalist.org/v1/observations/species_counts` +
+        `?user_login=${encodeURIComponent(user)}&per_page=${INAT_PAGE}&page=${page}`;
+      const res = await fetch(url);
+      if (!res.ok) break;
+      const json = await res.json();
+      const results = json.results ?? [];
+      for (const r of results) {
+        const common = r.taxon?.preferred_common_name;
+        if (common) names.push(common);
+      }
+      if (results.length < INAT_PAGE) break;
+    }
+  } catch {
+    // Accuracy aid, not a dependency: a failed lookup just means generic copy.
+  }
+  return names;
+}
+
+function speciesRule(species) {
+  if (species.length === 0) {
+    return `- Do NOT name species. Use the group instead ("a tree frog", "a heron", "a dart frog"). A wrong species name is worse than no name at all.`;
+  }
+  return `- You may name a species ONLY if it appears in this list of species the photographer has actually recorded and had verified on iNaturalist. Anything not on this list must stay at group level ("a tree frog", "a heron"). A wrong species name is worse than no name at all.
+Verified species: ${species.join("; ")}`;
 }

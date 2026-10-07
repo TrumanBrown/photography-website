@@ -246,12 +246,31 @@ captioned once. Edit them in `/admin` like any other caption.
 
 #### Turning it on
 
-Set `OPENAI_API_KEY` as a repository secret (optionally `OPENAI_MODEL` as a
-repository variable, default `gpt-4o-mini`). `ANTHROPIC_API_KEY` works too.
+This needs a vision model, which means an API key from somewhere. Two options:
+
+**OpenAI directly** — a separate account at platform.openai.com, billed separately
+from Azure. Set `OPENAI_API_KEY` as a repository secret, optionally
+`OPENAI_MODEL` as a repository variable (default `gpt-4o-mini`).
+`ANTHROPIC_API_KEY` works the same way.
+
+**Azure OpenAI** — keeps billing, data and region inside the subscription this
+site already runs in. Azure's v1 endpoint is OpenAI-compatible, so the same code
+path works with three variables and no code change:
+
+```
+OPENAI_BASE_URL = https://<your-resource>.openai.azure.com/openai/v1
+OPENAI_API_KEY  = <your Azure OpenAI key>
+OPENAI_MODEL    = <your deployment name>     # deployment, not model name
+```
+
+Either way, downsampled copies of the photos are sent to the provider so it can
+see what's in them. That's worth a conscious decision on a photography site;
+Azure OpenAI is the option that keeps them inside your own tenant.
 
 **With no key set, none of this runs** and prebuild behaves exactly as it always
 has — descriptions just stay empty. A drafting failure logs a warning and leaves
-the description blank; it can never fail a build.
+the description blank; it can never fail a build. Nothing on the live site calls
+a model: this happens at build time only, and a visitor request never touches it.
 
 Treat the output as a first pass. It's usually right about the place, which is
 the part that matters for search, but your own words are worth far more: generic

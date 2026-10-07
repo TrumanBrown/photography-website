@@ -82,9 +82,10 @@ const pageDescription =
   description ||
   `${imageList.length} photograph${imageList.length === 1 ? '' : 's'} from ${title}${locationSuffix}, by ${siteConfig.ownerName}.`;
 
-// An empty alt tells search engines and screen readers to skip the image, so
-// fall back to the session's own title and location when there's no caption.
-const fallbackAlt = location ? `${title}, ${location}` : title;
+// Titles carry the place and date, so they stand alone as alt text. Appending
+// the location too would just repeat it ("Gunn Peak, Washington — June 2026,
+// Central Cascades, Washington").
+const fallbackAlt = title;
 
 const siteOrigin = Astro.site ?? `https://${siteConfig.domain}`;
 const pageUrl = new URL(`/sessions/${slug}/`, siteOrigin).toString();

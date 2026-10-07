@@ -28,6 +28,7 @@ import { fileURLToPath } from "node:url";
 import process from "node:process";
 import { BlobServiceClient } from "@azure/storage-blob";
 import { DefaultAzureCredential } from "@azure/identity";
+import { sanitizeSlug } from "./prebuild.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const META_FILE = join(ROOT, "scripts/session-meta.json");
@@ -52,10 +53,28 @@ function parseArgs(argv) {
   return { dryRun, only, includeDrafts };
 }
 
-async function readSidecar(container, slug) {
+/**
+ * Map each session slug to its real blob prefix.
+ *
+ * The folder name in `originals/` is not always the slug: prebuild lowercases
+ * it and replaces anything non-alphanumeric, so a folder like "Lijiang May
+ * 2026" publishes as "lijiang-may-2026". Resolving through the same transform
+ * is the only reliable way to find a session's sidecar.
+ */
+async function prefixesBySlug(container) {
+  const map = new Map();
+  for await (const item of container.listBlobsByHierarchy("/")) {
+    if (item.kind !== "prefix") continue;
+    const prefix = item.name.replace(/\/$/, "");
+    map.set(sanitizeSlug(prefix), prefix);
+  }
+  return map;
+}
+
+async function readSidecar(container, prefix) {
   try {
     const buf = await container
-      .getBlobClient(`${slug}/${SESSION_JSON}`)
+      .getBlobClient(`${prefix}/${SESSION_JSON}`)
       .downloadToBuffer();
     return JSON.parse(buf.toString("utf8"));
   } catch (err) {
@@ -64,10 +83,10 @@ async function readSidecar(container, slug) {
   }
 }
 
-async function sessionExists(container, slug) {
+async function hasImages(container, prefix) {
   // A session is a prefix with at least one blob under it. `_session.json`
   // alone doesn't count, since prebuild ignores image-less sessions.
-  for await (const blob of container.listBlobsFlat({ prefix: `${slug}/` })) {
+  for await (const blob of container.listBlobsFlat({ prefix: `${prefix}/` })) {
     if (!blob.name.endsWith(`/${SESSION_JSON}`)) return true;
   }
   return false;
@@ -119,14 +138,16 @@ async function main() {
   let changed = 0;
   let unchanged = 0;
   const missing = [];
+  const prefixes = await prefixesBySlug(container);
 
   for (const [slug, meta] of selected) {
-    if (!(await sessionExists(container, slug))) {
+    const prefix = prefixes.get(slug);
+    if (!prefix || !(await hasImages(container, prefix))) {
       missing.push(slug);
       continue;
     }
 
-    const existing = (await readSidecar(container, slug)) ?? {};
+    const existing = (await readSidecar(container, prefix)) ?? {};
     const merged = { ...existing };
     const diffs = [];
     for (const field of MANAGED) {
@@ -145,7 +166,7 @@ async function main() {
     if (!dryRun) {
       const body = JSON.stringify(merged, null, 2) + "\n";
       await container
-        .getBlockBlobClient(`${slug}/${SESSION_JSON}`)
+        .getBlockBlobClient(`${prefix}/${SESSION_JSON}`)
         .upload(body, Buffer.byteLength(body), {
           blobHTTPHeaders: { blobContentType: "application/json" },
         });
