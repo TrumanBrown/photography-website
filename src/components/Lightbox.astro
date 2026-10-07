@@ -40,8 +40,17 @@ const { gallerySelector = "#gallery" } = Astro.props;
     showHideAnimationType: "fade",
     bgOpacity: 0.95,
     // Fetch a couple of neighbours ahead so moving through a session doesn't
-    // wait on the network at every step.
-    preload: [2, 3],
+    // wait on the network at every step. These are the size-capped copies, not
+    // the originals, so looking past a photograph stays cheap.
+    preload: [1, 2],
+  });
+
+  /* PhotoSwipe only reuses the gallery thumbnail as a placeholder on the first
+     slide. The thumbnails are already decoded in the grid behind the lightbox,
+     so letting every slide use one costs nothing and means a photograph is on
+     screen the instant it is opened rather than after a round trip. */
+  lightbox.addFilter("placeholderSrc", (src: string | false, content: any) => {
+    return content?.data?.msrc || src;
   });
 
   lightbox.on("uiRegister", function () {

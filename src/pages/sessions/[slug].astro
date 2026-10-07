@@ -66,9 +66,10 @@ type Resolved = {
   viewUrl: string;
 };
 
-// Widest image the lightbox will ever need. Beyond this the extra pixels are
-// invisible on any display we serve but cost megabytes per photograph.
-const VIEW_MAX_WIDTH = 2400;
+// Widest copy the lightbox shows before the original arrives. Its only job is
+// to be on screen quickly, so it matches a width the grid already generates
+// rather than adding a bespoke, heavier variant.
+const VIEW_MAX_WIDTH = 1600;
 
 const resolved: Resolved[] = await Promise.all(
   imageList.map(async (img) => {

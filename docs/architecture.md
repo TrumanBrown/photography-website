@@ -273,6 +273,8 @@ Full image-pipeline mechanics: [image-pipeline.md](image-pipeline.md).
 
 **Why this one:** no framework dependency, accessible, touch-friendly. Loaded only on gallery pages, the home page doesn't pay for it.
 
+**How it is wired:** each slide moves through three tiers — the already-cached grid thumbnail, a size-capped WebP bridge, then the untouched original, which is fetched only for the photograph actually on screen. That keeps full resolution without making the first paint wait on a 20 MB file. Details and measurements: [image-pipeline.md](image-pipeline.md#viewing-full-resolution-without-the-wait).
+
 ### Azure Blob Storage: the photo album
 
 **What it is:** Azure's cloud file storage. Think of it as a hard drive in the cloud you access by URL. You upload files, you get back a URL per file.

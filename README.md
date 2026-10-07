@@ -37,6 +37,7 @@ The project started as a photography portfolio and has grown into a small person
 - **Admin + analytics:** browser `/admin` panel gated by GitHub sign-in, cookieless traffic metrics, see [docs/admin.md](docs/admin.md) and [docs/analytics.md](docs/analytics.md)
 - **Hosting:** Azure Static Web Apps (Free tier), see [docs/azure.md](docs/azure.md)
 - **Storage:** Azure Blob Storage across five containers (`originals`, `derivatives`, `variants`, `metadata`, `hobby-media`), see [docs/image-pipeline.md](docs/image-pipeline.md)
+- **Galleries:** sessions open on a banner crop then a justified grid; the lightbox always ends on the untouched original while painting in ~80 ms, see [docs/image-pipeline.md#viewing-full-resolution-without-the-wait](docs/image-pipeline.md#viewing-full-resolution-without-the-wait)
 - **Domain + DNS:** Azure App Service Domain + Azure DNS
 - **IaC:** Bicep, see [docs/iac-bicep.md](docs/iac-bicep.md)
 - **CI/CD:** GitHub Actions, OIDC federation (no long-lived secrets), see [docs/cicd.md](docs/cicd.md)
@@ -174,6 +175,13 @@ Two options:
 
 `date` must be a real `YYYY-MM-DD` calendar date. Prebuild validates the whole
 sidecar and fails with the field path instead of publishing partial defaults.
+
+`cover` picks the card thumbnail and the link-preview image. The session page
+also opens on a wide banner, which is a hard crop: upright frames lose most of
+their height, so the banner uses the cover only when it is landscape enough and
+otherwise falls back to the widest photograph in the session. Add an optional
+`"bannerFocus"` — any CSS `object-position`, e.g. `"center 30%"` — to steer
+where that crop sits.
 
 ### Title and description conventions
 
