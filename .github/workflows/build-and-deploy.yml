@@ -106,6 +106,10 @@ jobs:
           # as before and descriptions stay empty.
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+          # Constrains generated copy to species this user has actually recorded
+          # and had verified on iNaturalist. Unset means the prompts forbid
+          # species names and stay at group level instead.
+          INATURALIST_USER: ${{ vars.INATURALIST_USER }}
           # Separate opt-in for per-image captions, which become alt text.
           # "1" captions every session; a slug (or comma-separated slugs)
           # captions only those, which is the way to trial one before

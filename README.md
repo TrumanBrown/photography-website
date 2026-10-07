@@ -175,6 +175,30 @@ Two options:
 `date` must be a real `YYYY-MM-DD` calendar date. Prebuild validates the whole
 sidecar and fails with the field path instead of publishing partial defaults.
 
+### Title and description conventions
+
+Session titles follow **`Place, Region — Month Year`**:
+
+```
+Zhangjiajie, Hunan — April 2026
+Gunn Peak, Washington — June 2026
+Tortuguero night walk, Costa Rica — September 2026
+```
+
+The specific place goes first because that's the word people search for, and
+the shape stays the same across the archive so the session list reads as one
+set rather than thirty separate naming decisions. Keep the month in step with
+the date the page displays, which prebuild derives from EXIF.
+
+Descriptions render on the **session page only** — the home-page cards show
+title, date, location and photo count. The description was previously on both,
+which duplicated the same sentences across two URLs for no benefit.
+
+Name a species only when it's unmistakable in the frame. Group level ("a tree
+frog", "a heron", "dart frogs") is the correct answer whenever there's doubt:
+a wrong species name is worse than no name at all for a naturalist audience,
+and it can rank the page for something it isn't.
+
 Changes go live on the next build, click **Run workflow** on `Build and Deploy`
 (or **Rebuild Site** in the admin panel) for a ~5 minute publish, or wait for the cron.
 
@@ -266,6 +290,14 @@ OPENAI_MODEL    = <your deployment name>     # deployment, not model name
 Either way, downsampled copies of the photos are sent to the provider so it can
 see what's in them. That's worth a conscious decision on a photography site;
 Azure OpenAI is the option that keeps them inside your own tenant.
+
+**Species accuracy.** Set `INATURALIST_USER` (a repository variable, e.g.
+`trumanbrown`) and the generated copy is constrained to species you've actually
+recorded and had verified on iNaturalist. Asked to name a frog, a vision model
+will happily produce a plausible-but-wrong species; an allowlist of
+community-verified identifications removes most of that. Without it the prompts
+forbid species names outright and fall back to group level. A failed lookup
+degrades the same way rather than breaking the build.
 
 **With no key set, none of this runs** and prebuild behaves exactly as it always
 has — descriptions just stay empty. A drafting failure logs a warning and leaves
