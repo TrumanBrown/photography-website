@@ -1,6 +1,6 @@
 ---
 description: 'Voice and style rules for every user-visible string on the site (page copy, hobby intros, button labels, empty states, errors, species facts).'
-applyTo: 'src/**/*.astro,src/**/*.ts,src/content/**/*.json,api/**/*.js,site.config.ts,site.config.example.ts'
+applyTo: 'src/**/*.astro,src/**/*.ts,src/content/**/*.json,api/**/*.js,site.config.ts,site.config.example.ts,scripts/session-meta.json'
 ---
 
 # Site copy style
@@ -11,6 +11,33 @@ inventing new phrasing. When in doubt, copy the shape of an existing string in t
 This applies to: page and section prose, hobby `intro`/`summary`/`blurb`/`heading` fields, button and
 tab labels, `aria-label` text, placeholders, status/empty/error strings, toasts, species facts, session
 titles/descriptions/captions. It does not apply to code comments, docs under `docs/`, or log messages.
+
+## Never sound like a language model
+
+This is the rule that gets broken most often, so it comes first. Truman will notice,
+and "it reeks of AI" is the one piece of feedback that means the copy has to be
+thrown out rather than edited.
+
+- **No em dashes in anything a visitor reads.** Not in titles, not in descriptions,
+  not in captions, not in meta descriptions. Use a comma, a colon, or start a new
+  sentence. A spaced em dash in a title is the single clearest tell there is, and
+  running one through all 31 sessions makes the whole archive look machine-written.
+  Code comments and `docs/` are exempt; everything else is not.
+- **Vary how sentences start.** If six descriptions open with "A" and five open with
+  "The", the set reads as generated even when each line is individually fine.
+  `scripts/session-copy.test.mjs` fails the build over this.
+- **Don't write the same shape every time.** A list of three ("X, Y, and Z") in every
+  entry is a tell. Mix sentence lengths. Let some entries be two sentences and others
+  four.
+- **Cut throat-clearing openers.** "Everything I've photographed in X, grouped in one
+  place" says nothing. Lead with the thing itself.
+- **No summarising clause at the end** that restates what was just said.
+- Prefer a real detail or an opinion over a balanced description. "There's no gentle
+  way up it" and "which I did not expect" read as a person; "offering a variety of
+  subjects" does not.
+
+Mechanically checkable parts of this are enforced in `scripts/session-copy.test.mjs`.
+If a rule can be tested, add it there rather than only writing it down here.
 
 ## Voice
 
@@ -41,8 +68,9 @@ titles/descriptions/captions. It does not apply to code comments, docs under `do
   desktop-only affordance (`Click to remove.`).
 - Prefer concrete nouns from the hobby — rocks, driftwood, headlight beam, eyeshine, bull kelp —
   over abstractions like "experience", "content", "elements".
-- Spaced em dash ` — ` is for a real aside, at most once per block. Dense one-line species facts are
-  the exception and may use it to hinge trait → consequence.
+- Spaced em dash ` — ` is banned in new copy (see the top of this file). Existing
+  hand-written strings that use it can stay; don't add more. Use a comma, a colon,
+  or a new sentence.
 - `·` separates metadata (`3 sessions · 41 photographs`, `Coho salmon · Sammamish River`).
 - `&` is fine in short pairings (`trout & salmon`, `My reptiles & amphibians, mapped`).
 - Use `...` (three dots) for in-progress status, not `…`. Use ASCII `'`, not `’`, in code strings.

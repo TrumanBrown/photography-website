@@ -42,14 +42,20 @@ function resolveCover(
 }
 
 const toLabel = (entry: CollectionEntry<"sessions">) => entry.data.location;
-// The distinct sub-locations inside this region, which is what makes the page
-// worth reading rather than just a filtered list.
-const places = [...new Set(sessions.map(toLabel).filter(Boolean))];
+// Sub-locations still carry the region ("Limón Province, Costa Rica"), which
+// reads badly once they're listed under a heading that already names it.
+const trimRegion = (location: string) =>
+  location.replace(new RegExp(`,?\\s*${group.region}\\s*$`, "i"), "").trim();
+const places = [
+  ...new Set(
+    sessions.map(toLabel).filter(Boolean).map(trimRegion).filter(Boolean),
+  ),
+];
 const years = [...new Set(sessions.map((s) => s.data.date.slice(0, 4)))].sort();
 const yearRange = years.length > 1 ? `${years[0]}–${years.at(-1)}` : years[0];
 
 const title = `${group.region} photography`;
-const description = `Photographs from ${group.region}: ${countLine(group)}${yearRange ? `, ${yearRange}` : ""}. ${places.slice(0, 4).join(", ")}.`;
+const description = `Photographs from ${group.region}, ${yearRange}. ${countLine(group)}.`;
 
 const cover = sessions[0];
 const coverFile = cover?.data.cover ?? cover?.data.images[0]?.file;
@@ -97,8 +103,7 @@ const breadcrumb = {
       {
         places.length > 0 && (
           <p class="max-w-prose text-sm text-neutral-700 dark:text-neutral-300">
-            Everything I've photographed in {group.region}, grouped in one
-            place: {places.join(", ")}.
+            Every session I've shot in {group.region}: {places.join(", ")}.
           </p>
         )
       }

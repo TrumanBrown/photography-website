@@ -132,7 +132,11 @@ ${speciesRule(species)}
 - Never invent numbers, distances, elevations, dates or conservation status.
 - If you cannot tell where it is, return an empty string for location rather than guessing.
 - Description: 2-4 sentences, roughly 200-350 characters. Concrete nouns, specific subjects, what is actually in the frames.
-- Title: sentence case. Lead with the place or the subject, not the date.
+- Title: sentence case, in the shape "Place, Region, Month Year".
+- Never use an em dash (—) anywhere. Use a comma, a colon, or a new sentence. An em
+  dash is the clearest sign of machine-written copy and will be rejected.
+- Don't open with "A" or "The" every time, and don't end on a clause that restates
+  what you just said.
 
 ${voiceRules ? `Voice rules for this site:\n${voiceRules}` : ""}
 
@@ -332,6 +336,7 @@ ${speciesRule(species)}
 - Name a peak or landmark only if you are sure. Otherwise describe it plainly.
 - Never invent numbers, elevations, distances, dates or conservation status.
 - No marketing words (stunning, breathtaking, vibrant). No "a photo of".
+- Never use an em dash (—). Use a comma or a new sentence.
 - Do not repeat the session title in every caption.
 
 ${voiceRules ? `Voice rules for this site:\n${voiceRules}` : ""}

@@ -18,7 +18,7 @@ export const siteConfig = {
 
   /** <meta description> for SEO and link previews. */
   siteDescription:
-    "Wildlife, landscape and travel photography by Truman Brown — the Pacific Northwest, Costa Rica, China and Tibet.",
+    "Wildlife, landscape and travel photography by Truman Brown. Washington, Costa Rica, China and Tibet.",
 
   /** Apex domain (no scheme, no www). www is bound automatically by SWA. */
   domain: "trumanbrown.com",
