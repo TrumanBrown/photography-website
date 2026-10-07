@@ -53,10 +53,14 @@ for (const entry of sessions) {
   rows.push({ kind: "session", entry });
 }
 
-/** Short label for a session in the rail: the place, falling back to the title. */
+/**
+ * Label for a session in the rail.
+ *
+ * The title names the specific place; `location` is the broad province it sits
+ * in, which repeats across neighbouring sessions ("Limón Province, Costa Rica"
+ * four times running). The title is what tells them apart.
+ */
 function railLabel(entry: (typeof sessions)[number]): string {
-  const location = entry.data.location?.trim();
-  if (location) return location;
   return splitSessionTitle(entry.data.title).label;
 }
 ---
@@ -124,8 +128,7 @@ function railLabel(entry: (typeof sessions)[number]): string {
             >
               <span class="t">{railLabel(row.entry)}</span>
               <span class="m">
-                <span>{monthLabel(row.entry.data.date)}</span>
-                <span class="tabular-nums">{row.entry.data.images.length}</span>
+                <span class="tabular-nums">{row.entry.data.images.length} photographs</span>
               </span>
             </a>
           ),
@@ -261,7 +264,7 @@ function railLabel(entry: (typeof sessions)[number]): string {
   }
   .rail-item .m {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-start;
     gap: 8px;
     font-size: 10px;
     letter-spacing: 0.08em;
