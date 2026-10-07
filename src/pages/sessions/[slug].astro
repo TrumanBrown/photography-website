@@ -64,8 +64,6 @@ type Resolved = {
   fullUrl: string;
   ratio: number;
   viewUrl: string;
-  viewWidth: number;
-  viewHeight: number;
 };
 
 // Widest image the lightbox will ever need. Beyond this the extra pixels are
@@ -88,12 +86,10 @@ const resolved: Resolved[] = await Promise.all(
 
     // The lightbox used to open the untouched original: 3-13 MB per photograph,
     // served without a Cache-Control header, with nothing prefetched. Clicking
-    // through a session re-downloaded all of that every time. A capped WebP is
-    // indistinguishable on screen and roughly twenty times smaller.
+    // through a session re-downloaded all of that every time. It now opens this
+    // capped WebP instead and fetches the original only once a photograph is
+    // shown larger than this can fill, so zooming still reaches full detail.
     const viewWidth = Math.min(VIEW_MAX_WIDTH, mod.default.width);
-    const viewHeight = Math.round(
-      mod.default.height * (viewWidth / mod.default.width),
-    );
     const view = await getImage({
       src: mod.default,
       width: viewWidth,
@@ -108,8 +104,6 @@ const resolved: Resolved[] = await Promise.all(
       fullUrl,
       ratio: mod.default.width / mod.default.height,
       viewUrl: view.src,
-      viewWidth,
-      viewHeight,
     };
   }),
 );
@@ -245,8 +239,8 @@ const structuredData = {
               <a
                 href={lead.viewUrl}
                 data-pswp-full={lead.fullUrl}
-                data-pswp-width={lead.viewWidth}
-                data-pswp-height={lead.viewHeight}
+                data-pswp-width={lead.src.width}
+                data-pswp-height={lead.src.height}
                 data-pswp-caption={lead.caption ?? ""}
                 data-pswp-exif={lead.exif}
                 data-pswp-filename={lead.file}
@@ -294,8 +288,8 @@ const structuredData = {
                       <a
                         href={img.viewUrl}
                         data-pswp-full={img.fullUrl}
-                        data-pswp-width={img.viewWidth}
-                        data-pswp-height={img.viewHeight}
+                        data-pswp-width={img.src.width}
+                        data-pswp-height={img.src.height}
                         data-pswp-caption={img.caption ?? ""}
                         data-pswp-exif={img.exif}
                         data-pswp-filename={img.file}

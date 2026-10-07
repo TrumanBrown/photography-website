@@ -4,11 +4,17 @@
  * given selector. Place once per page that needs a lightbox.
  *
  * The DOM contract: each gallery item must be an <a> with
- *   href={fullResUrl}
+ *   href={displayUrl}
  *   data-pswp-width={intrinsicWidth}
  *   data-pswp-height={intrinsicHeight}
  *   data-pswp-caption={optional caption}
  * and contain a thumbnail <img> child.
+ *
+ * Optionally, when href points at a size-capped copy rather than the original:
+ *   data-pswp-full={originalUrl}
+ * The width/height above must then describe the original. The capped copy is
+ * only a first paint: the lightbox swaps the original in as soon as it has
+ * loaded, and the download button always uses data-pswp-full.
  */
 interface Props {
   /** CSS selector for the gallery container. Defaults to `#gallery`. */
@@ -119,6 +125,54 @@ const { gallerySelector = "#gallery" } = Astro.props;
         });
       },
     });
+  });
+
+  /* Photographs are what this site is for, so the lightbox always ends up
+     showing the untouched original. The anchor points at a size-capped WebP
+     only so something appears instantly instead of waiting on a 6-9 MB file;
+     the original is fetched straight afterwards and swapped in underneath the
+     viewer. Dimensions declared to PhotoSwipe are the original's, so zoom
+     reaches true 100% rather than stopping at the stand-in's size.
+
+     Only the photograph actually on screen is upgraded. Neighbours stay on the
+     cheap version until you reach them, so flicking through a session doesn't
+     queue up tens of megabytes you never look at. */
+  const upgrading = new WeakSet<HTMLElement>();
+
+  function upgradeToOriginal(pswp: any) {
+    const slide = pswp?.currSlide;
+    const anchor = slide?.data?.element as HTMLElement | undefined;
+    const img = slide?.content?.element as HTMLImageElement | undefined;
+    if (!anchor || !img || upgrading.has(anchor)) return;
+
+    const full = anchor.dataset.pswpFull;
+    // Galleries that already link the original have nothing to upgrade to.
+    if (!full || img.src === full) return;
+
+    upgrading.add(anchor);
+    const original = new Image();
+    original.decoding = "async";
+    original.onload = () => {
+      // Decode before swapping so the visible image never flashes blank.
+      const swap = () => {
+        img.src = full;
+        img.srcset = "";
+      };
+      if (original.decode) original.decode().then(swap, swap);
+      else swap();
+    };
+    original.onerror = () => {
+      // Leave the stand-in on screen rather than breaking the slide.
+      upgrading.delete(anchor);
+    };
+    original.src = full;
+  }
+
+  lightbox.on("afterInit", () => {
+    const pswp = lightbox.pswp;
+    if (!pswp) return;
+    upgradeToOriginal(pswp);
+    pswp.on("change", () => upgradeToOriginal(pswp));
   });
 
   lightbox.init();

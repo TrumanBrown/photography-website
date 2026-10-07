@@ -53,6 +53,10 @@ const CONVERT_EXTS = new Set(['.heic', '.heif', '.tif', '.tiff']);
 const WEB_EXTS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.avif']);
 const STANDARD_IMG_EXTS = new Set([...WEB_EXTS, ...CONVERT_EXTS]);
 const SESSION_JSON = '_session.json';
+// Originals are addressed by filename and never edited in place, so they can be
+// cached hard. The lightbox loads them directly; without this every viewing
+// costs another several megabytes.
+const ORIGINALS_CACHE_CONTROL = 'public, max-age=31536000, immutable';
 
 const ORIGINALS = 'originals';
 const DERIVATIVES = 'derivatives';
@@ -241,9 +245,39 @@ async function processSession({ prefix, originalsClient, derivativesClient, serv
       ext,
       etag: blob.properties.etag,
       contentLength: blob.properties.contentLength,
+      contentType: blob.properties.contentType,
+      cacheControl: blob.properties.cacheControl,
     });
   }
   validateImageTargets(blobs, prefix);
+
+  // The lightbox serves these originals directly, so they must be cacheable or
+  // every viewing re-downloads several megabytes. Uploads don't set the header,
+  // so backfill it here: listBlobsFlat already reports it, making this a no-op
+  // on every build after the first.
+  const needCache = blobs.filter(
+    (b) => b.cacheControl !== ORIGINALS_CACHE_CONTROL && b.contentType,
+  );
+  for (let i = 0; i < needCache.length; i += 8) {
+    await Promise.all(
+      needCache.slice(i, i + 8).map(async (blob) => {
+        try {
+          // setHTTPHeaders replaces every header, so the content type has to be
+          // passed back in or it would be cleared.
+          await originalsClient.getBlockBlobClient(blob.name).setHTTPHeaders({
+            blobContentType: blob.contentType,
+            blobCacheControl: ORIGINALS_CACHE_CONTROL,
+          });
+        } catch (e) {
+          // Never fail a build over a cache header.
+          console.warn(`  cache-control skip: ${blob.name}: ${e.message}`);
+        }
+      }),
+    );
+  }
+  if (needCache.length > 0) {
+    console.log(`  cache-control: set on ${needCache.length} original(s)`);
+  }
 
   if (blobs.length === 0) {
     console.warn(`Session "${prefix}" has no images; skipping.`);
