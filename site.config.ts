@@ -8,22 +8,23 @@
  */
 export const siteConfig = {
   /** Your full name as it should appear in the footer, <meta author>, and EXIF. */
-  ownerName: 'Truman Brown',
+  ownerName: "Truman Brown",
 
   /** First year the site went live. Footer renders e.g. "© 2026–2028 <Owner>". */
   copyrightStartYear: 2026,
 
   /** Browser tab title and <h1> on the home page. */
-  siteTitle: 'Truman Brown Pics and More',
+  siteTitle: "Truman Brown Pics and More",
 
   /** <meta description> for SEO and link previews. */
-  siteDescription: 'Personal photography by Truman Brown.',
+  siteDescription:
+    "Wildlife, landscape and travel photography by Truman Brown — the Pacific Northwest, Costa Rica, China and Tibet.",
 
   /** Apex domain (no scheme, no www). www is bound automatically by SWA. */
-  domain: 'trumanbrown.com',
+  domain: "trumanbrown.com",
 
   /** BCP-47 locale for <html lang>. */
-  defaultLocale: 'en-US',
+  defaultLocale: "en-US",
 
   /**
    * Sort policy for the session list on the home page.
@@ -31,7 +32,7 @@ export const siteConfig = {
    *   then sessions without `order` by date descending.
    * - 'dateDesc': always sort by date descending.
    */
-  sessionsSort: 'orderThenDateDesc' as 'orderThenDateDesc' | 'dateDesc',
+  sessionsSort: "orderThenDateDesc" as "orderThenDateDesc" | "dateDesc",
 
   /**
    * Optional top-level sections beyond Photography (which is always the home
@@ -50,7 +51,7 @@ export const siteConfig = {
    *
    * Format: '<storage-account>.blob.core.windows.net'
    */
-  blobHost: 'stphotoprodnowiur.blob.core.windows.net',
+  blobHost: "stphotoprodnowiur.blob.core.windows.net",
 } as const;
 
 export type SiteConfig = typeof siteConfig;

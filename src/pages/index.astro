@@ -1,19 +1,23 @@
 ---
-import { getCollection } from 'astro:content';
-import type { ImageMetadata } from 'astro';
-import BaseLayout from '@/layouts/BaseLayout.astro';
-import SessionCard from '@/components/SessionCard.astro';
-import { sortSessions, sessionSlug } from '@/lib/sessions';
-import { siteConfig } from '../../site.config';
+import { getCollection } from "astro:content";
+import type { ImageMetadata } from "astro";
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import SessionCard from "@/components/SessionCard.astro";
+import { sortSessions, sessionSlug } from "@/lib/sessions";
+import { siteConfig } from "../../site.config";
 
 // Eagerly resolve every image under src/content/sessions/ so we can look up
 // cover image metadata at build time. Astro processes each as an ImageMetadata.
 const images = import.meta.glob<{ default: ImageMetadata }>(
-  '/src/content/sessions/**/images/*.{jpg,jpeg,png,webp,avif,JPG,JPEG,PNG,WEBP,AVIF}',
+  "/src/content/sessions/**/images/*.{jpg,jpeg,png,webp,avif,JPG,JPEG,PNG,WEBP,AVIF}",
   { eager: true },
 );
 
-function resolveCover(slug: string, coverFile: string | undefined, fallbackFile: string): ImageMetadata {
+function resolveCover(
+  slug: string,
+  coverFile: string | undefined,
+  fallbackFile: string,
+): ImageMetadata {
   const file = coverFile ?? fallbackFile;
   const key = `/src/content/sessions/${slug}/images/${file}`;
   const mod = images[key];
@@ -26,7 +30,7 @@ function resolveCover(slug: string, coverFile: string | undefined, fallbackFile:
   return mod.default;
 }
 
-const all = await getCollection('sessions');
+const all = await getCollection("sessions");
 const sessions = sortSessions(all);
 
 // Group by year for browsability when there are many sessions.
@@ -40,28 +44,75 @@ for (const entry of sessions) {
 }
 const years = [...byYear.keys()].sort((a, b) => b.localeCompare(a));
 const firstVisible = years.length > 0 ? byYear.get(years[0])?.[0] : undefined;
-const firstCoverFile = firstVisible?.data.cover ?? firstVisible?.data.images[0]?.file;
-const firstCoverRecord = firstVisible?.data.images.find((image) => image.file === firstCoverFile);
-const totalPhotos = sessions.reduce((total, session) => total + session.data.images.length, 0);
-const portfolioCount = `${sessions.length} session${sessions.length === 1 ? '' : 's'} · ${totalPhotos} photograph${totalPhotos === 1 ? '' : 's'}`;
+const firstCoverFile =
+  firstVisible?.data.cover ?? firstVisible?.data.images[0]?.file;
+const firstCoverRecord = firstVisible?.data.images.find(
+  (image) => image.file === firstCoverFile,
+);
+const totalPhotos = sessions.reduce(
+  (total, session) => total + session.data.images.length,
+  0,
+);
+const portfolioCount = `${sessions.length} session${sessions.length === 1 ? "" : "s"} · ${totalPhotos} photograph${totalPhotos === 1 ? "" : "s"}`;
+
+const siteOrigin = (Astro.site ?? `https://${siteConfig.domain}`).toString();
+// Identifies the photographer as an entity, with the off-site profiles that
+// corroborate it. Kept to the home page so it isn't repeated site-wide.
+const personSchema = {
+  "@context": "https://schema.org",
+  "@type": "Person",
+  name: siteConfig.ownerName,
+  url: siteOrigin,
+  jobTitle: "Photographer",
+  sameAs: [
+    "https://www.inaturalist.org/people/trumanbrown",
+    "https://github.com/TrumanBrown",
+  ],
+};
 ---
 
 <BaseLayout
   ogImage={firstCoverRecord?.fullUrl}
-  ogImageAlt={firstVisible ? `${firstVisible.data.title} cover photograph` : undefined}
+  ogImageAlt={firstVisible
+    ? `${firstVisible.data.title} cover photograph`
+    : undefined}
 >
+  <script
+    type="application/ld+json"
+    set:html={JSON.stringify(personSchema)}
+    is:inline
+  />
+
   <section class="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
-    <header class="mb-8 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-6">
+    <header
+      class="mb-8 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-6"
+    >
       <div>
         <h1 class="text-2xl font-semibold tracking-tight">Photography</h1>
-        <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">{siteConfig.siteDescription}</p>
+        <p
+          class="mt-1 max-w-prose text-sm text-neutral-600 dark:text-neutral-400"
+        >
+          I photograph wildlife and landscapes — mostly the Pacific Northwest,
+          with trips to Costa Rica, China and Tibet. Each session below is one
+          place over one set of days, newest first.
+        </p>
       </div>
-      {sessions.length > 0 && <p class="text-xs tabular-nums text-neutral-500 dark:text-neutral-400">{portfolioCount}</p>}
+      {
+        sessions.length > 0 && (
+          <p class="shrink-0 text-xs tabular-nums text-neutral-500 dark:text-neutral-400">
+            {portfolioCount}
+          </p>
+        )
+      }
     </header>
     {
       sessions.length === 0 ? (
         <div class="rounded-lg border border-dashed border-neutral-300 p-10 text-center text-neutral-600 dark:border-neutral-700 dark:text-neutral-400">
-          <p class="text-sm">No sessions yet. Add a folder under <code class="font-mono">originals/</code> in Blob Storage, then trigger a build.</p>
+          <p class="text-sm">
+            No sessions yet. Add a folder under{" "}
+            <code class="font-mono">originals/</code> in Blob Storage, then
+            trigger a build.
+          </p>
         </div>
       ) : (
         <div class="space-y-12">
@@ -76,10 +127,18 @@ const portfolioCount = `${sessions.length} session${sessions.length === 1 ? '' :
               <ul class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 {byYear.get(year)!.map((entry) => {
                   const slug = sessionSlug(entry);
-                  const cover = resolveCover(slug, entry.data.cover, entry.data.images[0].file);
+                  const cover = resolveCover(
+                    slug,
+                    entry.data.cover,
+                    entry.data.images[0].file,
+                  );
                   return (
                     <li>
-                      <SessionCard entry={entry} cover={cover} priority={entry.id === firstVisible?.id} />
+                      <SessionCard
+                        entry={entry}
+                        cover={cover}
+                        priority={entry.id === firstVisible?.id}
+                      />
                     </li>
                   );
                 })}
