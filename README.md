@@ -180,6 +180,121 @@ Changes go live on the next build, click **Run workflow** on `Build and Deploy`
 
 Full pipeline walkthrough: [docs/image-pipeline.md](docs/image-pipeline.md).
 
+### What happens when you upload a session
+
+Say you drop 30 photos into `staging/2026-japan/` with a `_session.json` that
+sets just a title, and run `./scripts/upload-session.sh 2026-japan --build`.
+On the next build, prebuild walks the session and fills in what you left blank:
+
+1. **Photos are downloaded and processed.** RAW and HEIC are converted, every
+   image is read for EXIF (camera, lens, date, caption if one is embedded).
+2. **Your title is kept.** Anything you set by hand always wins.
+3. **The description is written for you.** If `description` is empty, 8 photos
+   are sampled evenly across the session, shown to a vision model, and a
+   description is written from what's actually in them. `location` is filled the
+   same way if you left it blank.
+4. **Each photo gets a caption**, if captions are switched on (see below). A
+   caption becomes that photo's `alt` text. Photos you've already captioned are
+   left alone.
+5. **The results are saved back to `_session.json`** and the description is
+   tagged `"descriptionSource": "auto"`, so everything is generated once and
+   then behaves like any other metadata — edit it in `/admin` whenever you like.
+6. **The site builds** with that copy in the page body, the `<title>`, the meta
+   description, the image `alt` attributes, and the JSON-LD.
+
+What gets filled in, and what doesn't:
+
+| Field | If you set it | If you leave it blank |
+| --- | --- | --- |
+| `title` | kept as-is | folder name, tidied up, or a drafted one |
+| `location` | kept as-is | drafted from the photos |
+| `description` | kept as-is | **drafted from the photos** |
+| per-image `caption` | kept as-is | **drafted, if captions are switched on** |
+
+#### Captions, and why they're a separate switch
+
+Captions are off by default even when the API key is set. `DESCRIBE_CAPTIONS`
+takes either a switch or a list of sessions:
+
+| Value | Effect |
+| --- | --- |
+| unset, `0`, `off` | no captions anywhere (default) |
+| `1`, `true`, `on` | caption every session |
+| `gunn-peak-june-2026` | caption only that session |
+| `slug-a,slug-b` | caption only those sessions |
+
+Start with one session. Captioning the whole archive is ~877 photos in one
+build; trialling a single session first tells you whether the quality is worth
+it before you spend that.
+
+They're worth turning on: a caption becomes that photo's `alt` text, which is
+the thing image search actually reads. Without captions all 30 photos in a
+session share one generic `alt` ("session title, location"), so nothing
+distinguishes the heron shot from the caiman shot.
+
+They're a separate switch because the blast radius is different. A description
+is one sentence you can scan; captions are one claim per photograph. On a site
+that's largely wildlife macro, a confidently wrong species name is worse than a
+generic caption — it's wrong information under your name, and it can rank you
+for the wrong thing. The prompt tells the model to describe rather than guess
+("a small green tree frog" over a wrong binomial), but spot-check a session
+before trusting it across the archive.
+
+Captions are generated in batches of 10, skip any photo you've already
+captioned, and are saved into `_session.json` so each photo is only ever
+captioned once. Edit them in `/admin` like any other caption.
+
+#### Turning it on
+
+Set `OPENAI_API_KEY` as a repository secret (optionally `OPENAI_MODEL` as a
+repository variable, default `gpt-4o-mini`). `ANTHROPIC_API_KEY` works too.
+
+**With no key set, none of this runs** and prebuild behaves exactly as it always
+has — descriptions just stay empty. A drafting failure logs a warning and leaves
+the description blank; it can never fail a build.
+
+Treat the output as a first pass. It's usually right about the place, which is
+the part that matters for search, but your own words are worth far more: generic
+copy spread across thirty near-identical gallery pages is the exact pattern
+search engines discount.
+
+#### Backfilling sessions that are already published
+
+Order matters here, once:
+
+1. **Push the copy you've already written first.**
+   `AZURE_STORAGE_ACCOUNT=<account> npm run meta:apply` fills in every session
+   listed in `scripts/session-meta.json`. No API key involved.
+2. **Then** add `OPENAI_API_KEY`. Doing it the other way round means the next
+   build drafts descriptions for every session that's still blank, and
+   `meta:apply` immediately overwrites them — wasted calls for no benefit.
+   Sessions that already have a description are skipped, so once step 1 has run
+   the key only affects new uploads.
+3. **Captions last, one session at a time.** Set `DESCRIBE_CAPTIONS` to a single
+   slug, build, read the results in `/admin`, then widen to a comma-separated
+   list or `1`. Captioning the whole archive at once is several hundred photos
+   in a single build, which is both slow and unreviewed.
+
+#### Reading the copy before it goes live
+
+To review and edit wording before anything publishes, draft it into version
+control instead of letting the build write it:
+
+```bash
+npm run prebuild:remote                  # pull sessions + images from Blob
+OPENAI_API_KEY=sk-... npm run describe   # draft into scripts/session-meta.json
+# edit the wording, remove the "draft": true flags
+AZURE_STORAGE_ACCOUNT=<account> npm run meta:apply
+```
+
+Drafts land in [scripts/session-meta.json](scripts/session-meta.json) marked
+`"draft": true`, and `meta:apply` refuses to publish them until you clear the
+flag. Useful flags: `--force` to redraft, `--only <slug>` for one session,
+`--provider mock` to exercise the flow without an API key.
+
+`meta:apply` merges into each existing `_session.json`, so `cover`, `order`,
+`date` and per-image captions are preserved.
+
 ---
 
 ## Repository layout

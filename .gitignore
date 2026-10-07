@@ -47,3 +47,7 @@ __pycache__/
 # time by scripts/copy-birding-assets.mjs (reproducible from the pinned dep).
 # The model file (public/birding/face_landmarker.task) IS committed.
 public/birding/wasm/
+
+# Throwaway concept mocks + their prep scripts (never deployed).
+mocks/
+scripts-local/

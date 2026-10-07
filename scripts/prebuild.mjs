@@ -33,6 +33,12 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawn } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
+import {
+  describeSession,
+  captionImages,
+  isEnabled as describeEnabled,
+  captionsEnabledFor,
+} from './lib/describe.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -338,6 +344,20 @@ async function processSession({ prefix, originalsClient, derivativesClient, serv
     ? reorderByList(images, sidecar.images, targetBySource)
     : images.sort((a, b) => a.file.localeCompare(b.file));
 
+  // A session uploaded without a description gets one drafted from its own
+  // photographs. The result is written back to _session.json, so it costs one
+  // API call per session ever, and from then on it's ordinary metadata you can
+  // rewrite in the admin panel. Without a provider key this is a no-op.
+  if (!sidecar.description && orderedImages.length > 0 && describeEnabled()) {
+    await describeInto({ sidecar, slug, prefix, imagesDir, images: orderedImages, originalsClient });
+  }
+
+  // Per-image captions, if separately enabled. These become each photo's alt
+  // text, which is the signal image search actually reads.
+  if (orderedImages.length > 0 && captionsEnabledFor(slug)) {
+    await captionInto({ sidecar, slug, prefix, imagesDir, images: orderedImages, originalsClient });
+  }
+
   const cover = sidecar.cover
     ? (targetBySource.get(sidecar.cover) ?? sidecar.cover)
     : undefined;
@@ -380,6 +400,88 @@ async function processSession({ prefix, originalsClient, derivativesClient, serv
         .map((image) => [image.file, image.caption]),
     ),
   };
+}
+
+/**
+ * Draft title/location/description for a session that has none and merge the
+ * result into its sidecar, both in memory and back in Blob Storage.
+ *
+ * Mutates `sidecar`. Never throws: a drafting failure degrades to the old
+ * behaviour (an empty description) rather than failing the whole build.
+ */
+async function describeInto({ sidecar, slug, prefix, imagesDir, images, originalsClient }) {
+  try {
+    const drafted = await describeSession({
+      slug,
+      title: sidecar.title ?? humanize(slug),
+      date: sidecar.date ?? '',
+      location: sidecar.location ?? '',
+      images,
+      imagesDir,
+    });
+
+    sidecar.description = drafted.description;
+    // Only fill a title or location that wasn't already chosen by hand.
+    if (!sidecar.title && drafted.title) sidecar.title = drafted.title;
+    if (!sidecar.location && drafted.location) sidecar.location = drafted.location;
+    sidecar.descriptionSource = 'auto';
+
+    await writeSidecar(originalsClient, prefix, sidecar);
+    console.log(`  described: ${slug} (from ${drafted.sampled} photos, saved to ${SESSION_JSON})`);
+  } catch (e) {
+    console.warn(`  describe skipped for ${slug}: ${e.message}`);
+  }
+}
+
+/**
+ * Write a session's sidecar back to Blob Storage.
+ */
+async function writeSidecar(originalsClient, prefix, sidecar) {
+  const body = JSON.stringify(sidecar, null, 2) + '\n';
+  await originalsClient
+    .getBlockBlobClient(`${prefix}/${SESSION_JSON}`)
+    .upload(body, Buffer.byteLength(body), {
+      blobHTTPHeaders: { blobContentType: 'application/json' },
+    });
+}
+
+/**
+ * Caption every image that doesn't already have one, then persist the captions
+ * into the sidecar's `images` array so they're generated once and stay editable.
+ *
+ * Mutates `sidecar` and the `images` entries. Never throws.
+ */
+async function captionInto({ sidecar, slug, prefix, imagesDir, images, originalsClient }) {
+  const missing = images.filter((img) => !img.caption).length;
+  if (missing === 0) return;
+
+  try {
+    const captions = await captionImages({
+      title: sidecar.title ?? humanize(slug),
+      location: sidecar.location ?? '',
+      images,
+      imagesDir,
+      onBatchError: (err, count) =>
+        console.warn(`  caption batch of ${count} failed for ${slug}: ${err.message}`),
+    });
+    if (captions.size === 0) return;
+
+    for (const img of images) {
+      const caption = captions.get(img.file);
+      if (caption && !img.caption) img.caption = caption;
+    }
+
+    // Persist in the sidecar's own order-and-caption format. Built from the
+    // already-resolved order, so existing ordering survives the rewrite.
+    sidecar.images = images.map((img) => ({
+      file: img.file,
+      ...(img.caption ? { caption: img.caption } : {}),
+    }));
+    await writeSidecar(originalsClient, prefix, sidecar);
+    console.log(`  captioned: ${slug} (${captions.size} of ${missing} new captions)`);
+  } catch (e) {
+    console.warn(`  captions skipped for ${slug}: ${e.message}`);
+  }
 }
 
 async function processStandardBlob({ blob, originalsClient, localPath, cacheKey }) {

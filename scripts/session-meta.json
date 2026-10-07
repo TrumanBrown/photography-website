@@ -1,0 +1,189 @@
+{
+  "$comment": "Session metadata pushed to originals/<slug>/_session.json in Blob Storage by scripts/apply-session-meta.mjs. Only the keys present here are written; anything else already in a session's sidecar (cover, order, date, image captions) is preserved. Edit freely - this file is the source, the blob is the copy.",
+
+  "august-adventures-2026": {
+    "title": "August odds and ends around Puget Sound",
+    "location": "Puget Sound, Washington",
+    "description": "A few weeks of whatever turned up close to home — a garter snake mid-meal, a yellow-spotted millipede, a flounder from a low tide, and a hummingbird that finally held still at the feeder. Nothing planned, which is usually when the good stuff shows up."
+  },
+
+  "camping-eastern-wa-july-2026": {
+    "title": "Camping and macro in eastern Washington",
+    "location": "Eastern Washington",
+    "description": "A July camping trip spent mostly face-down in the dirt with a macro lens. Grasshoppers that vanish the second they stop moving, robber flies working over their prey, and stoneflies that found the tent every night. Two river otters came up on a log while I was packing out."
+  },
+
+  "costa-rica-amphibian-research-center-crarc-august-2026": {
+    "title": "Costa Rica Amphibian Research Center (CRARC), Guayacán",
+    "location": "Guayacán, Limón Province, Costa Rica",
+    "description": "CRARC breeds endangered Costa Rican amphibians, including the lemur leaf frog, and a night walk on the property is wall-to-wall frogs. Leaf frogs, glass frogs you can see straight through, and poison dart frogs on the leaf litter. A click beetle with two glowing headlights and a cicada halfway out of its old skin rounded it out."
+  },
+
+  "costa-rica-bijagua-august-2026": {
+    "title": "Hummingbirds and toucans at Bijagua",
+    "location": "Bijagua, Alajuela Province, Costa Rica",
+    "description": "Bijagua sits between Tenorio and the Caribbean slope, and the feeders here pull hummingbirds in all morning. Violet sabrewings, crowned woodnymphs, and a snowcap — the tiny dark one with the white crown. Keel-billed toucans worked the fruiting trees overhead and golden silk orb-weavers strung webs across the gaps."
+  },
+
+  "costa-rica-el-zota-biological-station-sept-2026": {
+    "title": "El Zota Biological Station, Caribbean lowlands",
+    "location": "El Zota Biological Station, Limón Province, Costa Rica",
+    "description": "El Zota is lowland Caribbean rainforest, and the trails gave up more in a few days than I expected. Motmots and trogons sitting still in the understory, a keel-billed toucan high up, emerald basilisks along the creek, strawberry poison dart frogs underfoot, and bats tucked into a culvert."
+  },
+
+  "costa-rica-la-fortuna-arenal-august-2026": {
+    "title": "Arenal Volcano and La Fortuna after dark",
+    "location": "La Fortuna, Arenal, Costa Rica",
+    "description": "Arenal showed its cone for about an hour before the clouds closed back in. Most of these are from the night walks instead — red-eyed tree frogs asleep with their eyes shut, smoky jungle frogs, wandering spiders, and a coati working the trail edge at first light."
+  },
+
+  "costa-rica-monteverde-natural-reserve-august-2026": {
+    "title": "Monteverde cloud forest",
+    "location": "Monteverde, Puntarenas Province, Costa Rica",
+    "description": "Monteverde earns the name. The mist never fully lifted while I was there, which is the point of a cloud forest. Hanging bridges through the canopy, a millipede longer than my hand, leaf-mimic katydids that are easier to find by sound, and a stream running clear in the middle of the wet season."
+  },
+
+  "costa-rica-playa-flamingo-august-2026": {
+    "title": "Playa Flamingo, Guanacaste",
+    "location": "Playa Flamingo, Guanacaste, Costa Rica",
+    "description": "A short stop on the dry Pacific coast, which feels like a different country from the Caribbean side. A turquoise-browed motmot sat out in the open, hermit crabs covered the driftwood, and the tide pools held blennies. Put the rocks back where you found them."
+  },
+
+  "costa-rica-tapir-valley-august-2026": {
+    "title": "Frogs after dark at Tapir Valley",
+    "location": "Tapir Valley Nature Reserve, Bijagua, Costa Rica",
+    "description": "Tapir Valley is old cattle pasture that was rewetted into wetland, and it's the only place the Tapir Valley tree frog has ever been found. The night walk is mostly frogs — red-eyed tree frogs, glass frogs on the undersides of leaves, and a lot of small callers with their throats blown out like balloons."
+  },
+
+  "costa-rica-tenorio-national-park-august-2026": {
+    "title": "Tenorio Volcano National Park",
+    "location": "Tenorio Volcano National Park, Costa Rica",
+    "description": "Most people come to Tenorio for Río Celeste. I spent the time looking at smaller things instead — poison dart frogs on the forest floor, a sloth hanging directly over the trail, stick insects, and a weevil so crusted in lichen I nearly walked past it."
+  },
+
+  "costa-rica-tortuguero-national-park-canal-august-2026": {
+    "title": "Tortuguero canals by boat",
+    "location": "Tortuguero National Park, Limón Province, Costa Rica",
+    "description": "You see Tortuguero from a boat, which makes the herons easy and everything else hard. Bare-throated tiger herons at every bend, a boat-billed heron with eyes too big for its head, anhingas drying their wings, a Montezuma oropendola, and a spectacled caiman holding dead still at the waterline."
+  },
+
+  "costa-rica-tortuguero-night-walk-august-2026": {
+    "title": "Tortuguero night walk",
+    "location": "Tortuguero, Limón Province, Costa Rica",
+    "description": "Everything on a night walk is either asleep or hunting. Blunt-headed tree snakes looping between leaves on a body about as thick as a pencil, basilisks balled up on the branch tips where they roost, leaf-mimic katydids, and a bark scorpion in the litter."
+  },
+
+  "eastern-washington-camping-memorial-weekend": {
+    "title": "Memorial Day weekend in the shrub-steppe",
+    "location": "Eastern Washington",
+    "description": "Sagebrush country with Mount Adams sitting on the horizon. Short-horned lizards flattened against the basalt, a racer that let me get close, California quail trotting down the road, great spangled fritillaries on the wet gravel, and a northern scorpion under a rock after dark."
+  },
+
+  "gunn-peak-june-2026": {
+    "title": "Gunn Peak scramble above the Skykomish",
+    "location": "Gunn Peak, Central Cascades, Washington",
+    "description": "Gunn Peak is a steep, brushy, off-trail climb out of the Skykomish valley and there's no gentle way up it. The reward is a pair of tarns just under the summit block that go dead flat in the morning, with the summit tower reflected in them and Mount Baker on the skyline. Not a casual hike — bring navigation and expect to use your hands."
+  },
+
+  "july-macro-eastern-washington": {
+    "title": "July macro in eastern Washington",
+    "location": "Eastern Washington",
+    "description": "A macro lens and a lot of flipping rocks. A northern alligator lizard working through a grasshopper headfirst, paired robber flies, a northern scorpion in the hand, and stoneflies on everything once the sun went down. Roll the rocks back the way you found them."
+  },
+
+  "june-nearby-seattle-wildlife": {
+    "title": "Alligator lizards and slugs near Seattle",
+    "location": "Puget Sound lowlands, Washington",
+    "description": "An old gravel pit twenty minutes from the city, which turns out to be the best northern alligator lizard habitat I know of. Banana slugs along the wet edges, an iridescent ground beetle in the rubble, and a pair of crows keeping an eye on all of it."
+  },
+
+  "june-sauk-mtn-and-nearby": {
+    "title": "Sauk Mountain switchbacks and marmots",
+    "location": "Sauk Mountain, North Cascades, Washington",
+    "description": "Sauk Mountain packs a couple of miles of tight switchbacks up an open meadow face above the Skagit, and the green was in full swing. Mount Baker sits on the skyline from the summit ridge, Sauk Lake is straight down the back side, and a marmot held its pose on the rocks long enough for a portrait."
+  },
+
+  "king-tide-june-2026": {
+    "title": "King tide at Deception Pass",
+    "location": "Deception Pass State Park, Washington",
+    "description": "A summer king tide pulls the water back far enough to walk onto ground that's normally well under. Giant green anemones closed up out of the water, hermit crabs, chitons clamped to the rock, and bull kelp laid out flat across the cobble. Put everything back where you found it."
+  },
+
+  "late-winter-washington-hikes-and-birds-2026": {
+    "title": "Late winter birds around Washington",
+    "location": "Washington",
+    "description": "March is the gap between the winter ducks and the spring migrants, so I took whatever turned up. A hooded merganser with its crest all the way up, a mountain bluebird on the east side, a western meadowlark singing from a young fir, and a brown creeper spiralling up a mossy trunk."
+  },
+
+  "lijiang-may-2026": {
+    "title": "Tiger Leaping Gorge and Jade Dragon Snow Mountain",
+    "location": "Lijiang, Yunnan, China",
+    "description": "Two days on the Tiger Leaping Gorge high trail, with Jade Dragon Snow Mountain on one side, Haba on the other, and the Jinsha River a long way down. The 28 Bends section is the part that hurts. A giant centipede and a wolf spider on the path, goats on ground I wouldn't walk, and a black-crowned night heron down near the water."
+  },
+
+  "may-ball-mountain-weekend": {
+    "title": "Ball Mountain weekend, snow and pikas",
+    "location": "Cascades, Washington",
+    "description": "Late May still meant walking on snow for most of the day, and the summit stayed socked in. A pika on a mossy boulder made up for it, along with a red-breasted sapsucker, a waterfall coming straight off the rock, and forest snails out everywhere in the wet."
+  },
+
+  "may-tidepooling-and-animals": {
+    "title": "May tide pooling on the Salish Sea",
+    "location": "Puget Sound, Washington",
+    "description": "A good spring low tide on Puget Sound. Sculpins and gunnels in the shallow pools, red rock crabs with purple-tipped claws, a decorator crab wearing most of a barnacle bed, and an osprey working the shoreline overhead. Always put the rocks back."
+  },
+
+  "mt-everest-may-2026": {
+    "title": "Everest north face from Rongbuk, Tibet",
+    "location": "Everest Base Camp, Tibet",
+    "description": "The Tibetan side gives you the north face straight on, which is the view you don't get from Nepal. I watched it clear and cloud back over through the afternoon, then catch alpenglow right at sunset. The survey marker at the viewpoint reads 8,848.86 meters, the height China and Nepal agreed on in 2020."
+  },
+
+  "north-cascades-july-2026": {
+    "title": "Liberty Bell and Washington Pass",
+    "location": "North Cascades, Washington",
+    "description": "Liberty Bell Mountain is the spire you see from the highway at Washington Pass, and it looks better still from the meadows underneath it. A clear July day, water running through the meadow grass, and a small toad that turned up on the trail."
+  },
+
+  "olympic-winter-2026": {
+    "title": "Olympic Peninsula in winter",
+    "location": "Olympic National Park, Washington",
+    "description": "February on the peninsula means fog, rain, and almost nobody else around. Harlequin ducks and black oystercatchers along the Strait of Juan de Fuca, Roosevelt elk grazing in the open, the footbridge over Devil's Punchbowl at Lake Crescent, and the Hall of Mosses dripping in the Hoh Rain Forest."
+  },
+
+  "shanghai-city-and-birds-spring-2026": {
+    "title": "Shanghai, the Bund and city birds",
+    "location": "Shanghai, China",
+    "description": "Nights on the Bund looking across at Pudong, and mornings in the city parks looking at birds. Light-vented bulbuls and Chinese blackbirds are everywhere once you start noticing them, and Century Park had dragonflies and a swallowtail working the hedges."
+  },
+
+  "spring-pnw-various-wildlife-2026": {
+    "title": "Spring herping around Puget Sound",
+    "location": "Western Washington",
+    "description": "The first warm weekends of April, when everything comes out at once. Northern alligator lizards on sun-warmed rock, garter snakes in the grass, a Pacific chorus frog, a rough-skinned newt, and a western red-backed salamander under a log. Please never handle salamanders with bug-sprayed or lotioned hands, and put the log back the way it was."
+  },
+
+  "sunrise-rainier-july-2026": {
+    "title": "Mount Rainier from Sunrise",
+    "location": "Sunrise, Mount Rainier National Park, Washington",
+    "description": "Sunrise is the highest you can drive in Mount Rainier National Park, and the Emmons Glacier fills most of the view from the Burroughs Mountain trail. I started in fog down in the meadows and walked out the top of it about an hour up. Shaggy mane mushrooms collapsing into ink on the way back down."
+  },
+
+  "tibet-spring-2026": {
+    "title": "Across the Tibetan plateau",
+    "location": "Tibet, China",
+    "description": "Lhasa and then west, over passes and past lakes most of the way. The Potala Palace, brown-headed gulls at Namtso, yaks strung out across a snowfield, a glacier sitting right beside the road, and Tibetan gazelles and kiang out on the open plateau. Everything is at altitude and the weather turns in minutes."
+  },
+
+  "various-april-wildlife-2026": {
+    "title": "April tide pools and fence lizards",
+    "location": "Washington",
+    "description": "Half tide pools, half sun-warmed driftwood. Ochre sea stars, gunnels wedged into the damp, shrimp, and a kelp crab riding on top of a sea star. Western fence lizards doing push-ups on the logs just above the tideline."
+  },
+
+  "zhangjiajie-april-2026": {
+    "title": "Zhangjiajie sandstone pillars and Tianmen Mountain",
+    "location": "Zhangjiajie, Hunan, China",
+    "description": "The quartz sandstone pillars in Wulingyuan are the ones people know from Avatar, and they hold mist most of the morning. Tianmen Mountain is the other half of this trip — the cable car, the 99 bends road, and the staircase up through Heaven's Gate. A pig-shaped monorail train runs through the forest park, which I did not expect"
+  }
+}

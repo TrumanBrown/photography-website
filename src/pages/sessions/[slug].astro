@@ -4,7 +4,7 @@ import { Picture } from 'astro:assets';
 import type { ImageMetadata } from 'astro';
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import Lightbox from '@/components/Lightbox.astro';
-import { sessionSlug, formatDate, formatExif, sortSessions } from '@/lib/sessions';
+import { sessionSlug, formatDate, formatExif, sortSessions, copyrightLine } from '@/lib/sessions';
 import { siteConfig } from '../../../site.config';
 
 type SessionLink = {
@@ -74,7 +74,46 @@ const resolved: Resolved[] = imageList.map((img) => {
 const coverFile = entry.data.cover ?? imageList[0]?.file;
 const coverResolved = resolved.find((r) => r.file === coverFile) ?? resolved[0];
 const ogImage = coverResolved?.fullUrl;
-const pageDescription = description || `${title}${location ? ` in ${location}` : ''}: ${imageList.length} photographs by ${siteConfig.ownerName}.`;
+// Skip the location when the title already names it, so auto-generated copy
+// doesn't read "Mt Everest May 2026 in Tibet side of Mt Everest".
+const locationSuffix =
+  location && !title.toLowerCase().includes(location.toLowerCase()) ? `, ${location}` : '';
+const pageDescription =
+  description ||
+  `${imageList.length} photograph${imageList.length === 1 ? '' : 's'} from ${title}${locationSuffix}, by ${siteConfig.ownerName}.`;
+
+// An empty alt tells search engines and screen readers to skip the image, so
+// fall back to the session's own title and location when there's no caption.
+const fallbackAlt = location ? `${title}, ${location}` : title;
+
+const siteOrigin = Astro.site ?? `https://${siteConfig.domain}`;
+const pageUrl = new URL(`/sessions/${slug}/`, siteOrigin).toString();
+const structuredData = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Photography', item: siteOrigin.toString() },
+        { '@type': 'ListItem', position: 2, name: title, item: pageUrl },
+      ],
+    },
+    // Image metadata is the one image-related markup Google documents support
+    // for. contentUrl points at the full-resolution original so Google Images
+    // has a discovery path to it beyond the single og:image cover.
+    ...resolved
+      .filter((img) => img.fullUrl.startsWith('http'))
+      .map((img) => ({
+        '@type': 'ImageObject',
+        contentUrl: img.fullUrl,
+        representativeOfPage: img.file === coverFile,
+        ...(img.caption ? { caption: img.caption, name: img.caption } : { name: fallbackAlt }),
+        creator: { '@type': 'Person', name: siteConfig.ownerName },
+        creditText: siteConfig.ownerName,
+        copyrightNotice: copyrightLine(),
+      })),
+  ],
+};
 ---
 
 <BaseLayout
@@ -84,6 +123,8 @@ const pageDescription = description || `${title}${location ? ` in ${location}` :
   ogImageAlt={coverResolved?.caption ?? `${title} cover photograph`}
   activeSlug={slug}
 >
+  <script type="application/ld+json" set:html={JSON.stringify(structuredData)} is:inline />
+
   <article class="mx-auto max-w-6xl px-4 py-10 sm:px-6">
     <header class="mb-8 space-y-2">
       <a href="/" class="text-xs text-neutral-600 no-underline hover:underline dark:text-neutral-400">← All sessions</a>
@@ -114,8 +155,9 @@ const pageDescription = description || `${title}${location ? ` in ${location}` :
             >
               <Picture
                 src={img.src}
-                alt={img.caption ?? ''}
+                alt={img.caption || fallbackAlt}
                 widths={[480, 800, 1200, 1600]}
+                width={Math.min(1600, img.src.width)}
                 sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
                 formats={['webp']}
                 fallbackFormat="jpeg"

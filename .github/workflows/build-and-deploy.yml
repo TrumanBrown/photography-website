@@ -100,6 +100,17 @@ jobs:
         if: env.CAN_USE_AZURE == 'true'
         env:
           AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
+          # Optional. When set, sessions uploaded without a description get one
+          # drafted from their own photographs and written back to _session.json,
+          # so it costs one call per session ever. Unset, prebuild behaves exactly
+          # as before and descriptions stay empty.
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+          # Separate opt-in for per-image captions, which become alt text.
+          # "1" captions every session; a slug (or comma-separated slugs)
+          # captions only those, which is the way to trial one before
+          # captioning the whole archive. Unset means no captions.
+          DESCRIBE_CAPTIONS: ${{ vars.DESCRIBE_CAPTIONS }}
         run: node scripts/prebuild.mjs
 
       - name: Save prebuild cache

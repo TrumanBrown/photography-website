@@ -2,3 +2,4 @@ User-agent: *
 Allow: /
 
 Sitemap: https://trumanbrown.com/sitemap-index.xml
+Sitemap: https://trumanbrown.com/image-sitemap.xml
