@@ -3,61 +3,64 @@ import { getCollection } from "astro:content";
 import type { ImageMetadata } from "astro";
 import BaseLayout from "@/layouts/BaseLayout.astro";
 import SessionCard from "@/components/SessionCard.astro";
+import LeadPhoto from "@/components/LeadPhoto.astro";
+import HobbyBand from "@/components/HobbyBand.astro";
 import { sortSessions, sessionSlug } from "@/lib/sessions";
-import { groupByRegion } from "@/lib/places";
+import { buildLeadFrames, coverFileOf, type LeadItem } from "@/lib/archive";
 import { siteConfig } from "../../site.config";
 
 // Eagerly resolve every image under src/content/sessions/ so we can look up
-// cover image metadata at build time. Astro processes each as an ImageMetadata.
+// image metadata at build time. Astro processes each as an ImageMetadata.
 const images = import.meta.glob<{ default: ImageMetadata }>(
   "/src/content/sessions/**/images/*.{jpg,jpeg,png,webp,avif,JPG,JPEG,PNG,WEBP,AVIF}",
   { eager: true },
 );
 
-function resolveCover(
-  slug: string,
-  coverFile: string | undefined,
-  fallbackFile: string,
-): ImageMetadata {
-  const file = coverFile ?? fallbackFile;
+function resolveImage(slug: string, file: string): ImageMetadata {
   const key = `/src/content/sessions/${slug}/images/${file}`;
   const mod = images[key];
   if (!mod) {
     throw new Error(
-      `Cover image not found for session "${slug}": expected ${key}. ` +
-        `Check that scripts/prebuild.mjs placed the file or update the session JSON's "cover" field.`,
+      `Image not found for session "${slug}": expected ${key}. ` +
+        `Check that scripts/prebuild.mjs placed the file or update the session JSON.`,
     );
   }
   return mod.default;
 }
 
-const all = await getCollection("sessions");
-const sessions = sortSessions(all);
-
-// Group by year for browsability when there are many sessions.
-type Entry = (typeof sessions)[number];
-const byYear = new Map<string, Entry[]>();
-for (const entry of sessions) {
-  const year = entry.data.date.slice(0, 4);
-  const bucket = byYear.get(year) ?? [];
-  bucket.push(entry);
-  byYear.set(year, bucket);
-}
-const years = [...byYear.keys()].sort((a, b) => b.localeCompare(a));
-const firstVisible = years.length > 0 ? byYear.get(years[0])?.[0] : undefined;
-const firstCoverFile =
-  firstVisible?.data.cover ?? firstVisible?.data.images[0]?.file;
-const firstCoverRecord = firstVisible?.data.images.find(
-  (image) => image.file === firstCoverFile,
-);
+const sessions = sortSessions(await getCollection("sessions"));
 const totalPhotos = sessions.reduce(
   (total, session) => total + session.data.images.length,
   0,
 );
-const portfolioCount = `${sessions.length} session${sessions.length === 1 ? "" : "s"} · ${totalPhotos} photograph${totalPhotos === 1 ? "" : "s"}`;
+const places = new Set(
+  sessions.map((entry) => entry.data.location?.trim()).filter(Boolean),
+);
+
+const summary = [
+  `${sessions.length} session${sessions.length === 1 ? "" : "s"}`,
+  `${totalPhotos} photograph${totalPhotos === 1 ? "" : "s"}`,
+  places.size > 1 ? `${places.size} places` : null,
+]
+  .filter(Boolean)
+  .join(" · ");
+
+// The photographs that rotate in the lead box: whatever the admin panel put in
+// each session's `showcase`, or one 3:2 frame per session picked automatically.
+const lead: LeadItem[] = buildLeadFrames(sessions).map((frame) => ({
+  slug: frame.slug,
+  title: frame.title,
+  location: frame.location,
+  image: resolveImage(frame.slug, frame.file),
+  alt: frame.caption ?? `${frame.title.split(" — ")[0]} — photograph`,
+}));
+
+const first = sessions[0];
+const firstCover = first?.data.images.find(
+  (image) => image.file === coverFileOf(first),
+);
 
 const siteOrigin = (Astro.site ?? `https://${siteConfig.domain}`).toString();
-const regions = groupByRegion(sessions);
 // Identifies the photographer as an entity, with the off-site profiles that
 // corroborate it. Kept to the home page so it isn't repeated site-wide.
 const personSchema = {
@@ -74,10 +77,8 @@ const personSchema = {
 ---
 
 <BaseLayout
-  ogImage={firstCoverRecord?.fullUrl}
-  ogImageAlt={firstVisible
-    ? `${firstVisible.data.title} cover photograph`
-    : undefined}
+  ogImage={firstCover?.fullUrl}
+  ogImageAlt={first ? `${first.data.title} cover photograph` : undefined}
 >
   <script
     type="application/ld+json"
@@ -85,87 +86,113 @@ const personSchema = {
     is:inline
   />
 
-  <section class="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
-    <header
-      class="mb-8 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-6"
-    >
-      <div>
-        <h1 class="text-2xl font-semibold tracking-tight">Photography</h1>
-      </div>
-      {
-        sessions.length > 0 && (
-          <p class="shrink-0 text-xs tabular-nums text-neutral-500 dark:text-neutral-400">
-            {portfolioCount}
-          </p>
-        )
-      }
-    </header>
-    {
-      regions.length > 1 && (
-        <nav aria-label="Browse by place" class="mb-10">
-          <h2 class="mb-3 text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
-            By place
-          </h2>
-          <ul class="flex flex-wrap gap-2">
-            {regions.map((group) => (
-              <li>
-                <a
-                  href={`/places/${group.slug}`}
-                  class="inline-flex items-baseline gap-2 rounded-full border border-neutral-200 px-3 py-1.5 text-sm no-underline hover:border-neutral-400 dark:border-neutral-800 dark:hover:border-neutral-600"
-                >
-                  <span>{group.region}</span>
-                  <span class="text-xs tabular-nums text-neutral-500 dark:text-neutral-400">
-                    {group.sessions.length}
-                  </span>
-                </a>
-              </li>
-            ))}
-          </ul>
-        </nav>
-      )
-    }
+  <div class="overview">
+    <div class="ohead">
+      <h1>Photographs</h1>
+      {sessions.length > 0 && <span class="u-label">{summary}</span>}
+    </div>
+
+    {lead.length > 0 && <LeadPhoto items={lead} />}
+
     {
       sessions.length === 0 ? (
-        <div class="rounded-lg border border-dashed border-neutral-300 p-10 text-center text-neutral-600 dark:border-neutral-700 dark:text-neutral-400">
-          <p class="text-sm">
-            No sessions yet. Add a folder under{" "}
-            <code class="font-mono">originals/</code> in Blob Storage, then
-            trigger a build.
+        <div class="empty">
+          <p>
+            No sessions yet. Add a folder under <code>originals/</code> in Blob
+            Storage, then trigger a build.
           </p>
         </div>
       ) : (
-        <div class="space-y-12">
-          {years.map((year) => (
-            <section aria-labelledby={`year-${year}`}>
-              <h2
-                id={`year-${year}`}
-                class="mb-4 border-b border-neutral-200 pb-2 text-sm font-semibold uppercase tracking-wider text-neutral-500 dark:border-neutral-800 dark:text-neutral-400"
-              >
-                {year}
-              </h2>
-              <ul class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                {byYear.get(year)!.map((entry) => {
-                  const slug = sessionSlug(entry);
-                  const cover = resolveCover(
-                    slug,
-                    entry.data.cover,
-                    entry.data.images[0].file,
-                  );
-                  return (
-                    <li>
-                      <SessionCard
-                        entry={entry}
-                        cover={cover}
-                        priority={entry.id === firstVisible?.id}
-                      />
-                    </li>
-                  );
-                })}
-              </ul>
-            </section>
-          ))}
+        <div class="grid">
+          <div class="cards">
+            {sessions.map((entry, index) => (
+              <SessionCard
+                entry={entry}
+                cover={resolveImage(sessionSlug(entry), coverFileOf(entry))}
+                priority={index < 3}
+              />
+            ))}
+          </div>
         </div>
       )
     }
-  </section>
+  </div>
+
+  <HobbyBand />
 </BaseLayout>
+
+<style>
+  .ohead {
+    padding: 26px var(--gutter) 0;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 18px;
+    flex-wrap: wrap;
+  }
+  .ohead h1 {
+    font-size: clamp(20px, 2.2vw, 27px);
+    font-weight: 300;
+    margin: 0;
+    line-height: 1.12;
+    letter-spacing: -0.012em;
+  }
+
+  .grid {
+    padding: 6vh var(--gutter) 10vh;
+  }
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 30px 22px;
+  }
+
+  .empty {
+    margin: 40px var(--gutter) 10vh;
+    border: 1px dashed var(--rule);
+    padding: 40px;
+    text-align: center;
+    color: var(--ink-2);
+    font-size: 14px;
+  }
+  .empty code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13px;
+  }
+
+  @media (max-width: 899px) {
+    .ohead {
+      padding-top: 18px;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .cards {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 22px 14px;
+    }
+    .grid {
+      padding-top: 5vh;
+    }
+  }
+</style>
+
+<script>
+  /* Pointing at a card moves the globe to where that session was shot. */
+  const cards = document.querySelectorAll<HTMLElement>("[data-session-card]");
+  function highlight(location: string | null, note?: string) {
+    document.dispatchEvent(
+      new CustomEvent("archive:highlight", { detail: { location, note } }),
+    );
+  }
+  for (const card of cards) {
+    card.addEventListener("pointerenter", () =>
+      highlight(card.dataset.location || null, card.dataset.note),
+    );
+    card.addEventListener("focus", () =>
+      highlight(card.dataset.location || null, card.dataset.note),
+    );
+  }
+  document
+    .querySelector(".cards")
+    ?.addEventListener("pointerleave", () => highlight(null));
+</script>

@@ -1,10 +1,10 @@
 ---
-import { getCollection } from 'astro:content';
-import BaseLayout from '@/layouts/BaseLayout.astro';
-import HobbyCard from '@/components/HobbyCard.astro';
-import { sortHobbies } from '@/lib/hobbies';
+import { getCollection } from "astro:content";
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import HobbyCard from "@/components/HobbyCard.astro";
+import { sortHobbies } from "@/lib/hobbies";
 
-const hobbies = sortHobbies(await getCollection('hobbies'));
+const hobbies = sortHobbies(await getCollection("hobbies"));
 ---
 
 <BaseLayout
@@ -14,9 +14,12 @@ const hobbies = sortHobbies(await getCollection('hobbies'));
 >
   <section class="mx-auto max-w-6xl px-4 py-10 sm:px-6">
     <header class="mb-8 space-y-2">
-      <h1 class="text-2xl font-semibold tracking-tight sm:text-3xl">Hobbies</h1>
+      <h1 class="text-2xl font-light tracking-tight sm:text-[30px]">
+        Things to try
+      </h1>
       <p class="max-w-prose text-sm text-neutral-600 dark:text-neutral-400">
-        Some of my hobbies and silly little virtual experiences I built around them. Maybe they will inspire you to give them a shot IRL
+        Some of my hobbies and silly little virtual experiences I built around
+        them. Maybe they will inspire you to give them a shot IRL
       </p>
     </header>
 
@@ -26,7 +29,7 @@ const hobbies = sortHobbies(await getCollection('hobbies'));
           Nothing here yet.
         </div>
       ) : (
-        <ul class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <ul class="grid grid-cols-1 gap-x-10 sm:grid-cols-2 lg:grid-cols-3">
           {hobbies.map((entry) => (
             <li>
               <HobbyCard entry={entry} />

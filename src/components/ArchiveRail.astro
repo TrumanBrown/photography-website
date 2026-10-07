@@ -1,0 +1,482 @@
+---
+import { getCollection } from "astro:content";
+import { sortSessions, sessionSlug } from "@/lib/sessions";
+import { buildPlaces } from "@/lib/archive";
+import { siteConfig } from "../../site.config";
+
+interface Props {
+  /** Slug of the session being shown, for the highlight. */
+  activeSlug?: string;
+  /** Which top-level section is current, for the nav state. */
+  section?: "photography" | "hobbies";
+}
+
+const { activeSlug, section = "photography" } = Astro.props;
+
+const sessions = sortSessions(await getCollection("sessions"));
+const places = buildPlaces(sessions);
+
+const MONTHS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+/** Month heading, with the year only when the archive spans more than one. */
+const years = new Set(sessions.map((entry) => entry.data.date.slice(0, 4)));
+function monthLabel(iso: string): string {
+  const [year, month] = iso.split("-");
+  const name = MONTHS[Number(month) - 1] ?? "";
+  return years.size > 1 ? `${name} ${year}` : name;
+}
+
+type Row =
+  | { kind: "heading"; label: string }
+  | { kind: "session"; entry: (typeof sessions)[number] };
+const rows: Row[] = [];
+let lastHeading = "";
+for (const entry of sessions) {
+  const label = monthLabel(entry.data.date);
+  if (label !== lastHeading) {
+    rows.push({ kind: "heading", label });
+    lastHeading = label;
+  }
+  rows.push({ kind: "session", entry });
+}
+
+/** Short label for a session in the rail: the place, falling back to the title. */
+function railLabel(entry: (typeof sessions)[number]): string {
+  const location = entry.data.location?.trim();
+  if (location) return location;
+  return entry.data.title.split(" — ")[0];
+}
+---
+
+<aside id="archive-rail" class="rail" aria-label="Sessions">
+  <div class="rail-top">
+    <a class="me" href="/">{siteConfig.ownerName}</a>
+    <nav class="rail-nav u-label" aria-label="Primary">
+      <a
+        href="/"
+        class:list={["rail-link", section === "photography" && "here"]}
+        >Photographs</a
+      >
+      {
+        siteConfig.sections.hobbies && (
+          <a
+            href="/hobbies"
+            class:list={["rail-link", section === "hobbies" && "here"]}
+          >
+            Things to try
+          </a>
+        )
+      }
+    </nav>
+    <button id="rail-close" class="rail-close u-label" type="button"
+      >Close</button
+    >
+  </div>
+
+  {
+    sessions.length > 0 && (
+      <div class="rail-filter">
+        <label class="sr-only" for="rail-search">
+          Filter sessions
+        </label>
+        <input
+          id="rail-search"
+          type="search"
+          placeholder="Filter sessions"
+          autocomplete="off"
+        />
+      </div>
+    )
+  }
+
+  <div class="rail-list" id="rail-list">
+    {
+      sessions.length === 0 ? (
+        <p class="rail-empty">No sessions yet.</p>
+      ) : (
+        rows.map((row) =>
+          row.kind === "heading" ? (
+            <h3 class="u-label" data-rail-heading>
+              {row.label}
+            </h3>
+          ) : (
+            <a
+              class:list={[
+                "rail-item",
+                sessionSlug(row.entry) === activeSlug && "on",
+              ]}
+              href={`/sessions/${sessionSlug(row.entry)}/`}
+              data-rail-item
+              data-search={`${row.entry.data.title} ${row.entry.data.location ?? ""} ${row.entry.data.date}`.toLowerCase()}
+            >
+              <span class="t">{railLabel(row.entry)}</span>
+              <span class="m">
+                <span>{monthLabel(row.entry.data.date)}</span>
+                <span class="tabular-nums">{row.entry.data.images.length}</span>
+              </span>
+            </a>
+          ),
+        )
+      )
+    }
+    <p class="rail-empty" id="rail-none" hidden>No sessions match.</p>
+  </div>
+
+  {
+    places.length > 1 && (
+      <div class="orb" id="orb" data-places={JSON.stringify(places)}>
+        <canvas
+          id="orb-canvas"
+          aria-label="Spin the globe to jump somewhere I've photographed"
+        />
+        <p class="orb-place" id="orb-place">
+          {places.length} places
+        </p>
+        <p class="u-label" id="orb-sub" />
+        <div class="orb-row">
+          <button class="orb-spin" type="button" id="orb-spin">
+            Spin it
+          </button>
+          <span class="u-label">{places.length} places</span>
+        </div>
+      </div>
+    )
+  }
+</aside>
+
+<style>
+  .rail {
+    width: var(--rail-w, 212px);
+    flex: none;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--rule);
+    background: var(--paper);
+    z-index: 40;
+  }
+
+  .rail-top {
+    padding: 18px 16px 12px;
+    position: relative;
+  }
+  .me {
+    display: block;
+    color: var(--ink);
+    text-decoration: none;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+  .rail-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    margin-top: 12px;
+  }
+  .rail-link {
+    color: var(--ink-2);
+    text-decoration: none;
+  }
+  .rail-link.here {
+    color: var(--ink);
+  }
+  .rail-close {
+    display: none;
+    position: absolute;
+    top: 18px;
+    right: 14px;
+    background: none;
+    border: 1px solid var(--rule);
+    color: var(--ink-2);
+    padding: 5px 9px;
+    cursor: pointer;
+  }
+
+  .rail-filter {
+    padding: 0 16px 10px;
+  }
+  .rail-filter input {
+    width: 100%;
+    font: inherit;
+    font-size: 13px;
+    color: var(--ink);
+    background: none;
+    border: 0;
+    border-bottom: 1px solid var(--rule);
+    padding: 5px 0;
+  }
+  .rail-filter input::placeholder {
+    color: var(--ink-2);
+  }
+  .rail-filter input:focus {
+    outline: none;
+    border-color: var(--ink);
+    box-shadow: none;
+  }
+
+  .rail-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 8px 14px;
+    scrollbar-width: thin;
+  }
+  .rail-list h3 {
+    margin: 14px 8px 4px;
+  }
+  .rail-item {
+    display: block;
+    padding: 5px 8px;
+    color: var(--ink);
+    text-decoration: none;
+    border-left: 2px solid transparent;
+  }
+  .rail-item:hover {
+    background: var(--hover);
+    text-decoration: none;
+  }
+  .rail-item.on {
+    border-left-color: var(--ink);
+    background: var(--hover);
+  }
+  .rail-item .t {
+    display: block;
+    font-size: 13px;
+    line-height: 1.25;
+  }
+  .rail-item .m {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-2);
+    margin-top: 1px;
+  }
+  .rail-empty {
+    padding: 12px 10px;
+    color: var(--ink-2);
+    font-size: 13px;
+  }
+
+  .orb {
+    border-top: 1px solid var(--rule);
+    padding: 12px 16px 14px;
+  }
+  .orb canvas {
+    width: 100%;
+    max-width: 152px;
+    margin-inline: auto;
+    height: auto;
+    display: block;
+    touch-action: none;
+    cursor: grab;
+  }
+  .orb canvas.is-dragging {
+    cursor: grabbing;
+  }
+  .orb-place {
+    margin: 8px 0 0;
+    font-size: 12px;
+    line-height: 1.3;
+  }
+  .orb-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .orb-spin {
+    font: inherit;
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    background: none;
+    border: 1px solid var(--ink);
+    color: var(--ink);
+    padding: 7px 10px;
+    cursor: pointer;
+  }
+  .orb-spin:hover {
+    background: var(--ink);
+    color: var(--paper);
+  }
+
+  /* Below the rail breakpoint it becomes a drawer. */
+  @media (max-width: 899px) {
+    .rail {
+      position: fixed;
+      inset: 0 auto 0 0;
+      height: auto;
+      width: 290px;
+      transform: translateX(-100%);
+      transition: transform 280ms ease;
+      box-shadow: 1px 0 0 var(--rule);
+      z-index: 60;
+    }
+    :global(body.rail-open) .rail {
+      transform: none;
+    }
+    .rail-close {
+      display: block;
+    }
+    .orb canvas {
+      max-width: 210px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .rail {
+      transition: none;
+    }
+  }
+</style>
+
+<script>
+  import { createGlobe, type GlobePlace } from "@/lib/globe";
+
+  const list = document.getElementById("rail-list");
+  const search = document.getElementById(
+    "rail-search",
+  ) as HTMLInputElement | null;
+  const none = document.getElementById("rail-none");
+
+  /* Filtering hides empty month headings too, so the list never shows a month
+     with nothing under it. */
+  function applyFilter() {
+    if (!list || !search) return;
+    const query = search.value.trim().toLowerCase();
+    const items = [...list.querySelectorAll<HTMLElement>("[data-rail-item]")];
+    let shown = 0;
+    for (const item of items) {
+      const match = !query || (item.dataset.search ?? "").includes(query);
+      item.hidden = !match;
+      if (match) shown++;
+    }
+    for (const heading of list.querySelectorAll<HTMLElement>(
+      "[data-rail-heading]",
+    )) {
+      let visible = false;
+      let node = heading.nextElementSibling as HTMLElement | null;
+      while (node && !node.hasAttribute("data-rail-heading")) {
+        if (node.hasAttribute("data-rail-item") && !node.hidden) visible = true;
+        node = node.nextElementSibling as HTMLElement | null;
+      }
+      heading.hidden = !visible;
+    }
+    if (none) none.hidden = shown > 0;
+  }
+  search?.addEventListener("input", applyFilter);
+
+  /* Keep the highlighted session in view without scrolling the page. */
+  const current = list?.querySelector<HTMLElement>(".rail-item.on");
+  if (list && current) {
+    const top = current.offsetTop;
+    if (
+      top < list.scrollTop ||
+      top + current.offsetHeight > list.scrollTop + list.clientHeight
+    ) {
+      list.scrollTop = top - list.clientHeight / 2 + current.offsetHeight / 2;
+    }
+  }
+
+  document.getElementById("rail-close")?.addEventListener("click", () => {
+    document.body.classList.remove("rail-open");
+  });
+
+  /* ---- globe ---- */
+  const orb = document.getElementById("orb");
+  const canvas = document.getElementById(
+    "orb-canvas",
+  ) as HTMLCanvasElement | null;
+  if (orb && canvas) {
+    let places: GlobePlace[] = [];
+    try {
+      places = JSON.parse(orb.dataset.places ?? "[]");
+    } catch {
+      places = [];
+    }
+
+    const placeEl = document.getElementById("orb-place");
+    const subEl = document.getElementById("orb-sub");
+    const active = document.querySelector<HTMLElement>(".rail-item.on");
+    const activeHref = active?.getAttribute("href") ?? "";
+
+    function describe(place: GlobePlace) {
+      if (placeEl) placeEl.textContent = place.name;
+      if (subEl) {
+        subEl.textContent =
+          place.slugs.length === 1
+            ? "1 session here"
+            : `${place.slugs.length} sessions here`;
+      }
+    }
+
+    const globe = createGlobe({
+      canvas,
+      places,
+      onArrive(place) {
+        const slug =
+          place.slugs[Math.floor(Math.random() * place.slugs.length)];
+        describe(place);
+        if (slug) window.location.href = `/sessions/${slug}/`;
+      },
+    });
+
+    /* On a session page the globe starts pointed at that session. */
+    const here = places.find((place) =>
+      place.slugs.some((slug) =>
+        activeHref.replace(/\/$/, "").endsWith(`/sessions/${slug}`),
+      ),
+    );
+    if (here) {
+      globe.mark(here.name);
+      globe.goTo(here.name, { silent: true });
+      describe(here);
+    } else if (places.length) {
+      globe.mark(null);
+      if (placeEl) placeEl.textContent = "Everywhere, this year";
+      if (subEl) subEl.textContent = `${places.length} places`;
+    }
+
+    document
+      .getElementById("orb-spin")
+      ?.addEventListener("click", () => globe.spin());
+
+    /* The overview marks whatever card you're pointing at. */
+    document.addEventListener("archive:highlight", (event) => {
+      const detail = (
+        event as CustomEvent<{ location: string | null; note?: string }>
+      ).detail;
+      if (!detail) return;
+      if (!detail.location) {
+        globe.mark(null);
+        if (placeEl) placeEl.textContent = "Everywhere, this year";
+        if (subEl) subEl.textContent = `${places.length} places`;
+        return;
+      }
+      const match = places.find((place) => place.name === detail.location);
+      if (!match) return;
+      globe.mark(match.name);
+      if (placeEl) placeEl.textContent = match.name;
+      if (subEl) subEl.textContent = detail.note ?? "";
+    });
+  }
+</script>

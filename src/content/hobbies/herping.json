@@ -12,5 +12,6 @@
     "heading": "My reptiles & amphibians, mapped",
     "blurb": "Every reptile and amphibian I've logged on iNaturalist, heat-mapped by where I found them. Toggle reptiles vs. amphibians, then tap a country (or the US, then a state) to zoom in and see each observation.",
     "limit": 300
-  }
+  },
+  "iconSrc": "/hobbies/herping-icon.svg"
 }

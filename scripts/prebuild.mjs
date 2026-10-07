@@ -311,13 +311,28 @@ async function processSession({ prefix, originalsClient, derivativesClient, serv
     const width = meta.width ?? 0;
     const height = meta.height ?? 0;
 
-    let captureDate;
+    let sessionCoords;
+  let captureDate;
     let exifSettings;
     try {
       const { default: exifr } = await import('exifr');
-      const exif = await exifr.parse(localPath, { tiff: true, ifd0: true, exif: true });
+      const exif = await exifr.parse(localPath, { tiff: true, ifd0: true, exif: true, gps: true });
       captureDate = exif?.DateTimeOriginal || exif?.CreateDate || exif?.ModifyDate;
       exifSettings = buildExifSettings(exif);
+      // First photograph with a position fixes the session on the globe. Most
+      // cameras record nothing, in which case src/lib/geo.ts falls back to the
+      // location string.
+      if (
+        !sessionCoords &&
+        Number.isFinite(exif?.latitude) &&
+        Number.isFinite(exif?.longitude) &&
+        (exif.latitude !== 0 || exif.longitude !== 0)
+      ) {
+        sessionCoords = {
+          lat: Number(exif.latitude.toFixed(5)),
+          lon: Number(exif.longitude.toFixed(5)),
+        };
+      }
     } catch {
       // ignore — synthetic JPEGs and stripped images may have no EXIF
     }
@@ -362,6 +377,14 @@ async function processSession({ prefix, originalsClient, derivativesClient, serv
     ? (targetBySource.get(sidecar.cover) ?? sidecar.cover)
     : undefined;
 
+  // Photographs chosen in the admin panel for the rotating lead box. Names go
+  // through the same rename table as the cover, and anything no longer in the
+  // session is dropped.
+  const presentFiles = new Set(orderedImages.map((image) => image.file));
+  const showcase = (Array.isArray(sidecar.showcase) ? sidecar.showcase : [])
+    .map((file) => targetBySource.get(file) ?? file)
+    .filter((file) => presentFiles.has(file));
+
   const sessionRecord = {
     title: sidecar.title ?? humanize(slug),
     date: sidecar.date ?? earliestExifDate?.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
@@ -369,6 +392,8 @@ async function processSession({ prefix, originalsClient, derivativesClient, serv
     description: sidecar.description ?? '',
     ...(cover ? { cover } : {}),
     ...(sidecar.order != null ? { order: sidecar.order } : {}),
+    ...(showcase.length ? { showcase } : {}),
+    ...(sessionCoords ? { coords: sessionCoords } : {}),
     images: orderedImages,
   };
 
@@ -394,6 +419,13 @@ async function processSession({ prefix, originalsClient, derivativesClient, serv
     cover: sessionRecord.cover ?? '',
     order: sessionRecord.order ?? null,
     images: orderedImages.map((i) => i.file),
+    showcase,
+    // Aspect ratios so the admin can show which frames fit the 3:2 lead box.
+    ratios: Object.fromEntries(
+      orderedImages
+        .filter((i) => i.width > 0 && i.height > 0)
+        .map((i) => [i.file, Number((i.width / i.height).toFixed(4))]),
+    ),
     captions: Object.fromEntries(
       orderedImages
         .filter((image) => image.caption)
@@ -725,6 +757,17 @@ export function validateSessionSidecar(value, source = '_session.json') {
   }
   if (value.order !== undefined && value.order !== null && !Number.isInteger(value.order)) {
     problems.push('order must be an integer or null');
+  }
+  if (value.showcase !== undefined) {
+    if (!Array.isArray(value.showcase)) {
+      problems.push('showcase must be an array of filenames');
+    } else {
+      value.showcase.forEach((item, index) => {
+        if (typeof item !== 'string' || !item) {
+          problems.push(`showcase[${index}] must be a non-empty filename`);
+        }
+      });
+    }
   }
   if (value.images !== undefined) {
     if (!Array.isArray(value.images)) {

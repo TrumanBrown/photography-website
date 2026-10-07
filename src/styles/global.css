@@ -2,21 +2,74 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Libre Franklin, self-hosted. The CSP allows font-src 'self' only, so this
+   can't come from a font CDN. One variable file covers 300-500. */
+@font-face {
+  font-family: "Libre Franklin";
+  src: url("/fonts/libre-franklin-latin.woff2") format("woff2");
+  font-weight: 300 500;
+  font-style: normal;
+  font-display: swap;
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 @layer base {
   :root {
     color-scheme: light dark;
-  }
 
-  html {
-    @apply bg-white text-neutral-900 antialiased;
+    /* One palette for the whole archive. Components read these rather than
+       hard-coding neutrals, so the theme toggle keeps working. */
+    --paper: #fbfaf8;
+    --band: #f3f0ea;
+    --ink: #16150f;
+    --ink-2: #8a857a;
+    --ink-3: #4a463d;
+    --rule: #e4e0d7;
+    --rule-soft: #eeebe3;
+    --stack-1: #d8d2c4;
+    --stack-2: #c7c0ae;
+    --hover: #f2efe9;
+
+    /* Globe ink. Canvas can't read Tailwind classes, so the colours live here
+       and src/lib/globe.ts resolves them at draw time. */
+    --globe-ink: #16150f;
+    --globe-dim: #a9a397;
+    --globe-rule: #ddd8cd;
+    --globe-grid: #eeebe3;
+    --globe-coast: #bab4a6;
   }
 
   html.dark {
-    @apply bg-neutral-950 text-neutral-100;
+    --paper: #121211;
+    --band: #181816;
+    --ink: #ece9e1;
+    --ink-2: #8d877a;
+    --ink-3: #b8b2a4;
+    --rule: #2b2924;
+    --rule-soft: #232220;
+    --stack-1: #2e2c27;
+    --stack-2: #3a372f;
+    --hover: #1c1b19;
+
+    --globe-ink: #ece9e1;
+    --globe-dim: #6f6a5f;
+    --globe-rule: #37342d;
+    --globe-grid: #242320;
+    --globe-coast: #5d584d;
+  }
+
+  html {
+    @apply antialiased;
+    background: var(--paper);
+    color: var(--ink);
   }
 
   body {
     @apply min-h-screen font-sans;
+    background: var(--paper);
   }
 
   a {
@@ -30,7 +83,21 @@
   /* Visible keyboard-focus ring for accessibility. Only shows for keyboard
      users (not mouse clicks) via :focus-visible. */
   :focus-visible {
-    @apply outline-none ring-2 ring-neutral-900 ring-offset-2 ring-offset-white dark:ring-white dark:ring-offset-neutral-950;
+    outline: none;
+    box-shadow:
+      0 0 0 2px var(--paper),
+      0 0 0 4px var(--ink);
     border-radius: 0.125rem;
+  }
+}
+
+@layer components {
+  /* Small letterspaced label used throughout the archive. */
+  .u-label {
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-2);
+    font-weight: 400;
   }
 }

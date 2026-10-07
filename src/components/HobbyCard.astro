@@ -1,55 +1,87 @@
 ---
-import type { CollectionEntry } from 'astro:content';
-import { hobbySlug } from '@/lib/hobbies';
+import type { CollectionEntry } from "astro:content";
+import { hobbySlug } from "@/lib/hobbies";
 
 interface Props {
-  entry: CollectionEntry<'hobbies'>;
+  entry: CollectionEntry<"hobbies">;
 }
 
 const { entry } = Astro.props;
 const slug = hobbySlug(entry);
-const { title, summary, emoji, accent, iconSrc, interactive } = entry.data;
-const cta = interactive ? 'Play it' : 'Explore';
+const { title, summary, emoji, iconSrc, interactive } = entry.data;
+const cta = interactive ? "Play it" : "Explore";
 ---
 
-<a href={`/hobbies/${slug}`} class="group block h-full no-underline">
-  <div class="flex h-full flex-col gap-4 rounded-lg border border-neutral-200 p-5 transition duration-200 hover:-translate-y-0.5 hover:border-neutral-300 hover:bg-neutral-50 hover:shadow-md dark:border-neutral-800 dark:hover:border-neutral-700 dark:hover:bg-neutral-900">
-    <div
-      class="flex h-14 w-14 items-center justify-center rounded-lg bg-neutral-100 dark:bg-neutral-800"
-      style={accent ? `background-color:${accent}1a` : undefined}
-      aria-hidden="true"
-    >
-      {
-        iconSrc ? (
-          <img src={iconSrc} alt="" width="40" height="40" class="h-10 w-10" />
-        ) : (
-          <span class="text-3xl">{emoji}</span>
-        )
-      }
-    </div>
-    <div class="space-y-1">
-      <h2 class="text-base font-medium group-hover:underline">{title}</h2>
-      <p class="text-sm text-neutral-600 dark:text-neutral-400">{summary}</p>
-    </div>
-    <div
-      class="mt-auto inline-flex items-center gap-1.5 pt-1 text-sm font-semibold text-sky-600 dark:text-sky-400"
-      style={accent ? `color:${accent}` : undefined}
-    >
-      {cta}
-      <svg
-        viewBox="0 0 16 16"
-        width="14"
-        height="14"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        class="transition-transform duration-200 ease-out group-hover:translate-x-1"
-        aria-hidden="true"
-      >
-        <path d="M3 8h9M9 4.5 12.5 8 9 11.5" />
-      </svg>
-    </div>
-  </div>
+<a href={`/hobbies/${slug}/`} class="hcard">
+  <span class="mark" aria-hidden="true">
+    {
+      iconSrc ? (
+        <img src={iconSrc} alt="" width="52" height="52" loading="lazy" />
+      ) : (
+        <span class="emoji">{emoji}</span>
+      )
+    }
+  </span>
+  <span class="body">
+    <h2>{title}</h2>
+    <p>{summary}</p>
+    <span class="cta u-label">{cta} →</span>
+  </span>
 </a>
+
+<style>
+  /* Deliberately not a card: a rule, a mark and some type. The tinted icon
+     tile and accent-coloured call to action this replaced were the most
+     generic-looking thing on the site. */
+  .hcard {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    height: 100%;
+    padding: 18px 10px 20px 0;
+    border-top: 1px solid var(--rule);
+    color: inherit;
+    text-decoration: none;
+  }
+  .hcard:hover {
+    text-decoration: none;
+  }
+  .hcard:hover h2 {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .mark {
+    flex: none;
+    width: 52px;
+    height: 52px;
+    display: block;
+  }
+  .mark .emoji {
+    font-size: 34px;
+    line-height: 52px;
+    display: block;
+    text-align: center;
+  }
+
+  .body {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  h2 {
+    font-size: 17px;
+    font-weight: 400;
+    margin: 0;
+    line-height: 1.25;
+  }
+  p {
+    margin: 4px 0 0;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--ink-3);
+  }
+  .cta {
+    margin-top: 10px;
+  }
+</style>

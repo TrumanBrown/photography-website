@@ -1,0 +1,296 @@
+---
+import { getImage } from "astro:assets";
+import type { LeadItem } from "@/lib/archive";
+
+interface Props {
+  items: LeadItem[];
+  /** Seconds between photographs. */
+  interval?: number;
+}
+
+const { items, interval = 6 } = Astro.props;
+
+/* Resolve optimised URLs at build time. The rotation swaps `src` on a pair of
+   stacked <img> elements, so only the frames actually shown get downloaded —
+   rendering all of them as real elements would pull the whole archive. */
+const resolved = await Promise.all(
+  items.map(async (item) => {
+    const [small, large] = await Promise.all([
+      getImage({ src: item.image, width: 900, format: "webp" }),
+      getImage({ src: item.image, width: 1600, format: "webp" }),
+    ]);
+    const [place, when] = item.title.split(" — ");
+    return {
+      slug: item.slug,
+      label: place?.trim() || item.title,
+      when: when?.trim() ?? "",
+      location: item.location,
+      alt: item.alt,
+      src: large.src,
+      srcset: `${small.src} 900w, ${large.src} 1600w`,
+    };
+  }),
+);
+
+const first = resolved[0];
+---
+
+{
+  first && (
+    <section
+      class="lead"
+      data-lead={JSON.stringify(resolved)}
+      data-interval={interval}
+    >
+      <div class="plate">
+        <img
+          id="lead-a"
+          class="on"
+          src={first.src}
+          srcset={first.srcset}
+          sizes="(min-width: 900px) 70vw, 100vw"
+          alt={first.alt}
+          width="1600"
+          height="1067"
+          decoding="async"
+          fetchpriority="high"
+        />
+        <img
+          id="lead-b"
+          alt=""
+          width="1600"
+          height="1067"
+          decoding="async"
+          aria-hidden="true"
+        />
+        <a class="plate-link" id="lead-link" href={`/sessions/${first.slug}/`}>
+          <span class="sr-only">Open this session</span>
+        </a>
+      </div>
+      <div class="cap">
+        <a class="t" id="lead-title" href={`/sessions/${first.slug}/`}>
+          {first.label}
+        </a>
+        <span class="steps">
+          <span class="u-label" id="lead-meta">
+            {first.when ? `${first.when} · ` : ""}1 / {resolved.length}
+          </span>
+          {resolved.length > 1 && (
+            <>
+              <button
+                type="button"
+                id="lead-prev"
+                aria-label="Previous photograph"
+              >
+                &#8592;
+              </button>
+              <button type="button" id="lead-next" aria-label="Next photograph">
+                &#8594;
+              </button>
+            </>
+          )}
+        </span>
+      </div>
+    </section>
+  )
+}
+
+<style>
+  .lead {
+    padding: 20px var(--gutter) 0;
+  }
+
+  /* A fixed 3:2 box holding only true 3:2 photographs, so the page never
+     reflows between slides and nothing is cropped to fit. */
+  .plate {
+    position: relative;
+    aspect-ratio: 3 / 2;
+    background: var(--band);
+    overflow: hidden;
+    width: min(100%, calc(64vh * 1.5));
+    margin-inline: auto;
+  }
+  .plate img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    opacity: 0;
+    transition: opacity 900ms ease;
+  }
+  .plate img.on {
+    opacity: 1;
+  }
+  .plate-link {
+    position: absolute;
+    inset: 0;
+  }
+
+  .cap {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 14px;
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid var(--rule);
+    width: min(100%, calc(64vh * 1.5));
+    margin-inline: auto;
+  }
+  .cap .t {
+    font-size: 17px;
+    font-weight: 400;
+    color: var(--ink);
+    text-decoration: none;
+  }
+  .cap .t:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .steps {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    flex: none;
+  }
+  .steps button {
+    font: inherit;
+    font-size: 13px;
+    background: none;
+    border: 0;
+    color: var(--ink-2);
+    cursor: pointer;
+    padding: 2px 4px;
+  }
+  .steps button:hover {
+    color: var(--ink);
+  }
+
+  @media (max-width: 899px) {
+    .plate {
+      width: 100%;
+    }
+    .cap {
+      width: 100%;
+      flex-wrap: wrap;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .plate img {
+      transition: none;
+    }
+  }
+</style>
+
+<script>
+  interface LeadFrame {
+    slug: string;
+    label: string;
+    when: string;
+    location: string;
+    alt: string;
+    src: string;
+    srcset: string;
+  }
+
+  const root = document.querySelector<HTMLElement>(".lead");
+  const a = document.getElementById("lead-a") as HTMLImageElement | null;
+  const b = document.getElementById("lead-b") as HTMLImageElement | null;
+
+  if (root && a && b) {
+    let frames: LeadFrame[] = [];
+    try {
+      frames = JSON.parse(root.dataset.lead ?? "[]");
+    } catch {
+      frames = [];
+    }
+
+    const titleEl = document.getElementById(
+      "lead-title",
+    ) as HTMLAnchorElement | null;
+    const metaEl = document.getElementById("lead-meta");
+    const linkEl = document.getElementById(
+      "lead-link",
+    ) as HTMLAnchorElement | null;
+    const reduced = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+
+    let front: HTMLImageElement = a;
+    let index = 0;
+    let timer: number | undefined;
+    let paused = false;
+
+    function show(next: number) {
+      if (!frames.length) return;
+      index = (next + frames.length) % frames.length;
+      const frame = frames[index];
+      const back = front === a ? b! : a!;
+
+      back.onload = () => {
+        back.classList.add("on");
+        front.classList.remove("on");
+        front.setAttribute("aria-hidden", "true");
+        back.removeAttribute("aria-hidden");
+        front = back;
+      };
+      back.src = frame.src;
+      back.srcset = frame.srcset;
+      back.sizes = "(min-width: 900px) 70vw, 100vw";
+      back.alt = frame.alt;
+
+      if (titleEl) {
+        titleEl.textContent = frame.label;
+        titleEl.href = `/sessions/${frame.slug}/`;
+      }
+      if (linkEl) linkEl.href = `/sessions/${frame.slug}/`;
+      if (metaEl) {
+        metaEl.textContent = `${frame.when}${frame.when ? " · " : ""}${index + 1} / ${frames.length}`;
+      }
+
+      /* Let the globe follow whatever is on the plate. */
+      document.dispatchEvent(
+        new CustomEvent("archive:highlight", {
+          detail: { location: frame.location, note: frame.label },
+        }),
+      );
+
+      const upcoming = frames[(index + 1) % frames.length];
+      if (upcoming) {
+        const warm = new Image();
+        warm.src = upcoming.src;
+      }
+    }
+
+    function start() {
+      if (reduced || frames.length < 2 || timer) return;
+      const seconds = Number(root!.dataset.interval ?? 6);
+      timer = window.setInterval(() => {
+        if (!paused && !document.hidden) show(index + 1);
+      }, seconds * 1000);
+    }
+
+    document
+      .getElementById("lead-next")
+      ?.addEventListener("click", () => show(index + 1));
+    document
+      .getElementById("lead-prev")
+      ?.addEventListener("click", () => show(index - 1));
+    root.addEventListener("pointerenter", () => (paused = true));
+    root.addEventListener("pointerleave", () => (paused = false));
+    root.addEventListener("focusin", () => (paused = true));
+    root.addEventListener("focusout", () => (paused = false));
+
+    /* Announce the first frame so the globe starts in the right place. */
+    if (frames[0]) {
+      document.dispatchEvent(
+        new CustomEvent("archive:highlight", {
+          detail: { location: frames[0].location, note: frames[0].label },
+        }),
+      );
+    }
+    start();
+  }
+</script>

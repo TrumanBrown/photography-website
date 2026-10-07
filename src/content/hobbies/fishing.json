@@ -5,5 +5,6 @@
   "emoji": "🎣",
   "accent": "#2563eb",
   "order": 3,
-  "interactive": "fishing"
+  "interactive": "fishing",
+  "iconSrc": "/hobbies/fishing-icon.svg"
 }

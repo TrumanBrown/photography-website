@@ -11,6 +11,10 @@ interface Session {
   order: number | null;
   images: string[];
   captions: Record<string, string>;
+  /** Aspect ratio per image, so the lead-box picker can grey out wrong shapes. */
+  ratios?: Record<string, number>;
+  /** Photographs chosen for the rotating lead box on the home page. */
+  showcase?: string[];
 }
 
 const listEl = document.getElementById('admin-list')!;
@@ -23,6 +27,16 @@ const toastEl = document.getElementById('toast')!;
 let sessions: Session[] = [];
 let blobHost = '';
 let editTrigger: HTMLElement | null = null;
+/** Current selection in the home-page rotation picker, for the open session. */
+let showcasePicks = new Set<string>();
+
+/** The lead box is a fixed 3:2, so only frames close to it can go in it. */
+function fitsLeadBox(session: Session, file: string): boolean {
+  const ratio = session.ratios?.[file];
+  // Without a ratio (older prebuild output) allow it rather than block the user.
+  if (ratio === undefined) return true;
+  return ratio >= 1.48 && ratio <= 1.52;
+}
 let previousBodyOverflow = '';
 
 const signinEl = document.getElementById('admin-signin')!;
@@ -776,6 +790,8 @@ function openEdit(slug: string, trigger?: HTMLElement) {
 
   coverInput.value = s.cover;
 
+  renderShowcasePicker(s);
+
   const captionDetails = document.getElementById('edit-captions') as HTMLDetailsElement;
   const captionList = document.getElementById('edit-caption-list')!;
   const captionCount = document.getElementById('edit-caption-count')!;
@@ -824,6 +840,53 @@ function openEdit(slug: string, trigger?: HTMLElement) {
   modal.classList.add('flex');
   document.body.style.overflow = 'hidden';
   (document.getElementById('edit-title') as HTMLInputElement).focus();
+}
+
+function renderShowcasePicker(s: Session) {
+  const grid = document.getElementById('edit-showcase-grid');
+  const count = document.getElementById('edit-showcase-count');
+  if (!grid) return;
+  grid.textContent = '';
+  showcasePicks = new Set((s.showcase ?? []).filter((file) => s.images.includes(file)));
+
+  const eligible = s.images.filter((file) => fitsLeadBox(s, file));
+  const updateCount = () => {
+    if (!count) return;
+    count.textContent = showcasePicks.size
+      ? `${showcasePicks.size} selected of ${eligible.length} usable`
+      : `Automatic · ${eligible.length} usable`;
+  };
+
+  for (const img of s.images) {
+    const usable = fitsLeadBox(s, img);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.title = usable ? img : `${img} — not a 3:2 horizontal`;
+    btn.disabled = !usable;
+    const paint = () => {
+      const on = showcasePicks.has(img);
+      btn.className =
+        'relative overflow-hidden rounded border-2 ' +
+        (!usable
+          ? 'cursor-not-allowed border-transparent opacity-25'
+          : on
+            ? 'border-neutral-900 dark:border-white'
+            : 'border-transparent opacity-60 hover:opacity-100');
+      btn.setAttribute('aria-pressed', String(on));
+    };
+    btn.innerHTML = `<img src="${thumbUrl(blobHost, s.thumbSlug, img)}" alt="${esc(img)}" loading="lazy" class="h-16 w-full object-cover" />`;
+    paint();
+    if (usable) {
+      btn.addEventListener('click', () => {
+        if (showcasePicks.has(img)) showcasePicks.delete(img);
+        else showcasePicks.add(img);
+        paint();
+        updateCount();
+      });
+    }
+    grid.appendChild(btn);
+  }
+  updateCount();
 }
 
 function closeEdit() {
@@ -902,6 +965,7 @@ form.addEventListener('submit', async (e) => {
     cover: (document.getElementById('edit-cover') as HTMLInputElement).value,
     order: orderRaw === '' ? null : parseInt(orderRaw, 10),
     images,
+    showcase: [...showcasePicks],
   };
 
   try {
@@ -921,6 +985,7 @@ form.addEventListener('submit', async (e) => {
       if (body.order !== undefined) s.order = body.order;
       if (body.location !== undefined) s.location = body.location;
       if (body.description !== undefined) s.description = body.description;
+      if (body.showcase !== undefined) s.showcase = body.showcase;
       if (body.images !== undefined) {
         s.captions = Object.fromEntries(
           body.images

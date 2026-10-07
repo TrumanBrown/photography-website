@@ -1,0 +1,146 @@
+---
+import { getCollection } from "astro:content";
+import { sortHobbies, hobbySlug } from "@/lib/hobbies";
+
+const hobbies = sortHobbies(await getCollection("hobbies"));
+
+/** The verb on each card, so the link names the world rather than the widget. */
+const VERBS: Record<string, string> = {
+  "aquarium-keeping": "Plan a tank",
+  "tide-pooling": "Walk the beach",
+  fishing: "Open the maps",
+  birding: "Make a bird",
+  herping: "Take the wheel",
+  hiking: "Build a trail",
+};
+---
+
+{
+  hobbies.length > 0 && (
+    <section class="band" aria-labelledby="things-to-try">
+      <div class="in">
+        <div class="bhead">
+          <h2 id="things-to-try">Things to try</h2>
+          <span class="u-label">
+            Six hobbies I actually do · nothing uploads anywhere
+          </span>
+        </div>
+        <div class="toyrow">
+          {hobbies.map((entry) => (
+            <a class="tcard" href={`/hobbies/${hobbySlug(entry)}/`}>
+              {entry.data.iconSrc ? (
+                <img
+                  src={entry.data.iconSrc}
+                  alt=""
+                  width="42"
+                  height="42"
+                  loading="lazy"
+                />
+              ) : (
+                <span class="emoji" aria-hidden="true">
+                  {entry.data.emoji}
+                </span>
+              )}
+              <span>
+                <span class="tn">{entry.data.title}</span>
+                <span class="td">{entry.data.summary}</span>
+                <span class="tv">
+                  {VERBS[hobbySlug(entry)] ?? "Have a go"} →
+                </span>
+              </span>
+            </a>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+<style>
+  /* A band at the foot of the overview, so the toys are findable without
+     hunting for a nav link. */
+  .band {
+    border-top: 1px solid var(--rule);
+    background: var(--band);
+  }
+  .in {
+    padding: 34px var(--gutter) 40px;
+  }
+  .bhead {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 18px;
+  }
+  .bhead h2 {
+    font-size: 19px;
+    font-weight: 300;
+    margin: 0;
+  }
+  .toyrow {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0 26px;
+  }
+  .tcard {
+    display: flex;
+    gap: 13px;
+    align-items: flex-start;
+    padding: 14px 10px 14px 0;
+    border-top: 1px solid var(--rule);
+    color: inherit;
+    text-decoration: none;
+  }
+  .tcard:hover {
+    text-decoration: none;
+  }
+  .tcard:hover .tn {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .tcard img,
+  .tcard .emoji {
+    width: 42px;
+    height: 42px;
+    flex: none;
+    font-size: 30px;
+    line-height: 1.2;
+    text-align: center;
+  }
+  .tn {
+    display: block;
+    font-size: 15px;
+    color: var(--ink);
+  }
+  .td {
+    display: block;
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--ink-3);
+    margin-top: 2px;
+  }
+  .tv {
+    display: block;
+    margin-top: 6px;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-2);
+  }
+
+  @media (max-width: 1099px) {
+    .toyrow {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (max-width: 899px) {
+    .toyrow {
+      grid-template-columns: 1fr;
+    }
+    .in {
+      padding-block: 26px 32px;
+    }
+  }
+</style>

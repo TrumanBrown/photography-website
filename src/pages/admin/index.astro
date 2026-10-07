@@ -222,6 +222,18 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
             <div id="edit-cover-grid" class="grid max-h-64 grid-cols-4 gap-2 overflow-y-auto rounded border border-neutral-300 p-2 dark:border-neutral-600 sm:grid-cols-5"></div>
           </div>
 
+          <div>
+            <div class="mb-1 flex items-baseline justify-between gap-3">
+              <label class="block text-sm font-medium">Home page rotation</label>
+              <span id="edit-showcase-count" class="text-xs tabular-nums text-neutral-500 dark:text-neutral-400"></span>
+            </div>
+            <p class="mb-2 text-xs text-neutral-500 dark:text-neutral-400">
+              Pick the photographs worth leading with. Only wide 3:2 frames fit the lead box, so the
+              rest are greyed out. Leave it empty and one is chosen for you.
+            </p>
+            <div id="edit-showcase-grid" class="grid max-h-64 grid-cols-4 gap-2 overflow-y-auto rounded border border-neutral-300 p-2 dark:border-neutral-600 sm:grid-cols-5"></div>
+          </div>
+
           <details id="edit-captions" class="rounded border border-neutral-300 p-3 dark:border-neutral-600">
             <summary class="flex cursor-pointer items-center justify-between gap-3 text-sm font-medium">
               <span>Image captions</span>

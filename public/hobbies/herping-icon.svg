@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none" role="img" aria-label="Salamander">
+  <!-- far pair of legs, set back a little -->
+  <path d="M21 35 L22 42 L18 45 M36 35 L37 42 L41 44" stroke="#1e1c16" stroke-width="3.4"
+        stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- near pair -->
+  <path d="M15 35 L14 43 L9 46 M31 35 L30 43 L35 46" stroke="#1e1c16" stroke-width="4.6"
+        stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- body, head and a tail about as long as the body -->
+  <path fill-rule="evenodd" fill="#1e1c16" d="M4 31.5
+    Q6 26.5 12 25.8 Q22 24.6 30 26 Q36 27 39 29.4
+    Q47 32 53 30 Q58 28.4 61 24.6
+    Q59 32 53 34.6 Q47 37 39 36.6
+    Q35 38.6 28 38.8 Q18 39 11 37.6 Q5.5 36.2 4 31.5 Z
+    M8.6 30.4 a1.7 1.7 0 1 0 3.4 0 a1.7 1.7 0 1 0 -3.4 0 Z"/>
+  <!-- mouth line -->
+  <path d="M4.6 33.4 Q8 34.6 11.5 34.4" stroke="#f3f0ea" stroke-width="1.1" stroke-linecap="round" opacity="0"/>
+</svg>

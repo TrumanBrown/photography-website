@@ -13,6 +13,7 @@ const ADMIN_INDEX = 'admin-index.json';
 const MAX_TITLE = 200;
 const MAX_LOCATION = 200;
 const MAX_DESCRIPTION = 1000;
+const MAX_SHOWCASE = 40;
 
 const ALLOWED_USERS = allowedUsers(process.env.ADMIN_GITHUB_USERS);
 
@@ -243,6 +244,7 @@ async function handlePut(context, req) {
   var order = body.order;
   var location = body.location;
   var description = body.description;
+  var showcase = body.showcase;
   var normalizedImages = normalizeSessionImages(body.images);
 
   var errors = [];
@@ -257,6 +259,18 @@ async function handlePut(context, req) {
   if (description && description.length > MAX_DESCRIPTION) errors.push('description too long.');
   if (order !== undefined && order !== null && (typeof order !== 'number' || !Number.isInteger(order))) {
     errors.push('order must be an integer or null.');
+  }
+  // Photographs chosen for the rotating lead box on the home page.
+  if (showcase !== undefined) {
+    if (!Array.isArray(showcase)) {
+      errors.push('showcase must be an array of filenames.');
+    } else if (showcase.length > MAX_SHOWCASE) {
+      errors.push('showcase can hold at most ' + MAX_SHOWCASE + ' photographs.');
+    } else if (showcase.some(function (f) { return typeof f !== 'string' || !f; })) {
+      errors.push('showcase entries must be non-empty filenames.');
+    } else if (showcase.some(function (f) { return f.indexOf('/') >= 0 || f.indexOf('\\') >= 0; })) {
+      errors.push('showcase entries must be plain filenames.');
+    }
   }
   errors.push(...normalizedImages.errors);
   if (slug && (slug.includes('/') || slug.includes('\\') || slug.includes('..') || slug.startsWith('.'))) {
@@ -294,6 +308,10 @@ async function handlePut(context, req) {
   if (location !== undefined) sidecar.location = location;
   if (description !== undefined) sidecar.description = description;
   if (normalizedImages.images !== undefined) sidecar.images = normalizedImages.images;
+  if (showcase !== undefined) {
+    if (showcase.length) sidecar.showcase = showcase;
+    else delete sidecar.showcase;
+  }
 
   var data = JSON.stringify(sidecar, null, 2);
   var blockBlob = container.getBlockBlobClient(slug + '/' + SESSION_JSON);
