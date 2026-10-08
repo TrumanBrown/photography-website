@@ -412,6 +412,12 @@ async function processSession({ prefix, originalsClient, derivativesClient, serv
     ? (targetBySource.get(sidecar.cover) ?? sidecar.cover)
     : undefined;
 
+  // The photograph cropped into the session page's header banner, when the
+  // admin panel pinned one. Goes through the same rename table as the cover.
+  const banner = sidecar.banner
+    ? (targetBySource.get(sidecar.banner) ?? sidecar.banner)
+    : undefined;
+
   // Photographs chosen in the admin panel for the rotating lead box. Names go
   // through the same rename table as the cover, and anything no longer in the
   // session is dropped.
@@ -426,6 +432,7 @@ async function processSession({ prefix, originalsClient, derivativesClient, serv
     location: sidecar.location ?? '',
     description: sidecar.description ?? '',
     ...(cover ? { cover } : {}),
+    ...(banner ? { banner } : {}),
     ...(sidecar.bannerFocus ? { bannerFocus: sidecar.bannerFocus } : {}),
     ...(sidecar.order != null ? { order: sidecar.order } : {}),
     ...(showcase.length ? { showcase } : {}),
@@ -453,6 +460,7 @@ async function processSession({ prefix, originalsClient, derivativesClient, serv
     location: sessionRecord.location,
     description: sessionRecord.description,
     cover: sessionRecord.cover ?? '',
+    banner: sessionRecord.banner ?? '',
     order: sessionRecord.order ?? null,
     images: orderedImages.map((i) => i.file),
     showcase,
@@ -787,6 +795,7 @@ export function validateSessionSidecar(value, source = '_session.json') {
   validateOptionalString(value, 'location', MAX_LOCATION, problems);
   validateOptionalString(value, 'description', MAX_DESCRIPTION, problems);
   validateOptionalString(value, 'cover', undefined, problems);
+  validateOptionalString(value, 'banner', undefined, problems);
   validateOptionalString(value, 'bannerFocus', 40, problems);
 
   if (value.date !== undefined && (typeof value.date !== 'string' || !isIsoCalendarDate(value.date))) {

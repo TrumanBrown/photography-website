@@ -175,9 +175,16 @@ const first = resolved[0];
     .plate {
       width: 100%;
     }
+    /* Side by side, the meta line jumps between the title's right edge and its
+       own row depending on how long the session's name is, so it shifts around
+       while scrolling the archive. Below the title always, at every length. */
     .cap {
       width: 100%;
-      flex-wrap: wrap;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 2px;
+      margin-top: 8px;
+      padding-top: 6px;
     }
   }
 

@@ -179,9 +179,14 @@ async function handleGet(context) {
         location: s.location || '',
         description: s.description || '',
         cover: s.cover || '',
+        banner: s.banner || '',
         order: s.order != null ? s.order : null,
         images: s.images || [],
         captions: s.captions || {},
+        // Shapes let the pickers grey out frames that won't survive the
+        // 3:2 lead box or the wide banner crop.
+        ratios: s.ratios || {},
+        showcase: s.showcase || [],
       };
     });
     context.res = { status: 200, headers: json(), body: { ok: true, sessions: sessions, blobHost: blobHost } };
@@ -227,9 +232,13 @@ async function handleGet(context) {
       location: sidecar.location || '',
       description: sidecar.description || '',
       cover: sidecar.cover || '',
+      banner: sidecar.banner || '',
       order: sidecar.order != null ? sidecar.order : null,
       images: images,
       captions: captionsFromImages(sidecar.images),
+      // No ratios on this path: scanning originals/ never opens the images.
+      // The pickers treat an unknown shape as usable rather than blocking it.
+      showcase: Array.isArray(sidecar.showcase) ? sidecar.showcase : [],
     });
   }
 
@@ -241,6 +250,7 @@ async function handlePut(context, req) {
   var slug = body.slug;
   var title = body.title;
   var cover = body.cover;
+  var banner = body.banner;
   var order = body.order;
   var location = body.location;
   var description = body.description;
@@ -253,6 +263,11 @@ async function handlePut(context, req) {
   if (title !== undefined && !title.trim()) errors.push('title cannot be empty.');
   if (title && title.length > MAX_TITLE) errors.push('title too long.');
   if (cover !== undefined && typeof cover !== 'string') errors.push('cover must be a string.');
+  if (banner !== undefined && typeof banner !== 'string') {
+    errors.push('banner must be a string.');
+  } else if (banner && (banner.indexOf('/') >= 0 || banner.indexOf('\\') >= 0)) {
+    errors.push('banner must be a plain filename.');
+  }
   if (location !== undefined && typeof location !== 'string') errors.push('location must be a string.');
   if (location && location.length > MAX_LOCATION) errors.push('location too long.');
   if (description !== undefined && typeof description !== 'string') errors.push('description must be a string.');
@@ -302,6 +317,11 @@ async function handlePut(context, req) {
 
   if (title !== undefined) sidecar.title = title;
   if (cover !== undefined) sidecar.cover = cover;
+  // Empty means "derive the banner from the cover", so drop the key entirely
+  // rather than leaving a blank string the prebuild would have to special-case.
+  if (banner !== undefined) {
+    if (banner) { sidecar.banner = banner; } else { delete sidecar.banner; }
+  }
   if (order !== undefined) {
     if (order === null) { delete sidecar.order; } else { sidecar.order = order; }
   }

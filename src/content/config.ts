@@ -20,8 +20,15 @@ const sessions = defineCollection({
     description: z.string().default(""),
     cover: z.string().optional(),
     /**
-     * Where to anchor the cover photograph inside the session banner, which is
-     * a wide crop. Any CSS object-position value; defaults to the centre.
+     * Filename of the photograph to crop into the session page's header
+     * banner. Unset means "derive one from the cover"; see the session page
+     * for that fallback. Set it when the cover is portrait, or when a
+     * different frame simply makes the better wide crop.
+     */
+    banner: z.string().optional(),
+    /**
+     * Where to anchor the banner photograph inside the session banner, which
+     * is a wide crop. Any CSS object-position value; defaults to the centre.
      * Set per session when the centre cuts the subject badly.
      */
     bannerFocus: z.string().max(40).optional(),

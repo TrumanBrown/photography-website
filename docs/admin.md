@@ -10,6 +10,7 @@ The admin page at `https://trumanbrown.com/admin` has three tabs:
 
 - **Title**: the display name shown on cards and the session page.
 - **Cover / thumbnail**: which image from the session to use as the card image on the home page.
+- **Session header**: which image the session page opens on, cropped wide. Leave it on **Auto** to follow the cover; pick a frame when the cover is upright or a different shot simply crops better.
 - **Location**: where the session was shot.
 - **Description**: a short blurb shown on the session page.
 - **Image captions**: optional descriptions shown in the lightbox and used as each photograph's accessible name. The completion count makes uncatalogued images visible without requiring every caption at once.

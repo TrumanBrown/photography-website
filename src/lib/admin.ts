@@ -8,6 +8,8 @@ interface Session {
   location: string;
   description: string;
   cover: string;
+  /** Photograph cropped into the session page's header. Empty means automatic. */
+  banner: string;
   order: number | null;
   images: string[];
   captions: Record<string, string>;
@@ -29,6 +31,8 @@ let blobHost = '';
 let editTrigger: HTMLElement | null = null;
 /** Current selection in the home-page rotation picker, for the open session. */
 let showcasePicks = new Set<string>();
+/** Current selection in the session-header picker. Empty means automatic. */
+let bannerPick = '';
 
 /** The lead box is a fixed 3:2, so only frames close to it can go in it. */
 function fitsLeadBox(session: Session, file: string): boolean {
@@ -36,6 +40,14 @@ function fitsLeadBox(session: Session, file: string): boolean {
   // Without a ratio (older prebuild output) allow it rather than block the user.
   if (ratio === undefined) return true;
   return ratio >= 1.48 && ratio <= 1.52;
+}
+
+/** The session header is a wide crop, so portrait frames lose most of their
+ *  height in it. Matches BANNER_MIN_RATIO in src/pages/sessions/[slug].astro. */
+function fitsBanner(session: Session, file: string): boolean {
+  const ratio = session.ratios?.[file];
+  if (ratio === undefined) return true;
+  return ratio >= 1.2;
 }
 let previousBodyOverflow = '';
 
@@ -673,6 +685,7 @@ async function loadSessions() {
     sessions = (data.sessions as Session[]).map((session) => ({
       ...session,
       captions: session.captions || {},
+      banner: session.banner || '',
     }));
     blobHost = data.blobHost || '';
     renderList();
@@ -718,6 +731,7 @@ function renderList() {
           · ${s.images.length} image${s.images.length !== 1 ? 's' : ''}
           · ${captionCount}/${s.images.length} captioned
           ${s.cover ? ' · cover: ' + esc(s.cover) : ''}
+          ${s.banner ? ' · header: ' + esc(s.banner) : ''}
           ${s.order != null ? ' · order: ' + s.order : ''}
         </p>
       </div>
@@ -791,6 +805,7 @@ function openEdit(slug: string, trigger?: HTMLElement) {
   coverInput.value = s.cover;
 
   renderShowcasePicker(s);
+  renderBannerPicker(s);
 
   const captionDetails = document.getElementById('edit-captions') as HTMLDetailsElement;
   const captionList = document.getElementById('edit-caption-list')!;
@@ -889,6 +904,67 @@ function renderShowcasePicker(s: Session) {
   updateCount();
 }
 
+/** Single-select picker for the photograph cropped into the session header.
+ *  "Auto" leaves it to the cover-then-widest fallback on the session page. */
+function renderBannerPicker(s: Session) {
+  const grid = document.getElementById('edit-banner-grid');
+  const note = document.getElementById('edit-banner-note');
+  if (!grid) return;
+  grid.textContent = '';
+  bannerPick = s.images.includes(s.banner) ? s.banner : '';
+
+  const paintAll: Array<() => void> = [];
+  const updateNote = () => {
+    if (!note) return;
+    note.textContent = bannerPick ? bannerPick : 'Automatic · follows the cover';
+  };
+  const select = (file: string) => {
+    bannerPick = file;
+    for (const paint of paintAll) paint();
+    updateNote();
+  };
+
+  const autoBtn = document.createElement('button');
+  autoBtn.type = 'button';
+  autoBtn.title = 'Let the site choose';
+  autoBtn.textContent = 'Auto';
+  const paintAuto = () => {
+    const on = !bannerPick;
+    autoBtn.className =
+      'flex h-16 items-center justify-center rounded border-2 text-xs ' +
+      (on ? 'border-neutral-900 dark:border-white' : 'border-transparent opacity-60 hover:opacity-100');
+    autoBtn.setAttribute('aria-pressed', String(on));
+  };
+  paintAll.push(paintAuto);
+  autoBtn.addEventListener('click', () => select(''));
+  grid.appendChild(autoBtn);
+
+  for (const img of s.images) {
+    const wide = fitsBanner(s, img);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.title = wide ? img : `${img}, too tall for the header crop`;
+    btn.innerHTML = `<img src="${thumbUrl(blobHost, s.thumbSlug, img)}" alt="${esc(img)}" loading="lazy" class="h-16 w-full object-cover" />`;
+    const paint = () => {
+      const on = bannerPick === img;
+      btn.className =
+        'relative overflow-hidden rounded border-2 ' +
+        (on
+          ? 'border-neutral-900 dark:border-white'
+          : wide
+            ? 'border-transparent opacity-60 hover:opacity-100'
+            : 'border-transparent opacity-25 hover:opacity-70');
+      btn.setAttribute('aria-pressed', String(on));
+    };
+    paintAll.push(paint);
+    btn.addEventListener('click', () => select(img));
+    grid.appendChild(btn);
+  }
+
+  for (const paint of paintAll) paint();
+  updateNote();
+}
+
 function closeEdit() {
   if (modal.classList.contains('hidden')) return;
   modal.classList.add('hidden');
@@ -963,6 +1039,7 @@ form.addEventListener('submit', async (e) => {
     location: (document.getElementById('edit-location') as HTMLInputElement).value.trim(),
     description: (document.getElementById('edit-description') as HTMLTextAreaElement).value.trim(),
     cover: (document.getElementById('edit-cover') as HTMLInputElement).value,
+    banner: bannerPick,
     order: orderRaw === '' ? null : parseInt(orderRaw, 10),
     images,
     showcase: [...showcasePicks],
@@ -982,6 +1059,7 @@ form.addEventListener('submit', async (e) => {
     if (s) {
       if (body.title !== undefined) s.title = body.title;
       if (body.cover !== undefined) s.cover = body.cover;
+      if (body.banner !== undefined) s.banner = body.banner;
       if (body.order !== undefined) s.order = body.order;
       if (body.location !== undefined) s.location = body.location;
       if (body.description !== undefined) s.description = body.description;

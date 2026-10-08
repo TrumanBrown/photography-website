@@ -177,11 +177,12 @@ Two options:
 sidecar and fails with the field path instead of publishing partial defaults.
 
 `cover` picks the card thumbnail and the link-preview image. The session page
-also opens on a wide banner, which is a hard crop: upright frames lose most of
-their height, so the banner uses the cover only when it is landscape enough and
-otherwise falls back to the widest photograph in the session. Add an optional
-`"bannerFocus"` — any CSS `object-position`, e.g. `"center 30%"` — to steer
-where that crop sits.
+opens on a separate wide banner, which is a hard crop: upright frames lose most
+of their height. Set `"banner"` to the filename you want there and it is used
+as-is. Leave it out and the banner derives one: the cover when the cover is
+landscape enough, otherwise the widest photograph in the session. Add an
+optional `"bannerFocus"` — any CSS `object-position`, e.g. `"center 30%"` — to
+steer where that crop sits.
 
 ### Title and description conventions
 

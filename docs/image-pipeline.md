@@ -85,6 +85,7 @@ Put one at the root of each session prefix to override defaults:
 | `location` | no | empty |
 | `description` | no | empty |
 | `cover` | no | first image alphabetically |
+| `banner` | no | derived from `cover` — the photograph cropped into the session page header |
 | `bannerFocus` | no | `center` — any CSS `object-position`, steering where the session banner crops its photograph |
 | `order` | no | sessions without `order` sort by date desc; sessions with it sort first (lowest = top) |
 | `images` | no | discovered automatically; provide an array of filenames to enforce ordering or attach captions |

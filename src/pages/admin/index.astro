@@ -224,6 +224,18 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
 
           <div>
             <div class="mb-1 flex items-baseline justify-between gap-3">
+              <label class="block text-sm font-medium">Session header</label>
+              <span id="edit-banner-note" class="truncate text-xs text-neutral-500 dark:text-neutral-400"></span>
+            </div>
+            <p class="mb-2 text-xs text-neutral-500 dark:text-neutral-400">
+              The photograph the session page opens on. It's cropped wide, so upright frames are
+              dimmed, pick one anyway if you want it. Auto follows the cover.
+            </p>
+            <div id="edit-banner-grid" class="grid max-h-64 grid-cols-4 gap-2 overflow-y-auto rounded border border-neutral-300 p-2 dark:border-neutral-600 sm:grid-cols-5"></div>
+          </div>
+
+          <div>
+            <div class="mb-1 flex items-baseline justify-between gap-3">
               <label class="block text-sm font-medium">Home page rotation</label>
               <span id="edit-showcase-count" class="text-xs tabular-nums text-neutral-500 dark:text-neutral-400"></span>
             </div>

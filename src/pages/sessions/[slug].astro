@@ -109,12 +109,12 @@ const resolved: Resolved[] = await Promise.all(
   }),
 );
 
-// The session opens on a wide banner crop of its cover photograph, then the
+// The session opens on a wide banner crop of one photograph, then the
 // whole roll is laid out as justified rows: a row's photographs share a height
 // and their widths stay proportional to their own shape, so nothing is cropped
 // and both edges of the grid stay flush. Rows are grouped here rather than in
 // the browser so the page needs no layout script and never reflows after load.
-// The banner is a crop, so the cover still appears whole in the grid below.
+// The banner is a crop, so that photograph still appears whole in the grid below.
 const TARGET_ROW_RATIO = 3.1;
 
 type Row = { items: Resolved[]; sum: number; pad: number };
@@ -148,16 +148,21 @@ const ogImage = coverResolved?.fullUrl;
 
 // The banner is a wide crop. A landscape photograph survives that; a portrait
 // one gets most of its height cut away, which decapitates a bird as readily as
-// it trims a mountain. So the banner uses the cover when the cover is wide
-// enough, and otherwise falls back to the widest photograph in the session.
-// The cover still represents the session everywhere else, including shares.
+// it trims a mountain. So an explicit `banner` wins outright, then the cover
+// when the cover is wide enough, and otherwise the widest photograph in the
+// session. The cover still represents the session everywhere else, including
+// shares.
 const BANNER_MIN_RATIO = 1.2;
+const bannerChoice = entry.data.banner
+  ? resolved.find((r) => r.file === entry.data.banner)
+  : undefined;
 const bannerImage =
-  coverResolved.ratio >= BANNER_MIN_RATIO
+  bannerChoice ??
+  (coverResolved.ratio >= BANNER_MIN_RATIO
     ? coverResolved
     : resolved.reduce((widest, img) =>
         img.ratio > widest.ratio ? img : widest,
-      );
+      ));
 // Even a wide photograph can want nudging; bannerFocus takes any CSS
 // object-position, e.g. "center 30%".
 const bannerFocus = entry.data.bannerFocus ?? "center";
@@ -351,7 +356,7 @@ const structuredData = {
     display: block;
   }
 
-  /* A wide crop of the cover photograph, with the session's name over it. The
+  /* A wide crop of the banner photograph, with the session's name over it. The
      photograph itself still appears whole further down the page, so nothing is
      only ever seen cropped. */
   .banner {

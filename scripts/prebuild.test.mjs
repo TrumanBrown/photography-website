@@ -97,10 +97,17 @@ describe("session sidecar validation", () => {
       location: "Coast",
       description: "",
       cover: "DSC0123.ARW",
+      banner: "DSC0124.jpg",
       order: 2,
       images: [{ file: "DSC0123.ARW", caption: "Sunrise" }, "DSC0124.jpg"],
     };
     expect(validateSessionSidecar(sidecar)).toBe(sidecar);
+  });
+
+  it("rejects a banner that is not a string", () => {
+    expect(() => validateSessionSidecar({ banner: 7 })).toThrow(
+      "banner must be a string",
+    );
   });
 
   it("rejects invalid dates and field types with actionable paths", () => {
