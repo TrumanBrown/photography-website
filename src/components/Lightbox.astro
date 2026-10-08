@@ -136,8 +136,8 @@ const { gallerySelector = "#gallery" } = Astro.props;
     });
   });
 
-  /* Photographs are what this site is for, so the lightbox normally ends up
-     showing the untouched original. The anchor points at a size-capped WebP
+  /* Photographs are what this site is for, so the lightbox always ends up
+     showing the untouched original, on every connection and with no exception. The anchor points at a size-capped WebP
      only so something appears instantly instead of waiting on a 6-9 MB file;
      the original is fetched straight afterwards and swapped in underneath the
      viewer. Dimensions declared to PhotoSwipe are the original's, so zoom
@@ -148,21 +148,7 @@ const { gallerySelector = "#gallery" } = Astro.props;
      queue up tens of megabytes you never look at. */
   const upgrading = new WeakSet<HTMLElement>();
 
-  /* One exception. An original is 3-22 MB, and a visitor who has explicitly
-     turned on their browser's data saver, or who is on a 2g connection, should
-     not have that spent on their behalf: six photographs is about 60 MB. For
-     them the capped copy stays on screen — at fit it is already finer than a
-     phone can resolve, so nothing visible is lost — and the original is
-     fetched the moment they zoom past what it can actually show. */
-  function prefersLessData() {
-    const conn = (navigator as any).connection;
-    if (!conn) return false;
-    return (
-      Boolean(conn.saveData) || /^(slow-)?2g$/.test(conn.effectiveType ?? "")
-    );
-  }
-
-  function upgradeToOriginal(pswp: any, onlyWhenZoomedIn = false) {
+  function upgradeToOriginal(pswp: any) {
     const slide = pswp?.currSlide;
     const anchor = slide?.data?.element as HTMLElement | undefined;
     const img = slide?.content?.element as HTMLImageElement | undefined;
@@ -171,13 +157,6 @@ const { gallerySelector = "#gallery" } = Astro.props;
     const full = anchor.dataset.pswpFull;
     // Galleries that already link the original have nothing to upgrade to.
     if (!full || img.src === full) return;
-
-    if (onlyWhenZoomedIn) {
-      // naturalWidth is still the capped copy's width at this point, so this
-      // asks whether the viewer is now looking at more detail than it holds.
-      const displayed = slide.width * (slide.currZoomLevel ?? 0);
-      if (!img.naturalWidth || displayed <= img.naturalWidth * 1.1) return;
-    }
 
     upgrading.add(anchor);
     const original = new Image();
@@ -201,12 +180,9 @@ const { gallerySelector = "#gallery" } = Astro.props;
   lightbox.on("afterInit", () => {
     const pswp = lightbox.pswp;
     if (!pswp) return;
-    const deferred = prefersLessData();
-    const run = () => upgradeToOriginal(pswp, deferred);
+    const run = () => upgradeToOriginal(pswp);
     run();
     pswp.on("change", run);
-    // Zooming is the signal that someone actually wants the detail.
-    if (deferred) pswp.on("zoomPanUpdate", run);
   });
 
   lightbox.init();

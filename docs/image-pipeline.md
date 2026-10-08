@@ -220,7 +220,7 @@ using three tiers that each do one job:
 |---|---|---|---|
 | 1. Placeholder | The grid thumbnail | 0 bytes | Already decoded on the page behind the lightbox |
 | 2. Bridge | Capped WebP (`VIEW_MAX_WIDTH`, 1600 px) | ~200 KB | On open, and preloaded for near neighbours |
-| 3. Full | The untouched original | 3–22 MB | Only for the photograph actually on screen — and on zoom rather than on open if the visitor has Save-Data on ([tradeoffs](#the-tradeoffs)) |
+| 3. Full | The untouched original | 3–22 MB | Always, for the photograph actually on screen |
 
 PhotoSwipe normally reuses the gallery thumbnail only on the first slide; a
 `placeholderSrc` filter in `src/components/Lightbox.astro` lets every slide use
@@ -274,16 +274,16 @@ sharpening rather than a blurry placeholder. Zoom in during it and the softness
 is obvious, which is the honest cost of not making everyone wait.
 
 **Total bytes go up, not down, for a visitor who views many photographs.** Six
-photographs on a phone is about 60 MB of originals. That is the price of
-showing the photograph as taken, and on a desktop or Wi‑Fi it is the right
-trade. On a metered connection it is not.
+photographs on a phone is about 60 MB of originals.
 
-So the upgrade is deferred for anyone whose browser reports
-[Save-Data](https://developer.mozilla.org/en-US/docs/Web/API/NetworkInformation/saveData)
-or a 2g `effectiveType`. They keep the bridge — which at a phone's pixel density
-is indistinguishable at fit — and the original is fetched the moment they zoom
-past what it can show. Nobody who has not asked for this is affected, and
-nobody is ever stuck below full resolution if they actually want it.
+That is a deliberate choice, not an oversight. This is a photography portfolio:
+anyone who opens a photograph is shown it as it was taken, on every connection,
+with no exception and no quality switch to get wrong. The bytes saved by
+serving something smaller would come straight out of the only thing the site
+exists to do.
+
+What is avoided instead is *waste* — originals for photographs nobody stopped
+on, and re-downloads of ones already seen.
 
 > **Changing the cap.** `VIEW_MAX_WIDTH` in `src/pages/sessions/[slug].astro` is
 > deliberately a width the grid already generates, so no bespoke variant is
