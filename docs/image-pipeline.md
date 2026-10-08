@@ -219,7 +219,7 @@ using three tiers that each do one job:
 |---|---|---|---|
 | 1. Placeholder | The grid thumbnail | 0 bytes | Already decoded on the page behind the lightbox |
 | 2. Bridge | Capped WebP (`VIEW_MAX_WIDTH`, 1600 px) | ~200 KB | On open, and preloaded for near neighbours |
-| 3. Full | The untouched original | 3–22 MB | Only for the photograph actually on screen |
+| 3. Full | The untouched original | 3–22 MB | Only for the photograph actually on screen — and on zoom rather than on open if the visitor has Save-Data on ([tradeoffs](#the-tradeoffs)) |
 
 PhotoSwipe normally reuses the gallery thumbnail only on the first slide; a
 `placeholderSrc` filter in `src/components/Lightbox.astro` lets every slide use
@@ -252,11 +252,43 @@ of them to show five:
 The remaining 57.7 MB *is* the deliverable: five untouched originals. The win is
 that nothing else is paid for, and none of it blocks the first paint.
 
+### The tradeoffs
+
+Nothing here makes a 12 MB file arrive faster — it only stops that download from
+blocking what you see. Two consequences follow, and both are real:
+
+**There is an upgrade window.** Between the bridge appearing and the original
+replacing it, you are looking at 1600 px. How long depends entirely on the link:
+
+| Connection | First pixel | Original arrives | Window |
+|---|---|---|---|
+| Unthrottled | 191 ms | 1.4 s | ~1.3 s |
+| Fast 4G (20 Mb) | 204 ms | 2.0 s | ~1.8 s |
+| Slow 4G (4 Mb) | 269 ms | 10.1 s | ~9.9 s |
+| 3G (1.5 Mb) | 471 ms | 25.7 s | ~25 s |
+
+At fit-to-screen the difference is hard to see — 1600 px already exceeds what
+most viewports resolve — so in practice the window shows up as a faint
+sharpening rather than a blurry placeholder. Zoom in during it and the softness
+is obvious, which is the honest cost of not making everyone wait.
+
+**Total bytes go up, not down, for a visitor who views many photographs.** Six
+photographs on a phone is about 60 MB of originals. That is the price of
+showing the photograph as taken, and on a desktop or Wi‑Fi it is the right
+trade. On a metered connection it is not.
+
+So the upgrade is deferred for anyone whose browser reports
+[Save-Data](https://developer.mozilla.org/en-US/docs/Web/API/NetworkInformation/saveData)
+or a 2g `effectiveType`. They keep the bridge — which at a phone's pixel density
+is indistinguishable at fit — and the original is fetched the moment they zoom
+past what it can show. Nobody who has not asked for this is affected, and
+nobody is ever stuck below full resolution if they actually want it.
+
 > **Changing the cap.** `VIEW_MAX_WIDTH` in `src/pages/sessions/[slug].astro` is
 > deliberately a width the grid already generates, so no bespoke variant is
 > built. Raising it improves the bridge on very large displays at the cost of
-> bytes spent on photographs people skim past; it does not affect final quality,
-> which is always the original.
+> bytes spent on photographs people skim past. It does not change the ceiling:
+> what you end up looking at is the original either way.
 
 ---
 
