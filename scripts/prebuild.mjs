@@ -694,41 +694,55 @@ function blobPublicUrl(containerClient, blobPath) {
   return `${base}/${blobPath.split('/').map(encodeURIComponent).join('/')}`;
 }
 
-// Thumbnails for the admin panel's pickers. 120px was unreadable on a laptop,
-// so these are big enough to judge a frame by (~20-35KB each) and still a
-// fraction of an original. The width is stamped on the blob so raising it again
-// reruns the ones that are too small rather than leaving a mixed set behind.
-const THUMB_WIDTH = 512;
+// Thumbnails for the admin panel's pickers, in two sizes.
+//
+// The grid stretches its columns to fill the row, so a tile can be 600px wide
+// on a big screen, and twice that in device pixels on a retina display. One
+// small thumbnail can't cover that without going soft, so the admin uses a
+// srcset: the 512px file for list rows and small tiles, the 1280px file when a
+// tile is genuinely large. Both stamp the width they were made at, so raising
+// either one reruns the files that are now too small instead of leaving a
+// mixed set behind.
+export const ADMIN_THUMB_SIZES = [
+  { dir: 'thumbs', width: 512, quality: 72 },
+  { dir: 'thumbs-lg', width: 1280, quality: 70 },
+];
 
-async function generateAdminThumbs({ slug, imagesDir, images, containerClient }) {
+export async function generateAdminThumbs({ slug, imagesDir, images, containerClient }) {
   const { default: sharp } = await import('sharp');
-  let uploaded = 0;
+  const uploaded = new Map(ADMIN_THUMB_SIZES.map((size) => [size.dir, 0]));
+
   for (const img of images) {
     const src = join(imagesDir, img.file);
-    const thumbName = `thumbs/${slug}/${img.file.replace(/\.[^.]+$/, '.jpg')}`;
-    const blobClient = containerClient.getBlockBlobClient(thumbName);
-    // Skip if a thumb of at least this width already exists (cheap HEAD check).
-    try {
-      const props = await blobClient.getProperties();
-      const existing = Number(props.metadata?.width ?? 0);
-      if (existing >= THUMB_WIDTH) continue;
-    } catch {}
-    try {
-      const buf = await sharp(src)
-        .rotate() // apply EXIF orientation so portrait photos aren't sideways
-        .resize({ width: THUMB_WIDTH, withoutEnlargement: true })
-        .jpeg({ quality: 72, mozjpeg: true })
-        .toBuffer();
-      await blobClient.upload(buf, buf.length, {
-        blobHTTPHeaders: { blobContentType: 'image/jpeg' },
-        metadata: { width: String(THUMB_WIDTH) },
-      });
-      uploaded++;
-    } catch (e) {
-      console.warn(`  thumb skip: ${img.file}: ${e.message}`);
+    const jpegName = img.file.replace(/\.[^.]+$/, '.jpg');
+
+    for (const size of ADMIN_THUMB_SIZES) {
+      const blobClient = containerClient.getBlockBlobClient(`${size.dir}/${slug}/${jpegName}`);
+      // Skip if a file of at least this width already exists (cheap HEAD check).
+      try {
+        const props = await blobClient.getProperties();
+        if (Number(props.metadata?.width ?? 0) >= size.width) continue;
+      } catch {}
+      try {
+        const buf = await sharp(src)
+          .rotate() // apply EXIF orientation so portrait photos aren't sideways
+          .resize({ width: size.width, withoutEnlargement: true })
+          .jpeg({ quality: size.quality, mozjpeg: true })
+          .toBuffer();
+        await blobClient.upload(buf, buf.length, {
+          blobHTTPHeaders: { blobContentType: 'image/jpeg' },
+          metadata: { width: String(size.width) },
+        });
+        uploaded.set(size.dir, uploaded.get(size.dir) + 1);
+      } catch (e) {
+        console.warn(`  ${size.dir} skip: ${img.file}: ${e.message}`);
+      }
     }
   }
-  if (uploaded > 0) console.log(`  thumbs: ${uploaded} new for ${slug}`);
+
+  for (const [dir, count] of uploaded) {
+    if (count > 0) console.log(`  ${dir}: ${count} new for ${slug}`);
+  }
 }
 
 export function sanitizeSlug(prefix) {

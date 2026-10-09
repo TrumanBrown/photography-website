@@ -18,6 +18,7 @@ import {
   ratioLabel,
   sessionFlags,
   sortSessions,
+  thumbSrcSet,
   thumbUrl,
   type AdminSession,
 } from "./admin-ui";
@@ -177,6 +178,18 @@ describe("image URLs", () => {
     );
   });
 
+  it("offers both widths so a stretched tile isn't upscaled", () => {
+    expect(thumbSrcSet("host", "costa-rica", "DSC001.JPG")).toBe(
+      "https://host/variants/thumbs/costa-rica/DSC001.jpg 512w, " +
+        "https://host/variants/thumbs-lg/costa-rica/DSC001.jpg 1280w",
+    );
+  });
+
+  it("builds no URLs at all without a storage host", () => {
+    expect(thumbUrl("", "costa-rica", "DSC001.JPG")).toBe("");
+    expect(thumbSrcSet("", "costa-rica", "DSC001.JPG")).toBe("");
+  });
+
   it("prefers the full-size URL for the preview and falls back to the thumb", () => {
     const session = mk({ urls: { "DSC001.JPG": "https://host/originals/s/DSC001.JPG" } });
     expect(previewUrl(session, "DSC001.JPG", "host")).toBe(
@@ -220,7 +233,7 @@ describe("panel and tile sizing", () => {
 
   it("holds tile sizes between the slider's ends", () => {
     expect(clampTileSize(40)).toBe(120);
-    expect(clampTileSize(900)).toBe(420);
+    expect(clampTileSize(900)).toBe(640);
     expect(clampTileSize(Number.NaN)).toBe(200);
     expect(clampTileSize(201.4)).toBe(201);
   });

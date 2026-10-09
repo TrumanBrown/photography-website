@@ -154,9 +154,34 @@ export function filterSessions(
 
 /** Tiny pre-generated thumbnails from variants/thumbs/, used by every picker. */
 export function thumbUrl(host: string, thumbSlug: string, file: string): string {
+  return adminImageUrl('thumbs', host, thumbSlug, file);
+}
+
+/** The widths prebuild writes for the admin, smallest first. */
+export const THUMB_WIDTHS = [
+  { dir: 'thumbs', width: 512 },
+  { dir: 'thumbs-lg', width: 1280 },
+];
+
+function adminImageUrl(dir: string, host: string, thumbSlug: string, file: string): string {
   if (!host) return '';
   const base = file.slice(0, file.lastIndexOf('.')) || file;
-  return `https://${host}/variants/thumbs/${encodeURIComponent(thumbSlug)}/${encodeURIComponent(`${base}.jpg`)}`;
+  return `https://${host}/variants/${dir}/${encodeURIComponent(thumbSlug)}/${encodeURIComponent(`${base}.jpg`)}`;
+}
+
+/**
+ * Candidates for a picker tile.
+ *
+ * Grid columns stretch to fill the row and a retina screen doubles that again,
+ * so a tile can need well over a thousand device pixels. Handing the browser
+ * both widths lets it pick, rather than upscaling the small one into mush or
+ * pulling the large one down for a 96px row.
+ */
+export function thumbSrcSet(host: string, thumbSlug: string, file: string): string {
+  if (!host) return '';
+  return THUMB_WIDTHS.map(
+    ({ dir, width }) => `${adminImageUrl(dir, host, thumbSlug, file)} ${width}w`,
+  ).join(', ');
 }
 
 /**
@@ -210,7 +235,7 @@ export function fullPanelSize(viewport: PanelSize): PanelSize {
 }
 
 export const TILE_MIN = 120;
-export const TILE_MAX = 420;
+export const TILE_MAX = 640;
 
 export function clampTileSize(value: number): number {
   if (!Number.isFinite(value)) return 200;

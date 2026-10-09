@@ -14,6 +14,7 @@ import {
   previewUrl,
   ratioLabel,
   sessionFlags,
+  thumbSrcSet,
   thumbUrl,
   type AdminSession,
   type Draft,
@@ -993,6 +994,7 @@ document.getElementById('edit-expand')!.addEventListener('click', () => {
     expanded ? fullPanelSize(viewport()) : (prefs.panel ?? defaultPanelSize(viewport())),
     { center: true },
   );
+  measureTiles();
 });
 
 function setExpanded(value: boolean) {
@@ -1046,13 +1048,17 @@ document.getElementById('edit-resize')!.addEventListener('pointerdown', (event) 
       setExpanded(false);
       applyPanelSize({ width: width + dx, height: height + dy });
     },
-    () => savePrefs({ panel: { width: panel.offsetWidth, height: panel.offsetHeight } }),
+    () => {
+      measureTiles();
+      savePrefs({ panel: { width: panel.offsetWidth, height: panel.offsetHeight } });
+    },
   );
 });
 
 window.addEventListener('resize', () => {
   if (modal.classList.contains('hidden')) return;
   applyPanelSize({ width: panel.offsetWidth, height: panel.offsetHeight });
+  measureTiles();
 });
 
 // ---------------------------------------------------------------------------
@@ -1208,8 +1214,27 @@ function renderGrid() {
 
   grid.addEventListener('keydown', onGridKeydown);
   gridEl.appendChild(grid);
+  measureTiles();
   if (hadFocus) {
     gridEl.querySelector<HTMLElement>(`[data-file="${CSS.escape(state.focused)}"]`)?.focus();
+  }
+}
+
+/**
+ * Tell the browser how wide a tile actually ended up.
+ *
+ * `minmax(tile, 1fr)` stretches columns to fill the row, so the slider value is
+ * only a floor. Without the real width the browser would fetch the small
+ * thumbnail for a tile twice that size and upscale it.
+ */
+function measureTiles() {
+  const grid = gridEl.firstElementChild as HTMLElement | null;
+  const first = grid?.querySelector<HTMLElement>('[data-file]');
+  if (!first) return;
+  const width = Math.ceil(first.getBoundingClientRect().width);
+  if (width <= 0) return;
+  for (const img of gridEl.querySelectorAll('img')) {
+    img.sizes = `${width}px`;
   }
 }
 
@@ -1288,9 +1313,18 @@ function photoTile(state: EditorState, file: string): HTMLElement {
 
   const img = document.createElement('img');
   img.src = thumbUrl(blobHost, state.session.thumbSlug, file);
+  img.srcset = thumbSrcSet(blobHost, state.session.thumbSlug, file);
+  img.sizes = `${prefs.tile}px`;
   img.alt = '';
   img.loading = 'lazy';
   img.decoding = 'async';
+  // A session published before the larger thumbnails existed still has the
+  // small one, so fall back rather than showing a broken frame.
+  img.addEventListener('error', () => {
+    if (!img.srcset) return;
+    img.srcset = '';
+    img.src = thumbUrl(blobHost, state.session.thumbSlug, file);
+  });
   img.className = 'h-full w-full bg-neutral-100 object-cover dark:bg-neutral-800';
   button.append(img, roleBadges(roles));
   button.addEventListener('click', () => applyPick(file));
@@ -1387,9 +1421,16 @@ function renderCaptionList(state: EditorState) {
 
     const img = document.createElement('img');
     img.src = thumbUrl(blobHost, state.session.thumbSlug, file);
+    img.srcset = thumbSrcSet(blobHost, state.session.thumbSlug, file);
+    img.sizes = `${thumbWidth}px`;
     img.alt = '';
     img.loading = 'lazy';
     img.decoding = 'async';
+    img.addEventListener('error', () => {
+      if (!img.srcset) return;
+      img.srcset = '';
+      img.src = thumbUrl(blobHost, state.session.thumbSlug, file);
+    });
     img.style.width = `${thumbWidth}px`;
     img.className = 'shrink-0 rounded bg-neutral-100 object-cover dark:bg-neutral-800';
     img.style.aspectRatio = '3 / 2';

@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import {
+  ADMIN_THUMB_SIZES,
+  generateAdminThumbs,
   hashKey,
   reorderByList,
   sanitizeSlug,
@@ -136,5 +141,109 @@ describe("session sidecar validation", () => {
         images: [{ file: "DSC0123.jpg", caption: "x".repeat(501) }],
       }),
     ).toThrow("caption must be at most 500 characters");
+  });
+});
+
+/** Stand-in for a blob container that records what the build would upload. */
+function fakeContainer(existing = {}) {
+  const uploads = [];
+  return {
+    uploads,
+    getBlockBlobClient(name) {
+      return {
+        async getProperties() {
+          if (!(name in existing)) {
+            const error = new Error("BlobNotFound");
+            error.statusCode = 404;
+            throw error;
+          }
+          return { metadata: { width: String(existing[name]) } };
+        },
+        async upload(buffer, length, options) {
+          uploads.push({ name, buffer, length, metadata: options.metadata });
+        },
+      };
+    },
+  };
+}
+
+describe("admin thumbnails", () => {
+  const slug = "costa-rica-2026";
+  const file = "DSC0001.JPEG";
+  let imagesDir;
+
+  beforeAll(async () => {
+    const { default: sharp } = await import("sharp");
+    imagesDir = await mkdtemp(join(tmpdir(), "admin-thumbs-"));
+    // A 3000px wide frame, big enough for both admin widths to downscale from.
+    const source = await sharp({
+      create: {
+        width: 3000,
+        height: 2000,
+        channels: 3,
+        background: { r: 40, g: 90, b: 60 },
+      },
+    })
+      .jpeg()
+      .toBuffer();
+    await writeFile(join(imagesDir, file), source);
+  });
+
+  afterAll(async () => {
+    await rm(imagesDir, { recursive: true, force: true });
+  });
+
+  it("writes one JPEG per admin width, stamped with the width it used", async () => {
+    const container = fakeContainer();
+    await generateAdminThumbs({
+      slug,
+      imagesDir,
+      images: [{ file }],
+      containerClient: container,
+    });
+
+    expect(container.uploads.map((u) => u.name)).toEqual([
+      `thumbs/${slug}/DSC0001.jpg`,
+      `thumbs-lg/${slug}/DSC0001.jpg`,
+    ]);
+    expect(container.uploads.map((u) => u.metadata)).toEqual([
+      { width: "512" },
+      { width: "1280" },
+    ]);
+
+    const { default: sharp } = await import("sharp");
+    const widths = [];
+    for (const upload of container.uploads) {
+      widths.push((await sharp(upload.buffer).metadata()).width);
+    }
+    expect(widths).toEqual(ADMIN_THUMB_SIZES.map((size) => size.width));
+  });
+
+  it("skips what is already big enough and reruns what is not", async () => {
+    const container = fakeContainer({
+      [`thumbs/${slug}/DSC0001.jpg`]: 512,
+      [`thumbs-lg/${slug}/DSC0001.jpg`]: 120,
+    });
+    await generateAdminThumbs({
+      slug,
+      imagesDir,
+      images: [{ file }],
+      containerClient: container,
+    });
+
+    expect(container.uploads.map((u) => u.name)).toEqual([
+      `thumbs-lg/${slug}/DSC0001.jpg`,
+    ]);
+  });
+
+  it("never fails a build over one unreadable photograph", async () => {
+    const container = fakeContainer();
+    await generateAdminThumbs({
+      slug,
+      imagesDir,
+      images: [{ file: "missing.JPEG" }],
+      containerClient: container,
+    });
+    expect(container.uploads).toEqual([]);
   });
 });
