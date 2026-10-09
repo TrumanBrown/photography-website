@@ -27,7 +27,19 @@ if (toggleMatches.length !== 1) {
   throw new Error(`Expected one inline script in ThemeToggle.astro; found ${toggleMatches.length}.`);
 }
 
-const expected = [cspToken(themeMatch[1].trim()), cspToken(toggleMatches[0][1])];
+// The lead photograph picks its starting frame while the parser is still
+// working, so that choice has to be inline rather than in a bundled module.
+const leadSource = read('src/components/LeadPhoto.astro');
+const leadMatches = [...leadSource.matchAll(/<script\s+is:inline>([\s\S]*?)<\/script>/g)];
+if (leadMatches.length !== 1) {
+  throw new Error(`Expected one inline script in LeadPhoto.astro; found ${leadMatches.length}.`);
+}
+
+const expected = [
+  cspToken(themeMatch[1].trim()),
+  cspToken(toggleMatches[0][1]),
+  cspToken(leadMatches[0][1]),
+];
 const config = JSON.parse(read('staticwebapp.config.json'));
 const policy = config.globalHeaders?.['Content-Security-Policy'];
 if (typeof policy !== 'string') {
@@ -44,5 +56,5 @@ if (missing.length || stale.length) {
   console.error('Update script-src in staticwebapp.config.json with the tokens above.');
   process.exitCode = 1;
 } else {
-  console.log(`CSP hashes match ${expected.length} inline theme scripts.`);
+  console.log(`CSP hashes match ${expected.length} inline scripts.`);
 }

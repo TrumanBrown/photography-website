@@ -34,7 +34,9 @@ does, and the grid is drawn in the shape that slot actually uses on the site:
   **Auto** follows the cover.
 - **Rotation**: the photographs offered to the rotating lead box on the home page. The box is a
   fixed 3:2, so anything else is greyed out and can't be chosen. An empty list means the site picks
-  one frame automatically.
+  one frame automatically. Every visit opens on a random frame from the pool and then rotates on
+  from there, so the home page shows a different photograph each time rather than always the same
+  one.
 - **Captions**: a list view with a thumbnail per row. Captions become the alt text in the lightbox
   and the line under each photograph.
 

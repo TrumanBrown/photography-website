@@ -67,7 +67,7 @@ base-uri 'self';
 form-action 'self'
 ```
 
-(The live policy in [staticwebapp.config.json](../staticwebapp.config.json) also carries two `sha256` hashes in `script-src` for the dark-mode inline scripts; they are omitted above for readability.)
+(The live policy in [staticwebapp.config.json](../staticwebapp.config.json) also carries three `sha256` hashes in `script-src`, two for the dark-mode inline scripts and one for the home page's lead photograph chooser; they are omitted above for readability.)
 
 Translation:
 - **`default-src 'self'`**: load resources only from the site's own origin unless overridden.
@@ -81,8 +81,8 @@ Translation:
 - **`base-uri 'self'`**: attackers can't inject a `<base>` tag pointing relative URLs elsewhere.
 - **`form-action 'self'`**: forms can only submit to the site's own origin (contact form, admin).
 
-`npm run check:csp` verifies both inline theme scripts against the configured
-hashes. It runs as part of `npm run check` and `npm run build`, so changing an
+`npm run check:csp` verifies every inline script (the two dark-mode ones and
+the lead photograph chooser) against the configured hashes. It runs as part of `npm run check` and `npm run build`, so changing an
 inline script without updating the policy fails before deployment. If you add
 another inline script, add its hash rather than enabling `'unsafe-inline'`.
 
