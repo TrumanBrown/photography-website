@@ -156,6 +156,17 @@ const hobbies = defineCollection({
       })
       .optional(),
     /**
+     * Optional daily puzzle: six species recorded at one real place in one
+     * month, revealed commonest-first, with a world map to guess where. Data is
+     * built by scripts/build-day-list.mjs. Opt-in per hobby so it stays a quiet
+     * extra rather than a headline feature.
+     */
+    dayList: z
+      .object({
+        heading: z.string().optional(),
+      })
+      .optional(),
+    /**
      * Optional personal touch: a live grid of the author's real iNaturalist
      * observations for this hobby, with a link to their full observations page.
      * The pixel game is the playful side; this is the real-world record. Any

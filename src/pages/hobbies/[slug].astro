@@ -11,6 +11,7 @@ import BirdingSpark from "@/components/hobbies/BirdingSpark.astro";
 import BirdingLifeList from "@/components/hobbies/BirdingLifeList.astro";
 import INatObservations from "@/components/hobbies/INatObservations.astro";
 import INatHerpMap from "@/components/hobbies/INatHerpMap.astro";
+import DayList from "@/components/hobbies/DayList.astro";
 import Lightbox from "@/components/Lightbox.astro";
 import { hobbySlug } from "@/lib/hobbies";
 
@@ -38,6 +39,7 @@ const {
   lifeList,
   spark,
   herpMap,
+  dayList,
 } = entry.data;
 const galleryItems = media?.gallery ?? [];
 ---
@@ -66,6 +68,8 @@ const galleryItems = media?.gallery ?? [];
     {interactive === "birding" && <Birding />}
     {interactive === "roadcruise" && <HerpingNight />}
     {interactive === "pixel-hike" && <PixelHike />}
+
+    {dayList && <DayList heading={dayList.heading} />}
 
     {
       spark && (

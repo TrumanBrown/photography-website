@@ -19,6 +19,7 @@
     "fetch:tidepool-photos": "node scripts/fetch-tidepool-photos.mjs",
     "fetch:herping-photos": "node scripts/fetch-herping-photos.mjs",
     "build:herp-geo": "node scripts/build-herp-geo.mjs",
+    "build:day-list": "node scripts/build-day-list.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint .",

@@ -293,6 +293,86 @@ A **road-cruising game**: a dark, wet Pacific Northwest back road scrolls toward
 
 Like the other islands, everything is **drawn in code**, the loop pauses offscreen and when the tab is hidden, and it honors `prefers-reduced-motion` — which **parks the car** (the road stops moving) and degrades to a stationary headlamp-sweep so there's no vestibular motion.
 
+## Reference implementation: Day list (daily puzzle)
+
+A daily puzzle that asks you to read a **community** rather than a single organism. Six species were
+all recorded at one real place in one month; they are revealed most-widely-recorded first, so the
+opening line narrows almost nothing and the last one is often local enough to name the valley. The
+visitor drops a pin on a world map, picks a month, and scores on distance, month accuracy, and how
+few species they needed.
+
+This is the inverse of a "what is this organism" quiz. One species gives you a range; an assemblage
+gives you a point, which is how field ecologists actually read a habitat (indicator species).
+
+**Files**
+
+- [src/components/hobbies/DayList.astro](../src/components/hobbies/DayList.astro), the markup,
+  the three-step explainer, and the styles.
+- [src/lib/hobbies/day-list.ts](../src/lib/hobbies/day-list.ts), the engine: daily round selection,
+  clue reveal, equirectangular map, pin and keyboard guessing, scoring, share string, the full
+  species roll, and `localStorage` persistence so a finished day stays finished.
+- [src/lib/hobbies/day-list.json](../src/lib/hobbies/day-list.json), the puzzle set.
+- [scripts/build-day-list.mjs](../scripts/build-day-list.mjs), the builder.
+- [scripts/resolve-day-list-places.mjs](../scripts/resolve-day-list-places.mjs), a helper that
+  resolves candidate locations to iNaturalist place ids and reports how much data each one has.
+  Run it by hand when adding a location.
+
+**Turning it on.** It is opt-in per hobby and deliberately unlisted, so it does not appear in the nav
+or on a hobby card. Add a `dayList` block to any hobby JSON:
+
+```json
+"dayList": { "heading": "Day list" }
+```
+
+It currently runs on Birding, where "day list" is the native term for what you saw in one outing.
+
+### Accuracy rules
+
+The puzzle is aimed at people who know the species, so the builder is strict about provenance.
+
+- **Locations are real iNaturalist places with published boundaries**, not arbitrary circles. Every
+  query is anchored to a place id, and the reveal links to that place so a player can check it.
+- **Scoring is against the boundary, not a centre point.** Madagascar is 1,500 km long; a pin on its
+  north coast is a correct answer, and measuring to a centroid would call that a 700 km miss. A pin
+  anywhere inside the bounding box scores as exact.
+- **Every clue is a research-grade record** from that place in that month, with at least two local
+  observations. A single record is too often a vagrant, an escape, or a misidentification.
+- **Species are labelled native, introduced or endemic for that place**, from iNaturalist's own
+  establishment means. This matters: the Laughing Kookaburra on the Cradle Mountain list is
+  introduced to Tasmania, and presenting it as a native indicator would be wrong.
+- **Facts come from the taxon's Wikipedia summary** and ship with the article link so they can be
+  checked. iNaturalist returns those URLs with raw spaces in the title, which do not resolve, so the
+  builder normalises them.
+- **Photos are openly licensed only.** The builder walks `default_photo` then `taxon_photos` until it
+  finds an acceptable licence, because the best-known species often have an all-rights-reserved lead
+  image. The photographer and licence travel with the photo and are rendered both on the clue and in
+  the reveal, since CC BY and CC BY-NC require attribution.
+- **Clue order uses worldwide observation counts**, which measure how often a species is _recorded_,
+  not how widespread it is. A well-studied European species out-records an equally widespread African
+  one. The UI says this plainly rather than implying a range map.
+- **A round is rejected** if its opening clue has fewer than 120,000 worldwide observations, because
+  without a genuinely cosmopolitan opener the puzzle starts half-solved.
+
+**Rebuilding the puzzles.**
+
+```bash
+npm run build:day-list
+```
+
+Takes roughly fifteen minutes: the script throttles to one request a second, and it retries up to
+five candidates per abundance band so one species without a usable photo costs a request rather than
+a whole round. It refuses to write a set with fewer than ten rounds.
+
+**No runtime API calls.** Puzzle data ships as JSON and photos load straight from the iNaturalist
+CDNs already allow-listed in `img-src`, so the island costs nothing per play and keeps working if the
+API is down.
+
+**One gotcha worth remembering.** The clue rows, month buttons and result card are all built by the
+script at runtime, so Astro's scoped styles never reach them. The component uses
+`<style is:global>` with every selector namespaced under `dl-` instead.
+
+---
+
 ## Photo galleries (`hobby-media`)
 
 Any hobby can show a photo gallery, a hero image up top plus a thumbnail grid, each click opening the full-resolution original in the same PhotoSwipe lightbox the photography pages use. It's driven by the optional `media` field on the hobby (`hero` + `gallery`), with `mediaTitle` setting the heading (e.g. "My tank"). The render lives in [src/pages/hobbies/[slug].astro](../src/pages/hobbies/%5Bslug%5D.astro) and only appears when `media` is present.

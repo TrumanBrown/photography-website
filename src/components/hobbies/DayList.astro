@@ -1,0 +1,630 @@
+---
+/**
+ * Day list - a daily puzzle built on real iNaturalist records.
+ *
+ * Six species were all recorded at one place in one month. They are revealed
+ * commonest-in-the-world first, so each one narrows the map further. The
+ * visitor drops a pin and picks a month; reading fewer species scores higher.
+ *
+ * Behaviour lives in @/lib/hobbies/day-list, bound via [data-daylist-*].
+ * Photos load from the iNaturalist CDNs already allow-listed in the CSP.
+ */
+interface Props {
+  heading?: string;
+}
+const { heading = "Day list" } = Astro.props;
+---
+
+<section class="dl not-prose mt-14" aria-label={heading} data-daylist>
+  <header class="dl-head">
+    <p class="u-label">Daily puzzle</p>
+    <h2 class="dl-title">{heading}</h2>
+    <p class="dl-lede">
+      Six species, all recorded at one real place in one month. Work out where
+      on earth that was, and which month.
+    </p>
+  </header>
+
+  <ol class="dl-steps">
+    <li>
+      <span class="dl-steps__n">1</span>
+      <span
+        >They arrive <strong>most widely recorded first</strong>. A dandelion
+        narrows nothing; the sixth species is often local enough to name the
+        valley.</span
+      >
+    </li>
+    <li>
+      <span class="dl-steps__n">2</span>
+      <span
+        >Drop a pin on the map and pick a month. You can guess after any number
+        of species.</span
+      >
+    </li>
+    <li>
+      <span class="dl-steps__n">3</span>
+      <span
+        >Guessing early is worth more. Reading all six makes it easy, so it only
+        scores about half. A pin anywhere inside the real boundary is exact.</span
+      >
+    </li>
+  </ol>
+
+  <div class="dl-grid">
+    <!-- the notebook -->
+    <div class="dl-book">
+      <div class="dl-book__head">
+        <p class="u-label">Species recorded here</p>
+        <p class="dl-book__count" data-daylist-counter>1 of 6 read</p>
+      </div>
+      <ol class="dl-clues" data-daylist-clues></ol>
+      <button type="button" class="dl-btn dl-btn--wide" data-daylist-more>
+        Read the next species
+      </button>
+    </div>
+
+    <!-- the guess -->
+    <div>
+      <div
+        class="dl-mapwrap"
+        data-daylist-mapwrap
+        tabindex="0"
+        role="application"
+        aria-label="World map. Click or tap to drop a pin where you think the list was written. Arrow keys move the pin."
+      >
+        <canvas data-daylist-map></canvas>
+        <p class="dl-maphint">Tap anywhere to drop your pin</p>
+      </div>
+
+      <div class="dl-ask">
+        <p class="u-label dl-ask__label">Which month were they there?</p>
+        <div
+          class="dl-months"
+          data-daylist-months
+          role="group"
+          aria-label="Choose a month"
+        >
+        </div>
+      </div>
+
+      <div class="dl-lockrow">
+        <p class="dl-readout" data-daylist-readout>
+          Drop a pin on the map, then choose a month.
+        </p>
+        <button
+          type="button"
+          class="dl-btn dl-btn--go"
+          data-daylist-lock
+          disabled>Lock it in</button
+        >
+      </div>
+
+      <div data-daylist-result></div>
+    </div>
+  </div>
+
+  <p class="dl-foot">
+    Every species is a research-grade iNaturalist record from that place in that
+    month, and every location is a real place with a published boundary. The bar
+    on each line is how often the species is <em>recorded</em> worldwide, which tracks
+    how much people look as well as where it lives, so treat it as a hint rather than
+    a range map. Species are marked native, introduced or endemic using iNaturalist's
+    establishment means for that place. Photos are Creative Commons and credited to
+    the photographer.
+  </p>
+</section>
+
+<script>
+  import { initDayList } from "@/lib/hobbies/day-list";
+
+  document
+    .querySelectorAll<HTMLElement>("[data-daylist]")
+    .forEach((el) => initDayList(el));
+</script>
+
+<style is:global>
+  /* Global rather than scoped, and namespaced under .dl so nothing leaks.
+     Astro's scoped styles only reach markup present at build time, and the
+     clue rows, month buttons and result card are all built by the script at
+     runtime, so scoping would silently miss them. */
+
+  /* Follows the archive's paper/ink palette rather than introducing a new one:
+     rules instead of cards, one accent-free column of type. */
+  .dl {
+    border-top: 1px solid var(--rule);
+    padding-top: 22px;
+  }
+
+  .dl-head {
+    max-width: 62ch;
+  }
+  .dl-title {
+    margin: 4px 0 0;
+    font-size: 20px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+  }
+  .dl-lede {
+    margin: 6px 0 0;
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--ink-3);
+  }
+
+  .dl-steps {
+    list-style: none;
+    margin: 16px 0 0;
+    padding: 0;
+    display: grid;
+    gap: 8px;
+    max-width: 72ch;
+  }
+  .dl-steps li {
+    display: flex;
+    gap: 10px;
+    align-items: baseline;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--ink-3);
+  }
+  .dl-steps__n {
+    flex: none;
+    width: 18px;
+    height: 18px;
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    display: inline-grid;
+    place-items: center;
+    font-size: 10px;
+    color: var(--ink-2);
+    transform: translateY(2px);
+  }
+  .dl-steps strong {
+    font-weight: 500;
+    color: var(--ink);
+  }
+
+  .dl-grid {
+    margin-top: 22px;
+    display: grid;
+    gap: 22px;
+    grid-template-columns: 1fr;
+  }
+  @media (min-width: 900px) {
+    .dl-grid {
+      grid-template-columns: minmax(0, 20rem) minmax(0, 1fr);
+      align-items: start;
+    }
+  }
+
+  /* ---------------- notebook ---------------- */
+  .dl-book {
+    border: 1px solid var(--rule);
+  }
+  .dl-book__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--rule);
+    background: var(--band);
+  }
+  .dl-book__count {
+    margin: 0;
+    font-size: 11px;
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .dl-clues {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .dl-clue {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+  .dl-clue__num {
+    flex: none;
+    width: 12px;
+    font-size: 10px;
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+    padding-top: 2px;
+  }
+  .dl-clue__photo {
+    flex: none;
+    width: 46px;
+    height: 46px;
+    object-fit: cover;
+    background: var(--band);
+  }
+  .dl-clue__body {
+    min-width: 0;
+    flex: 1;
+    display: block;
+  }
+  .dl-clue__name {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.3;
+  }
+  .dl-clue__sci {
+    display: block;
+    font-size: 11px;
+    font-style: italic;
+    color: var(--ink-2);
+    margin-top: 1px;
+  }
+  .dl-clue__bar {
+    display: block;
+    height: 3px;
+    background: var(--rule-soft);
+    margin-top: 6px;
+  }
+  .dl-clue__bar i {
+    display: block;
+    height: 100%;
+    background: var(--ink-2);
+  }
+  .dl-clue__meta {
+    display: block;
+    font-size: 10px;
+    color: var(--ink-2);
+    margin-top: 4px;
+    font-variant-numeric: tabular-nums;
+  }
+  .dl-clue--hidden {
+    color: var(--ink-2);
+  }
+  .dl-clue__wait {
+    font-size: 12px;
+    font-style: italic;
+    color: var(--ink-2);
+  }
+
+  /* ---------------- map ---------------- */
+  .dl-mapwrap {
+    position: relative;
+    border: 1px solid var(--rule);
+    aspect-ratio: 2 / 1;
+    cursor: crosshair;
+    touch-action: manipulation;
+  }
+  .dl-mapwrap canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  .dl-maphint {
+    position: absolute;
+    left: 8px;
+    bottom: 8px;
+    margin: 0;
+    font-size: 11px;
+    color: var(--ink-2);
+    background: color-mix(in srgb, var(--paper) 88%, transparent);
+    border: 1px solid var(--rule);
+    padding: 3px 7px;
+    pointer-events: none;
+    transition: opacity 0.25s;
+  }
+  .dl-mapwrap.is-placed .dl-maphint {
+    opacity: 0;
+  }
+
+  /* ---------------- month ---------------- */
+  .dl-ask {
+    margin-top: 14px;
+  }
+  .dl-ask__label {
+    margin: 0 0 6px;
+    display: block;
+  }
+  .dl-months {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 4px;
+  }
+  @media (min-width: 560px) {
+    .dl-months {
+      grid-template-columns: repeat(12, 1fr);
+    }
+  }
+  .dl-month {
+    border: 1px solid var(--rule);
+    background: transparent;
+    color: var(--ink-3);
+    font: inherit;
+    font-size: 11px;
+    padding: 7px 0;
+    cursor: pointer;
+  }
+  .dl-month:hover {
+    background: var(--hover);
+  }
+  .dl-month[aria-pressed="true"] {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: var(--paper);
+  }
+  .dl-sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /* ---------------- actions ---------------- */
+  .dl-lockrow {
+    margin-top: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .dl-readout {
+    margin: 0;
+    font-size: 12px;
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+  }
+  .dl-btn {
+    border: 1px solid var(--rule);
+    background: transparent;
+    color: var(--ink);
+    font: inherit;
+    font-size: 12px;
+    padding: 8px 14px;
+    cursor: pointer;
+  }
+  .dl-btn:hover:not(:disabled) {
+    background: var(--hover);
+  }
+  .dl-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  .dl-btn--wide {
+    display: block;
+    width: 100%;
+    border: 0;
+    border-top: 1px solid var(--rule);
+    padding: 11px 12px;
+  }
+  .dl-btn--go {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: var(--paper);
+  }
+  .dl-btn--go:hover:not(:disabled) {
+    opacity: 0.88;
+    background: var(--ink);
+  }
+
+  /* ---------------- result ---------------- */
+  .dl-result {
+    margin-top: 16px;
+    border: 1px solid var(--rule);
+  }
+  .dl-result__head {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--rule);
+    background: var(--band);
+  }
+  .dl-result__place {
+    margin: 3px 0 0;
+    font-size: 19px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+  }
+  .dl-result__region {
+    margin: 2px 0 0;
+    font-size: 12px;
+    color: var(--ink-2);
+  }
+  .dl-result__score {
+    text-align: right;
+  }
+  .dl-result__total {
+    margin: 3px 0 0;
+    font-size: 24px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
+
+  .dl-breakdown {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    margin: 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .dl-breakdown > div {
+    padding: 10px 14px;
+    border-right: 1px solid var(--rule);
+  }
+  .dl-breakdown > div:last-child {
+    border-right: 0;
+  }
+  .dl-breakdown dt {
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-2);
+  }
+  .dl-breakdown dd {
+    margin: 3px 0 0;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .dl-result__note {
+    margin: 0;
+    padding: 12px 14px;
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--ink-3);
+  }
+  .dl-result__note strong {
+    font-weight: 500;
+    color: var(--ink);
+  }
+  .dl-result__note--quiet {
+    border-top: 1px solid var(--rule-soft);
+    font-size: 12px;
+    color: var(--ink-2);
+  }
+  .dl-share {
+    margin: 0;
+    padding: 0 14px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 15px;
+    letter-spacing: 0.08em;
+    line-height: 1.45;
+  }
+  .dl-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    flex-wrap: wrap;
+  }
+  .dl-next {
+    font-size: 11px;
+    color: var(--ink-2);
+  }
+
+  /* ---------------- photo credit ---------------- */
+  /* CC BY and CC BY-NC both require the photographer to be named, so the
+     credit rides with the thumbnail rather than living in a footnote. */
+  .dl-clue__credit {
+    display: block;
+    font-size: 9px;
+    line-height: 1.3;
+    color: var(--ink-2);
+    margin-top: 3px;
+  }
+
+  /* ---------------- standing tags ---------------- */
+  .dl-tag {
+    display: inline-block;
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    border: 1px solid var(--rule);
+    padding: 1px 5px;
+    margin-left: 5px;
+    color: var(--ink-2);
+    vertical-align: 1px;
+    white-space: nowrap;
+  }
+  .dl-tag--introduced {
+    border-color: var(--ink-2);
+    color: var(--ink-3);
+  }
+  .dl-tag--endemic {
+    border-color: var(--ink);
+    color: var(--ink);
+  }
+
+  /* ---------------- the whole list ---------------- */
+  .dl-rollwrap {
+    border-top: 1px solid var(--rule);
+    padding: 12px 14px 4px;
+  }
+  .dl-rollwrap__label {
+    display: block;
+    margin: 0 0 8px;
+  }
+  .dl-rolls {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .dl-roll {
+    display: flex;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+  .dl-roll:last-child {
+    border-bottom: 0;
+  }
+  .dl-roll__photo {
+    flex: none;
+    width: 64px;
+    height: 64px;
+    object-fit: cover;
+    background: var(--band);
+  }
+  .dl-roll__body {
+    min-width: 0;
+    flex: 1;
+  }
+  .dl-roll__name {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.35;
+  }
+  .dl-roll__sci {
+    margin: 1px 0 0;
+    font-size: 11px;
+    font-style: italic;
+    color: var(--ink-2);
+  }
+  .dl-roll__fact {
+    margin: 5px 0 0;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--ink-3);
+  }
+  .dl-roll__meta {
+    margin: 5px 0 0;
+    font-size: 10px;
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+  }
+  .dl-roll__link {
+    color: var(--ink-3);
+  }
+  .dl-roll__credit {
+    margin: 3px 0 0;
+    font-size: 9px;
+    color: var(--ink-2);
+  }
+
+  .dl-actions a.dl-btn {
+    text-decoration: none;
+    color: var(--ink);
+  }
+  .dl-actions a.dl-btn:hover {
+    text-decoration: none;
+    background: var(--hover);
+  }
+
+  .dl-foot {
+    margin: 18px 0 0;
+    font-size: 11px;
+    line-height: 1.6;
+    color: var(--ink-2);
+    max-width: 72ch;
+  }
+</style>
