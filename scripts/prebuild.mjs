@@ -470,6 +470,11 @@ async function processSession({ prefix, originalsClient, derivativesClient, serv
         .filter((i) => i.width > 0 && i.height > 0)
         .map((i) => [i.file, Number((i.width / i.height).toFixed(4))]),
     ),
+    // Public URLs of the full-size frames, so the admin's preview can show the
+    // photograph itself rather than an enlarged thumbnail.
+    urls: Object.fromEntries(
+      orderedImages.filter((i) => i.fullUrl).map((i) => [i.file, i.fullUrl]),
+    ),
     captions: Object.fromEntries(
       orderedImages
         .filter((image) => image.caption)
@@ -689,28 +694,34 @@ function blobPublicUrl(containerClient, blobPath) {
   return `${base}/${blobPath.split('/').map(encodeURIComponent).join('/')}`;
 }
 
-// Generate tiny thumbnails for the admin panel (120px wide, ~3-8KB each).
+// Thumbnails for the admin panel's pickers. 120px was unreadable on a laptop,
+// so these are big enough to judge a frame by (~20-35KB each) and still a
+// fraction of an original. The width is stamped on the blob so raising it again
+// reruns the ones that are too small rather than leaving a mixed set behind.
+const THUMB_WIDTH = 512;
+
 async function generateAdminThumbs({ slug, imagesDir, images, containerClient }) {
   const { default: sharp } = await import('sharp');
-  const THUMB_WIDTH = 120;
   let uploaded = 0;
   for (const img of images) {
     const src = join(imagesDir, img.file);
     const thumbName = `thumbs/${slug}/${img.file.replace(/\.[^.]+$/, '.jpg')}`;
     const blobClient = containerClient.getBlockBlobClient(thumbName);
-    // Skip if thumb already exists (cheap HEAD check).
+    // Skip if a thumb of at least this width already exists (cheap HEAD check).
     try {
-      await blobClient.getProperties();
-      continue;
+      const props = await blobClient.getProperties();
+      const existing = Number(props.metadata?.width ?? 0);
+      if (existing >= THUMB_WIDTH) continue;
     } catch {}
     try {
       const buf = await sharp(src)
         .rotate() // apply EXIF orientation so portrait photos aren't sideways
         .resize({ width: THUMB_WIDTH, withoutEnlargement: true })
-        .jpeg({ quality: 50, mozjpeg: true })
+        .jpeg({ quality: 72, mozjpeg: true })
         .toBuffer();
       await blobClient.upload(buf, buf.length, {
         blobHTTPHeaders: { blobContentType: 'image/jpeg' },
+        metadata: { width: String(THUMB_WIDTH) },
       });
       uploaded++;
     } catch (e) {

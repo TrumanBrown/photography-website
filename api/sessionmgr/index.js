@@ -1,7 +1,7 @@
 let BlobServiceClient;
 let TableClient;
 const { allowedUsers, principalUserId } = require('./auth');
-const { captionsFromImages, normalizeSessionImages } = require('./session-images');
+const { captionsFromImages, fullUrls, normalizeSessionImages } = require('./session-images');
 const { analyticsDayKeys, buildAnalytics } = require('./analytics');
 
 const CONTAINER = 'originals';
@@ -186,6 +186,8 @@ async function handleGet(context) {
         // Shapes let the pickers grey out frames that won't survive the
         // 3:2 lead box or the wide banner crop.
         ratios: s.ratios || {},
+        // Full-size URLs back the preview overlay.
+        urls: s.urls || {},
         showcase: s.showcase || [],
       };
     });
@@ -222,11 +224,12 @@ async function handleGet(context) {
     }
 
     const images = (imagesByPrefix[prefix] || []).sort();
+    const thumbSlug = sanitizeSlug(prefix);
     sessions.push({
       slug: prefix,
       // Sanitized slug matches prebuild's output — used for thumbnail URLs in
       // variants/thumbs/<thumbSlug>/ and the public /sessions/<thumbSlug> path.
-      thumbSlug: sanitizeSlug(prefix),
+      thumbSlug: thumbSlug,
       title: sidecar.title || humanize(prefix),
       date: sidecar.date || '',
       location: sidecar.location || '',
@@ -238,6 +241,7 @@ async function handleGet(context) {
       captions: captionsFromImages(sidecar.images),
       // No ratios on this path: scanning originals/ never opens the images.
       // The pickers treat an unknown shape as usable rather than blocking it.
+      urls: fullUrls({ blobHost: blobHost, prefix: prefix, thumbSlug: thumbSlug, files: images }),
       showcase: Array.isArray(sidecar.showcase) ? sidecar.showcase : [],
     });
   }

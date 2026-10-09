@@ -2,6 +2,52 @@ const MAX_IMAGES = 500;
 const MAX_FILENAME = 255;
 const MAX_CAPTION = 500;
 
+const ORIGINALS_CONTAINER = "originals";
+const DERIVATIVES_CONTAINER = "derivatives";
+// The formats a browser can display straight from the originals container.
+// Everything else (RAW, HEIC, TIFF) is published as a JPEG derivative by
+// scripts/prebuild.mjs, under the sanitized slug.
+const WEB_EXTS = new Set([".jpg", ".jpeg", ".png", ".webp", ".avif"]);
+
+function extensionOf(name) {
+  const dot = name.lastIndexOf(".");
+  return dot > -1 ? name.slice(dot).toLowerCase() : "";
+}
+
+function encodePath(value) {
+  return value
+    .split("/")
+    .map((part) => encodeURIComponent(part))
+    .join("/");
+}
+
+/**
+ * Public URLs for the full-size frames, keyed by filename.
+ *
+ * The admin index records the real ones during a build. This rebuilds them the
+ * same way for the fallback path that scans originals/ directly, so the admin
+ * panel's preview still has something better than a thumbnail to show.
+ */
+function fullUrls({ blobHost, prefix, thumbSlug, files }) {
+  const urls = {};
+  if (!blobHost) return urls;
+
+  for (const file of files) {
+    const ext = extensionOf(file);
+    if (WEB_EXTS.has(ext)) {
+      urls[file] =
+        `https://${blobHost}/${ORIGINALS_CONTAINER}/` +
+        encodePath(`${prefix}/${file}`);
+    } else {
+      const base = `${file.slice(0, file.length - ext.length)}.jpg`;
+      urls[file] =
+        `https://${blobHost}/${DERIVATIVES_CONTAINER}/` +
+        encodePath(`${thumbSlug}/${base}`);
+    }
+  }
+  return urls;
+}
+
 function normalizeSessionImages(value) {
   if (value === undefined) return { images: undefined, errors: [] };
   if (!Array.isArray(value))
@@ -82,4 +128,9 @@ function captionsFromImages(images) {
   return captions;
 }
 
-module.exports = { MAX_CAPTION, captionsFromImages, normalizeSessionImages };
+module.exports = {
+  MAX_CAPTION,
+  captionsFromImages,
+  fullUrls,
+  normalizeSessionImages,
+};
