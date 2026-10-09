@@ -1,0 +1,11 @@
+{
+  "title": "Day list",
+  "summary": "Six animals from one real place. Work out where in the world somebody was standing.",
+  "intro": "Half of birding is working out what you're likely to see before you've seen it, and that habit is hard to switch off. Give me a list of what somebody found and I'll start guessing where they were. This is that, as a puzzle. Six species from one real place, handed over one at a time, commonest in the world first. Drop a pin where you think they were standing and name the month.",
+  "emoji": "🧭",
+  "accent": "#6b6250",
+  "order": 7,
+  "dayList": {
+    "heading": "Today's list"
+  }
+}

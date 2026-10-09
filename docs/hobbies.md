@@ -317,14 +317,16 @@ gives you a point, which is how field ecologists actually read a habitat (indica
   resolves candidate locations to iNaturalist place ids and reports how much data each one has.
   Run it by hand when adding a location.
 
-**Turning it on.** It is opt-in per hobby and deliberately unlisted, so it does not appear in the nav
-or on a hobby card. Add a `dayList` block to any hobby JSON:
+**Where it lives.** Day list is its own hobby at `/hobbies/day-list/`, with its own card on the
+hobbies index. The block is still opt-in per hobby, so it can be dropped onto any other hobby page
+by adding:
 
 ```json
-"dayList": { "heading": "Day list" }
+"dayList": { "heading": "Today's list" }
 ```
 
-It currently runs on Birding, where "day list" is the native term for what you saw in one outing.
+`HobbyCard` treats a `dayList` block the same as an `interactive` island when choosing its call to
+action, so the card reads "Play it" rather than "Explore".
 
 ### Accuracy rules
 
@@ -337,6 +339,11 @@ The puzzle is aimed at people who know the species, so the builder is strict abo
   anywhere inside the bounding box scores as exact.
 - **Every clue is a research-grade record** from that place in that month, with at least two local
   observations. A single record is too often a vagrant, an escape, or a misidentification.
+- **Animals are preferred over plants.** A birder can picture a kookaburra and reason about where it
+  lives; "Parry's Townsend-daisy" is a dead end for all but a handful of botanists. Animals sort
+  ahead of plants inside every abundance band, a round allows at most two botanical clues, and the
+  final band is reserved for animals entirely, because that last line is the one that gives the
+  place away.
 - **Species are labelled native, introduced or endemic for that place**, from iNaturalist's own
   establishment means. This matters: the Laughing Kookaburra on the Cradle Mountain list is
   introduced to Tasmania, and presenting it as a native indicator would be wrong.
@@ -359,9 +366,11 @@ The puzzle is aimed at people who know the species, so the builder is strict abo
 npm run build:day-list
 ```
 
-Takes roughly fifteen minutes: the script throttles to one request a second, and it retries up to
-five candidates per abundance band so one species without a usable photo costs a request rather than
-a whole round. It refuses to write a set with fewer than ten rounds.
+Takes around an hour for the full set of locations: the script throttles to one request a second,
+and it tries up to eight candidates per abundance band so a species without a usable photo costs a
+request rather than a whole round. Failed calls retry with a widening pause, because a build is well
+over a thousand requests and a dropped socket is a matter of when rather than if. It refuses to write
+a set with fewer than ten rounds.
 
 **No runtime API calls.** Puzzle data ships as JSON and photos load straight from the iNaturalist
 CDNs already allow-listed in `img-src`, so the island costs nothing per play and keeps working if the

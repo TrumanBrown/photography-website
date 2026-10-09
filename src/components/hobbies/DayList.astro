@@ -15,13 +15,13 @@ interface Props {
 const { heading = "Day list" } = Astro.props;
 ---
 
-<section class="dl not-prose mt-14" aria-label={heading} data-daylist>
+<section class="dl not-prose mt-8" aria-label={heading} data-daylist>
   <header class="dl-head">
-    <p class="u-label">Daily puzzle</p>
+    <p class="u-label">New list daily</p>
     <h2 class="dl-title">{heading}</h2>
     <p class="dl-lede">
-      Six species, all recorded at one real place in one month. Work out where
-      on earth that was, and which month.
+      Somebody kept a list at one place for a month. You get the species, one at
+      a time, and you work out where they were standing.
     </p>
   </header>
 
@@ -29,23 +29,21 @@ const { heading = "Day list" } = Astro.props;
     <li>
       <span class="dl-steps__n">1</span>
       <span
-        >They arrive <strong>most widely recorded first</strong>. A dandelion
-        narrows nothing; the sixth species is often local enough to name the
-        valley.</span
+        >The <strong>commonest animals come first</strong>. A house sparrow
+        tells you nothing. The last one is usually local enough to give it away.</span
       >
     </li>
     <li>
       <span class="dl-steps__n">2</span>
       <span
-        >Drop a pin on the map and pick a month. You can guess after any number
-        of species.</span
+        >Tap the map, pick a month, lock it in. Guess whenever you like.</span
       >
     </li>
     <li>
       <span class="dl-steps__n">3</span>
       <span
-        >Guessing early is worth more. Reading all six makes it easy, so it only
-        scores about half. A pin anywhere inside the real boundary is exact.</span
+        >The fewer you read, the better you score. Anywhere inside the real
+        boundary counts as spot on.</span
       >
     </li>
   </ol>
@@ -54,12 +52,12 @@ const { heading = "Day list" } = Astro.props;
     <!-- the notebook -->
     <div class="dl-book">
       <div class="dl-book__head">
-        <p class="u-label">Species recorded here</p>
-        <p class="dl-book__count" data-daylist-counter>1 of 6 read</p>
+        <p class="u-label">What they found</p>
+        <p class="dl-book__count" data-daylist-counter>1 of 6</p>
       </div>
       <ol class="dl-clues" data-daylist-clues></ol>
       <button type="button" class="dl-btn dl-btn--wide" data-daylist-more>
-        Read the next species
+        Show me the next one
       </button>
     </div>
 
@@ -73,11 +71,11 @@ const { heading = "Day list" } = Astro.props;
         aria-label="World map. Click or tap to drop a pin where you think the list was written. Arrow keys move the pin."
       >
         <canvas data-daylist-map></canvas>
-        <p class="dl-maphint">Tap anywhere to drop your pin</p>
+        <p class="dl-maphint">Tap the map to drop a pin</p>
       </div>
 
       <div class="dl-ask">
-        <p class="u-label dl-ask__label">Which month were they there?</p>
+        <p class="u-label dl-ask__label">What month was this?</p>
         <div
           class="dl-months"
           data-daylist-months
@@ -89,7 +87,7 @@ const { heading = "Day list" } = Astro.props;
 
       <div class="dl-lockrow">
         <p class="dl-readout" data-daylist-readout>
-          Drop a pin on the map, then choose a month.
+          Drop a pin, then pick a month.
         </p>
         <button
           type="button"
@@ -104,13 +102,14 @@ const { heading = "Day list" } = Astro.props;
   </div>
 
   <p class="dl-foot">
-    Every species is a research-grade iNaturalist record from that place in that
-    month, and every location is a real place with a published boundary. The bar
-    on each line is how often the species is <em>recorded</em> worldwide, which tracks
-    how much people look as well as where it lives, so treat it as a hint rather than
-    a range map. Species are marked native, introduced or endemic using iNaturalist's
-    establishment means for that place. Photos are Creative Commons and credited to
-    the photographer.
+    Every species really was recorded at that place in that month, and every
+    place is a real one with a published boundary. The bar shows how often
+    something gets
+    <em>recorded</em> worldwide, which says as much about where people go looking
+    as where the animal lives, so take it as a nudge and not a range map. Introduced
+    and endemic species are flagged, because a kookaburra in Tasmania is a very different
+    clue once you know it was put there. All data from iNaturalist, photos credited
+    to whoever took them.
   </p>
 </section>
 
@@ -132,7 +131,7 @@ const { heading = "Day list" } = Astro.props;
      rules instead of cards, one accent-free column of type. */
   .dl {
     border-top: 1px solid var(--rule);
-    padding-top: 22px;
+    padding-top: 20px;
   }
 
   .dl-head {

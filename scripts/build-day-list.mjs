@@ -72,6 +72,7 @@ const OPEN_LICENCES = new Map([
  * query, so the data stays exactly as authoritative.
  */
 const PLACES = [
+  // North America
   {
     id: 69094,
     month: 7,
@@ -114,23 +115,99 @@ const PLACES = [
     label: "Denali National Park",
     region: "Alaska, United States",
   },
+  {
+    id: 72645,
+    month: 5,
+    label: "Great Smoky Mountains",
+    region: "Tennessee, United States",
+  },
+  {
+    id: 55071,
+    month: 4,
+    label: "Big Bend National Park",
+    region: "Texas, United States",
+  },
+  {
+    id: 5781,
+    month: 10,
+    label: "Point Reyes",
+    region: "California, United States",
+  },
+  { id: 56788, month: 6, label: "Haleakala", region: "Hawaii, United States" },
+  {
+    id: 90295,
+    month: 6,
+    label: "Algonquin Provincial Park",
+    region: "Ontario, Canada",
+  },
+  {
+    id: 66300,
+    month: 7,
+    label: "Banff National Park",
+    region: "Alberta, Canada",
+  },
+
+  // Central and South America
+  {
+    id: 10110,
+    month: 8,
+    label: "Tortuguero National Park",
+    region: "Costa Rica",
+  },
+  { id: 54414, month: 9, label: "Manu National Park", region: "Peru" },
+  {
+    id: 130690,
+    month: 1,
+    label: "Torres del Paine",
+    region: "Patagonia, Chile",
+  },
   { id: 12990, month: 2, label: "The Galapagos", region: "Ecuador" },
   { id: 9120, month: 1, label: "Tierra del Fuego", region: "Argentina" },
+
+  // Africa
   { id: 69054, month: 2, label: "Serengeti National Park", region: "Tanzania" },
+  { id: 188740, month: 8, label: "Ngorongoro", region: "Tanzania" },
   {
     id: 69020,
     month: 9,
     label: "Kruger National Park",
     region: "South Africa",
   },
-  { id: 7783, month: 11, label: "Madagascar", region: "Indian Ocean" },
+  {
+    id: 71668,
+    month: 10,
+    label: "Table Mountain",
+    region: "Western Cape, South Africa",
+  },
+  { id: 69030, month: 6, label: "Etosha National Park", region: "Namibia" },
   { id: 131526, month: 8, label: "The Okavango Delta", region: "Botswana" },
+  { id: 7783, month: 11, label: "Madagascar", region: "Indian Ocean" },
+
+  // Europe and the Arctic
   { id: 7353, month: 7, label: "Svalbard", region: "Arctic Norway" },
   { id: 7278, month: 6, label: "Iceland", region: "North Atlantic" },
   { id: 200477, month: 4, label: "Donana", region: "Andalusia, Spain" },
   { id: 198736, month: 5, label: "The Camargue", region: "Provence, France" },
+  { id: 117827, month: 5, label: "The Danube Delta", region: "Romania" },
+  {
+    id: 138717,
+    month: 6,
+    label: "Bialowieza Forest",
+    region: "Poland and Belarus",
+  },
+  { id: 138716, month: 9, label: "The Wadden Sea", region: "North Sea coast" },
+  { id: 162899, month: 7, label: "The Cairngorms", region: "Scotland" },
+
+  // Asia
   { id: 13078, month: 6, label: "Hokkaido", region: "Japan" },
   { id: 34090, month: 5, label: "Yakushima", region: "Kagoshima, Japan" },
+  { id: 186468, month: 4, label: "The Ogasawara Islands", region: "Japan" },
+  { id: 150778, month: 2, label: "Sinharaja Forest", region: "Sri Lanka" },
+  { id: 131079, month: 3, label: "Kinabalu Park", region: "Sabah, Borneo" },
+  { id: 69564, month: 6, label: "Crocker Range", region: "Sabah, Borneo" },
+  { id: 131063, month: 7, label: "Komodo National Park", region: "Indonesia" },
+
+  // Australia and the Pacific
   {
     id: 131697,
     month: 7,
@@ -143,14 +220,34 @@ const PLACES = [
     label: "Cradle Mountain",
     region: "Tasmania, Australia",
   },
+  {
+    id: 141083,
+    month: 11,
+    label: "The Great Otway",
+    region: "Victoria, Australia",
+  },
 ];
 
-async function api(path, params = {}) {
+/**
+ * A full build is well over a thousand requests, so a dropped socket or a
+ * momentary 503 is a matter of when, not if. Retry with a widening pause rather
+ * than throwing away twenty minutes of work.
+ */
+async function api(path, params = {}, attempt = 1) {
   const q = new URLSearchParams(params);
   const url = `https://api.inaturalist.org/v1/${path}${q.toString() ? `?${q}` : ""}`;
-  const res = await fetch(url, { headers: UA });
-  if (!res.ok) throw new Error(`${path} HTTP ${res.status}`);
-  return res.json();
+  try {
+    const res = await fetch(url, { headers: UA });
+    if (res.status === 429 || res.status >= 500) {
+      throw new Error(`${path} HTTP ${res.status}`);
+    }
+    if (!res.ok) throw new Error(`${path} HTTP ${res.status}`);
+    return await res.json();
+  } catch (error) {
+    if (attempt >= 4) throw error;
+    await sleep(THROTTLE * attempt * 3);
+    return api(path, params, attempt + 1);
+  }
 }
 
 function stripHtml(value) {
@@ -275,7 +372,25 @@ const BANDS = [
 ];
 
 /** Up to this many candidates are tried per band before giving up on it. */
-const TRIES_PER_BAND = 5;
+const TRIES_PER_BAND = 8;
+
+/**
+ * Animals make better clues than plants. A birder can picture a kookaburra and
+ * reason about where it lives; "Parry's Townsend-daisy" is a dead end for all
+ * but a handful of botanists. So the puzzle is animal-first: plants and fungi
+ * are allowed, but only where they actually say something about the place, and
+ * never more than two in a list.
+ */
+const BOTANICAL = new Set(["Plantae", "Fungi", "Chromista", "Protozoa"]);
+const MAX_BOTANICAL_PER_ROUND = 2;
+
+/** Animals sort ahead of plants inside a band, so they are tried first. */
+function animalFirst(a, b) {
+  const ab = BOTANICAL.has(a.group) ? 1 : 0;
+  const bb = BOTANICAL.has(b.group) ? 1 : 0;
+  if (ab !== bb) return ab - bb;
+  return b.global - a.global;
+}
 
 /**
  * Fetches the fact, citation, credited photo and local standing for a species.
@@ -329,28 +444,52 @@ async function buildClues(list, status) {
   const sorted = list.slice().sort((a, b) => b.global - a.global);
   const used = new Set();
   const picked = [];
+  let botanical = 0;
 
-  for (const [lo, hi] of BANDS) {
-    const inBand = sorted.filter(
-      (s) => s.global >= lo && s.global < hi && !used.has(s.id),
-    );
+  for (let band = 0; band < BANDS.length; band++) {
+    const [lo, hi] = BANDS[band];
+    // The last band is the line that gives the place away, so it has to be an
+    // animal: somebody can reason from a honeyeater, not from a sedge.
+    const giveaway = band === BANDS.length - 1;
+    const inBand = sorted
+      .filter((s) => s.global >= lo && s.global < hi && !used.has(s.id))
+      .sort(animalFirst)
+      .filter((s) => {
+        if (!BOTANICAL.has(s.group)) return true;
+        return !giveaway && botanical < MAX_BOTANICAL_PER_ROUND;
+      });
+
     for (const candidate of inBand.slice(0, TRIES_PER_BAND)) {
       const clue = await enrich(candidate, status);
       if (clue) {
         used.add(candidate.id);
         picked.push(clue);
+        if (BOTANICAL.has(candidate.group)) botanical += 1;
         break;
       }
     }
   }
 
-  // Backfill from the most local end if a band came up empty.
-  for (let i = sorted.length - 1; i >= 0 && picked.length < 6; i--) {
-    if (used.has(sorted[i].id)) continue;
-    const clue = await enrich(sorted[i], status);
+  // Backfill from the most local end if a band came up empty, still animals first.
+  const backfill = sorted
+    .slice()
+    .reverse()
+    .sort((a, b) => {
+      const ab = BOTANICAL.has(a.group) ? 1 : 0;
+      const bb = BOTANICAL.has(b.group) ? 1 : 0;
+      if (ab !== bb) return ab - bb;
+      return a.global - b.global;
+    });
+  for (const candidate of backfill) {
+    if (picked.length >= 6) break;
+    if (used.has(candidate.id)) continue;
+    if (BOTANICAL.has(candidate.group) && botanical >= MAX_BOTANICAL_PER_ROUND)
+      continue;
+    const clue = await enrich(candidate, status);
     if (clue) {
-      used.add(sorted[i].id);
+      used.add(candidate.id);
       picked.push(clue);
+      if (BOTANICAL.has(candidate.group)) botanical += 1;
     }
   }
 

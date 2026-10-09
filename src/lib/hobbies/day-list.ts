@@ -170,18 +170,18 @@ function narrowing(globalCount: number): number {
 
 /** Deliberately about recording effort, never about range. */
 function howOften(globalCount: number): string {
-  if (globalCount > 200_000) return "recorded almost everywhere";
-  if (globalCount > 60_000) return "recorded very widely";
-  if (globalCount > 18_000) return "recorded widely";
-  if (globalCount > 5_000) return "recorded regionally";
-  if (globalCount > 1_200) return "rarely recorded";
-  return "very rarely recorded";
+  if (globalCount > 200_000) return "logged just about everywhere";
+  if (globalCount > 60_000) return "logged very widely";
+  if (globalCount > 18_000) return "logged widely";
+  if (globalCount > 5_000) return "mostly one region";
+  if (globalCount > 1_200) return "not logged often";
+  return "hardly ever logged";
 }
 
 const STANDING_LABEL: Record<Clue["standing"], string> = {
-  native: "Native here",
-  introduced: "Introduced here",
-  endemic: "Endemic here",
+  native: "Native",
+  introduced: "Introduced",
+  endemic: "Found nowhere else",
 };
 
 function cssVar(name: string, fallback: string): string {
@@ -367,7 +367,7 @@ export function initDayList(root: HTMLElement): void {
         if (i >= visible) {
           return `<li class="dl-clue dl-clue--hidden"><span class="dl-clue__num">${
             i + 1
-          }</span><span class="dl-clue__wait">Not read yet</span></li>`;
+          }</span><span class="dl-clue__wait">Still folded over</span></li>`;
         }
         // iNaturalist capitalises animal names but not plant ones, which is the
         // convention in the field. Lift the first letter so rows look even.
@@ -383,7 +383,7 @@ export function initDayList(root: HTMLElement): void {
             <span class="dl-clue__name">${escapeHtml(name)}</span>
             <span class="dl-clue__sci">${escapeHtml(clue.sci)}</span>
             <span class="dl-clue__bar"><i style="width:${narrowing(clue.global)}%"></i></span>
-            <span class="dl-clue__meta">${clue.global.toLocaleString()} observations worldwide &middot; ${howOften(
+            <span class="dl-clue__meta">${clue.global.toLocaleString()} worldwide &middot; ${howOften(
               clue.global,
             )}</span>
             <span class="dl-clue__credit">Photo ${credit}</span>
@@ -394,14 +394,12 @@ export function initDayList(root: HTMLElement): void {
 
     if (counter) {
       counter.textContent = done
-        ? "All six read"
-        : `${lines} of ${round.clues.length} read`;
+        ? "That is all six"
+        : `${lines} of ${round.clues.length}`;
     }
     moreBtn!.disabled = done || lines >= round.clues.length;
     moreBtn!.textContent =
-      lines >= round.clues.length
-        ? "That is the whole list"
-        : "Read the next species";
+      lines >= round.clues.length ? "That is the lot" : "Show me the next one";
   }
 
   /* ------------------------------------------------------------ guessing */
@@ -409,7 +407,7 @@ export function initDayList(root: HTMLElement): void {
   function describeGuess(): void {
     if (!readout) return;
     if (!pin && month === null) {
-      readout.textContent = "Drop a pin on the map, then choose a month.";
+      readout.textContent = "Drop a pin, then pick a month.";
       return;
     }
     const parts: string[] = [];
@@ -520,13 +518,13 @@ export function initDayList(root: HTMLElement): void {
 
     const verdict =
       km === 0
-        ? "Inside the boundary"
+        ? "You were standing in it"
         : km < 400
-          ? "Right region"
+          ? "Near enough"
           : km < 1500
             ? "Right part of the world"
             : km < 5000
-              ? "Wrong region"
+              ? "Not quite"
               : "Wrong side of the planet";
 
     renderClues();
@@ -564,7 +562,7 @@ export function initDayList(root: HTMLElement): void {
             <p class="dl-roll__sci">${escapeHtml(clue.sci)}</p>
             ${fact}
             <p class="dl-roll__meta">
-              ${clue.local.toLocaleString()} observations here that month &middot;
+              Seen here ${clue.local.toLocaleString()} times that month &middot;
               ${clue.global.toLocaleString()} worldwide${link ? ` &middot; ${link}` : ""} &middot; ${inat}
             </p>
             <p class="dl-roll__credit">Photo ${escapeHtml(clue.by)} &middot; ${escapeHtml(
@@ -591,10 +589,10 @@ export function initDayList(root: HTMLElement): void {
           </div>
         </div>
         <dl class="dl-breakdown">
-          <div><dt>How far off</dt><dd>${
-            km === 0 ? "inside it" : `${Math.round(km).toLocaleString()} km`
+          <div><dt>Off by</dt><dd>${
+            km === 0 ? "nothing" : `${Math.round(km).toLocaleString()} km`
           }</dd></div>
-          <div><dt>Species read</dt><dd>${Math.min(lines, 6)} of 6 &middot; &times;${multiplier.toFixed(
+          <div><dt>Species used</dt><dd>${Math.min(lines, 6)} of 6 &middot; &times;${multiplier.toFixed(
             2,
           )}</dd></div>
           <div><dt>Month</dt><dd>${
@@ -606,16 +604,16 @@ export function initDayList(root: HTMLElement): void {
           <button type="button" class="dl-btn" data-daylist-copy>Copy result</button>
           <a class="dl-btn" href="https://www.inaturalist.org/places/${
             round.placeId
-          }" target="_blank" rel="noopener noreferrer">Check the place</a>
-          <span class="dl-next">New list tomorrow</span>
+          }" target="_blank" rel="noopener noreferrer">See the place</a>
+          <span class="dl-next">A new list turns up tomorrow</span>
         </div>
         <div class="dl-rollwrap">
-          <p class="u-label dl-rollwrap__label">The whole list</p>
+          <p class="u-label dl-rollwrap__label">The full list</p>
           <ul class="dl-rolls">${roll}</ul>
         </div>
         <p class="dl-result__note dl-result__note--quiet">
-          Reading a place from what lives there is a real skill. Ecologists call them indicator
-          species, and it is how you work out what a habitat is before measuring anything.
+          Working out a place from what lives there is a real skill. Ecologists call these
+          indicator species, and it is how you read a habitat before you have measured anything
         </p>
       </div>`;
 

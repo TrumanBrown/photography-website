@@ -8,8 +8,8 @@ interface Props {
 
 const { entry } = Astro.props;
 const slug = hobbySlug(entry);
-const { title, summary, emoji, iconSrc, interactive } = entry.data;
-const cta = interactive ? "Play it" : "Explore";
+const { title, summary, emoji, iconSrc, interactive, dayList } = entry.data;
+const cta = interactive || dayList ? "Play it" : "Explore";
 ---
 
 <a href={`/hobbies/${slug}/`} class="hcard">
