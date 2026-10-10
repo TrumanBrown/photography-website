@@ -4,15 +4,18 @@
  * Shared by scripts/describe-sessions.mjs (the review-first CLI) and
  * scripts/prebuild.mjs (which fills in sessions uploaded without a description).
  *
- * Generation is opt-in: with no provider key configured, `isEnabled()` is false
+ * Generation is opt-in: with no provider configured, `isEnabled()` is false
  * and callers skip the step entirely, so builds never depend on an API being up.
  *
  * Environment:
  *   OPENAI_API_KEY      + optional OPENAI_BASE_URL, OPENAI_MODEL
  *   ANTHROPIC_API_KEY   + optional ANTHROPIC_MODEL
- *   DESCRIBE_PROVIDER   force a provider instead of inferring from the keys
+ *   AZURE_OPENAI_ENDPOINT + AZURE_OPENAI_DEPLOYMENT
+ *                       keyless: signs in with Entra ID (the build's OIDC login,
+ *                       or your `az login` locally). See infra/modules/ai.bicep.
+ *   DESCRIBE_PROVIDER   force a provider instead of inferring from the above
  *
- * Azure OpenAI works through the OpenAI path without code changes, since its v1
+ * Azure OpenAI with an API key also works through the OpenAI path, since its v1
  * endpoint is OpenAI-compatible. Point OPENAI_BASE_URL at
  * https://<resource>.openai.azure.com/openai/v1 and set OPENAI_MODEL to the
  * deployment name rather than the model name.
@@ -26,9 +29,10 @@ import sharp from "sharp";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const VOICE_FILE = join(ROOT, ".github/instructions/site-copy.instructions.md");
+const META_FILE = join(ROOT, "scripts/session-meta.json");
 const SAMPLE_WIDTH = 768;
 
-/** Which provider to use, inferred from whichever key is present. */
+/** Which provider to use, inferred from whichever key or endpoint is present. */
 export function activeProvider() {
   // Empty strings matter here: unset GitHub Actions secrets and vars are passed
   // through as '', so a plain presence check would wrongly enable the feature.
@@ -36,6 +40,7 @@ export function activeProvider() {
   if (forced) return forced;
   if (process.env.OPENAI_API_KEY) return "openai";
   if (process.env.ANTHROPIC_API_KEY) return "anthropic";
+  if (process.env.AZURE_OPENAI_ENDPOINT) return "azure";
   return null;
 }
 
@@ -101,6 +106,31 @@ async function loadVoiceRules() {
   }
 }
 
+/**
+ * A handful of the site's reviewed descriptions, for the model to match.
+ *
+ * Rules alone produce copy that's correct and still sounds generated ("I've
+ * framed Mount Baker above rocky ridges"). Seeing how the other pages actually
+ * read fixes the voice in a way a list of rules doesn't.
+ */
+export async function styleExamples({
+  exclude = "",
+  count = 6,
+  file = META_FILE,
+} = {}) {
+  try {
+    const meta = JSON.parse(await readFile(file, "utf8"));
+    const reviewed = Object.entries(meta)
+      .filter(([slug]) => !slug.startsWith("$") && slug !== exclude)
+      .filter(([, m]) => !m.draft && m.title && m.description);
+    return sampleEvenly(reviewed, count).map(
+      ([, m]) => `${m.title}\n${m.description}`,
+    );
+  } catch {
+    return [];
+  }
+}
+
 function buildPrompt({
   slug,
   title,
@@ -110,6 +140,7 @@ function buildPrompt({
   samples,
   voiceRules,
   species = [],
+  examples = [],
 }) {
   const captions = samples
     .filter((s) => s.caption)
@@ -150,9 +181,21 @@ ${speciesRule(species)}
   dash is the clearest sign of machine-written copy and will be rejected.
 - Don't open with "A" or "The" every time, and don't end on a clause that restates
   what you just said.
+- Write as Truman telling someone about the day, not as someone describing
+  photographs. Never mention framing, shots, frames or the photographs themselves.
 
 ${voiceRules ? `Voice rules for this site:\n${voiceRules}` : ""}
+${
+  examples.length
+    ? `
+Other sessions on the site, already written in Truman's voice. Match how these
+sound: plain, specific, a real detail or a dry aside where it fits. Never reuse
+their phrases or borrow their subjects; this session gets its own words.
 
+${examples.join("\n\n")}
+`
+    : ""
+}
 Reply with JSON only, no code fence:
 {"title": "...", "location": "...", "description": "..."}`;
 }
@@ -197,6 +240,90 @@ async function callOpenAI(prompt, samples, { detail = "low", maxTokens } = {}) {
     );
   const json = await res.json();
   return json.choices?.[0]?.message?.content ?? "";
+}
+
+/** Azure OpenAI v1 chat URL, whether or not the endpoint already includes the path. */
+export function azureChatUrl(endpoint) {
+  const base = endpoint.trim().replace(/\/+$/, "");
+  return base.endsWith("/openai/v1")
+    ? `${base}/chat/completions`
+    : `${base}/openai/v1/chat/completions`;
+}
+
+let azureCredential;
+let azureToken;
+
+/** Entra ID token for Azure OpenAI, reused until a few minutes before it expires. */
+async function azureBearer() {
+  if (azureToken && azureToken.expiresOnTimestamp - Date.now() > 5 * 60_000) {
+    return azureToken.token;
+  }
+  if (!azureCredential) {
+    const { DefaultAzureCredential } = await import("@azure/identity");
+    azureCredential = new DefaultAzureCredential();
+  }
+  azureToken = await azureCredential.getToken(
+    "https://cognitiveservices.azure.com/.default",
+  );
+  return azureToken.token;
+}
+
+async function callAzure(
+  prompt,
+  samples,
+  { detail = "low", maxTokens = 0 } = {},
+) {
+  const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
+  const deployment = process.env.AZURE_OPENAI_DEPLOYMENT;
+  if (!endpoint || !deployment) {
+    throw new Error(
+      "AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_DEPLOYMENT must both be set.",
+    );
+  }
+
+  const body = JSON.stringify({
+    model: deployment,
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: prompt },
+          ...samples.map((s) => ({
+            type: "image_url",
+            image_url: { url: `data:image/jpeg;base64,${s.base64}`, detail },
+          })),
+        ],
+      },
+    ],
+    // Current models reason before they answer and that counts against this
+    // limit, so it sits well above the length of any reply asked for here.
+    max_completion_tokens: Math.max(maxTokens, 8000),
+    response_format: { type: "json_object" },
+  });
+
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(azureChatUrl(endpoint), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${await azureBearer()}`,
+      },
+      body,
+    });
+    if (res.ok) {
+      const json = await res.json();
+      return json.choices?.[0]?.message?.content ?? "";
+    }
+    // A busy minute shouldn't cost a session its description until the next
+    // build, so rate limits and server errors get two more tries.
+    const retryable = res.status === 429 || res.status >= 500;
+    if (!retryable || attempt >= 2) {
+      throw new Error(
+        `Azure OpenAI ${res.status}: ${(await res.text()).slice(0, 300)}`,
+      );
+    }
+    await new Promise((r) => setTimeout(r, [5_000, 20_000][attempt]));
+  }
 }
 
 async function callAnthropic(prompt, samples, { maxTokens = 1024 } = {}) {
@@ -259,6 +386,7 @@ async function callMock(prompt, samples, { mode } = {}) {
 const PROVIDERS = {
   openai: callOpenAI,
   anthropic: callAnthropic,
+  azure: callAzure,
   mock: callMock,
 };
 
@@ -284,6 +412,10 @@ export function parseModelJson(text) {
 /**
  * Draft copy for one session. Throws if the provider is unavailable or the
  * reply can't be parsed; callers decide whether that's fatal.
+ *
+ * Drafts the build writes go live without anyone reading them first, so each
+ * one is held to the same mechanical rules as the hand-written copy. A draft
+ * that breaks one goes back to the model once, with the specific complaint.
  */
 export async function describeSession({
   slug,
@@ -298,15 +430,16 @@ export async function describeSession({
   const call = PROVIDERS[provider];
   if (!call)
     throw new Error(
-      `Unknown provider "${provider}". Use openai, anthropic or mock.`,
+      `Unknown provider "${provider}". Use openai, anthropic, azure or mock.`,
     );
 
   const encoded = await encodeSamples({ imagesDir, images, samples });
   if (encoded.length === 0) throw new Error("no readable images to sample");
 
-  const [voiceRules, species] = await Promise.all([
+  const [voiceRules, species, examples] = await Promise.all([
     loadVoiceRules(),
     inatSpecies(),
+    styleExamples({ exclude: slug }),
   ]);
   const prompt = buildPrompt({
     slug,
@@ -317,10 +450,66 @@ export async function describeSession({
     samples: encoded,
     voiceRules,
     species,
+    examples,
   });
+  let draft = parseModelJson(await call(prompt, encoded));
+  const problems = copyProblems(draft);
+  if (problems.length > 0) {
+    const retry = `${prompt}
+
+Your previous draft was:
+${JSON.stringify(draft)}
+
+It broke these rules:
+${problems.map((p) => `- ${p}`).join("\n")}
+
+Rewrite it so it follows every rule.`;
+    draft = parseModelJson(await call(retry, encoded));
+  }
+  return { ...stripEmDashes(draft), sampled: encoded.length };
+}
+
+const BANNED_WORDS =
+  /\b(stunning|breathtaking|vibrant|captivating|seamless|nestled|boasts|unleash|elevate|immerse|embark|dive in|discover)\b/i;
+const TITLE_SHAPE =
+  /, (January|February|March|April|May|June|July|August|September|October|November|December) \d{4}$/;
+
+/**
+ * What stops a draft from being publishable as-is, by the rules
+ * scripts/session-copy.test.mjs enforces on the hand-written copy. Each entry
+ * is phrased as feedback the model can act on. Empty means it passes.
+ */
+export function copyProblems({ title = "", description = "" }) {
+  const text = `${title} ${description}`;
+  const problems = [];
+  if (text.includes("—")) {
+    problems.push(
+      "It uses an em dash (—). Use a comma, a colon, or a new sentence instead.",
+    );
+  }
+  const banned = text.match(BANNED_WORDS);
+  if (banned) {
+    problems.push(`It uses "${banned[0]}", which the style guide bans.`);
+  }
+  if (title && !TITLE_SHAPE.test(title)) {
+    problems.push(
+      'The title must follow "Place, Region, Month Year", for example "Sauk Mountain, Washington, June 2026".',
+    );
+  }
+  return problems;
+}
+
+/** Last resort for a draft that kept its em dashes through the rewrite. */
+function stripEmDashes(draft) {
+  const fix = (s) =>
+    s
+      .replace(/\s*—\s*/g, ", ")
+      .replace(/,\s*,/g, ",")
+      .trim();
   return {
-    ...parseModelJson(await call(prompt, encoded)),
-    sampled: encoded.length,
+    title: fix(draft.title),
+    location: fix(draft.location),
+    description: fix(draft.description),
   };
 }
 
@@ -405,7 +594,7 @@ export async function captionImages({
   const call = PROVIDERS[provider];
   if (!call)
     throw new Error(
-      `Unknown provider "${provider}". Use openai, anthropic or mock.`,
+      `Unknown provider "${provider}". Use openai, anthropic, azure or mock.`,
     );
 
   const pending = images.filter((img) => !img.caption);

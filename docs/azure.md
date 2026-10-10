@@ -53,8 +53,9 @@ All inside resource group `rg-photography-prod`.
 | ↳ Tables | Contact messages, pageviews, and hashed contact rate-limit counters. |
 | **Static Web App** `swa-photography-prod` (Free SKU) | Hosting + global CDN + auto-TLS + PR previews. |
 | ↳ Custom domain bindings (apex + `www`) | Created only when `domainName` is set. |
-| **User-assigned managed identity** `id-photography-deploy-<env>` | Service account GitHub Actions assumes via OIDC. RBAC: `Storage Blob Data Contributor` on the storage account, `Reader` on the RG. |
+| **User-assigned managed identity** `id-photography-deploy-<env>` | Service account GitHub Actions assumes via OIDC. RBAC: `Storage Blob Data Contributor` on the storage account, `Reader` on the RG, and `Cognitive Services OpenAI User` on the Azure OpenAI account when that's deployed. |
 | ↳ Federated credentials `github-main`, `github-pull-request` | Trust JWTs from this specific repo + branch. No long-lived secrets. |
+| **Azure OpenAI account** `oai-photography-<env>-<suffix>` | Created only when `enableDescribeModel=true`. One model deployment (`gpt-6.1-sol`, US data zone) that drafts a description for any session uploaded without one. API keys are disabled; the build reaches it through its OIDC login. |
 | **App Service Domain** `yourdomain.com` | `.com` registration. Only created when `domainName` is set; first-time purchase needs `az appservice domain create --accept-terms` once. |
 | **Azure DNS zone** `yourdomain.com` | Holds `A` (apex → SWA), `CNAME` `www`, `TXT` (SWA ownership token). |
 | **Log Analytics workspace** `log-photography-prod` | Created only when `enableDiagnostics=true`; receives storage transaction metrics with a 1 GB/day cap. |
@@ -75,6 +76,7 @@ Assumes ~30 GB stored, ~5 GB egress, personal traffic. Region `westus3`.
 | App Service Domain (`.com`) | $11.99/yr amortized | ~$1.00 |
 | Azure DNS zone | 1 zone @ $0.50 | $0.50 |
 | Log Analytics | Not created by default; free allowance covers optional storage diagnostics | $0.00 |
+| Azure OpenAI (optional) | Pay per use, one call per new session, nothing while idle | <$0.10 |
 | Bicep deployments | Always free | $0.00 |
 | **Total** | | **~$2.10 – $2.60** |
 

@@ -24,6 +24,9 @@ param githubBranch string = 'main'
 @description('Enable diagnostic settings on the storage account → Log Analytics. Off by default to stay free.')
 param enableDiagnostics bool = false
 
+@description('Deploy an Azure OpenAI model so builds can draft descriptions for sessions uploaded without one. Billed per use, nothing when idle. Off by default.')
+param enableDescribeModel bool = false
+
 var resourceGroupName = 'rg-photography-${environment}'
 var tags = {
   project: 'photography-website'
@@ -49,6 +52,7 @@ module stack 'main.bicep' = {
     githubRepo: githubRepo
     githubBranch: githubBranch
     enableDiagnostics: enableDiagnostics
+    enableDescribeModel: enableDescribeModel
     tags: tags
   }
 }
@@ -60,3 +64,5 @@ output swaDefaultHostname string = stack.outputs.swaDefaultHostname
 output swaName string = stack.outputs.swaName
 output managedIdentityClientId string = stack.outputs.managedIdentityClientId
 output managedIdentityPrincipalId string = stack.outputs.managedIdentityPrincipalId
+output describeEndpoint string = stack.outputs.describeEndpoint
+output describeDeployment string = stack.outputs.describeDeployment

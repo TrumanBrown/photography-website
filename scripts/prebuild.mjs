@@ -397,9 +397,14 @@ async function processSession({ prefix, originalsClient, derivativesClient, serv
   // A session uploaded without a description gets one drafted from its own
   // photographs. The result is written back to _session.json, so it costs one
   // API call per session ever, and from then on it's ordinary metadata you can
-  // rewrite in the admin panel. Without a provider key this is a no-op.
-  if (!sidecar.description && orderedImages.length > 0 && describeEnabled()) {
-    await describeInto({ sidecar, slug, prefix, imagesDir, images: orderedImages, originalsClient });
+  // rewrite in the admin panel. With no model configured it says so, loudly
+  // enough to show on the Actions run, rather than leaving the page blank quietly.
+  if (!sidecar.description && orderedImages.length > 0) {
+    if (describeEnabled()) {
+      await describeInto({ sidecar, slug, prefix, imagesDir, images: orderedImages, originalsClient });
+    } else {
+      warn(`${slug} has no description, and no model is configured to draft one. Write it in /admin, or turn drafting on (README, "Turning it on").`);
+    }
   }
 
   // Per-image captions, if separately enabled. These become each photo's alt
@@ -502,16 +507,27 @@ async function describeInto({ sidecar, slug, prefix, imagesDir, images, original
     });
 
     sidecar.description = drafted.description;
-    // Only fill a title or location that wasn't already chosen by hand.
-    if (!sidecar.title && drafted.title) sidecar.title = drafted.title;
+    // Only fill a title or location that wasn't already chosen by hand. A title
+    // that's just the folder name tidied up is what /admin saves when nobody
+    // typed one, so it isn't a choice and the drafted title replaces it.
+    if ((!sidecar.title || sidecar.title === humanize(slug)) && drafted.title) sidecar.title = drafted.title;
     if (!sidecar.location && drafted.location) sidecar.location = drafted.location;
     sidecar.descriptionSource = 'auto';
 
     await writeSidecar(originalsClient, prefix, sidecar);
     console.log(`  described: ${slug} (from ${drafted.sampled} photos, saved to ${SESSION_JSON})`);
   } catch (e) {
-    console.warn(`  describe skipped for ${slug}: ${e.message}`);
+    warn(`Couldn't draft a description for ${slug}, so it'll be retried on the next build. ${e.message}`);
   }
+}
+
+/**
+ * A warning that also shows as an annotation on the GitHub Actions run, so a
+ * session missing its description is visible without opening the log.
+ */
+function warn(message) {
+  const oneLine = message.replace(/\s+/g, ' ').trim();
+  console.warn(process.env.GITHUB_ACTIONS === 'true' ? `::warning::${oneLine}` : `  warning: ${oneLine}`);
 }
 
 /**

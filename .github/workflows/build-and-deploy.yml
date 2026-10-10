@@ -100,12 +100,21 @@ jobs:
         if: env.CAN_USE_AZURE == 'true'
         env:
           AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
-          # Optional. When set, sessions uploaded without a description get one
-          # drafted from their own photographs and written back to _session.json,
-          # so it costs one call per session ever. Unset, prebuild behaves exactly
-          # as before and descriptions stay empty.
+          # Optional. When a model is configured, sessions uploaded without a
+          # description get one drafted from their own photographs and written
+          # back to _session.json, so it costs one call per session ever. With
+          # none configured, descriptions stay empty and the run shows a warning
+          # for each session missing one.
+          #
+          # Keyless (recommended): the Azure OpenAI deployment from
+          # infra/modules/ai.bicep, reached through the OIDC login above.
+          AZURE_OPENAI_ENDPOINT: ${{ vars.AZURE_OPENAI_ENDPOINT }}
+          AZURE_OPENAI_DEPLOYMENT: ${{ vars.AZURE_OPENAI_DEPLOYMENT }}
+          # Or an API key, which wins if both are set.
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_BASE_URL: ${{ vars.OPENAI_BASE_URL }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           # Constrains generated copy to species this user has actually recorded
           # and had verified on iNaturalist. Unset means the prompts forbid
           # species names and stay at group level instead.

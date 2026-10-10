@@ -9,6 +9,7 @@
     "githubOwner": { "value": "TrumanBrown" },
     "githubRepo": { "value": "photography-website" },
     "githubBranch": { "value": "main" },
-    "enableDiagnostics": { "value": false }
+    "enableDiagnostics": { "value": false },
+    "enableDescribeModel": { "value": true }
   }
 }

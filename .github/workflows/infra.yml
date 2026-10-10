@@ -45,6 +45,8 @@ jobs:
           echo "Blob endpoint: ${{ steps.deploy.outputs.blobEndpoint }}"
           echo "SWA hostname: ${{ steps.deploy.outputs.swaDefaultHostname }}"
           echo "MI client id: ${{ steps.deploy.outputs.managedIdentityClientId }}"
+          echo "Describe endpoint (repo variable AZURE_OPENAI_ENDPOINT): ${{ steps.deploy.outputs.describeEndpoint }}"
+          echo "Describe deployment (repo variable AZURE_OPENAI_DEPLOYMENT): ${{ steps.deploy.outputs.describeDeployment }}"
 
       - name: Configure SWA API runtime
         env:

@@ -186,12 +186,12 @@ steer where that crop sits.
 
 ### Title and description conventions
 
-Session titles follow **`Place, Region — Month Year`**:
+Session titles follow **`Place, Region, Month Year`**:
 
 ```
-Zhangjiajie, Hunan — April 2026
-Gunn Peak, Washington — June 2026
-Tortuguero night walk, Costa Rica — September 2026
+Zhangjiajie, Hunan, April 2026
+Gunn Peak, Washington, June 2026
+Tortuguero night walk, Costa Rica, September 2026
 ```
 
 The specific place goes first because that's the word people search for, and
@@ -221,7 +221,9 @@ On the next build, prebuild walks the session and fills in what you left blank:
 
 1. **Photos are downloaded and processed.** RAW and HEIC are converted, every
    image is read for EXIF (camera, lens, date, caption if one is embedded).
-2. **Your title is kept.** Anything you set by hand always wins.
+2. **Your title is kept.** Anything you set by hand always wins. A title that's
+   only the folder name tidied up, which is what `/admin` saves if you never
+   typed one, counts as blank and is replaced by the drafted one.
 3. **The description is written for you.** If `description` is empty, 8 photos
    are sampled evenly across the session, shown to a vision model, and a
    description is written from what's actually in them. `location` is filled the
@@ -279,24 +281,48 @@ captioned once. Edit them in `/admin` like any other caption.
 
 #### Turning it on
 
-This needs a vision model, which means an API key from somewhere. Two options:
+This needs a vision model. The recommended setup uses no API key at all.
 
-**OpenAI directly** — a separate account at platform.openai.com, billed separately
-from Azure. Set `OPENAI_API_KEY` as a repository secret, optionally
-`OPENAI_MODEL` as a repository variable (default `gpt-4o-mini`).
-`ANTHROPIC_API_KEY` works the same way.
-
-**Azure OpenAI** — keeps billing, data and region inside the subscription this
-site already runs in. Azure's v1 endpoint is OpenAI-compatible, so the same code
-path works with three variables and no code change:
+**Azure OpenAI, keyless (recommended, and what this site runs).** Set
+`enableDescribeModel` to `true` in
+[infra/main.parameters.json](infra/main.parameters.json) and run the Infra
+workflow. [infra/modules/ai.bicep](infra/modules/ai.bicep) adds an Azure OpenAI
+account with one model deployment (`gpt-6.1-sol`, processed inside the US data
+zone) and lets the build's managed identity call that model and nothing else.
+API keys are switched off on the account, so there's nothing to store, leak or
+rotate: the build signs in through the same OIDC login it already uses for Blob
+Storage. Then set two repository variables from the deploy outputs:
 
 ```
-OPENAI_BASE_URL = https://<your-resource>.openai.azure.com/openai/v1
-OPENAI_API_KEY  = <your Azure OpenAI key>
+AZURE_OPENAI_ENDPOINT   = https://<your-resource>.openai.azure.com/   # output describeEndpoint
+AZURE_OPENAI_DEPLOYMENT = gpt-6.1-sol                                  # output describeDeployment
+```
+
+It's billed per use, a few cents per session, and costs nothing while idle. To
+run `npm run describe` from your laptop the same way, give yourself the same
+narrow role once, and your `az login` becomes the credential:
+
+```bash
+az role assignment create \
+  --assignee-object-id "$(az ad signed-in-user show --query id -o tsv)" \
+  --assignee-principal-type User --role "Cognitive Services OpenAI User" \
+  --scope "$(az cognitiveservices account show -g rg-photography-prod -n <your-resource> --query id -o tsv)"
+```
+
+**An API key instead.** `OPENAI_API_KEY` (a repository secret, from
+platform.openai.com) with an optional `OPENAI_MODEL` variable (default
+`gpt-4o-mini`), or `ANTHROPIC_API_KEY`. Azure OpenAI with a key also works
+through the OpenAI path, since its v1 endpoint is OpenAI-compatible:
+
+```
+OPENAI_BASE_URL = https://<your-resource>.openai.azure.com/openai/v1   # variable
+OPENAI_API_KEY  = <your Azure OpenAI key>                              # secret
 OPENAI_MODEL    = <your deployment name>     # deployment, not model name
 ```
 
-Either way, downsampled copies of the photos are sent to the provider so it can
+A key wins over the keyless endpoint if both are set.
+
+Either way, downsampled copies of the photos are sent to the model so it can
 see what's in them. That's worth a conscious decision on a photography site;
 Azure OpenAI is the option that keeps them inside your own tenant.
 
@@ -308,10 +334,20 @@ community-verified identifications removes most of that. Without it the prompts
 forbid species names outright and fall back to group level. A failed lookup
 degrades the same way rather than breaking the build.
 
-**With no key set, none of this runs** and prebuild behaves exactly as it always
-has — descriptions just stay empty. A drafting failure logs a warning and leaves
-the description blank; it can never fail a build. Nothing on the live site calls
-a model: this happens at build time only, and a visitor request never touches it.
+**Drafts go live unread, so they're checked first.** The model is shown a few
+of the reviewed descriptions in
+[scripts/session-meta.json](scripts/session-meta.json) to match their voice,
+and each draft is held to the rules
+[scripts/session-copy.test.mjs](scripts/session-copy.test.mjs) enforces on the
+hand-written copy: no em dashes, none of the banned marketing words, and a
+title in the `Place, Region, Month Year` shape. A draft that breaks one goes
+back to the model once, with the specific complaint.
+
+**With no model configured, none of this runs** and descriptions stay empty,
+but not quietly: every session without a description gets a warning on the
+Actions run. A drafting failure warns the same way and is retried on the next
+build; it can never fail a build. Nothing on the live site calls a model: this
+happens at build time only, and a visitor request never touches it.
 
 Treat the output as a first pass. It's usually right about the place, which is
 the part that matters for search, but your own words are worth far more: generic
@@ -325,11 +361,11 @@ Order matters here, once:
 1. **Push the copy you've already written first.**
    `AZURE_STORAGE_ACCOUNT=<account> npm run meta:apply` fills in every session
    listed in `scripts/session-meta.json`. No API key involved.
-2. **Then** add `OPENAI_API_KEY`. Doing it the other way round means the next
+2. **Then** turn on a model. Doing it the other way round means the next
    build drafts descriptions for every session that's still blank, and
    `meta:apply` immediately overwrites them — wasted calls for no benefit.
    Sessions that already have a description are skipped, so once step 1 has run
-   the key only affects new uploads.
+   the model only touches new uploads.
 3. **Captions last, one session at a time.** Set `DESCRIBE_CAPTIONS` to a single
    slug, build, read the results in `/admin`, then widen to a comma-separated
    list or `1`. Captioning the whole archive at once is several hundred photos
@@ -342,7 +378,9 @@ control instead of letting the build write it:
 
 ```bash
 npm run prebuild:remote                  # pull sessions + images from Blob
-OPENAI_API_KEY=sk-... npm run describe   # draft into scripts/session-meta.json
+AZURE_OPENAI_ENDPOINT=https://<your-resource>.openai.azure.com/ \
+AZURE_OPENAI_DEPLOYMENT=gpt-6.1-sol \
+npm run describe                         # or OPENAI_API_KEY=sk-...; drafts into scripts/session-meta.json
 # edit the wording, remove the "draft": true flags
 AZURE_STORAGE_ACCOUNT=<account> npm run meta:apply
 ```

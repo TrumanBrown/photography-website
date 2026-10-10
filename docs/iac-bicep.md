@@ -45,7 +45,8 @@ infra/
     ├── swa.bicep             # Static Web App + custom domains
     ├── identity.bicep        # managed identity + RBAC + GitHub OIDC
     ├── domain.bicep          # App Service Domain + DNS records
-    └── monitoring.bicep      # optional Log Analytics workspace
+    ├── monitoring.bicep      # optional Log Analytics workspace
+    └── ai.bicep              # optional Azure OpenAI model that drafts session descriptions
 ```
 
 ### Why a separate `subscription.bicep`
@@ -104,6 +105,9 @@ And two role assignments:
 - `Storage Blob Data Contributor` on the storage account, read originals, write derivatives.
 - `Reader` on the resource group, look up resource properties during deploy.
 
+With `enableDescribeModel` on, [`modules/ai.bicep`](../infra/modules/ai.bicep)
+also grants it `Cognitive Services OpenAI User` on the Azure OpenAI account (see 10).
+
 Full mechanism: [cicd.md](cicd.md#oidc-federation-no-long-lived-secrets).
 
 ### 7. App Service Domain (only if `domainName` is set)
@@ -123,12 +127,33 @@ when `enableDiagnostics=true`. It receives storage transaction metrics and has
 a 30-day retention period plus a 1 GB/day runaway-cost cap. Visitor analytics
 use the separate first-party Table Storage pipeline.
 
-### 10. Outputs
+### 10. Optional Azure OpenAI account: `oai-photography-<env>-<suffix>`
+
+Created by [`modules/ai.bicep`](../infra/modules/ai.bicep) only when
+`enableDescribeModel=true`. Prebuild uses it to draft a title, location and
+description for any session uploaded without one (see the README, "Turning it
+on").
+
+- One model deployment, `gpt-6.1-sol`, on `DataZoneStandard`, so requests are
+  processed inside the US data zone. Azure moves it to each new default version
+  on its own; change `modelName`/`modelVersion` before the model's retirement
+  date (March 2028 for this one).
+- `disableLocalAuth: true`: API keys don't exist, so there's nothing to store or
+  rotate. Callers sign in with Entra ID, which is also why the account needs its
+  own custom subdomain.
+- The build identity gets `Cognitive Services OpenAI User`: it can call the
+  deployment and nothing else.
+- Billed per token. Capacity (50K tokens/minute) is a rate ceiling, not a charge.
+
+### 11. Outputs
 
 The deployment emits values your scripts/workflows need:
 - `storageAccountName`, `blobEndpoint`
 - `swaName`, `swaDefaultHostname`
 - `managedIdentityClientId`, `managedIdentityPrincipalId`
+- `describeEndpoint`, `describeDeployment` (empty unless `enableDescribeModel`
+  is on), the values for the `AZURE_OPENAI_ENDPOINT` and
+  `AZURE_OPENAI_DEPLOYMENT` repository variables
 
 The Infra workflow uses these to populate repo secrets (`AZURE_STATIC_WEB_APPS_API_TOKEN`, `AZURE_STORAGE_ACCOUNT`) and writes the runtime storage connection, analytics salt, and initial admin directly to SWA app settings.
 

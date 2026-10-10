@@ -23,6 +23,9 @@ param githubBranch string
 @description('Enable Log Analytics diagnostics for the storage account.')
 param enableDiagnostics bool
 
+@description('Deploy an Azure OpenAI model the build can use, keylessly, to draft descriptions for new sessions.')
+param enableDescribeModel bool
+
 @description('Tags applied to every resource.')
 param tags object
 
@@ -80,6 +83,16 @@ module identity 'modules/identity.bicep' = {
   }
 }
 
+module ai 'modules/ai.bicep' = if (enableDescribeModel) {
+  name: 'ai'
+  params: {
+    location: location
+    name: 'oai-${namePrefix}-${suffix}'
+    principalId: identity.outputs.principalId
+    tags: tags
+  }
+}
+
 module domain 'modules/domain.bicep' = if (!empty(domainName)) {
   name: 'domain'
   params: {
@@ -95,3 +108,5 @@ output swaDefaultHostname string = swa.outputs.defaultHostname
 output swaName string = swa.outputs.name
 output managedIdentityClientId string = identity.outputs.clientId
 output managedIdentityPrincipalId string = identity.outputs.principalId
+output describeEndpoint string = enableDescribeModel ? ai!.outputs.endpoint : ''
+output describeDeployment string = enableDescribeModel ? ai!.outputs.deploymentName : ''

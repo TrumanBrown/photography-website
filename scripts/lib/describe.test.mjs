@@ -1,4 +1,17 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  afterAll,
+  beforeEach,
+  afterEach,
+  vi,
+} from "vitest";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import sharp from "sharp";
 import {
   sampleEvenly,
   parseModelJson,
@@ -8,7 +21,24 @@ import {
   activeProvider,
   isEnabled,
   inatSpecies,
+  describeSession,
+  copyProblems,
+  azureChatUrl,
+  styleExamples,
 } from "./describe.mjs";
+
+// The keyless Azure path signs in through @azure/identity. Tests never reach a
+// real tenant; they get a fixed token instead.
+vi.mock("@azure/identity", () => ({
+  DefaultAzureCredential: class {
+    async getToken() {
+      return {
+        token: "test-token",
+        expiresOnTimestamp: Date.now() + 3_600_000,
+      };
+    }
+  },
+}));
 
 describe("sampleEvenly", () => {
   it("returns everything when the list is already short enough", () => {
@@ -91,7 +121,12 @@ describe("parseModelJson", () => {
 
 describe("provider selection", () => {
   const saved = {};
-  const keys = ["DESCRIBE_PROVIDER", "OPENAI_API_KEY", "ANTHROPIC_API_KEY"];
+  const keys = [
+    "DESCRIBE_PROVIDER",
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "AZURE_OPENAI_ENDPOINT",
+  ];
 
   beforeEach(() => {
     for (const k of keys) {
@@ -115,9 +150,22 @@ describe("provider selection", () => {
   it("stays disabled when keys are empty strings, as unset CI secrets are", () => {
     process.env.OPENAI_API_KEY = "";
     process.env.ANTHROPIC_API_KEY = "";
+    process.env.AZURE_OPENAI_ENDPOINT = "";
     process.env.DESCRIBE_PROVIDER = "";
     expect(activeProvider()).toBeNull();
     expect(isEnabled()).toBe(false);
+  });
+
+  it("infers azure from AZURE_OPENAI_ENDPOINT, with no key at all", () => {
+    process.env.AZURE_OPENAI_ENDPOINT = "https://example.openai.azure.com/";
+    expect(activeProvider()).toBe("azure");
+    expect(isEnabled()).toBe(true);
+  });
+
+  it("lets an API key win over the keyless endpoint", () => {
+    process.env.AZURE_OPENAI_ENDPOINT = "https://example.openai.azure.com/";
+    process.env.OPENAI_API_KEY = "sk-test";
+    expect(activeProvider()).toBe("openai");
   });
 
   it("infers openai from OPENAI_API_KEY", () => {
@@ -342,5 +390,225 @@ describe("inatSpecies", () => {
     } finally {
       globalThis.fetch = realFetch;
     }
+  });
+});
+
+describe("azureChatUrl", () => {
+  it("adds the v1 path to a bare resource endpoint", () => {
+    expect(azureChatUrl("https://x.openai.azure.com/")).toBe(
+      "https://x.openai.azure.com/openai/v1/chat/completions",
+    );
+  });
+
+  it("accepts an endpoint that already ends in /openai/v1", () => {
+    expect(azureChatUrl("https://x.openai.azure.com/openai/v1/")).toBe(
+      "https://x.openai.azure.com/openai/v1/chat/completions",
+    );
+  });
+});
+
+describe("copyProblems", () => {
+  const good = {
+    title: "Gunn Peak, Washington, June 2026",
+    description: "Two tarns sitting just under the summit block.",
+  };
+
+  it("passes copy that follows the rules", () => {
+    expect(copyProblems(good)).toEqual([]);
+  });
+
+  it("flags an em dash in the title or the description", () => {
+    const inTitle = copyProblems({
+      ...good,
+      title: "Gunn Peak, Washington — June 2026",
+    });
+    const inBody = copyProblems({ ...good, description: "Tarns — a tower." });
+    expect(inTitle.join(" ")).toMatch(/em dash/);
+    expect(inBody.join(" ")).toMatch(/em dash/);
+  });
+
+  it("names the banned word it found", () => {
+    const out = copyProblems({ ...good, description: "A stunning tarn." });
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatch(/"stunning"/);
+  });
+
+  it("flags a title that isn't Place, Region, Month Year", () => {
+    expect(copyProblems({ ...good, title: "Mt Baker Fall 2026" })).toHaveLength(
+      1,
+    );
+  });
+});
+
+describe("describeSession with keyless Azure OpenAI", () => {
+  const saved = {};
+  const keys = [
+    "DESCRIBE_PROVIDER",
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "AZURE_OPENAI_ENDPOINT",
+    "AZURE_OPENAI_DEPLOYMENT",
+  ];
+  const clean = {
+    title: "Gunn Peak, Washington, June 2026",
+    location: "Central Cascades, Washington",
+    description: "Two tarns sitting just under the summit block.",
+  };
+  let dir;
+  let realFetch;
+
+  beforeAll(async () => {
+    dir = await mkdtemp(join(tmpdir(), "describe-test-"));
+    for (const file of ["a.jpg", "b.jpg"]) {
+      await sharp({
+        create: { width: 32, height: 24, channels: 3, background: "#3a6" },
+      })
+        .jpeg()
+        .toFile(join(dir, file));
+    }
+  });
+
+  afterAll(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  beforeEach(() => {
+    for (const k of keys) {
+      saved[k] = process.env[k];
+      delete process.env[k];
+    }
+    process.env.AZURE_OPENAI_ENDPOINT = "https://example.openai.azure.com/";
+    process.env.AZURE_OPENAI_DEPLOYMENT = "gpt-test";
+    realFetch = globalThis.fetch;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+    for (const k of keys) {
+      if (saved[k] === undefined) delete process.env[k];
+      else process.env[k] = saved[k];
+    }
+  });
+
+  /** Answers model calls with the given drafts in turn and records each request. */
+  function fakeModel(...drafts) {
+    const requests = [];
+    globalThis.fetch = async (url, init) => {
+      if (String(url).includes("inaturalist")) {
+        return { ok: true, json: async () => ({ results: [] }) };
+      }
+      requests.push({
+        url: String(url),
+        headers: init.headers,
+        body: JSON.parse(init.body),
+      });
+      const draft = drafts[Math.min(requests.length, drafts.length) - 1];
+      return {
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { content: JSON.stringify(draft) } }],
+        }),
+      };
+    };
+    return requests;
+  }
+
+  const session = () => ({
+    slug: "gunn-peak-june-2026",
+    title: "Gunn Peak June 2026",
+    date: "2026-06-20",
+    location: "",
+    images: [{ file: "a.jpg" }, { file: "b.jpg" }],
+    imagesDir: dir,
+  });
+
+  it("signs in with Entra ID and sends the photos to the deployment", async () => {
+    const requests = fakeModel(clean);
+    const out = await describeSession(session());
+
+    expect(out).toMatchObject(clean);
+    expect(out.sampled).toBe(2);
+    expect(requests).toHaveLength(1);
+    const [req] = requests;
+    expect(req.url).toBe(
+      "https://example.openai.azure.com/openai/v1/chat/completions",
+    );
+    expect(req.headers.Authorization).toBe("Bearer test-token");
+    expect(req.body.model).toBe("gpt-test");
+    expect(req.body.response_format).toEqual({ type: "json_object" });
+    expect(req.body.max_completion_tokens).toBeGreaterThanOrEqual(8000);
+    const photos = req.body.messages[0].content.filter(
+      (part) => part.type === "image_url",
+    );
+    expect(photos).toHaveLength(2);
+  });
+
+  it("sends a draft that breaks a rule back once, with the complaint", async () => {
+    const requests = fakeModel(
+      { ...clean, description: "Two tarns — and a tower over them." },
+      clean,
+    );
+    const out = await describeSession(session());
+
+    expect(requests).toHaveLength(2);
+    expect(requests[1].body.messages[0].content[0].text).toMatch(
+      /It broke these rules:[\s\S]*em dash/,
+    );
+    expect(out.description).toBe(clean.description);
+  });
+
+  it("swaps out em dashes that survive the rewrite rather than publishing them", async () => {
+    const stubborn = { ...clean, description: "Two tarns — and a tower." };
+    const requests = fakeModel(stubborn, stubborn);
+    const out = await describeSession(session());
+
+    expect(requests).toHaveLength(2);
+    expect(out.description).toBe("Two tarns, and a tower.");
+  });
+
+  it("shows the model the site's own reviewed copy for voice, but not this session's", async () => {
+    const requests = fakeModel(clean);
+    await describeSession(session());
+
+    const prompt = requests[0].body.messages[0].content[0].text;
+    expect(prompt).toMatch(/Other sessions on the site/);
+    expect(prompt).not.toMatch(/Gunn Peak, and a pair of tarns/);
+  });
+});
+
+describe("styleExamples", () => {
+  let dir;
+
+  beforeAll(async () => {
+    dir = await mkdtemp(join(tmpdir(), "style-examples-"));
+  });
+
+  afterAll(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it("uses reviewed entries only, never drafts, the comment, or the excluded session", async () => {
+    const file = join(dir, "meta.json");
+    await writeFile(
+      file,
+      JSON.stringify({
+        $comment: "not a session",
+        "a-slug": { title: "A, Washington, May 2026", description: "Kept." },
+        "b-slug": {
+          title: "B, Washington, May 2026",
+          description: "Unread.",
+          draft: true,
+        },
+        "c-slug": { title: "C, Washington, May 2026", description: "Mine." },
+      }),
+    );
+    const out = await styleExamples({ exclude: "c-slug", file });
+    expect(out).toEqual(["A, Washington, May 2026\nKept."]);
+  });
+
+  it("returns nothing rather than failing when the file is missing", async () => {
+    expect(await styleExamples({ file: join(dir, "missing.json") })).toEqual(
+      [],
+    );
   });
 });

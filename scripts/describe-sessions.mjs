@@ -9,7 +9,8 @@
  *
  * Usage:
  *   npm run prebuild:remote                  # pull sessions + images from Blob
- *   OPENAI_API_KEY=sk-... npm run describe
+ *   AZURE_OPENAI_ENDPOINT=https://<resource>.openai.azure.com/ \
+ *   AZURE_OPENAI_DEPLOYMENT=gpt-6.1-sol npm run describe   # or OPENAI_API_KEY=sk-...
  *   # review and edit scripts/session-meta.json, drop the "draft": true flags
  *   npm run meta:apply
  *
@@ -17,7 +18,7 @@
  *   --force          Redraft sessions that already have an entry
  *   --only <slug>    Draft a single session (repeatable)
  *   --samples <n>    Photos to show the model per session (default: 8)
- *   --provider <p>   openai | anthropic | mock (default: inferred from keys)
+ *   --provider <p>   openai | anthropic | azure | mock (default: inferred from env)
  *   --dry-run        Print drafts without writing session-meta.json
  *
  * A generated description beats an empty one, but it's far worse than your own
@@ -85,10 +86,10 @@ async function main() {
   const provider = opts.provider ?? activeProvider();
   if (!provider) {
     console.error(
-      "No provider configured. Set OPENAI_API_KEY or ANTHROPIC_API_KEY,",
+      "No provider configured. Set AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_DEPLOYMENT,",
     );
     console.error(
-      "or pass --provider mock to exercise the flow without an API.",
+      "or OPENAI_API_KEY or ANTHROPIC_API_KEY, or pass --provider mock to exercise the flow without a model.",
     );
     process.exit(1);
   }
