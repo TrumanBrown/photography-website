@@ -141,8 +141,11 @@ on").
 - `disableLocalAuth: true`: API keys don't exist, so there's nothing to store or
   rotate. Callers sign in with Entra ID, which is also why the account needs its
   own custom subdomain.
-- The build identity gets `Cognitive Services OpenAI User`: it can call the
-  deployment and nothing else.
+- Inference-only access (`Cognitive Services OpenAI User`) for the identity
+  GitHub Actions signs in as, `id-photography-bootstrap` from
+  [scripts/setup-federated-credential.sh](../scripts/setup-federated-credential.sh),
+  and for `id-photography-deploy-<env>`. It can call the deployment and nothing
+  else.
 - Billed per token. Capacity (50K tokens/minute) is a rate ceiling, not a charge.
 
 ### 11. Outputs

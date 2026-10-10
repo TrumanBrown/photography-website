@@ -4,8 +4,14 @@ param name string
 @description('Region.')
 param location string
 
-@description('Principal ID of the build identity. It gets inference-only access.')
+@description('Principal ID of the Bicep deploy identity (id-photography-deploy-<env>). It gets inference-only access.')
 param principalId string
+
+@description('The identity GitHub Actions actually signs in as, through the AZURE_CLIENT_ID secret. scripts/setup-federated-credential.sh creates it under these names. It gets inference-only access too.')
+param ciIdentityName string = 'id-photography-bootstrap'
+
+@description('Resource group of the GitHub Actions identity.')
+param ciIdentityResourceGroup string = 'rg-photography-bootstrap'
 
 @description('Model that drafts session descriptions. It must accept image input.')
 param modelName string = 'gpt-6.1-sol'
@@ -65,6 +71,23 @@ resource roleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   scope: account
   properties: {
     principalId: principalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', openAiUserRoleId)
+  }
+}
+
+resource ciIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' existing = {
+  name: ciIdentityName
+  scope: resourceGroup(ciIdentityResourceGroup)
+}
+
+// The build's prebuild step runs as this identity, so this is the grant that
+// lets new sessions get a drafted description.
+resource ciRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(account.id, ciIdentity.id, openAiUserRoleId)
+  scope: account
+  properties: {
+    principalId: ciIdentity.properties.principalId
     principalType: 'ServicePrincipal'
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', openAiUserRoleId)
   }

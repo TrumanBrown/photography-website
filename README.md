@@ -288,10 +288,11 @@ This needs a vision model. The recommended setup uses no API key at all.
 [infra/main.parameters.json](infra/main.parameters.json) and run the Infra
 workflow. [infra/modules/ai.bicep](infra/modules/ai.bicep) adds an Azure OpenAI
 account with one model deployment (`gpt-6.1-sol`, processed inside the US data
-zone) and lets the build's managed identity call that model and nothing else.
-API keys are switched off on the account, so there's nothing to store, leak or
-rotate: the build signs in through the same OIDC login it already uses for Blob
-Storage. Then set two repository variables from the deploy outputs:
+zone) and lets the identity GitHub Actions signs in as call that model and
+nothing else. API keys are switched off on the account, so there's nothing to
+store, leak or rotate: the build signs in through the same OIDC login it
+already uses for Blob Storage. Then set two repository variables from the
+deploy outputs:
 
 ```
 AZURE_OPENAI_ENDPOINT   = https://<your-resource>.openai.azure.com/   # output describeEndpoint
