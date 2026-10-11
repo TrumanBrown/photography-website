@@ -64,7 +64,7 @@ Additional runtime settings live in **Azure SWA app settings**, not GitHub:
 - `AZURE_STORAGE_CONNECTION_STRING`, a real storage-account credential written by the Infra workflow.
 - `ANALYTICS_SALT`, a derived secret used for one-way visitor/rate-limit hashes.
 - `ADMIN_GITHUB_USERS`, a non-secret comma-separated allowlist.
-- `GITHUB_TOKEN`, an optional fine-grained PAT for the admin rebuild button.
+- `GITHUB_TOKEN`, an optional fine-grained PAT for the admin rebuild button. The optional Instagram timer (a Logic App) reads the same token when it's deployed and keeps it as a secure parameter, hidden from its run history.
 
 The true credentials with meaningful blast radius are:
 - The SWA deploy token (rotated by re-running the Bicep deploy)
@@ -80,7 +80,19 @@ If you turn on [social posting](social.md), nothing in this repository or its pu
 - images reach Meta through links that expire after two hours, and are deleted after posting
 - the workflows log counts only, through a redactor that strips tokens, ids and signed URLs
 
-The workflow runs themselves are visible, so someone reading the repo can tell the feature is in use, but not where. The photographs are the same ones on the site, so a reverse image search could still connect the two.
+The workflow runs themselves are visible, so someone reading the repo can tell the feature is in use, but not where. The photographs are the same ones on the site, so a reverse image search could still connect the two, and your Instagram bio links to the site by design. Nothing links the other way.
+
+Checked in October 2026, after posting went live: the tracked files, the full git history including commit messages, and the logs of every workflow run since the feature was added contain no account name, Meta app name, access token or signed link. The only identifiers in the logs are ones that grant nothing on their own: the storage account (already public in `blobHost`) and the Azure OpenAI endpoint hostname, which the logs print because it's a repository variable and which only accepts your Azure sign-in.
+
+To repeat that check on your own copy, search for your handle and app name, and for token shapes:
+
+```bash
+git grep -niE 'your_handle|your-app-name'                      # files today
+git log --all -p | grep -iE 'your_handle|your-app-name'         # every commit ever
+git log --all -p | grep -E 'IGAA[A-Za-z0-9_-]{20,}|EAA[A-Za-z0-9]{30,}|github_pat_|AccountKey='
+gh run list --limit 100 --json databaseId --jq '.[].databaseId' |
+  xargs -I{} sh -c 'gh run view {} --log | grep -iE "your_handle|your-app-name|IGAA"'
+```
 
 ## What lives in **Azure** (not in this repo, not in GitHub)
 

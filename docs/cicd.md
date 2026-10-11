@@ -24,6 +24,8 @@ For this project we use it for two distinct purposes:
 ├── lint.yml               # PR quality gate
 ├── photos.yml             # photo captions + session descriptions, and Instagram planning (see docs/photos.md)
 └── social-post.yml        # optional: publishes the day's Instagram posts (see docs/social.md)
+
+infra/modules/scheduler.bicep  # optional: Azure timer that starts the two above on time
 ```
 
 ### [`infra.yml`](../.github/workflows/infra.yml): deploy Azure infrastructure
@@ -74,9 +76,19 @@ The prebuild cache cleanup is a disk-capacity requirement, not a cache miss. A p
 
 ### [`photos.yml`](../.github/workflows/photos.yml): photo captions and session descriptions
 
-**When it runs:** twice a day, right after a build finds new photos, or by hand (with `limit`, `overwrite` and `dry_run` options). Only when a model is configured.
+**When it runs:** once a day from the Azure timer (below), twice a day from its own schedule when GitHub runs it, right after a build finds new photos, or by hand (with `limit`, `overwrite` and `dry_run` options). Only when a model is configured.
 
 **What it does:** looks at each new photo once with a vision model, matches it to your iNaturalist observations, writes every photo's caption and each session's description into `_session.json`, then starts `build-and-deploy.yml` so they go live. With `SOCIAL_ENABLED=true` it also plans and writes the next two weeks of Instagram posts. Needs `actions: write` for that last dispatch. Full walkthrough: [docs/photos.md](photos.md).
+
+### [`social-post.yml`](../.github/workflows/social-post.yml): Instagram posting
+
+**When it runs:** every 30 minutes through the posting day, started by the timer below; on its own half-hourly schedule as a backup; or by hand (tick **force** to post now). Only with `SOCIAL_ENABLED=true`, and it only publishes with `SOCIAL_LIVE=true`.
+
+**What it does:** a dependency-free check decides in seconds whether one of the day's slots is due. If it is, it renders the next planned photo, hands it to Instagram and publishes it, exactly once per slot. Full walkthrough: [docs/social.md](social.md).
+
+### The timer: a Logic App that starts workflows
+
+GitHub's scheduler is best effort and skips many scheduled runs: here an hourly cron ran about every five hours. Posting needs set times, so [infra/modules/scheduler.bicep](../infra/modules/scheduler.bicep) deploys a consumption Logic App that calls GitHub's `workflow_dispatch` API: `social-post.yml` at :02 and :32 from 7 am to 10:32 pm Pacific, and `photos.yml` at 3:02 am. It authenticates with the Static Web App's `GITHUB_TOKEN` setting (a fine-grained token with Actions read and write on this repo), read at deploy time and hidden from the run history. Turn it on with `enableSocialScheduler` in `infra/main.parameters.json`.
 
 ### [`lint.yml`](../.github/workflows/lint.yml): PR quality gate
 

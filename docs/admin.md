@@ -169,7 +169,7 @@ The Infra workflow automatically sets `AZURE_STORAGE_CONNECTION_STRING`,
 `ANALYTICS_SALT`, and `ADMIN_GITHUB_USERS`. After the first deployment:
 
 1. Optionally change `ADMIN_GITHUB_USERS` to a comma-separated list of GitHub usernames.
-2. **Set `GITHUB_TOKEN`** to a fine-grained GitHub PAT with `actions:write` scope on this repo. This enables the "Rebuild Site" button. If omitted, the button shows an error but everything else works.
+2. **Set `GITHUB_TOKEN`** to a fine-grained GitHub PAT with `actions:write` scope on this repo. This enables the "Rebuild Site" button. If omitted, the button shows an error but everything else works. The optional Instagram timer uses the same token ([docs/social.md](social.md#step-9-start-the-timer)); after replacing it, run the Infra workflow so the timer picks it up.
 3. Visit `https://yourdomain.com/admin`, sign in with GitHub and you'll see the session manager.
 
 If you deploy Bicep manually instead of using the workflow, set the three

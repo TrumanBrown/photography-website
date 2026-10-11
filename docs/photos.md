@@ -53,7 +53,7 @@ Photo captions workflow  (photos.yml)
 Build and Deploy ──── captions and description live
 ```
 
-Usually 15 to 30 minutes from the first build to the second. The workflow also runs twice a day, about 3 am and 3 pm Pacific, so anything a run missed is picked up within hours.
+Usually 15 to 30 minutes from the first build to the second. The workflow also runs on a schedule, so anything a run missed is picked up within a day: twice a day on GitHub's scheduler (about 3 am and 3 pm Pacific, though GitHub skips many scheduled runs), and at 3 am from the Azure timer when the Instagram posting is set up ([docs/social.md](social.md#what-runs-automatically)).
 
 The site build itself never calls a model.
 

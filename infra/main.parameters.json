@@ -10,6 +10,7 @@
     "githubRepo": { "value": "photography-website" },
     "githubBranch": { "value": "main" },
     "enableDiagnostics": { "value": false },
-    "enableDescribeModel": { "value": true }
+    "enableDescribeModel": { "value": true },
+    "enableSocialScheduler": { "value": true }
   }
 }

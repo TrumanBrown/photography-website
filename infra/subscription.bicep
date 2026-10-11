@@ -27,6 +27,9 @@ param enableDiagnostics bool = false
 @description('Deploy an Azure OpenAI model so builds can draft descriptions for sessions uploaded without one. Billed per use, nothing when idle. Off by default.')
 param enableDescribeModel bool = false
 
+@description('Deploy the timer that starts the Instagram posting and photo workflows on schedule. Needs the GITHUB_TOKEN setting on the Static Web App (docs/admin.md). Cents a month. Off by default.')
+param enableSocialScheduler bool = false
+
 var resourceGroupName = 'rg-photography-${environment}'
 var tags = {
   project: 'photography-website'
@@ -53,6 +56,7 @@ module stack 'main.bicep' = {
     githubBranch: githubBranch
     enableDiagnostics: enableDiagnostics
     enableDescribeModel: enableDescribeModel
+    enableSocialScheduler: enableSocialScheduler
     tags: tags
   }
 }
@@ -66,3 +70,4 @@ output managedIdentityClientId string = stack.outputs.managedIdentityClientId
 output managedIdentityPrincipalId string = stack.outputs.managedIdentityPrincipalId
 output describeEndpoint string = stack.outputs.describeEndpoint
 output describeDeployment string = stack.outputs.describeDeployment
+output schedulerEnabled bool = stack.outputs.schedulerEnabled

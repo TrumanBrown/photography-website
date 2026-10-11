@@ -4,6 +4,7 @@
 
 - [What it does](#what-it-does)
 - [What runs automatically](#what-runs-automatically)
+- [New sessions](#new-sessions)
 - [What stays private](#what-stays-private)
 - [First-time setup](#first-time-setup) (step by step, with where each step happens)
 - [Day to day](#day-to-day)
@@ -29,8 +30,9 @@
 
 | When | Where | What happens |
 |---|---|---|
-| Twice a day (about 3 am and 3 pm Pacific), and after new photos appear | **Photo captions** workflow ([docs/photos.md](photos.md)) | Analyses photos new to the site once, for the website and Instagram alike. With `SOCIAL_ENABLED=true` it also checks what's already on the Instagram account, plans the next two weeks of posts and writes them, so posting carries on even if GitHub skips this workflow for days |
-| Every 30 minutes, about 7 am to midnight Pacific | **Social post** workflow | Checks whether one of today's posting slots is due. If it is, publishes the next planned photo. Most runs find nothing due and finish in seconds |
+| Every 30 minutes from 7 am to 10:30 pm Pacific, and at 3 am | **The timer**, a Logic App in your Azure resource group ([infra/modules/scheduler.bicep](../infra/modules/scheduler.bicep)) | Starts Social post on GitHub at :02 and :32, and Photo captions at 3:02 am. GitHub's own scheduler is best effort: on this repository an hourly schedule ran about once every five hours, and the new half-hourly one didn't run at all for its first hours, so the timer is what keeps posts on time. The schedules inside the workflow files stay as a backup |
+| Once a day (the timer), twice a day (GitHub's schedule, when it runs), and after new photos appear | **Photo captions** workflow ([docs/photos.md](photos.md)) | Analyses photos new to the site once, for the website and Instagram alike. With `SOCIAL_ENABLED=true` it also checks what's already on the Instagram account, plans the next two weeks of posts and writes them, so posting carries on for two weeks even if nothing starts this workflow |
+| Each time the timer starts it | **Social post** workflow | Checks whether one of today's posting slots is due. If it is, publishes the next planned photo. Most runs find nothing due and finish in seconds |
 | Once a week | inside Social post | Renews the Instagram access token, so it never reaches its 60-day expiry |
 | The morning after a day with no post | inside Social post | Fails one run on purpose, so GitHub emails you |
 | After 45 days without a commit | inside Social post | Makes an empty commit. GitHub switches off scheduled workflows in public repositories after 60 days without one |
@@ -39,6 +41,16 @@ Two switches, both repository variables:
 
 - `SOCIAL_ENABLED=true` turns on the Instagram stage of Photo captions, and the Social post workflow.
 - `SOCIAL_LIVE=true` lets them actually publish. Without it everything happens except the post itself. That's the **dry run**: at each slot it picks the photo, renders it, and hands the image and caption to Instagram exactly as a real post would, which proves the token works, the account can publish and Instagram accepts the post. Then it stops. Instagram throws an unpublished post away by itself within a day, and nobody sees it.
+
+## New sessions
+
+Nothing needs doing when you add photos. After `./scripts/upload-session.sh <folder> --build`:
+
+1. **Build and Deploy** publishes the photos, notices ones the pipeline hasn't seen, and starts **Photo captions**.
+2. **Photo captions** analyses the new photos, matches them to your iNaturalist observations, writes their website captions and the session description, redeploys the site, and adds them to the Instagram plan.
+3. They're posted as their turn comes. Sessions photographed in the last 45 days get a small head start; the plan never posts one session twice in a day, the same species within about five days, or frames from the same burst within about ten.
+
+Adding iNaturalist observations later is fine: the next Photo captions run matches them, and the website captions and any post not yet published pick up the species.
 
 ## What stays private
 
@@ -161,7 +173,18 @@ Posts are written from the same records as the website's captions, by the **Phot
 - Check with `gh variable list` that `AZURE_OPENAI_ENDPOINT` and `AZURE_OPENAI_DEPLOYMENT` are set (the keyless model), or `PHOTOS_ENABLED` with an API key.
 - Otherwise, follow [Setting it up](photos.md#setting-it-up) in docs/photos.md first.
 
-### Step 9. Turn it on, still as a dry run
+### Step 9. Start the timer
+
+**Where: GitHub, the Azure portal or CLI, then the Actions tab.**
+
+The timer starts the posting workflow on time ([why it's needed](#what-runs-automatically)). It uses the same GitHub token as the admin panel's **Rebuild Site** button: a fine-grained token with **Actions: Read and write** on this repository and nothing else.
+
+1. If the Rebuild button works, that token already exists. Otherwise create one at **GitHub → Settings → Developer settings → Fine-grained tokens**: repository access *Only select repositories* (this one), permission **Actions: Read and write**. Save it as the `GITHUB_TOKEN` setting of the Static Web App ([docs/admin.md](admin.md)).
+2. Make sure `enableSocialScheduler` is `true` in [infra/main.parameters.json](../infra/main.parameters.json), then run **Actions → Infra (Bicep) → Run workflow**. That deploys a Logic App named `logic-photography-<environment>-scheduler`, which reads the token from the Static Web App while it's being deployed.
+
+A new timer runs once straight away, so a **Social post** run appears in the Actions tab within a minute or two. The token is never in the repository, the deployment's outputs or the timer's run history. When you replace it, run the Infra workflow again so the timer picks up the new one. Without a token the timer is deployed switched off.
+
+### Step 10. Turn it on, still as a dry run
 
 **Where: a terminal.**
 
@@ -172,9 +195,9 @@ gh workflow run photos.yml   # plans the next two weeks and writes those posts
 
 The photos are already analysed, so this run only checks the account, plans the next two weeks and writes those posts: a couple of minutes. Watch it under **Actions → Photo captions**; the log only shows counts. From now on it keeps two weeks of posts written ahead.
 
-The Social post workflow also starts running now, in dry-run mode: at each slot it rehearses a post with Instagram, then stops short of publishing. GitHub can take a few hours to start a new schedule, so run it once by hand to see a rehearsal straight away: **Actions → Social post → Run workflow** (leave **force** unticked). The log should end with "Instagram accepted the image and caption, and the account can publish".
+From now on each Social post run the timer starts is a dry run: at each slot it rehearses a post with Instagram, then stops short of publishing. To see a rehearsal straight away, run it by hand: **Actions → Social post → Run workflow** (leave **force** unticked). If a slot has passed today, the log ends with "Instagram accepted the image and caption, and the account can publish".
 
-### Step 10. Read what it's going to post
+### Step 11. Read what it's going to post
 
 **Where: your computer, signed in to Azure with `az login`.**
 
@@ -187,7 +210,7 @@ The preview shows each post in the order it'll go out, with its full caption and
 
 To keep a photo from ever being posted, run `npm run social -- skip DSC01234`.
 
-### Step 11. Go live
+### Step 12. Go live
 
 ```bash
 gh variable set SOCIAL_LIVE --body true
@@ -201,7 +224,7 @@ The next run publishes once a slot has passed. Switching on part-way through a d
 
 Nothing needs doing. New sessions are analysed soon after they go live and join the plan.
 
-When you want to steer it, these run on your computer (signed in with `az login`, as in step 10):
+When you want to steer it, these run on your computer (signed in with `az login`, as in step 11):
 
 | Command | What it does |
 |---|---|
@@ -229,6 +252,7 @@ For example after rebuilding the site, moving to a new repository or storage acc
 | Photo records | `metadata/photos/` in the site's storage account | The next Photo captions run analyses everything again ([docs/photos.md](photos.md)) |
 | Plan, history | `metadata/social/` in the site's storage account | The next Photo captions run plans again. Photos already on the account are recognised by their fingerprints and not posted again |
 | Model | Azure OpenAI deployment, plus the two `AZURE_OPENAI_*` variables | Re-run the Infra workflow ([docs/photos.md](photos.md#setting-it-up)) |
+| Timer | Logic App in the site's resource group, reading the Static Web App's `GITHUB_TOKEN` | Run the Infra workflow (step 9). Run it again after replacing `GITHUB_TOKEN` |
 | Switches and settings | Repository variables | Set `SOCIAL_ENABLED`, `SOCIAL_LIVE` and any [settings](#settings) again |
 
 The token stops working if the workflows were switched off for more than about 60 days, or if the app was removed from the Instagram account. Either way, redo steps 6 and 7.
@@ -254,6 +278,8 @@ Set these as **secrets** (masked in logs) or **variables** under Settings → Se
 | `SOCIAL_PAD_COLOR` | variable | `auto` | Border colour. `auto` picks black or white from the photo's edges |
 | `SOCIAL_REQUIRE_APPROVAL` | variable | off | `true` posts only captions you've approved |
 | `IG_LOGIN_MODE`, `IG_USER_ID` | variable, secret | `instagram` | Only for the [Facebook Login setup](#location-tags-and-tagging-accounts) |
+
+The timer's own settings are parameters of [scheduler.bicep](../infra/modules/scheduler.bicep): `timeZone` (a Windows time zone name, `Pacific Standard Time` by default; keep it the same as `SOCIAL_TIMEZONE`), `postingHours` (7 to 22, which covers the default slots and the 11 pm cutoff) and `pipelineHour` (3). Change them there and run the Infra workflow.
 
 ---
 
@@ -347,7 +373,7 @@ When there's no subject tag (most landscapes), the broad region takes the slot (
 
 ## Reliability and failures
 
-**Posting times.** GitHub drops many scheduled runs; this repository's hourly site build fired about a fifth of the time. So Social post fires every 30 minutes at off-peak minutes, and [due.mjs](../scripts/social/due.mjs) decides whether a post is due. Post *N* becomes due at slot *N* and stays due until it's done, so a dropped run only means the next one catches up.
+**Posting times.** GitHub drops many scheduled runs; this repository's hourly site build fired about a fifth of the time. So the [timer](#step-9-start-the-timer) starts Social post every 30 minutes through the posting day, GitHub's schedule adds more starts when it runs, and [due.mjs](../scripts/social/due.mjs) decides whether a post is due. Post *N* becomes due at slot *N* and stays due until it's done, so a missed start only means the next one catches up. Starts that overlap wait for each other, and the day record makes sure a slot is only ever posted once.
 
 **Exactly once** ([post.mjs](../scripts/social/post.mjs)):
 
@@ -375,7 +401,7 @@ When there's no subject tag (most landscapes), the broad region takes the slot (
 
 **Once it's running**
 
-- **The Social post workflow has no runs at all.** GitHub can take hours to start a new schedule, and drops scheduled runs when it's busy. Run it once by hand (**Actions → Social post → Run workflow**). A post that's due stays due, so one run is enough to catch up.
+- **The Social post workflow has no runs at all.** The timer isn't starting it. In the Azure portal, open the Logic App `logic-photography-<environment>-scheduler` → **Run history**. Failed runs with status 401 mean `GITHUB_TOKEN` has expired or lost its Actions permission: replace it on the Static Web App and run the Infra workflow. A disabled Logic App means it was deployed without a token (step 9). Meanwhile, run Social post by hand (**Actions → Social post → Run workflow**); a post that's due stays due, so one run catches up.
 - **An email says "No post was published yesterday".** Open that day's Social post runs. A failed post shows its (redacted) reason. If there are no runs at all, GitHub dropped them. That's rare across 30+ attempts a day, but if it keeps happening, trigger the workflow from a reliable timer (for example an Azure Logic App calling `workflow_dispatch`).
 - **The run reports an invalid or expired token.** Redo steps 6 and 7.
 - **Nothing is posting.**
@@ -432,6 +458,7 @@ node scripts/social/post.mjs --local --force                                  # 
 | Item | Cost |
 |---|---|
 | GitHub Actions | Free on public repositories |
+| Timer (Logic App) | About 1,000 runs a month, which costs a few cents at most |
 | Writing posts | Cents a month. Analysing the photos is shared with the website ([docs/photos.md](photos.md#cost-and-speed)) |
 | Storage | Cents |
 | Instagram API | Free |

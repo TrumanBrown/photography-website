@@ -26,6 +26,9 @@ param enableDiagnostics bool
 @description('Deploy an Azure OpenAI model the build can use, keylessly, to draft descriptions for new sessions.')
 param enableDescribeModel bool
 
+@description('Deploy the timer that starts the Instagram posting and photo workflows on schedule (docs/social.md). Uses the Static Web App\'s GITHUB_TOKEN setting.')
+param enableSocialScheduler bool = false
+
 @description('Tags applied to every resource.')
 param tags object
 
@@ -93,6 +96,19 @@ module ai 'modules/ai.bicep' = if (enableDescribeModel) {
   }
 }
 
+module scheduler 'modules/scheduler.bicep' = if (enableSocialScheduler) {
+  name: 'scheduler'
+  params: {
+    location: location
+    name: 'logic-${namePrefix}-scheduler'
+    swaName: swa.outputs.name
+    githubOwner: githubOwner
+    githubRepo: githubRepo
+    githubBranch: githubBranch
+    tags: tags
+  }
+}
+
 module domain 'modules/domain.bicep' = if (!empty(domainName)) {
   name: 'domain'
   params: {
@@ -110,3 +126,4 @@ output managedIdentityClientId string = identity.outputs.clientId
 output managedIdentityPrincipalId string = identity.outputs.principalId
 output describeEndpoint string = enableDescribeModel ? ai!.outputs.endpoint : ''
 output describeDeployment string = enableDescribeModel ? ai!.outputs.deploymentName : ''
+output schedulerEnabled bool = enableSocialScheduler ? scheduler!.outputs.enabled : false

@@ -244,6 +244,52 @@ how identifications work, the checks every caption and description has to
 pass, and commands to preview or redo anything:
 [docs/photos.md](docs/photos.md).
 
+### Instagram, a few photos a day (optional)
+
+The same pipeline can post the archive to an Instagram account: 3 photos a
+day by default, each one once, in an order that mixes sessions and subjects
+rather than going oldest to newest. Each post is:
+
+- **the whole photo at Instagram's full resolution** (1440 px), never cropped.
+  Frames Instagram can't take as they are get plain borders.
+- **a caption written from the photo's own record**: the species from your
+  iNaturalist identification of that exact photo with its scientific name, the
+  place, one checked fact, the camera and lens, five hashtags built from data,
+  alt text, and a last line sending people to the full-resolution photo on
+  your site through the link in your bio.
+
+**What happens when you upload a session**, with nothing else to do:
+
+1. `./scripts/upload-session.sh <folder> --build` uploads the photos and starts
+   a build. The photos go live without captions.
+2. The build notices photos the pipeline hasn't seen and starts the **Photo
+   captions** workflow. It looks at each new photo once, matches it to your
+   iNaturalist observations, writes the captions and the session description,
+   and redeploys the site (usually 15 to 30 minutes after the upload).
+3. The same run puts the new photos into the Instagram plan alongside the
+   rest of the archive. Sessions photographed in the last 45 days get a small
+   head start, and the plan never posts the same session twice in a day or
+   the same species within about five days.
+4. Their posts are written as they come up, two weeks ahead, and the posting
+   workflow publishes them at the next slots.
+
+Add iNaturalist observations for those photos any time later: the next run
+finds them, and captions and unposted posts pick up the species.
+
+**What keeps it running:**
+
+| What | When | Does |
+| --- | --- | --- |
+| A timer in Azure (a Logic App, cents a month) | Every 30 minutes from 7 am to 10:30 pm Pacific, and at 3 am | Starts the two workflows below on GitHub. GitHub's own schedules are best effort and often skipped, so they're only a backup |
+| **Social post** workflow | Each time the timer starts it | Publishes the next post if one of the day's slots (08:30, 12:30, 18:00 Pacific) is due, otherwise stops in seconds. Renews the Instagram token weekly, and fails one run (so GitHub emails you) after a day with no post |
+| **Photo captions** workflow | Once a day, and after uploads | Keeps captions current and two weeks of posts written ahead |
+
+Setting it up takes about 30 minutes, mostly on Meta's developer site, and
+nothing about the account ever goes in the repository: it's in GitHub secrets
+and private storage, and the workflow logs show counts only. Step-by-step
+setup, the posting rules, and troubleshooting: [docs/social.md](docs/social.md).
+Preview what's coming with `npm run social -- preview`.
+
 ---
 
 ## Repository layout

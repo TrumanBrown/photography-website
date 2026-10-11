@@ -49,13 +49,14 @@ All inside resource group `rg-photography-prod`.
 | ↳ Container `derivatives` | RAW→JPEG sidecars written by the build. Same access. |
 | ↳ Container `variants` | Responsive WebP/JPEG outputs and tiny admin thumbnails. Same access. |
 | ↳ Container `hobby-media` | Full/display hobby-gallery photos, kept separate from sessions. Same access. |
-| ↳ Container `metadata` | Private. Build manifest + future admin state. |
+| ↳ Container `metadata` | Private. Build manifest, the admin index, the photo pipeline's records (`photos/`) and the Instagram poster's state (`social/`). |
 | ↳ Tables | Contact messages, pageviews, and hashed contact rate-limit counters. |
 | **Static Web App** `swa-photography-prod` (Free SKU) | Hosting + global CDN + auto-TLS + PR previews. |
 | ↳ Custom domain bindings (apex + `www`) | Created only when `domainName` is set. |
 | **User-assigned managed identity** `id-photography-deploy-<env>` | Service account GitHub Actions assumes via OIDC. RBAC: `Storage Blob Data Contributor` on the storage account, `Reader` on the RG, and `Cognitive Services OpenAI User` on the Azure OpenAI account when that's deployed. |
 | ↳ Federated credentials `github-main`, `github-pull-request` | Trust JWTs from this specific repo + branch. No long-lived secrets. |
-| **Azure OpenAI account** `oai-photography-<env>-<suffix>` | Created only when `enableDescribeModel=true`. One model deployment (`gpt-6.1-sol`, US data zone) that drafts a description for any session uploaded without one. API keys are disabled; the build reaches it through its OIDC login, as `id-photography-bootstrap`, which has inference-only access. |
+| **Azure OpenAI account** `oai-photography-<env>-<suffix>` | Created only when `enableDescribeModel=true`. One model deployment (`gpt-6.1-sol`, US data zone) that the photo pipeline uses to look at each photo once and write captions and session descriptions ([docs/photos.md](photos.md)). API keys are disabled; workflows reach it through their OIDC login, as `id-photography-bootstrap`, which has inference-only access. |
+| **Logic App** `logic-photography-<env>-scheduler` | Created only when `enableSocialScheduler=true`. A timer that starts the Instagram posting and photo workflows on GitHub, because GitHub's own scheduler skips many runs ([docs/social.md](social.md#what-runs-automatically)). Uses the Static Web App's `GITHUB_TOKEN` setting. |
 | **App Service Domain** `yourdomain.com` | `.com` registration. Only created when `domainName` is set; first-time purchase needs `az appservice domain create --accept-terms` once. |
 | **Azure DNS zone** `yourdomain.com` | Holds `A` (apex → SWA), `CNAME` `www`, `TXT` (SWA ownership token). |
 | **Log Analytics workspace** `log-photography-prod` | Created only when `enableDiagnostics=true`; receives storage transaction metrics with a 1 GB/day cap. |
@@ -76,7 +77,8 @@ Assumes ~30 GB stored, ~5 GB egress, personal traffic. Region `westus3`.
 | App Service Domain (`.com`) | $11.99/yr amortized | ~$1.00 |
 | Azure DNS zone | 1 zone @ $0.50 | $0.50 |
 | Log Analytics | Not created by default; free allowance covers optional storage diagnostics | $0.00 |
-| Azure OpenAI (optional) | Pay per use, one call per new session, nothing while idle | <$0.10 |
+| Azure OpenAI (optional) | Pay per use: about $10–15 once for an 800-photo archive, then cents per new session, nothing while idle | <$0.25 |
+| Logic App timer (optional) | Consumption, about 1,000 runs a month | <$0.10 |
 | Bicep deployments | Always free | $0.00 |
 | **Total** | | **~$2.10 – $2.60** |
 

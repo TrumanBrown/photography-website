@@ -46,7 +46,8 @@ infra/
     ├── identity.bicep        # managed identity + RBAC + GitHub OIDC
     ├── domain.bicep          # App Service Domain + DNS records
     ├── monitoring.bicep      # optional Log Analytics workspace
-    └── ai.bicep              # optional Azure OpenAI model that drafts session descriptions
+    ├── ai.bicep              # optional Azure OpenAI model for photo captions and descriptions
+    └── scheduler.bicep       # optional timer that starts the Instagram and photo workflows
 ```
 
 ### Why a separate `subscription.bicep`
@@ -130,9 +131,9 @@ use the separate first-party Table Storage pipeline.
 ### 10. Optional Azure OpenAI account: `oai-photography-<env>-<suffix>`
 
 Created by [`modules/ai.bicep`](../infra/modules/ai.bicep) only when
-`enableDescribeModel=true`. Prebuild uses it to draft a title, location and
-description for any session uploaded without one (see the README, "Turning it
-on").
+`enableDescribeModel=true`. The photo pipeline (`photos.yml`) uses it to look
+at each photo once and write its caption and its session's description
+([docs/photos.md](photos.md)). The site build itself never calls it.
 
 - One model deployment, `gpt-6.1-sol`, on `DataZoneStandard`, so requests are
   processed inside the US data zone. Azure moves it to each new default version
@@ -148,7 +149,25 @@ on").
   else.
 - Billed per token. Capacity (50K tokens/minute) is a rate ceiling, not a charge.
 
-### 11. Outputs
+### 11. Optional timer: `logic-photography-<env>-scheduler`
+
+Created by [`modules/scheduler.bicep`](../infra/modules/scheduler.bicep) only
+when `enableSocialScheduler=true`. A consumption Logic App that starts
+`social-post.yml` on GitHub every 30 minutes through the posting day and
+`photos.yml` once a day, because GitHub's own scheduler skips many runs
+([docs/social.md](social.md#what-runs-automatically)).
+
+- It calls GitHub's `workflow_dispatch` API with the Static Web App's
+  `GITHUB_TOKEN` setting, the fine-grained token (Actions read and write on this
+  repo) the admin panel's Rebuild button uses. The template reads it with
+  `listAppSettings()` while deploying and passes it on as a secure parameter, so
+  it never appears in the template, the outputs or the run history. Re-run the
+  deploy after replacing the token.
+- Deployed switched off when there's no token.
+- `timeZone`, `postingHours` and `pipelineHour` set when it fires.
+- About 1,000 runs a month: a few cents at most.
+
+### 12. Outputs
 
 The deployment emits values your scripts/workflows need:
 - `storageAccountName`, `blobEndpoint`
@@ -157,6 +176,7 @@ The deployment emits values your scripts/workflows need:
 - `describeEndpoint`, `describeDeployment` (empty unless `enableDescribeModel`
   is on), the values for the `AZURE_OPENAI_ENDPOINT` and
   `AZURE_OPENAI_DEPLOYMENT` repository variables
+- `schedulerEnabled`: whether the timer found a token and is running
 
 The Infra workflow uses these to populate repo secrets (`AZURE_STATIC_WEB_APPS_API_TOKEN`, `AZURE_STORAGE_ACCOUNT`) and writes the runtime storage connection, analytics salt, and initial admin directly to SWA app settings.
 
