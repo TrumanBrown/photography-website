@@ -11,7 +11,10 @@
  * The model may suggest a place or landmark, but only words that already
  * appear in your session title or location are accepted.
  */
-import { cameraName } from "./exif.mjs";
+import { cameraName } from "../photos/exif.mjs";
+import { LANDSCAPE_GROUPS, ORGANISM_GROUPS } from "../photos/groups.mjs";
+
+export { GROUPS } from "../photos/groups.mjs";
 
 export const MAX_HASHTAGS = 5;
 
@@ -97,51 +100,6 @@ const GROUP_TAGS = {
   village: "travel",
   people: "travel",
 };
-
-const ORGANISM_GROUPS = new Set([
-  "frog",
-  "toad",
-  "salamander",
-  "snake",
-  "lizard",
-  "turtle",
-  "bird",
-  "mammal",
-  "insect",
-  "butterfly",
-  "moth",
-  "dragonfly",
-  "beetle",
-  "spider",
-  "scorpion",
-  "crab",
-  "fish",
-  "marine-invertebrate",
-  "fungus",
-  "plant",
-  "flower",
-]);
-const LANDSCAPE_GROUPS = new Set([
-  "mountain",
-  "glacier",
-  "lake",
-  "river",
-  "waterfall",
-  "coast",
-  "forest",
-  "desert",
-  "sky",
-]);
-
-export const GROUPS = [
-  ...ORGANISM_GROUPS,
-  ...LANDSCAPE_GROUPS,
-  "city",
-  "temple",
-  "village",
-  "people",
-  "other",
-];
 
 export function isOrganism({ taxon, group }) {
   return Boolean(taxon) || ORGANISM_GROUPS.has(group);

@@ -11,7 +11,7 @@
  * always wins over the stored copy.
  */
 import { fingerprint, keyFromBase64, seal, unseal } from "./seal.mjs";
-import { redact, registerSecret, warn } from "./redact.mjs";
+import { redact, registerSecret, warn } from "../photos/redact.mjs";
 
 const TOKEN_FILE = "token.json";
 const REFRESH_AFTER_MS = 7 * 24 * 3600 * 1000;

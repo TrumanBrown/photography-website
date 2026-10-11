@@ -6,7 +6,7 @@
  *   - the same session not within the last day's posts
  *   - the same species not within about five days
  *   - frames from the same burst not within about ten days
- * Score: the model's appeal rating, a bump for research-grade species (they're
+ * Score: the analysis's appeal rating, a bump for photos identified to species (they're
  * what people search for), a bump for sessions from the last 45 days, and a
  * small penalty for repeating the previous post's kind of subject. A seeded
  * jitter breaks ties so the order is stable but not alphabetical.
@@ -28,9 +28,9 @@ function facts(key, shot) {
     session: shot.session,
     taxon: shot.speciesOk ? shot.inat?.taxon : null,
     burst: shot.burst ?? null,
-    group: shot.post?.group ?? null,
+    group: shot.analysis?.group ?? shot.post?.group ?? null,
     location: shot.location ?? null,
-    appeal: Number(shot.post?.appeal) || 5,
+    appeal: Number(shot.analysis?.appeal ?? shot.post?.appeal) || 5,
     speciesOk: Boolean(shot.speciesOk),
     sessionDate: shot.sessionDate ?? null,
   };
@@ -57,8 +57,18 @@ function score(c, seq, now) {
   return s + jitter(c.key) * 0.6;
 }
 
+/** Ready to post now: analysed, written up, and not held back. */
 export function isPostable(shot) {
   return shot?.status === "ready" && !shot.skip && !shot.blocked;
+}
+
+/** Can go in the plan: analysed and not held back. Its post is written once it's planned. */
+export function isPlannable(shot) {
+  return (
+    (shot?.status === "ready" || shot?.status === "new") &&
+    !shot.skip &&
+    !shot.blocked
+  );
 }
 
 /**
@@ -76,7 +86,7 @@ export function planQueue({
 }) {
   const remaining = new Map(
     Object.entries(shots)
-      .filter(([key, shot]) => isPostable(shot) && !posted.has(key))
+      .filter(([key, shot]) => isPlannable(shot) && !posted.has(key))
       .map(([key, shot]) => [key, facts(key, shot)]),
   );
   const seq = recent.filter((k) => shots[k]).map((k) => facts(k, shots[k]));

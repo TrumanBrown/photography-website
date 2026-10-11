@@ -18,7 +18,7 @@ import { dhash, hamming } from "./hash.mjs";
 import { clockMs } from "./shots.mjs";
 
 const API = "https://api.inaturalist.org/v1";
-const UA = "photo-site-social/1.0";
+const UA = "photo-site/1.0";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /** iNat asks for at most ~1 request a second. */

@@ -27,18 +27,12 @@
  * Exit code 0 even when no sessions exist — the site renders an empty state.
  */
 import { mkdir, writeFile, readFile, rm, access, copyFile as fsCopyFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { appendFileSync, existsSync } from 'node:fs';
 import { dirname, join, basename, extname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawn } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
-import {
-  describeSession,
-  captionImages,
-  isEnabled as describeEnabled,
-  captionsEnabledFor,
-} from './lib/describe.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -124,7 +118,33 @@ async function main() {
 
   await saveManifest(metadataClient, nextManifest);
   await writeAdminIndex(metadataClient, indexRecords);
+  await reportNewPhotos(metadataClient, indexRecords);
   console.log('Prebuild complete.');
+}
+
+/**
+ * Count photos the photo pipeline (scripts/photos, docs/photos.md) hasn't seen
+ * yet, by checking its private catalog. The build workflow starts the pipeline
+ * when this is above zero, so a new session gets captions and a description
+ * soon after it goes live instead of waiting for the nightly run.
+ */
+async function reportNewPhotos(metadataClient, records) {
+  let known;
+  try {
+    const buf = await metadataClient.getBlockBlobClient('photos/catalog.json').downloadToBuffer();
+    known = new Set(Object.keys(JSON.parse(buf.toString('utf8')).files ?? {}));
+  } catch (e) {
+    if (e?.statusCode !== 404) {
+      console.warn('Could not read the photo catalog:', e.message);
+      return;
+    }
+    known = new Set();
+  }
+  const fresh = records
+    .flatMap((r) => r.images.map((file) => `${r.slug}/${file}`))
+    .filter((id) => !known.has(id)).length;
+  console.log(`Photos the photo pipeline hasn't seen yet: ${fresh}`);
+  if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `new_photos=${fresh}\n`);
 }
 
 // Write a consolidated index of resolved session metadata to the (private)
@@ -394,24 +414,9 @@ async function processSession({ prefix, originalsClient, derivativesClient, serv
     ? reorderByList(images, sidecar.images, targetBySource)
     : images.sort((a, b) => a.file.localeCompare(b.file));
 
-  // A session uploaded without a description gets one drafted from its own
-  // photographs. The result is written back to _session.json, so it costs one
-  // API call per session ever, and from then on it's ordinary metadata you can
-  // rewrite in the admin panel. With no model configured it says so, loudly
-  // enough to show on the Actions run, rather than leaving the page blank quietly.
-  if (!sidecar.description && orderedImages.length > 0) {
-    if (describeEnabled()) {
-      await describeInto({ sidecar, slug, prefix, imagesDir, images: orderedImages, originalsClient });
-    } else {
-      warn(`${slug} has no description, and no model is configured to draft one. Write it in /admin, or turn drafting on (README, "Turning it on").`);
-    }
-  }
-
-  // Per-image captions, if separately enabled. These become each photo's alt
-  // text, which is the signal image search actually reads.
-  if (orderedImages.length > 0 && captionsEnabledFor(slug)) {
-    await captionInto({ sidecar, slug, prefix, imagesDir, images: orderedImages, originalsClient });
-  }
+  // Captions and descriptions aren't written here: the photo pipeline
+  // (scripts/photos) writes them into _session.json, and they arrive through
+  // the sidecar like anything typed in /admin.
 
   const cover = sidecar.cover
     ? (targetBySource.get(sidecar.cover) ?? sidecar.cover)
@@ -486,99 +491,6 @@ async function processSession({ prefix, originalsClient, derivativesClient, serv
         .map((image) => [image.file, image.caption]),
     ),
   };
-}
-
-/**
- * Draft title/location/description for a session that has none and merge the
- * result into its sidecar, both in memory and back in Blob Storage.
- *
- * Mutates `sidecar`. Never throws: a drafting failure degrades to the old
- * behaviour (an empty description) rather than failing the whole build.
- */
-async function describeInto({ sidecar, slug, prefix, imagesDir, images, originalsClient }) {
-  try {
-    const drafted = await describeSession({
-      slug,
-      title: sidecar.title ?? humanize(slug),
-      date: sidecar.date ?? '',
-      location: sidecar.location ?? '',
-      images,
-      imagesDir,
-    });
-
-    sidecar.description = drafted.description;
-    // Only fill a title or location that wasn't already chosen by hand. A title
-    // that's just the folder name tidied up is what /admin saves when nobody
-    // typed one, so it isn't a choice and the drafted title replaces it.
-    if ((!sidecar.title || sidecar.title === humanize(slug)) && drafted.title) sidecar.title = drafted.title;
-    if (!sidecar.location && drafted.location) sidecar.location = drafted.location;
-    sidecar.descriptionSource = 'auto';
-
-    await writeSidecar(originalsClient, prefix, sidecar);
-    console.log(`  described: ${slug} (from ${drafted.sampled} photos, saved to ${SESSION_JSON})`);
-  } catch (e) {
-    warn(`Couldn't draft a description for ${slug}, so it'll be retried on the next build. ${e.message}`);
-  }
-}
-
-/**
- * A warning that also shows as an annotation on the GitHub Actions run, so a
- * session missing its description is visible without opening the log.
- */
-function warn(message) {
-  const oneLine = message.replace(/\s+/g, ' ').trim();
-  console.warn(process.env.GITHUB_ACTIONS === 'true' ? `::warning::${oneLine}` : `  warning: ${oneLine}`);
-}
-
-/**
- * Write a session's sidecar back to Blob Storage.
- */
-async function writeSidecar(originalsClient, prefix, sidecar) {
-  const body = JSON.stringify(sidecar, null, 2) + '\n';
-  await originalsClient
-    .getBlockBlobClient(`${prefix}/${SESSION_JSON}`)
-    .upload(body, Buffer.byteLength(body), {
-      blobHTTPHeaders: { blobContentType: 'application/json' },
-    });
-}
-
-/**
- * Caption every image that doesn't already have one, then persist the captions
- * into the sidecar's `images` array so they're generated once and stay editable.
- *
- * Mutates `sidecar` and the `images` entries. Never throws.
- */
-async function captionInto({ sidecar, slug, prefix, imagesDir, images, originalsClient }) {
-  const missing = images.filter((img) => !img.caption).length;
-  if (missing === 0) return;
-
-  try {
-    const captions = await captionImages({
-      title: sidecar.title ?? humanize(slug),
-      location: sidecar.location ?? '',
-      images,
-      imagesDir,
-      onBatchError: (err, count) =>
-        console.warn(`  caption batch of ${count} failed for ${slug}: ${err.message}`),
-    });
-    if (captions.size === 0) return;
-
-    for (const img of images) {
-      const caption = captions.get(img.file);
-      if (caption && !img.caption) img.caption = caption;
-    }
-
-    // Persist in the sidecar's own order-and-caption format. Built from the
-    // already-resolved order, so existing ordering survives the rewrite.
-    sidecar.images = images.map((img) => ({
-      file: img.file,
-      ...(img.caption ? { caption: img.caption } : {}),
-    }));
-    await writeSidecar(originalsClient, prefix, sidecar);
-    console.log(`  captioned: ${slug} (${captions.size} of ${missing} new captions)`);
-  } catch (e) {
-    console.warn(`  captions skipped for ${slug}: ${e.message}`);
-  }
 }
 
 async function processStandardBlob({ blob, originalsClient, localPath, cacheKey }) {

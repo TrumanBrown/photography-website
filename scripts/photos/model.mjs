@@ -1,11 +1,9 @@
 /**
- * Vision model calls for the social auto-poster.
+ * Model calls for the photo pipeline: one vision call per photograph, and
+ * text-only calls that turn the stored facts into captions and descriptions.
+ * The site build itself never calls a model.
  *
- * Kept separate from scripts/lib/describe.mjs on purpose: that module drives the
- * public site build, and the poster needs request options current models
- * require (max_completion_tokens) without changing how the site build behaves.
- *
- * Providers, chosen by what's configured (or forced with SOCIAL_PROVIDER):
+ * Providers, chosen by what's configured (or forced with PHOTOS_PROVIDER):
  *   azure      AZURE_OPENAI_ENDPOINT + AZURE_OPENAI_DEPLOYMENT, keyless: the
  *              workflow's own Azure sign-in gets the token, so no API key
  *              exists anywhere and photos stay in your tenant
@@ -18,7 +16,7 @@ import sharp from "sharp";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export function providerFor(env = process.env) {
-  if (env.SOCIAL_PROVIDER) return env.SOCIAL_PROVIDER;
+  if (env.PHOTOS_PROVIDER) return env.PHOTOS_PROVIDER;
   if (env.AZURE_OPENAI_ENDPOINT && env.AZURE_OPENAI_DEPLOYMENT) return "azure";
   if (env.OPENAI_API_KEY) return "openai";
   if (env.ANTHROPIC_API_KEY) return "anthropic";
@@ -27,8 +25,8 @@ export function providerFor(env = process.env) {
 
 export function modelFor(provider, env = process.env) {
   if (provider === "azure")
-    return env.AZURE_OPENAI_DEPLOYMENT || env.SOCIAL_MODEL || "";
-  if (env.SOCIAL_MODEL) return env.SOCIAL_MODEL;
+    return env.AZURE_OPENAI_DEPLOYMENT || env.PHOTOS_MODEL || "";
+  if (env.PHOTOS_MODEL) return env.PHOTOS_MODEL;
   if (provider === "openai") return env.OPENAI_MODEL || "gpt-6.1-sol";
   if (provider === "anthropic")
     return env.ANTHROPIC_MODEL || "claude-sonnet-4-5";

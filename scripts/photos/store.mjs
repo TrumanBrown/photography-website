@@ -1,8 +1,8 @@
 /**
- * Private state for the social auto-poster.
+ * Private state for the photo pipeline and the Instagram poster.
  *
- * Everything the poster remembers (catalog, queue, ledger, day records, the
- * sealed token) lives under one prefix in a PRIVATE container, never in the
+ * Everything they remember (the photo catalog, and for Instagram the queue,
+ * ledger, day records and sealed token) lives in a PRIVATE container, never in the
  * repository, so nothing public says which account it posts to.
  *
  * Two backends share one interface:
@@ -68,7 +68,7 @@ export function localStore(dir) {
 export async function blobStore({
   account,
   container = "metadata",
-  prefix = "social/",
+  prefix = "photos/",
 }) {
   if (!account) throw new Error("AZURE_STORAGE_ACCOUNT is required.");
   const {

@@ -1,0 +1,99 @@
+name: Photo captions
+
+# The photo pipeline (docs/photos.md). Looks at each new photo once with a
+# vision model, matches it to your iNaturalist observations, then writes the
+# website's per-photo captions and session descriptions into each session's
+# _session.json and redeploys the site. With SOCIAL_ENABLED=true it also plans
+# and writes the Instagram posts (docs/social.md).
+#
+# Runs nightly, right after a build finds new photos, or by hand. State lives
+# in the private `metadata` container and logs are counts only.
+
+on:
+  schedule:
+    - cron: "23 10 * * *"
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "Most photos to analyse this run"
+        default: "300"
+      overwrite:
+        description: "Replace descriptions and captions even where they were edited by hand"
+        type: boolean
+        default: false
+      dry_run:
+        description: "Analyse and write the copy privately, but leave the site's session files alone"
+        type: boolean
+        default: false
+
+concurrency:
+  group: photos
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+  # Starts a site build once captions have been written.
+  actions: write
+
+jobs:
+  photos:
+    # On when a model is configured: the keyless Azure OpenAI variable, or
+    # PHOTOS_ENABLED=true for an API key.
+    if: github.ref == 'refs/heads/main' && (vars.AZURE_OPENAI_ENDPOINT != '' || vars.PHOTOS_ENABLED == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # Installed before signing in to anything, like the site build.
+      - name: Install npm deps
+        run: npm ci
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Analyse photos and write captions
+        id: photos
+        env:
+          LIMIT: ${{ inputs.limit || '300' }}
+          OVERWRITE: ${{ inputs.overwrite && '--overwrite' || '' }}
+          DRY_RUN: ${{ inputs.dry_run && '--no-write' || '' }}
+          AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
+          # Keyless Azure OpenAI: the Azure sign-in above is the credential.
+          AZURE_OPENAI_ENDPOINT: ${{ vars.AZURE_OPENAI_ENDPOINT }}
+          AZURE_OPENAI_DEPLOYMENT: ${{ vars.AZURE_OPENAI_DEPLOYMENT }}
+          # Or an API key.
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_BASE_URL: ${{ vars.OPENAI_BASE_URL }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL }}
+          INATURALIST_USER: ${{ vars.INATURALIST_USER }}
+          # Instagram (stage 6), only with SOCIAL_ENABLED=true.
+          SOCIAL_ENABLED: ${{ vars.SOCIAL_ENABLED }}
+          SOCIAL_POSTS_PER_DAY: ${{ vars.SOCIAL_POSTS_PER_DAY }}
+          SOCIAL_TALL_IMAGES: ${{ vars.SOCIAL_TALL_IMAGES }}
+          SOCIAL_MIN_WIDTH: ${{ vars.SOCIAL_MIN_WIDTH }}
+          IG_LOGIN_MODE: ${{ vars.IG_LOGIN_MODE }}
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          SOCIAL_SECRET_KEY: ${{ secrets.SOCIAL_SECRET_KEY }}
+        run: node scripts/photos/catalog.mjs --limit "$LIMIT" $OVERWRITE $DRY_RUN
+
+      - name: Redeploy the site with the new copy
+        if: steps.photos.outputs.sessions_updated != '' && steps.photos.outputs.sessions_updated != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run build-and-deploy.yml --ref main --repo "$GITHUB_REPOSITORY"

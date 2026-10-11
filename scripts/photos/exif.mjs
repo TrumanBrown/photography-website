@@ -7,6 +7,7 @@
  * photo, so comparing readings directly is what lines the two up.
  */
 import exifr from "exifr";
+import sharp from "sharp";
 
 function clockFrom(raw) {
   const m = /^(\d{4})[:-](\d{2})[:-](\d{2})[ T](\d{2}):(\d{2}):(\d{2})/.exec(
@@ -113,4 +114,13 @@ export function gearLine(facts) {
     if (facts.iso) parts.push(`ISO ${facts.iso}`);
   }
   return parts.join(" · ");
+}
+
+/** Width and height after EXIF orientation is applied. */
+export async function orientedSize(input) {
+  const meta = await sharp(input, { failOn: "none" }).metadata();
+  const swap = (meta.orientation ?? 1) >= 5;
+  return swap
+    ? { width: meta.height, height: meta.width }
+    : { width: meta.width, height: meta.height };
 }

@@ -10,7 +10,7 @@
  * Publishing is two steps: create a media container from a URL Meta can fetch,
  * then publish it. Nothing here logs; errors are redacted before they surface.
  */
-import { redact } from "./redact.mjs";
+import { redact } from "../photos/redact.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 

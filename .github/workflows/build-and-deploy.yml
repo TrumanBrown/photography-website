@@ -30,6 +30,8 @@ permissions:
   id-token: write
   contents: read
   pull-requests: write
+  # Starts the photo pipeline (photos.yml) when a build finds new photos.
+  actions: write
 
 jobs:
   build_and_deploy:
@@ -96,34 +98,14 @@ jobs:
           restore-keys: |
             prebuild-cache-
 
+      # The build never calls a model. Captions and session descriptions are
+      # written into _session.json by the photo pipeline (photos.yml), which
+      # this step tells about new photos through its `new_photos` output.
       - name: Run prebuild (sync from Blob)
         if: env.CAN_USE_AZURE == 'true'
+        id: prebuild
         env:
           AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
-          # Optional. When a model is configured, sessions uploaded without a
-          # description get one drafted from their own photographs and written
-          # back to _session.json, so it costs one call per session ever. With
-          # none configured, descriptions stay empty and the run shows a warning
-          # for each session missing one.
-          #
-          # Keyless (recommended): the Azure OpenAI deployment from
-          # infra/modules/ai.bicep, reached through the OIDC login above.
-          AZURE_OPENAI_ENDPOINT: ${{ vars.AZURE_OPENAI_ENDPOINT }}
-          AZURE_OPENAI_DEPLOYMENT: ${{ vars.AZURE_OPENAI_DEPLOYMENT }}
-          # Or an API key, which wins if both are set.
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          OPENAI_BASE_URL: ${{ vars.OPENAI_BASE_URL }}
-          OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          # Constrains generated copy to species this user has actually recorded
-          # and had verified on iNaturalist. Unset means the prompts forbid
-          # species names and stay at group level instead.
-          INATURALIST_USER: ${{ vars.INATURALIST_USER }}
-          # Separate opt-in for per-image captions, which become alt text.
-          # "1" captions every session; a slug (or comma-separated slugs)
-          # captions only those, which is the way to trial one before
-          # captioning the whole archive. Unset means no captions.
-          DESCRIBE_CAPTIONS: ${{ vars.DESCRIBE_CAPTIONS }}
         run: node scripts/prebuild.mjs
 
       - name: Save prebuild cache
@@ -194,6 +176,15 @@ jobs:
           app_location: 'dist'
           api_location: 'api'
           skip_app_build: true
+
+      # New photos are live now, without captions. The photo pipeline analyses
+      # them, writes their captions and the session description, and starts
+      # another build when it's done (docs/photos.md).
+      - name: Start the photo pipeline for new photos
+        if: env.CAN_USE_AZURE == 'true' && github.event_name != 'pull_request' && steps.prebuild.outputs.new_photos != '' && steps.prebuild.outputs.new_photos != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run photos.yml --ref main --repo "$GITHUB_REPOSITORY"
 
   close_pr:
     if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.user.login != 'dependabot[bot]' && github.event.pull_request.head.repo.fork == false

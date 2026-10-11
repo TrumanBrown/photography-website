@@ -1,8 +1,8 @@
 /**
- * Log scrubbing for the social auto-poster.
+ * Log scrubbing for the photo pipeline and the Instagram poster.
  *
  * The repository and its Actions logs are public, and the account this posts to
- * must not be discoverable from either. Every message the poster prints goes
+ * must not be discoverable from either. Every message they print goes
  * through redact(): registered secrets (tokens, account ids) are replaced, and
  * so is anything shaped like a Graph API id, an access_token parameter, or a
  * signed URL. Callers still avoid printing captions, ids and URLs at all; this

@@ -11,7 +11,8 @@
  * Output is sRGB, 4:4:4 chroma, quality 95, with camera metadata stripped.
  */
 import sharp from "sharp";
-import { IG_MAX_RATIO, IG_MIN_RATIO } from "./shots.mjs";
+import { IG_MAX_RATIO, IG_MIN_RATIO } from "../photos/shots.mjs";
+import { orientedSize } from "../photos/exif.mjs";
 
 export const IG_MAX_WIDTH = 1440;
 export const IG_MAX_BYTES = 8 * 1024 * 1024;
@@ -42,15 +43,6 @@ export function canvasFor(width, height, maxWidth = IG_MAX_WIDTH) {
   if (w / h < IG_MIN_RATIO) h = Math.floor(w / IG_MIN_RATIO);
   if (w / h > IG_MAX_RATIO) h = Math.ceil(w / IG_MAX_RATIO);
   return { width: w, height: h, padded: false, side: null };
-}
-
-/** Width and height after EXIF orientation is applied. */
-export async function orientedSize(input) {
-  const meta = await sharp(input, { failOn: "none" }).metadata();
-  const swap = (meta.orientation ?? 1) >= 5;
-  return swap
-    ? { width: meta.height, height: meta.width }
-    : { width: meta.width, height: meta.height };
 }
 
 /** Black or white, whichever is closer to the edges the border will touch. */

@@ -1,14 +1,14 @@
 import { buildHashtags, landmarkTag, placeTag, tagify } from "./hashtags.mjs";
+import { finishPost } from "./compose.mjs";
 import {
   compileLexicon,
   displayName,
-  finishPost,
   lint,
   speciesLabel,
   tidy,
   ungroundedNames,
-} from "./compose.mjs";
-import { cameraName, gearLine } from "./exif.mjs";
+} from "../photos/text.mjs";
+import { cameraName, gearLine } from "../photos/exif.mjs";
 
 const frog = {
   id: 1,
@@ -158,6 +158,18 @@ describe("caption text", () => {
     expect(lint("Orange hands and a barred yellow side")).toEqual([]);
   });
 
+  it("keeps demonyms capitalised mid-sentence", () => {
+    expect(displayName("Ecuadorian Hermit Crab", { midSentence: true })).toBe(
+      "Ecuadorian hermit crab",
+    );
+    expect(
+      displayName("Northwestern Garter Snake", { midSentence: true }),
+    ).toBe("northwestern garter snake");
+    expect(displayName("Ocean Sunfish", { midSentence: true })).toBe(
+      "ocean sunfish",
+    );
+  });
+
   it("finds capitalised names that aren't in the session text", () => {
     expect(
       ungroundedNames("Snow on Mount Shuksan", "North Cascades, Washington"),
@@ -170,18 +182,16 @@ describe("caption text", () => {
     ).toEqual([]);
   });
 
-  it("assembles a verified post with the species first and the place grounded", () => {
+  it("assembles a post: website caption first, then body, IUCN line, gear and hashtags", () => {
     const post = finishPost({
-      draft: {
-        detail: "on a thin twig at night",
-        place_line: "Guayacán, Limón Province, Costa Rica",
-        body: "Orange hands, a barred yellow side, and a firm grip on a very thin twig.",
-        alt_text: "A green frog with orange hands gripping a twig at night",
-      },
-      session,
-      gear: gearLine(a6700macro),
+      headline:
+        "Sylvia's tree frog (Cruziohyla sylviae) on a thin twig at night, Guayacán, Limón Province, Costa Rica",
+      body: "Orange hands, a barred yellow side, and a firm grip on a very thin twig.",
+      alt: "A green frog with orange hands gripping a twig at night",
+      session: { ...session, slug: "costa-rica-crarc-august-2026" },
       taxon: { ...frog, iucn: "Vulnerable" },
-      speciesOk: true,
+      level: "species",
+      gear: gearLine(a6700macro),
       hashtags: ["#sylviastreefrog", "#frogsofinstagram"],
       pointer: "The rest of this set is on example.com, link in bio",
     });
@@ -192,112 +202,78 @@ describe("caption text", () => {
     expect(post.caption).toContain(
       "Listed as Vulnerable on the IUCN Red List.",
     );
+    expect(post.caption).toContain("Sony a6700");
     expect(post.caption.endsWith("#sylviastreefrog #frogsofinstagram")).toBe(
       true,
     );
   });
 
-  it("falls back to the session location when the model invents a place", () => {
-    const post = finishPost({
-      draft: {
-        detail: "",
-        place_line: "Tortuguero National Park",
-        body: "Green and orange.",
-        alt_text: "A frog",
-      },
-      session,
-      gear: "",
-      taxon: frog,
-      speciesOk: true,
-      hashtags: [],
-      pointer: "",
-    });
-    expect(post.headline).toBe(
-      "Sylvia's tree frog (Cruziohyla sylviae), Limón Province, Costa Rica",
-    );
-  });
-
-  it("rejects species names a post has no verified right to use", () => {
+  it("rejects a body that names a species nobody identified", () => {
     const lexicon = compileLexicon([
       "Red-eyed Tree Frog",
       "Agalychnis callidryas",
       "Sylvia's Tree Frog",
       "Cruziohyla sylviae",
     ]);
-    const unverified = finishPost({
-      draft: {
-        subject: "Tree frog",
-        detail: "",
-        place_line: "",
-        body: "A red-eyed tree frog, Agalychnis callidryas.",
-        alt_text: "A frog",
-      },
-      session,
+    const base = {
+      headline: "Tree frog on a leaf, Guayacán",
+      alt: "A frog",
+      session: { ...session, slug: "crarc" },
       gear: "",
-      taxon: null,
-      speciesOk: false,
       hashtags: [],
       pointer: "",
       lexicon,
+    };
+    const unverified = finishPost({
+      ...base,
+      body: "A red-eyed tree frog, Agalychnis callidryas.",
+      taxon: null,
+      level: null,
     });
     expect(unverified.problem).toMatch(/Red-eyed Tree Frog/);
     const verified = finishPost({
-      draft: {
-        detail: "",
-        place_line: "",
-        body: "Green back, orange hands.",
-        alt_text: "Sylvia's tree frog on a twig",
-      },
-      session,
-      gear: "",
+      ...base,
+      body: "Green back, orange hands. Sylvia's tree frog keeps to the canopy.",
       taxon: frog,
-      speciesOk: true,
-      hashtags: [],
-      pointer: "",
-      lexicon,
+      level: "species",
     });
     expect(verified.problem).toBeUndefined();
   });
 
-  it("drops a detail phrase that names something unverified", () => {
+  it("rejects a body that names a place the facts don't mention", () => {
     const post = finishPost({
-      draft: {
-        detail: "on a Heliconia leaf",
-        place_line: "",
-        body: "Green and orange.",
-        alt_text: "A frog",
-      },
-      session,
-      gear: "",
-      taxon: frog,
-      speciesOk: true,
-      hashtags: [],
-      pointer: "",
-    });
-    expect(post.headline).toBe(
-      "Sylvia's tree frog (Cruziohyla sylviae), Limón Province, Costa Rica",
-    );
-  });
-
-  it("rejects an unverified subject that names something not in the session", () => {
-    const post = finishPost({
-      draft: {
-        subject: "Snow on Mount Shuksan",
-        detail: "",
-        place_line: "",
-        body: "Snow.",
-        alt_text: "Snow",
-      },
+      headline: "Snow-covered peak above the meadows, Washington Pass",
+      body: "Fresh snow on Mount Shuksan above the meadows.",
+      alt: "Snow",
       session: {
-        title: "North Cascades, July 2026",
+        slug: "north-cascades-july-2026",
+        title: "Washington Pass, North Cascades, July 2026",
         location: "North Cascades, Washington",
       },
-      gear: "",
       taxon: null,
-      speciesOk: false,
+      level: null,
+      gear: "",
       hashtags: [],
       pointer: "",
     });
-    expect(post.problem).toMatch(/Mount, Shuksan/);
+    expect(post.problem).toMatch(/Shuksan/);
+  });
+
+  it("lets the body repeat a name from the species' reference summary", () => {
+    const post = finishPost({
+      headline: "Sylvia's tree frog (Cruziohyla sylviae) on a twig, Guayacán",
+      body: "Orange hands. These frogs live in the canopy from Honduras to Panama.",
+      alt: "A frog",
+      session: { ...session, slug: "crarc" },
+      taxon: {
+        ...frog,
+        summary: "It is found in lowland forest from Honduras to Panama.",
+      },
+      level: "species",
+      gear: "",
+      hashtags: [],
+      pointer: "",
+    });
+    expect(post.problem).toBeUndefined();
   });
 });

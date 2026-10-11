@@ -1,6 +1,6 @@
 ---
 description: 'Voice and style rules for every user-visible string on the site (page copy, hobby intros, button labels, empty states, errors, species facts).'
-applyTo: 'src/**/*.astro,src/**/*.ts,src/content/**/*.json,api/**/*.js,site.config.ts,site.config.example.ts,scripts/session-meta.json'
+applyTo: 'src/**/*.astro,src/**/*.ts,src/content/**/*.json,api/**/*.js,site.config.ts,site.config.example.ts,scripts/photos/website.mjs,scripts/social/compose.mjs'
 ---
 
 # Site copy style
@@ -25,7 +25,8 @@ thrown out rather than edited.
   Code comments and `docs/` are exempt; everything else is not.
 - **Vary how sentences start.** If six descriptions open with "A" and five open with
   "The", the set reads as generated even when each line is individually fine.
-  `scripts/session-copy.test.mjs` fails the build over this.
+  The photo pipeline rejects a generated description that opens like three others
+  already do (`descriptionProblems` in `scripts/photos/website.mjs`).
 - **Don't write the same shape every time.** A list of three ("X, Y, and Z") in every
   entry is a tell. Mix sentence lengths. Let some entries be two sentences and others
   four.
@@ -36,8 +37,10 @@ thrown out rather than edited.
   way up it" and "which I did not expect" read as a person; "offering a variety of
   subjects" does not.
 
-Mechanically checkable parts of this are enforced in `scripts/session-copy.test.mjs`.
-If a rule can be tested, add it there rather than only writing it down here.
+Mechanically checkable parts of this are enforced on generated captions and session
+descriptions in `scripts/photos/website.mjs` (`captionFor`, `descriptionProblems`),
+tested in `scripts/photos/website.test.mjs`. If a rule can be checked, add it there
+rather than only writing it down here.
 
 ## Voice
 

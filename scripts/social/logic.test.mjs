@@ -1,4 +1,4 @@
-import { burstGroups, chooseVersion, padFraction, shotKey } from "./shots.mjs";
+import { burstGroups, chooseVersion, padFraction, shotKey } from "../photos/shots.mjs";
 import { countsToward, decide, localParts, previousDay } from "./schedule.mjs";
 import { planQueue } from "./plan.mjs";
 import {
@@ -8,8 +8,8 @@ import {
   pickObservation,
   speciesUsable,
   timeCandidates,
-} from "./inat.mjs";
-import { hamming } from "./hash.mjs";
+} from "../photos/inat.mjs";
+import { hamming } from "../photos/hash.mjs";
 import { loadSettings } from "./settings.mjs";
 
 describe("shots", () => {

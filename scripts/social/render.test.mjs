@@ -1,5 +1,6 @@
 import sharp from "sharp";
-import { canvasFor, orientedSize, renderForInstagram } from "./render.mjs";
+import { canvasFor, renderForInstagram } from "./render.mjs";
+import { orientedSize } from "../photos/exif.mjs";
 
 const solid = (width, height, background, extra = (s) => s) =>
   extra(sharp({ create: { width, height, channels: 3, background } }))

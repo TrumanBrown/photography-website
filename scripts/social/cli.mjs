@@ -6,7 +6,7 @@
  *   npm run social -- preview [count]     write .cache/social/preview.html with upcoming posts
  *   npm run social -- skip <photo> [why]  never post this shot
  *   npm run social -- unskip <photo>
- *   npm run social -- redraft <photo>     rewrite this post's caption on the next catalog run
+ *   npm run social -- redraft <photo>     rewrite this post on the next Photo captions run
  *   npm run social -- approve <photo>     only matters with SOCIAL_REQUIRE_APPROVAL=true
  *   npm run social -- retry <photo>|--all clear failed attempts so a photo can be tried again
  *
@@ -14,11 +14,14 @@
  * unique part of a filename ("DSC01234"). Reads private state with your
  * `az login` (AZURE_STORAGE_ACCOUNT must be set), or the local dry-run state
  * with --local. Nothing here is uploaded anywhere except the catalog flags.
+ *
+ * The photo catalog (metadata/photos/) is shared with the website pipeline;
+ * the poster's own ledger and queue live in metadata/social/.
  */
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { ROOT, loadSettings } from "./settings.mjs";
-import { blobStore, localStore, updateJson } from "./store.mjs";
+import { blobStore, localStore, updateJson } from "../photos/store.mjs";
 import { isPostable } from "./plan.mjs";
 
 const args = process.argv.slice(2).filter((a) => a !== "--local");
@@ -32,10 +35,22 @@ const escape = (s) =>
     (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c],
   );
 
-async function openStore() {
+async function openStores() {
   return local
-    ? localStore(join(ROOT, ".cache/social/state"))
-    : blobStore({ account: settings.storageAccount });
+    ? {
+        social: localStore(join(ROOT, ".cache/social/state")),
+        photos: localStore(join(ROOT, ".cache/photos/state")),
+      }
+    : {
+        social: await blobStore({
+          account: settings.storageAccount,
+          prefix: "social/",
+        }),
+        photos: await blobStore({
+          account: settings.storageAccount,
+          prefix: "photos/",
+        }),
+      };
 }
 
 function findShot(catalog, needle) {
@@ -65,18 +80,20 @@ async function setFlag(store, needle, apply) {
   return findShot(data, needle)[1].pick;
 }
 
-async function status(store) {
-  const catalog = (await store.readJson("catalog.json"))?.data;
-  const ledger = (await store.readJson("ledger.json"))?.data ?? { posted: {} };
+async function status({ social, photos }) {
+  const catalog = (await photos.readJson("catalog.json"))?.data;
+  const ledger = (await social.readJson("ledger.json"))?.data ?? { posted: {} };
   if (!catalog)
-    return console.log("No catalog yet. Run the catalog workflow first.");
+    return console.log(
+      "No catalog yet. Run the Photo captions workflow first.",
+    );
   const shots = Object.entries(catalog.shots);
   const posted = new Set(Object.keys(ledger.posted ?? {}));
   const ready = shots.filter(
     ([k, s]) => isPostable(s) && !posted.has(k),
   ).length;
   const waiting = shots.filter(
-    ([k, s]) => (!s.status || s.status === "new") && !posted.has(k),
+    ([k, s]) => (!s.status || s.status === "new") && !s.skip && !posted.has(k),
   ).length;
   const left = ready + waiting;
   const days = Math.ceil(left / settings.postsPerDay);
@@ -86,7 +103,7 @@ async function status(store) {
   console.log(`Shots: ${shots.length}`);
   console.log(`Posted: ${posted.size}`);
   console.log(`Ready to post: ${ready}`);
-  console.log(`Waiting for a caption: ${waiting}`);
+  console.log(`Waiting to be analysed or written up: ${waiting}`);
   console.log(
     `Needs review: ${shots.filter(([, s]) => s.status === "needs_review").length}`,
   );
@@ -108,11 +125,13 @@ async function status(store) {
   );
 }
 
-async function preview(store, count) {
-  const catalog = (await store.readJson("catalog.json"))?.data;
-  const queue = (await store.readJson("queue.json"))?.data?.items ?? [];
+async function preview({ social, photos }, count) {
+  const catalog = (await photos.readJson("catalog.json"))?.data;
+  const queue = (await social.readJson("queue.json"))?.data?.items ?? [];
   if (!catalog)
-    return console.log("No catalog yet. Run the catalog workflow first.");
+    return console.log(
+      "No catalog yet. Run the Photo captions workflow first.",
+    );
   const card = (key) => {
     const s = catalog.shots[key];
     const f = catalog.files[s.pick];
@@ -142,14 +161,14 @@ ${review.length ? `<h1>Needs review (${review.length})</h1>${review.slice(0, 50)
 }
 
 async function main() {
-  const store = await openStore();
-  if (command === "status") return status(store);
+  const stores = await openStores();
+  if (command === "status") return status(stores);
   if (command === "preview")
-    return preview(store, Number(rest[0]) || settings.postsPerDay * 7);
+    return preview(stores, Number(rest[0]) || settings.postsPerDay * 7);
   if (["skip", "unskip", "approve", "redraft"].includes(command)) {
     if (!rest[0])
       throw new Error(`Usage: npm run social -- ${command} <photo>`);
-    const pick = await setFlag(store, rest[0], (shot) => {
+    const pick = await setFlag(stores.photos, rest[0], (shot) => {
       if (command === "skip") {
         shot.skip = true;
         if (rest[1]) shot.note = rest.slice(1).join(" ");
@@ -168,8 +187,9 @@ async function main() {
     const done = {
       approve: "Approved it.",
       skip: "Skipped it. It won't be posted.",
-      unskip: "Unskipped it. The next catalog run puts it back in the plan.",
-      redraft: "The next catalog run rewrites its caption.",
+      unskip:
+        "Unskipped it. The next Photo captions run puts it back in the plan.",
+      redraft: "The next Photo captions run rewrites its post.",
     }[command];
     console.log(`${pick}: ${done}`);
     return;
@@ -177,13 +197,13 @@ async function main() {
   if (command === "retry") {
     if (!rest[0])
       throw new Error("Usage: npm run social -- retry <photo> | --all");
-    const catalog = (await store.readJson("catalog.json"))?.data ?? {
+    const catalog = (await stores.photos.readJson("catalog.json"))?.data ?? {
       shots: {},
     };
     const key = rest[0] === "--all" ? null : findShot(catalog, rest[0])[0];
     let cleared = 0;
     await updateJson(
-      store,
+      stores.social,
       "ledger.json",
       (l) => {
         l.failed = l.failed ?? {};

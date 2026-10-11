@@ -1,15 +1,13 @@
 /**
- * Settings for the social auto-poster, read from the environment.
+ * Settings for the Instagram poster, read from the environment.
  *
  * Nothing here is secret or account-identifying. Secrets (the access token, the
  * at-rest key, model API keys) are read where they're used and never logged.
  * See docs/social.md for what each variable does.
  */
-import { readFileSync, readdirSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { photoSettings, siteDomain } from "../photos/settings.mjs";
 
-export const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+export { ROOT, siteDomain, siteOwner } from "../photos/settings.mjs";
 
 /**
  * Default posting times by posts-per-day, in the configured time zone.
@@ -61,43 +59,6 @@ function spread(count) {
   });
 }
 
-/** Public site domain, read from site.config.ts so captions point at the right place. */
-export function siteDomain() {
-  return siteConfigValue("domain");
-}
-
-/** The photographer's name, already public in site.config.ts. */
-export function siteOwner() {
-  return siteConfigValue("ownerName") || "the photographer";
-}
-
-/** The iNaturalist login the hobby pages already link to, if any. */
-export function hobbyInatUser() {
-  try {
-    const dir = join(ROOT, "src/content/hobbies");
-    for (const file of readdirSync(dir)
-      .filter((f) => f.endsWith(".json"))
-      .sort()) {
-      const match = /"userId":\s*"([^"]+)"/.exec(
-        readFileSync(join(dir, file), "utf8"),
-      );
-      if (match) return match[1];
-    }
-  } catch {
-    // No hobbies section; iNaturalist matching stays off unless configured.
-  }
-  return "";
-}
-
-function siteConfigValue(field) {
-  try {
-    const text = readFileSync(join(ROOT, "site.config.ts"), "utf8");
-    return new RegExp(`${field}:\\s*["']([^"']+)["']`).exec(text)?.[1] ?? "";
-  } catch {
-    return "";
-  }
-}
-
 export function loadSettings(env = process.env) {
   const postsPerDay = int(env.SOCIAL_POSTS_PER_DAY, 3, 1, 6);
   return {
@@ -120,9 +81,7 @@ export function loadSettings(env = process.env) {
     /** Border colour for padded frames: "auto" picks black or white from the photo's edges. */
     padColor: env.SOCIAL_PAD_COLOR || "auto",
     minWidth: int(env.SOCIAL_MIN_WIDTH, 1080, 320, 4000),
-    inatUser:
-      env.SOCIAL_INATURALIST_USER || env.INATURALIST_USER || hobbyInatUser(),
+    ...photoSettings(env),
     domain: env.SOCIAL_SITE_DOMAIN || siteDomain(),
-    storageAccount: env.AZURE_STORAGE_ACCOUNT || "",
   };
 }

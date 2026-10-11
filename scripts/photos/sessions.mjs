@@ -1,7 +1,7 @@
 /**
  * Where the photos come from.
  *
- * In CI the poster reads the same resolved index the admin panel uses
+ * In CI the pipeline reads the same resolved index the admin panel uses
  * (metadata/admin-index.json, written by prebuild) and fetches originals from
  * their public URLs, so it never needs the multi-gigabyte prebuild cache.
  * Locally (--local) it reads the sessions prebuild already wrote to
@@ -17,6 +17,8 @@ export async function loadSessionsFromIndex(store) {
   );
   return (index.sessions ?? []).map((s) => ({
     slug: s.slug,
+    // The originals/ folder, which is where the session's _session.json lives.
+    prefix: s.prefix ?? s.slug,
     title: s.title ?? s.slug,
     date: s.date ?? "",
     location: s.location ?? "",
@@ -39,6 +41,7 @@ export async function loadSessionsLocal(root) {
     const s = JSON.parse(await readFile(join(dir, f), "utf8"));
     out.push({
       slug,
+      prefix: slug,
       title: s.title ?? slug,
       date: s.date ?? "",
       location: s.location ?? "",

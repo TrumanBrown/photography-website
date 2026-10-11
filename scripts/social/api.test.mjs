@@ -2,9 +2,9 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createClient } from "./instagram.mjs";
-import { _resetSecrets, redact, registerSecret } from "./redact.mjs";
+import { _resetSecrets, redact, registerSecret } from "../photos/redact.mjs";
 import { fingerprint, keyFromBase64, seal, unseal } from "./seal.mjs";
-import { ConflictError, localStore, updateJson } from "./store.mjs";
+import { ConflictError, localStore, updateJson } from "../photos/store.mjs";
 import { resolveToken } from "./token.mjs";
 import {
   askJson,
@@ -12,7 +12,7 @@ import {
   modelFor,
   providerFor,
   retryDelay,
-} from "./model.mjs";
+} from "../photos/model.mjs";
 
 const TOKEN = "IGAAtesttoken1234567890";
 

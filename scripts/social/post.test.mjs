@@ -1,10 +1,10 @@
 import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { localStore } from "./store.mjs";
+import { localStore } from "../photos/store.mjs";
 import { loadSettings } from "./settings.mjs";
 import { runPost } from "./post.mjs";
-import { _resetSecrets } from "./redact.mjs";
+import { _resetSecrets } from "../photos/redact.mjs";
 
 // Wednesday 2026-10-14, Los Angeles (UTC-7).
 const at = (day, hhmm) => new Date(`${day}T${hhmm}:00-07:00`);

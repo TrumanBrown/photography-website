@@ -29,13 +29,13 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { ROOT, loadSettings } from "./settings.mjs";
-import { blobStore, localStore, updateJson } from "./store.mjs";
+import { blobStore, localStore, updateJson } from "../photos/store.mjs";
 import { IN_FLIGHT, decide, localParts, previousDay } from "./schedule.mjs";
 import { isPostable, planQueue } from "./plan.mjs";
 import { resolveToken } from "./token.mjs";
 import { createClient } from "./instagram.mjs";
 import { renderForInstagram } from "./render.mjs";
-import { info, redact, registerSecret } from "./redact.mjs";
+import { info, redact, registerSecret } from "../photos/redact.mjs";
 
 const dayFile = (day) => `days/${day}.json`;
 const STALE_CLAIM_MS = 20 * 60 * 1000;
@@ -101,8 +101,8 @@ function userTagsFor(config, shot) {
   }));
 }
 
-async function nextShot(store, settings, busy) {
-  const catalog = (await store.readJson("catalog.json"))?.data;
+async function nextShot(store, photos, settings, busy) {
+  const catalog = (await photos.readJson("catalog.json"))?.data;
   if (!catalog) return null;
   const queue = (await store.readJson("queue.json"))?.data?.items ?? [];
   const ledger = (await store.readJson("ledger.json"))?.data ?? emptyLedger();
@@ -207,6 +207,8 @@ async function reconcile({ store, client, day, today, now }) {
 export async function runPost({
   settings,
   store,
+  // Where the photo catalog lives (metadata/photos/); the poster's own state is in `store`.
+  photos = store,
   makeClient,
   env = process.env,
   now = new Date(),
@@ -276,7 +278,7 @@ export async function runPost({
   }
 
   const busy = busyShots([yesterdayRec, todayRec]);
-  const pick = await nextShot(store, settings, busy);
+  const pick = await nextShot(store, photos, settings, busy);
   if (!pick) {
     log("Nothing is ready to post.");
     if (settings.live)
@@ -423,7 +425,10 @@ async function main() {
   const settings = loadSettings();
   const store = local
     ? localStore(join(ROOT, ".cache/social/state"))
-    : await blobStore({ account: settings.storageAccount });
+    : await blobStore({ account: settings.storageAccount, prefix: "social/" });
+  const photos = local
+    ? localStore(join(ROOT, ".cache/photos/state"))
+    : await blobStore({ account: settings.storageAccount, prefix: "photos/" });
   if (process.env.IG_USER_ID) registerSecret(process.env.IG_USER_ID);
   const makeClient = (token) =>
     createClient({
@@ -449,6 +454,7 @@ async function main() {
   const result = await runPost({
     settings,
     store,
+    photos,
     makeClient,
     force,
     readImage,
