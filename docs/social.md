@@ -1,109 +1,340 @@
-# Social posting: daily Instagram posts from the archive
+# Instagram posting: a few photos a day, automatically
 
-> Audience: the site owner setting this up, or anyone recreating the site with their own account. Nothing in this repository says which account it posts to, and nothing it logs does either.
+> For the site owner setting this up (or setting it up again), and for anyone recreating the site with their own account. Nothing in this repository, its workflow logs or its docs says which Instagram account it posts to.
 
-Two GitHub Actions workflows post photographs from the site to an Instagram professional account, a few a day, until every photograph has gone out once:
-
-- **[Social catalog](../.github/workflows/social-catalog.yml)** runs nightly. It fingerprints new photos, matches animals to your iNaturalist observations, has a vision model draft each post, and plans the next week.
-- **[Social post](../.github/workflows/social-post.yml)** fires every half hour and publishes the next planned photo whenever one of the day's slots is due.
-
-Both are off until you set the `SOCIAL_ENABLED` repository variable to `true`, and nothing is published until `SOCIAL_LIVE` is `true` too.
+- [What it does](#what-it-does)
+- [What runs automatically](#what-runs-automatically)
+- [What stays private](#what-stays-private)
+- [First-time setup](#first-time-setup) (step by step, with where each step happens)
+- [Day to day](#day-to-day)
+- [Setting it up again](#setting-it-up-again)
+- [Settings](#settings)
+- [How each post is made](#how-each-post-is-made)
+- [Reliability and failures](#reliability-and-failures)
+- [Troubleshooting](#troubleshooting)
+- [Optional extras](#optional-extras)
 
 ---
+
+## What it does
+
+- Posts photographs from the site to one Instagram account: **3 a day** by default, at 08:30, 12:30 and 18:00 Pacific.
+- **Never posts the same photograph twice**, even when it exists as several files (crops, re-exports, copies in two sessions), and never re-posts anything already on the account.
+- Posts the **whole frame at Instagram's full resolution** (1440 px wide). It never crops. Frames too tall or too wide for Instagram get plain borders instead.
+- **Writes each caption from the photo itself**: what's in the frame, where it is, the camera and lens, alt text, and five hashtags. For animals it uses **your own iNaturalist identification of that exact photo**.
+- **Picks up new sessions on its own**, the night after they appear on the site.
+- Runs entirely in **GitHub Actions**. Nothing has to run on your computer.
+
+## What runs automatically
+
+| When | Where | What happens |
+|---|---|---|
+| Every night, about 3 am Pacific | **Social catalog** workflow | Finds photos new to the site, fingerprints them, matches animals to your iNaturalist observations, writes their captions with the vision model, checks what's already on the Instagram account, and plans the next 7 days of posts |
+| Every 30 minutes, about 7 am to midnight Pacific | **Social post** workflow | Checks whether one of today's posting slots is due. If it is, publishes the next planned photo. Most runs find nothing due and finish in seconds |
+| Once a week | inside Social post | Renews the Instagram access token, so it never reaches its 60-day expiry |
+| The morning after a day with no post | inside Social post | Fails one run on purpose, so GitHub emails you |
+| After 45 days without a commit | inside Social post | Makes an empty commit. GitHub switches off scheduled workflows in public repositories after 60 days without one |
+
+Two switches, both repository variables:
+
+- `SOCIAL_ENABLED=true` lets both workflows run at all.
+- `SOCIAL_LIVE=true` lets them actually publish. Without it everything happens (captions, planning, rendering the image) except the post itself. That's the **dry run**.
 
 ## What stays private
 
 | Thing | Where it lives | Public? |
 |---|---|---|
-| Which account it posts to, and the access token | GitHub secrets, plus a sealed copy in the private `metadata` container | No |
-| Catalog, captions, plan, posting history | `metadata/social/*` (the private container) | No |
-| The images sent to Instagram | Uploaded to the private container, handed to Meta as a link that expires after two hours, deleted after posting | No |
-| Workflow logs | Public, like every Actions log in a public repo | Yes, but they only contain counts and generic messages. Errors go through [redact.mjs](../scripts/social/redact.mjs), which strips tokens, account and media ids, signed URLs and provider ids |
-| The code and these docs | This repository | Yes, by design: it's how anyone else could set up the same thing |
+| Which account, and its access token | GitHub secrets, plus an encrypted copy in the private `metadata` storage container | No |
+| Captions, the posting plan, posting history | `metadata/social/` in the private container | No |
+| The images sent to Instagram | Uploaded to the private container, given to Instagram as a link that expires after two hours, deleted after posting | No |
+| Workflow logs | Public, like every Actions log in a public repository | Yes, but they only contain counts and generic messages. Errors pass through [redact.mjs](../scripts/social/redact.mjs), which strips tokens, account and media ids, signed links and provider ids |
+| This code and these docs | The repository | Yes, by design |
 
-One honest limit: the same photographs are public on the site and on Instagram, so a reverse image search could connect the two. The repository just won't be what gives it away.
+Someone reading the repository can tell the feature exists (the workflow runs are visible), but not which account it posts to. The same photographs are public on the site and on Instagram, so a reverse image search could still connect them. The repository just won't be what gives it away.
 
 ---
 
-## How a post is built
+## First-time setup
 
-### 1. Which photo
+About 30 minutes. Each step says **where** it happens: the Instagram app, the Meta developer site, or your terminal.
 
-The archive holds crops, `-1` re-exports, `.JPG`/`.JPEG` pairs and the same frame copied into two sessions. "Never post the same photo twice" therefore works on **shots** (one shutter press), keyed by camera model plus the capture time recorded in EXIF. Files without a capture time fall back to a perceptual fingerprint. Anything already on the account, posted before this existed or by hand later, is fingerprinted and excluded.
+You'll need:
 
-Order isn't chronological. Each next post is the best-scoring shot that doesn't repeat something recent:
+- the Instagram account you want to post to
+- a Meta login for the developer site (step 2; it can be unrelated to the Instagram account)
+- the GitHub CLI (`gh`), signed in with access to this repository. Anything done with `gh` here can also be done in the browser, under the repository's **Settings → Secrets and variables → Actions**.
+
+Meta renames buttons and moves menus around fairly often. The names below are what the screens said in October 2026.
+
+### Step 1. Make the Instagram account professional
+
+**Where: the Instagram app on your phone, signed in as the account you'll post to.**
+
+1. Profile → ☰ menu → **Settings and activity → Account type and tools → Switch to professional account → Creator**.
+2. Keep the account public.
+3. Under **Account privacy**, leave "Allow public photos and videos to appear in search engine results" turned on. Google can then index the posts.
+
+The account stays an ordinary Instagram account. It doesn't need a Facebook account or a Facebook Page.
+
+### Step 2. Sign in to Meta for Developers
+
+**Where: https://developers.facebook.com, in a browser.**
+
+Any Meta login works, and it **doesn't have to be related to the Instagram account**. The two only get linked privately, in steps 5 and 6.
+
+- **Create new account** makes a Meta account from just an email address, with no Facebook account. Meta sends a code to verify it. This keeps the developer login completely separate from the Instagram account.
+- **Continue with Facebook** also works if you'd rather use an existing Facebook account.
+
+### Step 3. Create the app
+
+**Where: developers.facebook.com → My Apps → Create app.**
+
+1. Give it any name. It's never shown publicly.
+2. Use case: tick **only** "Manage messaging & content on Instagram".
+3. Business portfolio: choose **"I don't want to connect a business portfolio yet"**.
+4. Finish creating it, and leave it **unpublished**. An unpublished (development mode) app can post to accounts you add as testers, without going through Meta's App Review.
+
+### Step 4. Add the two permissions
+
+**Where: in the app's left sidebar → Use cases → "Manage messaging & content on Instagram" → Customize → Permissions and features.**
+
+Click **Add** next to:
+
+- `instagram_business_basic`
+- `instagram_business_content_publish`
+
+Do this before step 6. A token only gets the permissions that were added when it was created.
+
+Two things in the sidebar look relevant but aren't:
+
+- **Testing** shows API test calls. It isn't where setup happens.
+- **Facebook Login for Business** (Settings, Quickstart, Configurations…) is added to new apps automatically and belongs to the other kind of setup. Leave it alone.
+
+### Step 5. Make the Instagram account a tester
+
+1. **Where: in the app's left sidebar → App roles → Roles → Add People.**
+   Choose **Instagram Tester**, enter the Instagram username, and click Add. It shows as *Pending*.
+2. **Where: https://www.instagram.com/accounts/manage_access/, signed in as the Instagram account → Tester Invites tab.**
+   Click **Accept**. The phone app has the same thing under Settings → Website permissions → Apps and websites → Tester invites, but the website is more reliable.
+
+### Step 6. Generate the access token
+
+**Where: in the app → Use cases → "Manage messaging & content on Instagram" → Customize → API setup with Instagram login.**
+
+This page is on the developer site, not on Instagram.
+
+1. Click the heading **"1. Generate access tokens"** to expand it. The steps on this page are fold-out sections, and the button is inside.
+2. Click **Add account**. A popup asks you to log in to **Instagram**, as the account you'll post to.
+3. Instagram shows a permissions screen. Allow only what posting needs:
+
+   | Toggle | Set to |
+   |---|---|
+   | Allow access to messages | Off |
+   | View profile and access media (required) | On (can't be changed) |
+   | Access and manage comments | Off |
+   | Access and manage messages | Off |
+   | **Access and publish content** | **On** |
+   | Access and manage insights | Off |
+
+4. Click **Allow**. Back on the developer site, the account now appears in the list. Click **Generate token** next to it, and **copy the token straight away**. It's only shown once.
+
+The other steps on that page (webhooks, business login setup, App Review) aren't needed.
+
+### Step 7. Store the token and an encryption key
+
+**Where: a terminal, in this repository.**
+
+```bash
+gh secret set IG_ACCESS_TOKEN                               # paste the token when it asks
+openssl rand -base64 32 | gh secret set SOCIAL_SECRET_KEY   # a random key; you never need to see it
+```
+
+Paste the token only into that prompt, never into a file, chat or issue.
+
+The token lasts 60 days. The post workflow renews it every week and keeps the renewed copy in private storage, encrypted with `SOCIAL_SECRET_KEY`.
+
+### Step 8. Give it a model to write captions
+
+The captions are written by the same Azure OpenAI deployment the site build uses for session descriptions, with no API key. The workflow signs in to Azure the same way the site build does, and that sign-in is the credential.
+
+- **If that deployment exists** (the Infra workflow with `enableDescribeModel`; see [Turning it on](../README.md#turning-it-on) in the README), the repository variables `AZURE_OPENAI_ENDPOINT` and `AZURE_OPENAI_DEPLOYMENT` are already set. Check with `gh variable list`. There's nothing else to do.
+- **Otherwise**, use an API key instead: `gh secret set SOCIAL_OPENAI_API_KEY` (or `SOCIAL_ANTHROPIC_API_KEY`).
+
+### Step 9. Turn it on, still as a dry run, and caption the archive
+
+**Where: a terminal.**
+
+```bash
+gh variable set SOCIAL_ENABLED --body true
+gh workflow run social-catalog.yml -f limit=800   # captions the whole archive
+```
+
+The first catalog run takes roughly an hour for 800 photos. Watch it under the repository's **Actions → Social catalog**; the log only shows counts. From now on the nightly run handles new photos (60 a night by default).
+
+The Social post workflow also starts running now, in dry-run mode. At each slot it picks and renders a photo, then stops short of publishing.
+
+### Step 10. Read what it's going to post
+
+**Where: your computer, signed in to Azure with `az login`.**
+
+```bash
+export AZURE_STORAGE_ACCOUNT=<storage account>   # the part of blobHost in site.config.ts before .blob.core.windows.net
+npm run social -- status     # how many are ready, and roughly when the archive runs out
+npm run social -- preview    # writes .cache/social/preview.html: the next week of posts, with photos
+```
+
+Open `.cache/social/preview.html` in a browser. It never leaves your machine. To keep a photo from ever being posted, run `npm run social -- skip DSC01234`.
+
+### Step 11. Go live
+
+```bash
+gh variable set SOCIAL_LIVE --body true
+```
+
+The next due slot publishes. To post one immediately: **Actions → Social post → Run workflow**, tick **force**.
+
+---
+
+## Day to day
+
+Nothing needs doing. New sessions are captioned overnight and join the plan.
+
+When you want to steer it, these run on your computer (with `az login` and `AZURE_STORAGE_ACCOUNT` set, as in step 10):
+
+| Command | What it does |
+|---|---|
+| `npm run social -- status` | Counts, and roughly when the archive runs out |
+| `npm run social -- preview` | The next week of posts as a local web page |
+| `npm run social -- skip DSC01234 [why]` | Never post this shot |
+| `npm run social -- unskip DSC01234` | Undo a skip |
+| `npm run social -- redraft DSC01234` | Rewrite its caption on the next catalog run |
+| `npm run social -- approve DSC01234` | Approve this exact caption (only matters with `SOCIAL_REQUIRE_APPROVAL=true`) |
+| `npm run social -- retry DSC01234` | Clear failed attempts so a photo can be tried again (`--all` for every photo) |
+
+`DSC01234` can be any unique part of a filename, or a full `session/file` id.
+
+To pause posting, set `SOCIAL_LIVE` to anything other than `true`. To stop everything, set `SOCIAL_ENABLED` to `false`.
+
+## Setting it up again
+
+For example after rebuilding the site, moving to a new repository or storage account, or the token expiring.
+
+| Piece | Where it lives | If it's lost or expired |
+|---|---|---|
+| Meta app | developers.facebook.com | Keeps working on its own. Only recreate it (steps 2–6) if it was deleted |
+| Access token | `IG_ACCESS_TOKEN` secret, plus the encrypted renewed copy in storage | Generate a new one (step 6) and set the secret again (step 7). A new secret always replaces the stored copy |
+| Encryption key | `SOCIAL_SECRET_KEY` secret | Make a new one (step 7). The stored copy can't be read without the old key, so the next run starts again from `IG_ACCESS_TOKEN` |
+| Captions, plan, history | `metadata/social/` in the site's storage account | The next catalog run rebuilds everything. Photos already on the account are recognised by their fingerprints and not posted again |
+| Caption model | Azure OpenAI deployment, plus the two `AZURE_OPENAI_*` variables | Re-run the Infra workflow (step 8) |
+| Switches and settings | Repository variables | Set `SOCIAL_ENABLED`, `SOCIAL_LIVE` and any [settings](#settings) again |
+
+The token stops working if the workflows were switched off for more than about 60 days, or if the app was removed from the Instagram account. Either way, redo steps 6 and 7.
+
+If you change to a different Instagram account, redo steps 1, 5, 6 and 7.
+
+## Settings
+
+Set these as **secrets** (masked in logs) or **variables** under Settings → Secrets and variables → Actions. Anything that identifies the account is a secret.
+
+| Name | Kind | Default | What it does |
+|---|---|---|---|
+| `IG_ACCESS_TOKEN` | secret | (required) | The Instagram token from step 6 |
+| `SOCIAL_SECRET_KEY` | secret | (required) | Encrypts the renewed token in storage (step 7) |
+| `SOCIAL_ENABLED` | variable | off | `true` lets the workflows run |
+| `SOCIAL_LIVE` | variable | off | `true` publishes; anything else is a dry run |
+| `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_DEPLOYMENT` | variables | set by Infra | Keyless caption model (step 8) |
+| `SOCIAL_OPENAI_API_KEY` / `SOCIAL_ANTHROPIC_API_KEY` | secret | none | Caption model by API key instead. Kept separate from the site build's keys |
+| `SOCIAL_MODEL` | variable | `gpt-6.1-sol` / `claude-sonnet-4-5` | Model name when using a key |
+| `SOCIAL_OPENAI_BASE_URL` | variable | OpenAI | Another OpenAI-compatible endpoint, used with `SOCIAL_OPENAI_API_KEY` |
+| `SOCIAL_POSTS_PER_DAY` | variable | `3` | 1 to 6 |
+| `SOCIAL_SLOTS` | variable | `08:30,12:30,18:00` | Posting times, comma-separated |
+| `SOCIAL_TIMEZONE` | variable | `America/Los_Angeles` | Time zone for the slots |
+| `SOCIAL_MIN_GAP_MINUTES` | variable | `150` | Minimum time between two posts |
+| `SOCIAL_DAY_END` | variable | `23:00` | No new posts after this time |
+| `SOCIAL_TALL_IMAGES` | variable | `pad` | `skip` leaves out frames that would need borders |
+| `SOCIAL_PAD_COLOR` | variable | `auto` | Border colour. `auto` picks black or white from the photo's edges |
+| `SOCIAL_REQUIRE_APPROVAL` | variable | off | `true` posts only captions you've approved |
+| `SOCIAL_INATURALIST_USER` | variable | the hobby pages' account | Which iNaturalist account to match against |
+| `IG_LOGIN_MODE`, `IG_USER_ID` | variable, secret | `instagram` | Only for the [Facebook Login setup](#location-tags-and-tagging-accounts) |
+
+---
+
+## How each post is made
+
+### 1. Choosing the photograph
+
+"Never twice" works on **shots**, meaning presses of the shutter, rather than files. A shot is identified by the camera model and the capture time recorded in the photo. Files without a capture time fall back to a fingerprint of the image. When a shot exists as several files, the one that fits Instagram without borders is posted, then the largest. Your own crops are used exactly as you made them.
+
+Each nightly run plans the next week. Each next post is the best-scoring shot that doesn't repeat something recent:
 
 - the same session isn't posted twice within a day
 - the same species isn't posted again within about five days
-- frames from the same burst aren't posted within about ten days
+- frames from the same burst aren't posted again within about ten days
+- the same location as the last post or two is penalised, so places rotate
 
-The score is the model's 1–10 "would this stop a scroll" rating, plus a bump for verified species and for sessions from the last 45 days, minus a little for repeating the previous post's kind of subject or place.
+The score is the model's 1–10 rating of how likely the frame is to stop someone scrolling, plus a bump for verified species and for sessions from the last 45 days.
 
-Shots are skipped automatically when they're under 1080 px wide, out of focus, or an identifiable person is the subject. You can skip anything else yourself (see [Day to day](#day-to-day)).
+Shots are skipped automatically when they're under 1080 px wide, out of focus, or an identifiable person is the subject.
 
-**Strikes.** Only a problem with the photo itself counts against it: Instagram rejecting the image, or a missing or unreadable file. Two strikes and the shot is left out until `npm run social -- retry`. An expired token, a rate limit or an outage never counts against a photo. It pauses posting for two hours and fails the run once that day, so you get one email rather than thirty.
+### 2. The image
 
-### 2. The image: full resolution, never cropped
+Instagram only accepts JPEGs between 4:5 (portrait) and 1.91:1 (landscape), at most 1440 px wide and 8 MB. Anything wider is shrunk on Instagram's side, so 1440 px is the most resolution a post can carry. [render.mjs](../scripts/social/render.mjs):
 
-Instagram's publishing API only accepts JPEGs between 4:5 (portrait) and 1.91:1 (landscape), at most 1440 px wide and 8 MB. Anything wider is downscaled on Instagram's side, so 1440 px is the most resolution a post can carry. [render.mjs](../scripts/social/render.mjs):
+- starts from the untouched original and turns it the right way up from its EXIF data, as the site does
+- sends it at 1440 px wide with high-quality resizing, and never enlarges it
+- sends a frame inside Instagram's limits whole, with nothing added
+- gives a frame outside them (mostly 2:3 portraits) **plain borders, never a crop**, black or white to match the photo's own edges
+- writes sRGB, 4:4:4 colour, JPEG quality 95, with camera metadata removed
 
-- starts from the untouched original and applies EXIF orientation, exactly like the site does
-- sends it at 1440 px wide with high-quality resampling, never upscaled
-- sends a frame that's already inside Instagram's allowed shape whole, with nothing added
-- gives a frame that's too tall (2:3 portraits) or too wide **plain borders, never a crop**, black or white to match the photo's own edges
-- writes sRGB, 4:4:4 chroma, quality 95, and strips camera metadata
+### 3. Animals: your iNaturalist observations
 
-Set `SOCIAL_TALL_IMAGES=skip` to leave out frames that would need borders instead.
+Every photo on your iNaturalist observations is fingerprinted once (a 128-bit image fingerprint). A site photo is treated as the photo on an observation when both of these hold:
 
-When the same shot exists as both your crop and the full frame, the version that needs no border is posted, then the largest. Your crops are used as you made them.
+- the fingerprints are within 14 bits of each other
+- the observation date is within a day of the capture date
 
-### 3. Is it an animal? iNaturalist
+When a date is missing, the fingerprints must be within 6 bits instead.
 
-If the hobby pages link to an iNaturalist account (or `SOCIAL_INATURALIST_USER` is set), every photo on that account's observations is fingerprinted once. A site photo whose fingerprint matches **and** whose observation date is within a day of the capture date is **that observation's photo**. Matching by time alone fails here: camera clocks in this archive were off by up to 18 hours in places, and dense survey nights produce false matches.
+Those numbers were measured on this archive. Different shots never came closer than 9 bits, and only same-day near-duplicates got that close. True copies sat within 16 bits, and 288 of 290 were observed within a day of capture. Matching by time alone fails here: some camera clocks were off by up to 18 hours, and busy survey nights produce false matches.
 
-Fingerprints are 128-bit. They were tuned on this archive:
-
-- **Different shots** never came closer than 9 bits, and only same-day near-duplicates got that close.
-- **True iNaturalist copies** sat within 16 bits, and 288 of 290 were observed within a day of capture.
-
-So a match needs at most 14 bits and agreeing dates, or at most 6 bits when a date is missing. The closest match always wins, and only near-ties are broken by "animal over the plant it sits on".
-
-When there's no exact-frame match, observations made within five minutes of the capture become candidates. The session's clock error is learned from its exact matches first. A candidate is only used if the vision model, shown both photos, is confident it's the same animal.
+When there's no fingerprint match, observations made within five minutes of the capture are offered to the vision model with both photos. One is only used if the model is confident it's the same animal. Each session's camera-clock error is learned from its fingerprint matches first.
 
 From the matched observation, [inat.mjs](../scripts/social/inat.mjs) takes:
 
-- the common and scientific name
+- the common and scientific names
 - the class, order and family
 - iNaturalist's Wikipedia summary
 - the global IUCN Red List status
 
-A species name is only ever used when the observation is **research grade at species rank or finer**. Anything else stays at group level ("a tree frog"), the same rule as the site's captions. As a backstop, every draft is checked against the full list of species you've recorded. A caption that names one of them without a verified ID for that photo is sent back. Identifications are re-checked on every catalog run, and a post whose ID changed is redrafted.
+A species name is only used when that observation is **research grade at species level or finer**. Anything else stays at group level ("a tree frog"), the same rule as the site's captions.
 
-Observation notes are deliberately ignored. On this account they're questions to identifiers ("Can someone help confirm this ID?"), not captions.
+As a second check, every caption is compared with the full list of species you've recorded on iNaturalist. A caption that names one without a verified identification for that photo goes back to be rewritten. Identifications are re-checked every night, and a caption whose identification changed is rewritten.
 
-### 4. Looking at the photo
+Observation notes aren't used. On this account they're questions to identifiers ("Can someone help confirm this ID?"), not captions.
 
-Every photo, animal or not, goes through a vision model. The simplest option is the site's own Azure OpenAI deployment (the Infra workflow's `enableDescribeModel`). Set the `AZURE_OPENAI_ENDPOINT` and `AZURE_OPENAI_DEPLOYMENT` repository variables and the workflow's Azure sign-in is the credential, so no API key exists anywhere and photos stay in your tenant. Otherwise set `SOCIAL_OPENAI_API_KEY` or `SOCIAL_ANTHROPIC_API_KEY`. The model receives:
+### 4. The vision model
+
+Every photo, animal or not, is described by a vision model ([model.mjs](../scripts/social/model.mjs)). It receives:
 
 - the photo, downscaled to 1280 px
 - the session title, location and your own session description
-- the camera and lens from EXIF, and the capture month
-- the iNaturalist facts above, when there are any
+- the camera, lens and capture month
+- the iNaturalist facts, when there are any
 - the site's voice rules from [site-copy.instructions.md](../.github/instructions/site-copy.instructions.md)
 
-It returns JSON:
+It returns:
 
-- what the subject is
+- the kind of subject
 - a few words on what it's doing
-- where it is
+- the place
 - a one-to-three-sentence description
 - alt text
-- an appeal score
-- a skip flag
+- a 1–10 appeal score
+- a skip flag for blurred or people shots
 
-Its rules: describe only what's visible; add at most one fact, and only from the supplied summary; and use place names only if they already appear in the session title or location.
+Its rules: describe only what's visible, add at most one fact (and only from the supplied summary), and use place names only if the session title or location already contains them.
 
-**Example, a mountain session.** Take a frame from "Sunrise, Mount Rainier National Park, July 2026" that actually shows a foggy meadow and a creek. The model writes what's in the frame ("Fog over a subalpine meadow and a winding creek"), not what the session is named after. It names Mount Rainier only because the session text does, and leans on your own description ("I started in fog down in the meadows…") for context. If it names a peak that isn't in the session text, the draft is rejected and rewritten.
+**Example, a mountain session.** In "Sunrise, Mount Rainier National Park, July 2026", one frame actually shows a foggy meadow and a creek. The model writes what's in the frame ("Fog over a subalpine meadow and a winding creek"), not what the session is named after. It names Mount Rainier only because the session text does, and borrows context from your own description. A draft that names a peak the session text doesn't mention is rejected and rewritten.
 
 ### 5. The caption
 
@@ -118,137 +349,86 @@ The rest of this set is on example.com, link in bio
 #boatbilledheron #birdsofinstagram #tortuguero #birdphotography #sonya6700
 ```
 
-- **First line:** keywords first, which is what Instagram search and Google read. Verified species get their scientific name, and places come from your session text.
+- **First line:** keywords first, because Instagram search and Google read it. Verified species get their scientific name too.
 - **Body:** written by the model under the rules above.
-- **IUCN line:** added by code when the global status is Near Threatened or worse.
-- **Gear line:** from EXIF.
-- **Pointer:** captions can't carry links, so it points to the link in the profile.
-- **Hashtags:** exactly five, built by [hashtags.mjs](../scripts/social/hashtags.mjs) from data, never invented:
+- **Red List line:** added when the global IUCN status is Near Threatened or worse.
+- **Gear line:** from the photo's EXIF data.
+- **Link line:** captions can't hold clickable links, so it points to the link in the profile.
+- **Alt text:** sent with every post. Instagram and Google both read it.
 
-| Slot | From | Example |
+**Hashtags:** exactly five, because Instagram allows no more since December 2025. They're built from data by [hashtags.mjs](../scripts/social/hashtags.mjs), never made up by the model:
+
+| Slot | Comes from | Example |
 |---|---|---|
 | Subject | Research-grade species, or a landmark named in the session | `#boatbilledheron` |
-| Community | iNat lineage (order, class) or the model's subject group | `#birdsofinstagram` |
+| Community | iNaturalist lineage, or the model's subject group | `#birdsofinstagram` |
 | Place | A place word from the session title or location | `#tortuguero` |
 | Genre | Lens and subject | `#birdphotography`, `#macrophotography` |
 | Gear | Camera body | `#sonya6700` |
 
-When the subject slot is empty (most landscapes), the broad region fills it (`#costarica`, `#pnw`).
+When there's no subject tag (most landscapes), the broad region takes the slot (`#costarica`, `#pnw`).
 
-The model also writes the **alt text**. It's sent with every post, and both Instagram and Google read it.
+**Checks before a caption is saved:**
 
-Every caption is checked before it's saved:
-
-- **Fixed automatically:** em dashes, emoji, exclamation marks and stray `#`/`@`.
-- **Rejected:** banned marketing words and ungrounded place names, followed by one redraft with the reason.
-- **Needs review:** a draft that still fails is marked and never posted unprompted.
+- **Fixed automatically:** em dashes, emoji, exclamation marks, and stray `#` or `@`.
+- **Rejected and rewritten once:** marketing words, place names that aren't grounded in the session, and unverified species names.
+- **Held back:** a caption that still fails is marked "needs review" and is never posted unprompted.
 
 ---
 
-## When it posts
+## Reliability and failures
 
-The default is three posts a day at 08:30, 12:30 and 18:00 Pacific, at least 2½ hours apart:
-
-| Variable | Default | Meaning |
-|---|---|---|
-| `SOCIAL_POSTS_PER_DAY` | `3` | 1–6 |
-| `SOCIAL_SLOTS` | per count | comma-separated `HH:MM` |
-| `SOCIAL_TIMEZONE` | `America/Los_Angeles` | |
-| `SOCIAL_MIN_GAP_MINUTES` | `150` | |
-| `SOCIAL_DAY_END` | `23:00` | no new posts after this |
-
-GitHub drops scheduled runs; this repository's hourly build fired about a fifth of the time. So the post workflow fires every half hour at off-peak minutes across the posting day. A dependency-free check ([due.mjs](../scripts/social/due.mjs)) ends most runs in seconds. Post *N* becomes due at slot *N* and stays due until it's done, so a dropped run just means the next one catches up.
+**Posting times.** GitHub drops many scheduled runs; this repository's hourly site build fired about a fifth of the time. So Social post fires every 30 minutes at off-peak minutes, and [due.mjs](../scripts/social/due.mjs) decides whether a post is due. Post *N* becomes due at slot *N* and stays due until it's done, so a dropped run only means the next one catches up.
 
 **Exactly once** ([post.mjs](../scripts/social/post.mjs)):
 
-- runs are serialised
-- each day has one private record, and a post is claimed in it with a conditional write before anything goes to Instagram
-- the media container id is saved before publishing, so a run that dies mid-publish is settled by the next one, which asks Instagram for the container's status
-- only `ERROR` or `EXPIRED` count as "not posted"; a status that can't be read keeps the slot blocked rather than risk a repeat
-- a shot that's posted or still in flight today or yesterday can't be picked again
+- runs never overlap
+- each day has one private record, and a post is claimed in it before anything is sent to Instagram
+- the Instagram "container" id is saved before publishing. If a run dies halfway, the next run asks Instagram what happened to it and finishes it
+- only an Instagram status of ERROR or EXPIRED counts as "not posted". An unknown status keeps the slot blocked rather than risk posting twice
+- a photo that's posted or still in progress today or yesterday can't be picked again
 
-**Missed days are loud.** A dropped schedule never fails on its own. The first run of the next day checks for yesterday's post and fails if there wasn't one, which makes GitHub email whoever last edited the cron line. It's one email per missed day.
+**Failures.**
 
-**Staying enabled.** Public repositories lose their schedules after 60 days without a commit. After 45 quiet days the post workflow makes an empty commit, which keeps both this and the site build alive.
+- **A problem with the photo itself** (Instagram rejecting the image, or a missing or unreadable file) counts as a strike against that photo. Two strikes and it's left out until `npm run social -- retry`.
+- **Anything else** (an expired token, a rate limit, an outage) never counts against a photo. Posting pauses for two hours and the run fails once that day, so you get one email rather than thirty.
 
----
+**Missed days.** A dropped schedule never fails on its own. So the first run each morning checks for yesterday's post and fails if there wasn't one, which makes GitHub email whoever last edited the schedule. That's one email per missed day.
 
-## Setup
+## Troubleshooting
 
-### 1. The Instagram account
+**During setup**
 
-1. Switch it to a **professional** account (Creator or Business): Settings → Account type and tools.
-2. Keep it public, and leave "Allow public photos and videos to appear in search engine results" on (Settings → Account privacy).
+- **No "Add account" button (step 6).** Click the "1. Generate access tokens" heading to expand it. Make sure the page is **API setup with Instagram login**, not "with Facebook login".
+- **The account isn't offered.** Check that it's a professional account (step 1) and that the tester invite was accepted (step 5). Then wait a couple of minutes and refresh.
+- **A guide says you need a Facebook Page.** That's only true for the other setup ([Facebook Login](#location-tags-and-tagging-accounts)), not this one.
+- **You can't find the setup pages.** They're all under **Use cases → Customize**, not under "Testing" or "Facebook Login for Business".
 
-### 2. A Meta app (pick one)
+**Once it's running**
 
-**A. Instagram Login (simplest, no Facebook Page)**
+- **An email says "No post was published yesterday".** Open that day's Social post runs. A failed post shows its (redacted) reason. If there are no runs at all, GitHub dropped them. That's rare across 30+ attempts a day, but if it keeps happening, trigger the workflow from a reliable timer (for example an Azure Logic App calling `workflow_dispatch`).
+- **The run reports an invalid or expired token.** Redo steps 6 and 7.
+- **Nothing is posting.**
+  - Check that `SOCIAL_ENABLED` and `SOCIAL_LIVE` are both `true`.
+  - Run `npm run social -- status` and check "Ready to post".
+  - Look for photos "left out after failing twice" in the same output.
+- **A caption is wrong.** Run `npm run social -- skip` or `npm run social -- redraft`. If the mistake came from the session's description, fix that in `/admin` first; the next site build passes it on.
 
-1. At developers.facebook.com create an app and add the Instagram product's **API setup with Instagram login**.
-2. Under App roles add the account as an **Instagram tester**, and accept the invite in Instagram (Settings → Website permissions → Apps and websites).
-3. On the API setup page, generate a token with `instagram_business_basic` and `instagram_business_content_publish`. It's long-lived (60 days); the workflow refreshes it weekly from then on.
-4. Leave the app in **Development** mode. App Review is only needed to serve other people's accounts.
+## Optional extras
 
-This setup **cannot add a location or tag other accounts** (Meta: "This API setup cannot access ads or tagging").
+### Location tags and tagging accounts
 
-**B. Facebook Login (adds location tags and tagged accounts)**
+The setup above ("Instagram Login") can't add a location to a post or tag other accounts in the photo. Meta's own docs say this setup "cannot access ads or tagging." Both are available through the **Facebook Login** setup instead:
 
 1. Link the Instagram account to a Facebook Page.
 2. Create a Business-type app with Facebook Login for Business and the Instagram API.
 3. Grant `instagram_basic`, `instagram_content_publish`, `pages_read_engagement` and `pages_show_list`.
-4. Use a token that doesn't expire: a Page token from a long-lived user token, or a system user token.
+4. Use a token that doesn't expire: a Page token, or a system user token.
 5. Set `IG_LOGIN_MODE=facebook` and add the account id as the `IG_USER_ID` secret.
 
-### 3. Secrets and variables
+The code supports both setups.
 
-Set these under Settings → Secrets and variables → Actions. Anything that identifies the account is a **secret**, because secrets are masked in logs and variables aren't.
-
-| Name | Kind | Needed | What |
-|---|---|---|---|
-| `IG_ACCESS_TOKEN` | secret | yes | The token from step 2. Pasting a new one replaces the stored copy |
-| `SOCIAL_SECRET_KEY` | secret | Instagram Login | 32 random bytes, `openssl rand -base64 32`. Seals the refreshed token at rest |
-| `IG_USER_ID` | secret | Facebook Login | The Instagram professional account id |
-| `AZURE_OPENAI_ENDPOINT` + `AZURE_OPENAI_DEPLOYMENT` | variables | one model option | Keyless Azure OpenAI (from the Infra workflow's outputs). Preferred |
-| `SOCIAL_OPENAI_API_KEY` or `SOCIAL_ANTHROPIC_API_KEY` | secret | one model option | Vision model by key instead. Separate from the site build's keys on purpose |
-| `SOCIAL_ENABLED` | variable | yes | `true` turns both workflows on |
-| `SOCIAL_LIVE` | variable | to publish | `true` publishes; anything else is a dry run |
-| `SOCIAL_MODEL` | variable | no | Model name for key-based providers (defaults: `gpt-6.1-sol` / `claude-sonnet-4-5`); Azure uses the deployment |
-| `SOCIAL_OPENAI_BASE_URL` | variable | no | Another OpenAI-compatible endpoint, used with `SOCIAL_OPENAI_API_KEY` |
-| `SOCIAL_INATURALIST_USER` | variable | no | Defaults to the login the hobby pages link to |
-| `SOCIAL_TALL_IMAGES` | variable | no | `pad` (default) or `skip` |
-| `SOCIAL_REQUIRE_APPROVAL` | variable | no | `true` posts only shots you've approved |
-| `IG_LOGIN_MODE` | variable | no | `instagram` (default) or `facebook` |
-
-The workflows reuse the site's OIDC login (`AZURE_*` secrets) to reach the private container. Nothing new is needed in Azure.
-
-### 4. First run
-
-1. Set `SOCIAL_ENABLED=true`, leaving `SOCIAL_LIVE` unset.
-2. Run **Social catalog** by hand with `limit` = `800` to caption the whole archive (roughly 30–60 minutes).
-3. Read the plan with `npm run social -- preview` (below), and skip anything you don't want.
-4. Set `SOCIAL_LIVE=true`. The next due slot publishes.
-
----
-
-## Day to day
-
-From your machine, after `az login`, with `AZURE_STORAGE_ACCOUNT` set:
-
-```bash
-npm run social -- status                 # counts, and roughly when the archive runs out
-npm run social -- preview                # .cache/social/preview.html: next week's posts with photos
-npm run social -- skip DSC01234 [why]    # never post this shot
-npm run social -- unskip DSC01234
-npm run social -- redraft DSC01234       # rewrite its caption on the next catalog run
-npm run social -- approve DSC01234       # approves this exact draft (SOCIAL_REQUIRE_APPROVAL=true)
-npm run social -- retry DSC01234         # clear failed attempts (or --all)
-```
-
-The preview is a local file and never leaves your machine. To post right away, run **Social post** with `force` ticked.
-
-Dry runs work without Azure or Instagram: `node scripts/social/catalog.mjs --local --provider mock` and `node scripts/social/post.mjs --local --force` use `src/content/sessions` and keep state in `.cache/social/state`.
-
-## Optional private settings
+### Private settings file
 
 `metadata/social/config.json` in the private container (upload it with Storage Explorer or `az storage blob upload`):
 
@@ -261,23 +441,27 @@ Dry runs work without Azure or Instagram: `node scripts/social/catalog.mjs --loc
 }
 ```
 
+- `linkLine` replaces the caption's last line before the hashtags.
 - `hubHashtags` puts a feature account's hashtag in the genre slot for that kind of subject.
-- `hubAccounts` (Facebook Login only) tags up to two feature accounts in the photo, which is how many curators find work.
-- `locations` (Facebook Login only) maps a session to a location's Facebook Page id.
+- `hubAccounts` tags up to two feature accounts in the photo, which is how many curators find work. Facebook Login only.
+- `locations` maps a session to a location's Facebook Page id. Facebook Login only.
 
-These stay private because they're strategy, not code.
+These live in private storage because they're strategy, not code.
+
+### Trying it without Azure or Instagram
+
+Both scripts can run locally against the sessions prebuild already downloaded, keeping state in `.cache/social/state`:
+
+```bash
+node scripts/social/catalog.mjs --local --provider mock   # mock captions, no model
+node scripts/social/post.mjs --local --force              # renders the next post to a local file
+```
 
 ## Cost
 
 | Item | Cost |
 |---|---|
 | GitHub Actions | Free on public repositories |
-| Vision model | One-time $1–15 for ~800 photos, then cents a month |
-| Blob | Cents |
+| Caption model | About $1–15 once for the whole archive, then cents a month |
+| Storage | Cents |
 | Instagram API | Free |
-
-## Troubleshooting
-
-- **"No post was published yesterday."** Open the workflow's runs for that day. A failed publish shows its (redacted) reason. If there are no runs at all, GitHub dropped them. That's rare across 30+ attempts, but if it keeps happening, start the workflow on a reliable timer (an Azure Logic App calling `workflow_dispatch`).
-- **Token errors.** Instagram Login tokens die after 60 days without a refresh, for example if the workflows were disabled. Generate a new one and paste it into `IG_ACCESS_TOKEN`.
-- **A caption is wrong.** Run `npm run social -- skip <photo>`, or `npm run social -- redraft <photo>` to have it rewritten on the next catalog run. If the mistake came from the session's description, fix that in `/admin` first; the next site build passes it on.
