@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   allowedNames,
+  backdropIn,
   captionFor,
   descriptionProblems,
   placeAfter,
@@ -12,6 +13,7 @@ import {
   sharedPhrase,
   slugPlace,
   speciesSubject,
+  withoutBackdrop,
 } from "./website.mjs";
 import { compileLexicon } from "./text.mjs";
 
@@ -510,6 +512,31 @@ describe("session descriptions", () => {
         },
       ).join(" "),
     ).toMatch(/open with "frogs"/);
+  });
+
+  it("won't describe the photo instead of the moment, and leaves it out of what the writer sees", () => {
+    for (const text of [
+      "Frogs on every leaf after dark, their orange toes bright against a nearly black background.",
+      "A heron by the canal, its bill sharp against blurred green water.",
+      "Snow on the face, with a bright foreground ridge in the light.",
+      "A basilisk on a branch, lit against the dark.",
+      "Basilisks on a branch, with leafy vegetation and water behind them.",
+      "A fritillary on wet stones with a dark shadow falling to the left.",
+      "A pika on a mossy rock, facing left.",
+      "Under direct flash, a poison dart frog on a leaf.",
+    ])
+      expect(check(text).join(" ")).toMatch(/describes the photo/);
+    expect(backdropIn("Waves break against the rocks below the trail.")).toBe(
+      null,
+    );
+    expect(backdropIn("We left the trail where the river turns.")).toBe(null);
+    expect(
+      withoutBackdrop(
+        "A dark brown bird faces right with one red foot raised. It has a raised crest and white flecks on its neck, against blurred green leaves and pale grass heads. The background is dark.",
+      ),
+    ).toBe(
+      "A dark brown bird with one red foot raised. It has a raised crest and white flecks on its neck.",
+    );
   });
 
   it("checks the shape of a drafted title", () => {

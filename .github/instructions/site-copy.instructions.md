@@ -32,6 +32,10 @@ thrown out rather than edited.
   four.
 - **Cut throat-clearing openers.** "Everything I've photographed in X, grouped in one
   place" says nothing. Lead with the thing itself.
+- **Describe the moment, not the photo.** "A red-eyed tree frog clinging to a stem", not
+  "clinging to a green stem against a dark background". No backgrounds, blur, framing,
+  which way something faces, or the flash. That's alt text talking; nobody describes their
+  own photo that way.
 - **No summarising clause at the end** that restates what was just said.
 - Prefer a real detail or an opinion over a balanced description. "There's no gentle
   way up it" and "which I did not expect" read as a person; "offering a variety of

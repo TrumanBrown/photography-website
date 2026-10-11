@@ -156,12 +156,13 @@ One text-only call per session ([website.mjs](../scripts/photos/website.mjs)) ge
 - every photo's caption, without the place
 - the identified species, with counts
 - the settings and the light seen across the session
-- the six best frames in more detail
+- the six best frames in more detail, with any background, blur or framing cut out first
 - the site's voice rules from [site-copy.instructions.md](../.github/instructions/site-copy.instructions.md)
 
 It writes 2 to 4 sentences in your voice, without repeating the title or date that sit right above it. Each session is given one of five shapes, picked from its folder name (lead with the standout photo, lead with the setting, two sentences only, and so on), so the archive doesn't read as one template thirty times. Before a description is used, it has to pass these checks (`descriptionProblems`):
 
 - no em dashes, emoji or banned marketing words
+- nothing that describes the photo rather than the moment: the background, the blur, the framing, which way something faces, the flash ("against a dark background", "facing left")
 - no species name that isn't identified in that session
 - no capitalised name that isn't in the session's own text, so no invented places
 - not opening with the same word as three other sessions
@@ -170,7 +171,7 @@ It writes 2 to 4 sentences in your voice, without repeating the title or date th
 
 A draft that fails goes back with the reasons, up to three times. If it still fails, the old description stays and `npm run photos -- status` says why.
 
-A description is only rewritten when the session's photos or identifications change, and only once every photo in the session has been analysed. A session with no title or location gets one drafted too, in the `Place, Region, Month Year` shape. A title or location that's already set is never changed.
+A description is only rewritten when the session's photos or identifications change, and only once every photo in the session has been analysed. One the pipeline wrote before a check existed is also rewritten if it breaks the photo-not-moment check, never one you edited. A session with no title or location gets one drafted too, in the `Place, Region, Month Year` shape. A title or location that's already set is never changed.
 
 ## Your edits win
 

@@ -428,6 +428,44 @@ export function captionFor({
 }
 
 /**
+ * Describing the photo rather than the moment: the background, the framing
+ * or the light. "against a dark background", "blurred leaves", "a bright
+ * foreground ridge", "facing left", "a shadow falling to the left", "under
+ * direct flash".
+ */
+const BACKDROP_WORDS =
+  /\b(?:backgrounds?|backdrops?|blurred|blurry|foreground|bokeh|out of focus)\b|\bagainst the dark\b|\b(?:behind|beyond) (?:it|them)\b|\b(?:faces|facing|turned|turning|pointing|extending|looking|leaning|angled|falling)\s+(?:to(?:ward)?s?\s+the\s+)?(?:left|right)\b|\bto the (?:left|right)\b|\b(?:under|in|with)\s+(?:the\s+|a\s+)?(?:direct\s+|bright\s+)?flash\b/i;
+
+/** The first phrase in `text` that describes the photo rather than the moment, or null. */
+export function backdropIn(text) {
+  return BACKDROP_WORDS.exec(String(text ?? ""))?.[0] ?? null;
+}
+
+/**
+ * A photo's stored description with the background and the framing left
+ * out, for the session description to draw on: "...on its neck, against
+ * blurred green leaves." becomes "...on its neck."
+ */
+export function withoutBackdrop(text) {
+  return String(text ?? "")
+    .split(/(?<=[.!?])\s+/)
+    .map((s) =>
+      s
+        .replace(/,?\s+(?:set\s+)?against\s+[^,.;]+/gi, "")
+        .replace(/,?\s+with\s+[^,.;]*\b(?:behind|beyond)\s+(?:it|them)\b/gi, "")
+        .replace(
+          /\s+(?:faces|facing|turned|turning|pointing|extending|looking|leaning|angled|falling)\s+(?:to(?:ward)?s?\s+the\s+)?(?:left|right)\b/gi,
+          "",
+        )
+        .replace(/\s+to(?:ward)?s?\s+the\s+(?:left|right)\b/gi, "")
+        .trim(),
+    )
+    .filter((s) => s && !backdropIn(s))
+    .map((s) => (/[.!?]$/.test(s) ? s : `${s}.`))
+    .join(" ");
+}
+
+/**
  * Everything the session description may draw on, condensed from its photos.
  * `shots` are catalog shots with analysis; `taxa` is the taxon cache.
  */
@@ -472,7 +510,7 @@ export function sessionDigest({ session, shots, taxa = {}, captions = [] }) {
   const highlights = [...analysed]
     .sort((x, y) => y.analysis.appeal - x.analysis.appeal)
     .slice(0, 14)
-    .map((s) => s.analysis.description)
+    .map((s) => withoutBackdrop(s.analysis.description))
     .filter(Boolean);
   const place = placeLabel(session);
   const tail = place ? `, ${place}` : null;
@@ -596,6 +634,7 @@ ${facts.join("\n")}
 
 How to write it:
 - ${shapeFor(session.slug)} Don't walk through the photos one by one.
+- Say what the animals are doing and what the place was like, the way you'd tell a friend. Never describe the photo itself: not the background, the blur or the framing ("against a dark background", "blurred leaves", "a bright foreground ridge", "with water behind them"), not which way something faces ("facing left", "head turned right"), not the flash or the shadows.
 - No filler: not "I also photographed", "There's also", "these frames", "this session".
 - First person where it fits. Plain, specific words, sentences of different lengths.
 - Common names mid-sentence are lowercase except proper nouns: "a turquoise-browed motmot", "an Ecuadorian hermit crab".
@@ -647,6 +686,11 @@ export function descriptionProblems(
   if (found.length) problems.push(`It ${found.join(", ")}.`);
   if (EXTRA_BANNED.test(text))
     problems.push(`It uses "${EXTRA_BANNED.exec(text)[0]}".`);
+  const backdrop = backdropIn(text);
+  if (backdrop)
+    problems.push(
+      `It describes the photo rather than the moment ("${backdrop}"). Say what the animals are doing or what the place is like instead.`,
+    );
   const opener = text
     .split(/\s+/)[0]
     ?.toLowerCase()

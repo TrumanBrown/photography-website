@@ -60,6 +60,7 @@ import {
 } from "./analyse.mjs";
 import {
   allowedNames,
+  backdropIn,
   captionFor,
   descriptionProblems,
   descriptionPrompt,
@@ -680,12 +681,16 @@ async function main() {
       current !== rec.written?.description &&
       current !== rec.description &&
       !args.overwrite;
+    // One written before a rule existed is rewritten once it breaks it
+    // (yours never are).
+    const broken = Boolean(backdropIn(rec.description ?? current));
     const redo =
       digest &&
       provider &&
       !yours &&
       (rec.facts !== facts ||
         !rec.description ||
+        broken ||
         (rec.redescribe ?? "") > (rec.at ?? ""));
     plans.push({
       session,
