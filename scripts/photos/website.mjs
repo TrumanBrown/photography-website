@@ -149,16 +149,24 @@ export function plural(name) {
 
 const capitalise = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 
-/** "Northwestern garter snake (Thamnophis ordinoides)", or "Two harbor seals (Phoca vitulina)". */
-export function speciesSubject(taxon, count = 1) {
+/**
+ * "Northwestern garter snake (Thamnophis ordinoides)", "Two harbor seals (Phoca
+ * vitulina)". A species with no English name is led by a plain word for what it
+ * is, so people searching for it can find it: "Jumping spider (Corythalia opima)".
+ */
+export function speciesSubject(taxon, count = 1, plain = "") {
   const common = displayName(taxon.common);
-  if (!common) return taxon.name;
+  const name = common || plain;
+  if (!name) return taxon.name;
   if (count >= 2) {
-    const many = plural(displayName(taxon.common, { midSentence: true }));
+    const one = common
+      ? displayName(taxon.common, { midSentence: true })
+      : plain.charAt(0).toLowerCase() + plain.slice(1);
+    const many = plural(one);
     const lead = count <= 10 ? `${NUMBER_WORDS[count]} ${many}` : many;
     return `${capitalise(lead)} (${taxon.name})`;
   }
-  return `${common} (${taxon.name})`;
+  return `${name} (${taxon.name})`;
 }
 
 /** Ranks worth a scientific name in brackets; "Bird (Aves)" says nothing useful. */
@@ -277,7 +285,14 @@ export function captionFor({
 
   let subject;
   if (level === "species") {
-    subject = speciesSubject(taxon, a.count);
+    // The model's plain word for it ("Jumping spider") stands in for a missing
+    // English name, unless it just repeats the scientific one.
+    const plain =
+      clean(a.subject, { ...ctx, first: true }) &&
+      !norm(a.subject).includes(norm(taxon.name))
+        ? a.subject
+        : (FALLBACK[a.group] ?? "");
+    subject = speciesSubject(taxon, a.count, plain);
   } else {
     subject = clean(a.subject, { ...ctx, first: true })
       ? a.subject

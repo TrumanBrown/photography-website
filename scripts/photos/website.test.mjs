@@ -79,6 +79,42 @@ describe("website captions", () => {
     expect(plural("finch")).toBe("finches");
   });
 
+  it("leads a species with no English name with a plain word for what it is", () => {
+    const opima = { name: "Corythalia opima", common: null, rank: "species" };
+    expect(speciesSubject(opima, 1, "Jumping spider")).toBe(
+      "Jumping spider (Corythalia opima)",
+    );
+    expect(speciesSubject(opima, 2, "Jumping spider")).toBe(
+      "Two jumping spiders (Corythalia opima)",
+    );
+    expect(speciesSubject(opima)).toBe("Corythalia opima");
+    const caption = captionFor({
+      analysis: look({
+        group: "spider",
+        subject: "Jumping spider",
+        scene: "on a fern",
+        conditions: "",
+      }),
+      taxon: opima,
+      session: crarc,
+    });
+    expect(caption).toBe(
+      "Jumping spider (Corythalia opima) on a fern, Guayacán",
+    );
+    // A subject that only repeats the scientific name falls back to the group word.
+    const repeated = captionFor({
+      analysis: look({
+        group: "spider",
+        subject: "Corythalia opima",
+        scene: "on a fern",
+        conditions: "",
+      }),
+      taxon: opima,
+      session: crarc,
+    });
+    expect(repeated).toBe("Spider (Corythalia opima) on a fern, Guayacán");
+  });
+
   it("brackets a coarser identification after the model's plain word for it", () => {
     const caption = captionFor({
       analysis: look({

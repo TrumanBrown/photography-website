@@ -85,6 +85,8 @@ Write 1 to 3 short sentences:
 - Start with something specific in the frame: colour, posture, texture, light, what it's on. Not "This photo shows".
 ${level && taxon.summary ? '- Then at most one fact from the reference summary, reworded plainly. If the summary is about the genus or family, say so ("Leaf frogs like this one..."). Add no facts that aren\'t in it.' : "- Add no facts beyond the ones above."}
 - Never state behaviour, rarity, seasons, habitat, distances, elevations or history that isn't given above.
+- Don't repeat what the first line already says (the name, the place, the date), and never mention how it was identified.
+- Taxonomy trivia isn't a fact worth adding: not who described it or when, and never "X belongs to the genus X". If the summary has nothing better, add no fact and stop after the description.
 - First person is fine when it fits, but don't invent what happened.
 - No hashtags, no @mentions, no emoji, no exclamation marks, no em dashes, no questions to the reader.
 

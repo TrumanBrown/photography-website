@@ -120,7 +120,7 @@ Built by code in [website.mjs](../scripts/photos/website.mjs), in this order:
 <subject> <scene> <conditions>, <place>
 ```
 
-- **Subject:** the iNaturalist name with its scientific name, counted when several are visible ("Two harbor seals (Phoca vitulina)"). Otherwise the model's plain subject.
+- **Subject:** the iNaturalist name with its scientific name, counted when several are visible ("Two harbor seals (Phoca vitulina)"). A species with no English name is led by the model's plain word for what it is, because that's what people search for: "Jumping spider (Corythalia opima)". Otherwise the model's plain subject.
 - **Place:** the first part of the session title ("Yellow Aster Butte"), left off when the subject already is the place.
 - **At most 125 characters,** the length screen readers and image search handle best. Conditions go first when it's too long, then the place.
 - **Light that only describes the flash** ("under bright direct light") is left out.

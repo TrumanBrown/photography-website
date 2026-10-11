@@ -547,14 +547,24 @@ async function main() {
       : null;
     const needTitle = !hasRealTitle(session);
     const needLocation = !session.location;
-    const inputs = digest
+    // A description is rewritten when what's known about its photos changes
+    // (a photo added or looked at again, an identification changed), not when
+    // the way captions are worded does.
+    const facts = complete
       ? sha({
           v: DESCRIPTION_VERSION,
-          digest,
-          needTitle,
-          needLocation,
+          shots: list
+            .map((s) => [
+              s.pick,
+              s.analysis?.at ?? null,
+              s.inat?.taxon ?? null,
+              s.analysis?.idCheck ?? null,
+            ])
+            .sort((x, y) => String(x[0]).localeCompare(String(y[0]))),
         })
       : null;
+    // Descriptions written before this was recorded were written for today's facts.
+    if (facts && !rec.facts && rec.description && rec.inputs) rec.facts = facts;
     const current = session.description ?? "";
     const yours =
       current &&
@@ -565,7 +575,7 @@ async function main() {
       digest &&
       provider &&
       !yours &&
-      (rec.inputs !== inputs ||
+      (rec.facts !== facts ||
         !rec.description ||
         (rec.redescribe ?? "") > (rec.at ?? ""));
     plans.push({
@@ -573,7 +583,7 @@ async function main() {
       rec,
       captions,
       digest,
-      inputs,
+      facts,
       redo,
       needTitle,
       needLocation,
@@ -655,7 +665,8 @@ async function main() {
       rec.description = accepted.description;
       if (accepted.title) rec.title = accepted.title;
       if (accepted.location) rec.location = accepted.location;
-      rec.inputs = plan.inputs;
+      rec.facts = plan.facts;
+      delete rec.inputs;
       rec.at = new Date().toISOString();
       delete rec.problem;
       countOpener(accepted.description);
