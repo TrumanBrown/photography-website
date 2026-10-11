@@ -771,24 +771,80 @@ async function main() {
       }
     }
 
+    const owner = siteOwner();
+    const pointer =
+      config.linkLine ??
+      (settings.domain
+        ? `The rest of this set is on ${settings.domain}, link in bio`
+        : "");
+
+    // Everything in a post that code decides. A post written from different
+    // parts (the caption rules changed, a hashtag rule, the link line) is
+    // rewritten the next time it's planned.
+    const partsFor = (s) => {
+      const file = catalog.files[s.pick];
+      const session = sessionOf(s.session);
+      const taxon = taxonOf(s);
+      const level = s.analysis.idCheck === "conflict" ? null : idLevel(taxon);
+      const headline = captionFor({
+        analysis: s.analysis,
+        taxon,
+        session,
+        lexicon,
+        place: placeLine(session, placeLabel(session)),
+        max: 220,
+      });
+      const hashtags = buildHashtags({
+        taxon,
+        speciesOk: level === "species",
+        group: s.analysis.group,
+        facts: file.facts,
+        session: { ...session, description: sessionNames(session) },
+        proposedPlace: s.analysis.placeTag,
+        landmark: s.analysis.landmark,
+        hubTags: config.hubHashtags ?? {},
+      });
+      const gear = gearLine(file.facts);
+      const basis = sha({
+        headline,
+        hashtags,
+        gear,
+        pointer,
+        iucn: level === "species" ? (taxon.iucn ?? null) : null,
+      });
+      return { file, session, taxon, level, headline, hashtags, gear, basis };
+    };
+
     // Where each shot stands for Instagram.
     for (const s of Object.values(shots)) {
       const file = catalog.files[s.pick];
       const level =
         s.analysis?.idCheck === "conflict" ? null : idLevel(taxonOf(s));
       s.speciesOk = level === "species";
+      const basis = s.analysis ? partsFor(s).basis : null;
       const stale =
         s.post &&
         (s.post.analysedAt !== s.analysis?.at ||
+          s.post.basis !== basis ||
           (s.redraft && s.redraft > (s.post.draftedAt ?? "")));
       if (stale) {
         delete s.post;
-        if (s.status === "ready" || s.status === "needs_review")
-          s.status = "new";
+        if (s.status === "ready") s.status = "new";
+      }
+      // A post that failed its checks gets another go once something changes.
+      if (
+        s.status === "needs_review" &&
+        (s.problemBasis !== basis ||
+          (s.redraft && s.redraft > (s.problemAt ?? "")))
+      ) {
+        s.status = "new";
+        delete s.problem;
       }
       delete s.skipReason;
-      if (!s.analysis) s.status = undefined;
-      else if (s.analysis.skip) {
+      if (!s.analysis) {
+        s.status = s.unreadable ? "skipped" : undefined;
+        if (s.unreadable) s.skipReason = "refused-by-the-model";
+      } else if (s.analysis.skip) {
         s.status = "skipped";
         s.skipReason = s.analysis.skip;
       } else if (s.analysis.idCheck === "conflict") {
@@ -824,12 +880,6 @@ async function main() {
       });
 
     // Write the posts the next week needs, then plan again around any that failed.
-    const owner = siteOwner();
-    const pointer =
-      config.linkLine ??
-      (settings.domain
-        ? `The rest of this set is on ${settings.domain}, link in bio`
-        : "");
     let items = plan();
     for (let round = 0; round < 2; round++) {
       const missing = items.filter((k) => !shots[k].post?.caption);
@@ -853,29 +903,8 @@ async function main() {
     });
 
     async function writePost(s) {
-      const file = catalog.files[s.pick];
-      const session = sessionOf(s.session);
-      const taxon = taxonOf(s);
-      const level = s.analysis.idCheck === "conflict" ? null : idLevel(taxon);
-      const headline = captionFor({
-        analysis: s.analysis,
-        taxon,
-        session,
-        lexicon,
-        place: placeLine(session, placeLabel(session)),
-        max: 220,
-      });
-      const hashtags = buildHashtags({
-        taxon,
-        speciesOk: level === "species",
-        group: s.analysis.group,
-        facts: file.facts,
-        session: { ...session, description: sessionNames(session) },
-        proposedPlace: s.analysis.placeTag,
-        landmark: s.analysis.landmark,
-        hubTags: config.hubHashtags ?? {},
-      });
-      const gear = gearLine(file.facts);
+      const { session, taxon, level, headline, hashtags, gear, basis } =
+        partsFor(s);
       let feedback = null;
       let finished = null;
       for (let attempt = 0; attempt < 2; attempt++) {
@@ -915,11 +944,14 @@ async function main() {
             appeal: s.analysis.appeal,
             taxon: level ? taxon.id : null,
             analysedAt: s.analysis.at,
+            basis,
             model,
             draftedAt: new Date().toISOString(),
           };
           s.status = "ready";
           delete s.problem;
+          delete s.problemBasis;
+          delete s.problemAt;
           ig.rendered++;
           return;
         }
@@ -927,6 +959,8 @@ async function main() {
       }
       s.status = "needs_review";
       s.problem = finished?.problem ?? "draft failed";
+      s.problemBasis = basis;
+      s.problemAt = new Date().toISOString();
       ig.review++;
     }
   }

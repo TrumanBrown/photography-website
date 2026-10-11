@@ -228,8 +228,15 @@ export async function runPost({
     ).data;
   }
 
+  // A dry run rehearses everything short of publishing when it can reach
+  // Instagram: the token (refreshed on schedule, so it can't lapse while you're
+  // still trying things out), the account's permission to publish, and Instagram
+  // fetching and accepting the image and caption. That needs the token and an
+  // image link Instagram can reach, so local dry runs skip it.
+  const rehearse =
+    !settings.live && store.kind === "blob" && Boolean(env.IG_ACCESS_TOKEN);
   let client = null;
-  if (settings.live) {
+  if (settings.live || rehearse) {
     const token = await resolveToken({
       settings,
       env,
@@ -241,8 +248,15 @@ export async function runPost({
     client = makeClient(token);
   }
 
+  // Only a live run settles posts in flight. A dry run never publishes anything.
   for (const day of [yesterday, today])
-    await reconcile({ store, client, day, today, now });
+    await reconcile({
+      store,
+      client: settings.live ? client : null,
+      day,
+      today,
+      now,
+    });
 
   // One email per missed day: a dropped schedule never fails on its own.
   // Only full days after going live count; the switch-on day may start late.
@@ -340,12 +354,34 @@ export async function runPost({
     await store.putMedia(media, rendered.buffer);
 
     if (!settings.live) {
+      let checked = "";
+      if (client) {
+        const limit = await client.publishingLimit();
+        // Made exactly as a real post is, then never published: Instagram lets
+        // an unpublished container expire on its own within a day.
+        const rehearsal = await client.createImageContainer({
+          imageUrl: await store.mediaUrl(media),
+          caption: pick.shot.post.caption,
+          altText: pick.shot.post.alt,
+          locationId: pick.locationId,
+          userTags: pick.userTags,
+        });
+        registerSecret(rehearsal);
+        const status = await client.waitUntilReady(rehearsal);
+        if (status !== "FINISHED") {
+          const e = new Error(`Instagram didn't accept the post (${status}).`);
+          e.photoProblem = status === "ERROR";
+          throw e;
+        }
+        await setAttempt({ rehearsed: true });
+        checked = ` Instagram accepted the image and caption, and the account can publish (${limit.used} of ${limit.total} posts used in the last 24 hours).`;
+      }
       log(
-        `Dry run: post ${n + 1} for today is ready (${rendered.width}x${rendered.height}${rendered.padded ? ", with borders" : ""}). ` +
+        `Dry run: post ${n + 1} for today is ready (${rendered.width}x${rendered.height}${rendered.padded ? ", with borders" : ""}).${checked} ` +
           'Nothing was published because SOCIAL_LIVE is not "true".',
       );
       keepMedia = store.kind === "local";
-      return { outcome: "dry-run", alert, media };
+      return { outcome: "dry-run", alert, media, rehearsed: Boolean(client) };
     }
 
     const limit = await client.publishingLimit();

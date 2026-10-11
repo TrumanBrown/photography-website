@@ -70,7 +70,10 @@ export async function blobStore({
   container = "metadata",
   prefix = "photos/",
 }) {
-  if (!account) throw new Error("AZURE_STORAGE_ACCOUNT is required.");
+  if (!account)
+    throw new Error(
+      "Set AZURE_STORAGE_ACCOUNT to your storage account's name: the part of blobHost in site.config.ts before .blob.core.windows.net.",
+    );
   const {
     BlobServiceClient,
     BlobSASPermissions,

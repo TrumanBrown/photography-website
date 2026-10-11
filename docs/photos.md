@@ -182,12 +182,12 @@ From then on it runs by itself.
 
 ## Day to day
 
-Nothing needs doing. These run on your computer, signed in with `az login` and with `AZURE_STORAGE_ACCOUNT` set to the storage account name (the part of `blobHost` in `site.config.ts` before `.blob.core.windows.net`):
+Nothing needs doing. These run on your computer, signed in with `az login`. The storage account is read from `blobHost` in `site.config.ts`; set `AZURE_STORAGE_ACCOUNT` only if yours is different.
 
 | Command | What it does |
 |---|---|
 | `npm run photos -- status` | What's analysed, matched and written, and any description that failed its checks |
-| `npm run photos -- preview [session]` | Writes `.cache/photos/preview.html`: every photo with its caption, and each description |
+| `npm run photos -- preview [session]` | Opens every photo with its caption, and each description, in your browser |
 | `npm run photos -- redo DSC01234` | Look at this photo again on the next run |
 | `npm run photos -- redo --session <slug>` | ...or every photo in a session |
 | `npm run photos -- redescribe <slug>` | Rewrite this session's description on the next run |

@@ -216,6 +216,71 @@ describe("runPost", () => {
     expect(await store.readJson("ledger.json")).toBeNull();
   });
 
+  it("rehearses a dry run with Instagram when it can, and never publishes it", async () => {
+    const client = fakeClient();
+    // Instagram can only fetch from real storage, so the rehearsal needs it.
+    const blobLike = {
+      ...store,
+      kind: "blob",
+      mediaUrl: async (name) => `https://storage.test/${name}`,
+    };
+    const dry = { ...settings, live: false };
+    const res = await runPost({
+      settings: dry,
+      store: blobLike,
+      makeClient: client.makeClient,
+      env,
+      now: at(TODAY, "08:35"),
+      readImage,
+      render,
+      log: () => {},
+    });
+    expect(res).toMatchObject({ outcome: "dry-run", rehearsed: true });
+    expect(client.log.filter((l) => l[0] === "create")).toHaveLength(1);
+    expect(client.log[0][1].imageUrl).toMatch(
+      /^https:\/\/storage\.test\/media\//,
+    );
+    const day = (await store.readJson(`days/${TODAY}.json`)).data;
+    expect(day.attempts[0]).toMatchObject({
+      state: "dry-run",
+      rehearsed: true,
+    });
+    expect(day.attempts[0].containerId).toBeUndefined();
+
+    // Going live later the same day neither publishes the rehearsal nor
+    // counts it as one of today's posts.
+    const live = await run(client, at(TODAY, "12:35"));
+    expect(live.outcome).toBe("published");
+    expect(client.log.filter((l) => l[0] === "publish")).toEqual([
+      ["publish", "c2"],
+    ]);
+  });
+
+  it("reports a rehearsal Instagram rejects without counting it against the photo", async () => {
+    const client = fakeClient({ readyStatus: "ERROR" });
+    const blobLike = {
+      ...store,
+      kind: "blob",
+      mediaUrl: async (name) => `https://storage.test/${name}`,
+    };
+    await expect(
+      runPost({
+        settings: { ...settings, live: false },
+        store: blobLike,
+        makeClient: client.makeClient,
+        env,
+        now: at(TODAY, "08:35"),
+        readImage,
+        render,
+        log: () => {},
+      }),
+    ).rejects.toThrow(/didn't accept the post \(ERROR\)/);
+    expect(client.log.some((l) => l[0] === "publish")).toBe(false);
+    expect((await store.readJson("ledger.json"))?.data?.failed ?? {}).toEqual(
+      {},
+    );
+  });
+
   it("doesn't blame the photo for an outage: pauses, and reports once a day", async () => {
     const client = fakeClient({
       limitError: "Error validating access token: Session has expired",

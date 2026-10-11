@@ -3,15 +3,16 @@
  * Private helper for the photo pipeline, run on your own machine.
  *
  *   npm run photos -- status                 what's analysed, matched and written
- *   npm run photos -- preview [session]      write .cache/photos/preview.html: every
- *                                            photo with its caption, and each description
+ *   npm run photos -- preview [session]      open every photo with its caption, and each
+ *                                            description, as a page in your browser
  *   npm run photos -- redo <photo>           look at this photo again on the next run
  *   npm run photos -- redo --session <slug>  ...or every photo in a session
  *   npm run photos -- redescribe <slug>      rewrite this session's description next run
  *
  * <photo> is a session/file id ("gunn-peak-june-2026/DSC01234.JPEG") or any
- * unique part of a filename. Reads private state with your `az login`
- * (AZURE_STORAGE_ACCOUNT must be set), or the trial state with --local.
+ * unique part of a filename. Reads private state with your `az login`, from
+ * the storage account in site.config.ts (or AZURE_STORAGE_ACCOUNT), or the
+ * trial state with --local.
  * The next run is the nightly one, or start it from the Actions tab
  * (Photo captions -> Run workflow).
  */
@@ -20,9 +21,13 @@ import { join } from "node:path";
 import { ROOT, photoSettings } from "./settings.mjs";
 import { blobStore, localStore, updateJson } from "./store.mjs";
 import { loadSessionsFromIndex } from "./sessions.mjs";
+import { showPage } from "./open.mjs";
 
 const local = process.argv.includes("--local");
-const args = process.argv.slice(2).filter((a) => a !== "--local");
+const openPage = !process.argv.includes("--no-open");
+const args = process.argv
+  .slice(2)
+  .filter((a) => a !== "--local" && a !== "--no-open");
 const [command, ...rest] = args;
 const settings = photoSettings();
 
@@ -124,7 +129,7 @@ figure{margin:0}img{width:100%;height:220px;object-fit:cover;background:#eee}fig
   const out = join(ROOT, ".cache/photos/preview.html");
   await mkdir(join(ROOT, ".cache/photos"), { recursive: true });
   await writeFile(out, html);
-  console.log(`Wrote ${out}`);
+  showPage(out, { open: openPage });
 }
 
 async function main() {
@@ -173,6 +178,13 @@ async function main() {
 }
 
 main().catch((e) => {
-  console.error(e.message ?? e);
+  const message = String(e?.message ?? e);
+  if (
+    /DefaultAzureCredential|CredentialUnavailable|AADSTS|az login/i.test(
+      message,
+    )
+  )
+    console.error("Sign in to Azure first with `az login`, then try again.");
+  console.error(message.split("\n")[0]);
   process.exit(1);
 });

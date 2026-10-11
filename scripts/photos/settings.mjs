@@ -47,10 +47,20 @@ function siteConfigValue(field) {
   }
 }
 
+/** "stphotoprodnowiur.blob.core.windows.net" in site.config.ts -> "stphotoprodnowiur". */
+export function storageAccountFromSite() {
+  return (
+    /^([a-z0-9]{3,24})\.blob\.core\.windows\.net$/.exec(
+      siteConfigValue("blobHost"),
+    )?.[1] ?? ""
+  );
+}
+
 export function photoSettings(env = process.env) {
   return {
     /** Whose iNaturalist observations count as the identification for a photo. */
     inatUser: env.INATURALIST_USER || hobbyInatUser(),
-    storageAccount: env.AZURE_STORAGE_ACCOUNT || "",
+    /** CI passes it in; on your own machine it's read from site.config.ts. */
+    storageAccount: env.AZURE_STORAGE_ACCOUNT || storageAccountFromSite(),
   };
 }

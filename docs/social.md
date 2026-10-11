@@ -38,7 +38,7 @@
 Two switches, both repository variables:
 
 - `SOCIAL_ENABLED=true` turns on the Instagram stage of Photo captions, and the Social post workflow.
-- `SOCIAL_LIVE=true` lets them actually publish. Without it everything happens (captions, planning, rendering the image) except the post itself. That's the **dry run**.
+- `SOCIAL_LIVE=true` lets them actually publish. Without it everything happens except the post itself. That's the **dry run**: at each slot it picks the photo, renders it, and hands the image and caption to Instagram exactly as a real post would, which proves the token works, the account can publish and Instagram accepts the post. Then it stops. Instagram throws an unpublished post away by itself within a day, and nobody sees it.
 
 ## What stays private
 
@@ -172,19 +172,20 @@ gh workflow run photos.yml   # plans the next week and writes those posts
 
 The photos are already analysed, so this run only checks the account, plans the next 7 days and writes those posts: a couple of minutes. Watch it under **Actions → Photo captions**; the log only shows counts. From now on the nightly run keeps a week of posts written ahead.
 
-The Social post workflow also starts running now, in dry-run mode. At each slot it picks and renders a photo, then stops short of publishing.
+The Social post workflow also starts running now, in dry-run mode: at each slot it rehearses a post with Instagram, then stops short of publishing. GitHub can take a few hours to start a new schedule, so run it once by hand to see a rehearsal straight away: **Actions → Social post → Run workflow** (leave **force** unticked). The log should end with "Instagram accepted the image and caption, and the account can publish".
 
 ### Step 10. Read what it's going to post
 
 **Where: your computer, signed in to Azure with `az login`.**
 
 ```bash
-export AZURE_STORAGE_ACCOUNT=<storage account>   # the part of blobHost in site.config.ts before .blob.core.windows.net
 npm run social -- status     # how many are ready, and roughly when the archive runs out
-npm run social -- preview    # writes .cache/social/preview.html: the next week of posts, with photos
+npm run social -- preview    # opens the next week of posts in your browser
 ```
 
-Open `.cache/social/preview.html` in a browser. It never leaves your machine. To keep a photo from ever being posted, run `npm run social -- skip DSC01234`.
+The preview shows each post in the order it'll go out, with its full caption and alt text, and the photo in the frame Instagram will use (whole, with borders where it doesn't fit). The page is written to `.cache/social/preview.html` and never leaves your machine. The storage account is read from `blobHost` in `site.config.ts`; set `AZURE_STORAGE_ACCOUNT` only if yours is different.
+
+To keep a photo from ever being posted, run `npm run social -- skip DSC01234`.
 
 ### Step 11. Go live
 
@@ -192,7 +193,7 @@ Open `.cache/social/preview.html` in a browser. It never leaves your machine. To
 gh variable set SOCIAL_LIVE --body true
 ```
 
-The next due slot publishes. To post one immediately: **Actions → Social post → Run workflow**, tick **force**.
+The next run publishes once a slot has passed. Switching on part-way through a day picks up from there: at 7:45 pm, say, the first post goes out at the next run and a second one 2½ hours later if that's still before 11 pm. To start with a full day instead, switch it on after 11 pm. To post one immediately: **Actions → Social post → Run workflow**, tick **force**.
 
 ---
 
@@ -200,12 +201,12 @@ The next due slot publishes. To post one immediately: **Actions → Social post 
 
 Nothing needs doing. New sessions are analysed soon after they go live and join the plan.
 
-When you want to steer it, these run on your computer (with `az login` and `AZURE_STORAGE_ACCOUNT` set, as in step 10):
+When you want to steer it, these run on your computer (signed in with `az login`, as in step 10):
 
 | Command | What it does |
 |---|---|
 | `npm run social -- status` | Counts, and roughly when the archive runs out |
-| `npm run social -- preview` | The next week of posts as a local web page |
+| `npm run social -- preview` | Opens the next week of posts in your browser (`--no-open` just writes the page) |
 | `npm run social -- skip DSC01234 [why]` | Never post this shot |
 | `npm run social -- unskip DSC01234` | Undo a skip |
 | `npm run social -- redraft DSC01234` | Rewrite its post on the next Photo captions run |
@@ -374,6 +375,7 @@ When there's no subject tag (most landscapes), the broad region takes the slot (
 
 **Once it's running**
 
+- **The Social post workflow has no runs at all.** GitHub can take hours to start a new schedule, and drops scheduled runs when it's busy. Run it once by hand (**Actions → Social post → Run workflow**). A post that's due stays due, so one run is enough to catch up.
 - **An email says "No post was published yesterday".** Open that day's Social post runs. A failed post shows its (redacted) reason. If there are no runs at all, GitHub dropped them. That's rare across 30+ attempts a day, but if it keeps happening, trigger the workflow from a reliable timer (for example an Azure Logic App calling `workflow_dispatch`).
 - **The run reports an invalid or expired token.** Redo steps 6 and 7.
 - **Nothing is posting.**

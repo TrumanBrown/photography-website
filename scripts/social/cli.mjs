@@ -3,7 +3,8 @@
  * Private helper for the social auto-poster, run on your own machine.
  *
  *   npm run social -- status              counts, and roughly when the archive runs out
- *   npm run social -- preview [count]     write .cache/social/preview.html with upcoming posts
+ *   npm run social -- preview [count]     open the upcoming posts as a page in your browser
+ *                                         (.cache/social/preview.html; --no-open just writes it)
  *   npm run social -- skip <photo> [why]  never post this shot
  *   npm run social -- unskip <photo>
  *   npm run social -- redraft <photo>     rewrite this post on the next Photo captions run
@@ -12,8 +13,8 @@
  *
  * <photo> is a session/file id ("gunn-peak-june-2026/DSC01234.JPEG") or any
  * unique part of a filename ("DSC01234"). Reads private state with your
- * `az login` (AZURE_STORAGE_ACCOUNT must be set), or the local dry-run state
- * with --local. Nothing here is uploaded anywhere except the catalog flags.
+ * `az login`, from the storage account in site.config.ts (or
+ * AZURE_STORAGE_ACCOUNT), or the local dry-run state with --local. Nothing here is uploaded anywhere except the catalog flags.
  *
  * The photo catalog (metadata/photos/) is shared with the website pipeline;
  * the poster's own ledger and queue live in metadata/social/.
@@ -23,9 +24,14 @@ import { join } from "node:path";
 import { ROOT, loadSettings } from "./settings.mjs";
 import { blobStore, localStore, updateJson } from "../photos/store.mjs";
 import { isPostable } from "./plan.mjs";
+import { canvasFor } from "./render.mjs";
+import { showPage } from "../photos/open.mjs";
 
-const args = process.argv.slice(2).filter((a) => a !== "--local");
+const args = process.argv
+  .slice(2)
+  .filter((a) => a !== "--local" && a !== "--no-open");
 const local = process.argv.includes("--local");
+const openPage = !process.argv.includes("--no-open");
 const [command, ...rest] = args;
 const settings = loadSettings();
 
@@ -92,9 +98,11 @@ async function status({ social, photos }) {
   const ready = shots.filter(
     ([k, s]) => isPostable(s) && !posted.has(k),
   ).length;
-  const waiting = shots.filter(
+  const open = shots.filter(
     ([k, s]) => (!s.status || s.status === "new") && !s.skip && !posted.has(k),
-  ).length;
+  );
+  const waiting = open.length;
+  const unanalysed = open.filter(([, s]) => !s.analysis).length;
   const left = ready + waiting;
   const days = Math.ceil(left / settings.postsPerDay);
   const end = new Date(Date.now() + days * 24 * 3600 * 1000)
@@ -103,12 +111,30 @@ async function status({ social, photos }) {
   console.log(`Shots: ${shots.length}`);
   console.log(`Posted: ${posted.size}`);
   console.log(`Ready to post: ${ready}`);
-  console.log(`Waiting to be analysed or written up: ${waiting}`);
+  console.log(
+    `Waiting their turn: ${waiting - unanalysed} (each post is written the week it's planned)`,
+  );
+  if (unanalysed)
+    console.log(
+      `Not analysed yet: ${unanalysed} (the next Photo captions run)`,
+    );
   console.log(
     `Needs review: ${shots.filter(([, s]) => s.status === "needs_review").length}`,
   );
+  const skipped = shots.filter(([, s]) => s.status === "skipped" || s.skip);
+  const why = {};
+  for (const [, s] of skipped) {
+    const reason = s.skip ? "skipped by you" : (s.skipReason ?? "other");
+    why[reason] = (why[reason] ?? 0) + 1;
+  }
   console.log(
-    `Skipped: ${shots.filter(([, s]) => s.status === "skipped" || s.skip).length}`,
+    `Skipped: ${skipped.length}${
+      skipped.length
+        ? ` (${Object.entries(why)
+            .map(([r, n]) => `${r.replaceAll("-", " ")} ${n}`)
+            .join(", ")})`
+        : ""
+    }`,
   );
   console.log(
     `Already on the account: ${shots.filter(([, s]) => s.blocked).length}`,
@@ -132,32 +158,47 @@ async function preview({ social, photos }, count) {
     return console.log(
       "No catalog yet. Run the Photo captions workflow first.",
     );
-  const card = (key) => {
+  const card = (key, i) => {
     const s = catalog.shots[key];
     const f = catalog.files[s.pick];
     const src = local
       ? `file://${join(ROOT, "src/content/sessions", f.session, "images", f.file)}`
       : f.url;
     const id = s.inat
-      ? `iNat ${s.inat.via} match, ${s.speciesOk ? "species named" : "group level"}`
-      : "no iNat match";
-    return `<article><img src="${escape(src)}" loading="lazy"><div>
-<p class="meta">${escape(s.pick)} · appeal ${escape(s.post?.appeal ?? "?")} · ${escape(id)} · ${escape(s.status)}${s.problem ? ` · ${escape(s.problem)}` : ""}</p>
+      ? `iNaturalist ${s.speciesOk ? "species" : "group-level"} ID`
+      : "no iNaturalist match";
+    // The photo inside the frame Instagram will show, borders and all.
+    const frame = canvasFor(f.width || 1, f.height || 1);
+    const number = i === undefined ? "" : `Post ${i + 1} · `;
+    const borders = frame.padded ? " · posted whole, with borders" : "";
+    return `<article><div class="frame" style="aspect-ratio:${frame.width}/${frame.height}"><img src="${escape(src)}" loading="lazy" alt=""></div><div>
+<p class="meta">${number}${escape(s.pick)} · appeal ${escape(s.post?.appeal ?? s.analysis?.appeal ?? "?")} · ${escape(id)}${borders}${s.problem ? ` · ${escape(s.problem)}` : ""}</p>
 <pre>${escape(s.post?.caption ?? "(no caption yet)")}</pre>
 <p class="alt"><b>Alt text:</b> ${escape(s.post?.alt ?? "")}</p></div></article>`;
   };
   const review = Object.keys(catalog.shots).filter(
     (k) => catalog.shots[k].status === "needs_review",
   );
+  const shown = queue.slice(0, count);
   const html = `<!doctype html><meta charset="utf-8"><title>Upcoming posts</title>
-<style>body{font:15px system-ui;margin:2rem;max-width:1100px}article{display:grid;grid-template-columns:340px 1fr;gap:1.2rem;margin:0 0 2rem}
-img{width:340px;height:auto;background:#eee}pre{white-space:pre-wrap;font:15px system-ui;margin:.4rem 0}.meta{color:#666;font-size:13px;margin:0}.alt{color:#444;font-size:13px}</style>
-<h1>Next ${Math.min(count, queue.length)} posts</h1>${queue.slice(0, count).map(card).join("\n")}
-${review.length ? `<h1>Needs review (${review.length})</h1>${review.slice(0, 50).map(card).join("\n")}` : ""}`;
+<style>body{font:15px system-ui;margin:2rem;max-width:1100px}article{display:grid;grid-template-columns:340px 1fr;gap:1.4rem;margin:0 0 2.2rem}
+.frame{width:340px;background:#1b1b1b;display:flex}.frame img{width:100%;height:100%;object-fit:contain}
+pre{white-space:pre-wrap;font:15px system-ui;margin:.4rem 0}.meta{color:#666;font-size:13px;margin:0}.alt{color:#444;font-size:13px}.lede{color:#444;max-width:70ch}</style>
+<h1>Next ${shown.length} posts</h1>
+<p class="lede">In the order they'll go out, ${settings.postsPerDay} a day. Each photo is shown in the frame Instagram will use: never cropped, with plain borders where it doesn't fit (black or white, matched to the photo when it's posted).</p>
+${shown.map((key, i) => card(key, i)).join("\n")}
+${
+  review.length
+    ? `<h1>Needs review (${review.length})</h1>${review
+        .slice(0, 50)
+        .map((key) => card(key))
+        .join("\n")}`
+    : ""
+}`;
   const out = join(ROOT, ".cache/social/preview.html");
   await mkdir(join(ROOT, ".cache/social"), { recursive: true });
   await writeFile(out, html);
-  console.log(`Wrote ${out}`);
+  showPage(out, { open: openPage });
 }
 
 async function main() {
@@ -228,6 +269,13 @@ async function main() {
 }
 
 main().catch((e) => {
-  console.error(e.message ?? e);
+  const message = String(e?.message ?? e);
+  if (
+    /DefaultAzureCredential|CredentialUnavailable|AADSTS|az login/i.test(
+      message,
+    )
+  )
+    console.error("Sign in to Azure first with `az login`, then try again.");
+  console.error(message.split("\n")[0]);
   process.exit(1);
 });
