@@ -1,0 +1,121 @@
+name: Social post
+
+# Publishes the next planned photo when one of the day's slots is due.
+# GitHub drops a lot of scheduled runs (this repo's hourly build fires about a
+# fifth of the time), so this fires every half hour at off-peak minutes across
+# the posting day, in both daylight and standard time, and the dependency-free
+# check below decides. Runs with nothing to do end in seconds. Exactly-once
+# posting, the missed-day alert and the dry-run mode are explained in
+# docs/social.md. Off until SOCIAL_ENABLED is "true"; publishes only when
+# SOCIAL_LIVE is "true".
+
+on:
+  schedule:
+    - cron: "17,47 0-7,14-23 * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Post now, ignoring the time slots"
+        type: boolean
+        default: false
+
+concurrency:
+  group: social-post
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  post:
+    if: vars.SOCIAL_ENABLED == 'true' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      ran: ${{ steps.publish.outputs.ran }}
+    env:
+      AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
+      SOCIAL_LIVE: ${{ vars.SOCIAL_LIVE }}
+      SOCIAL_TIMEZONE: ${{ vars.SOCIAL_TIMEZONE }}
+      SOCIAL_POSTS_PER_DAY: ${{ vars.SOCIAL_POSTS_PER_DAY }}
+      SOCIAL_SLOTS: ${{ vars.SOCIAL_SLOTS }}
+      SOCIAL_MIN_GAP_MINUTES: ${{ vars.SOCIAL_MIN_GAP_MINUTES }}
+      SOCIAL_DAY_END: ${{ vars.SOCIAL_DAY_END }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Is a post due?
+        id: due
+        if: ${{ !inputs.force }}
+        run: node scripts/social/due.mjs
+
+      # Package install scripts never run while signed in to anything.
+      - name: Sign out before installing packages
+        if: inputs.force || steps.due.outputs.due == 'true'
+        run: az logout
+
+      - name: Install npm deps
+        if: inputs.force || steps.due.outputs.due == 'true'
+        run: npm ci
+
+      - name: Azure login (OIDC)
+        if: inputs.force || steps.due.outputs.due == 'true'
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Publish
+        id: publish
+        if: inputs.force || steps.due.outputs.due == 'true'
+        env:
+          FORCE: ${{ inputs.force && '--force' || '' }}
+          IG_LOGIN_MODE: ${{ vars.IG_LOGIN_MODE }}
+          IG_API_VERSION: ${{ vars.IG_API_VERSION }}
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          SOCIAL_SECRET_KEY: ${{ secrets.SOCIAL_SECRET_KEY }}
+          SOCIAL_REQUIRE_APPROVAL: ${{ vars.SOCIAL_REQUIRE_APPROVAL }}
+          SOCIAL_PAD_COLOR: ${{ vars.SOCIAL_PAD_COLOR }}
+        run: |
+          node scripts/social/post.mjs $FORCE
+          echo "ran=true" >> "$GITHUB_OUTPUT"
+
+  # Public repos lose their schedules after 60 days without a commit. An empty
+  # commit every 45 quiet days keeps this and the site build running. Its own
+  # job, so the write permission never sits next to npm packages.
+  keepalive:
+    needs: post
+    if: needs.post.outputs.ran == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Keep scheduled workflows enabled
+        run: |
+          last=$(git log -1 --format=%ct)
+          if [ $(( ($(date +%s) - last) / 86400 )) -ge 45 ]; then
+            git -c user.name="github-actions[bot]" \
+                -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+                commit --allow-empty -m "Keep scheduled workflows enabled"
+            git push origin HEAD:main
+          fi

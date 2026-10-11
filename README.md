@@ -22,6 +22,7 @@ The project started as a photography portfolio and has grown into a small person
 | The optional **Hobbies** section + interactive islands | [docs/hobbies.md](docs/hobbies.md) |
 | Editing session metadata from the browser (`/admin`) | [docs/admin.md](docs/admin.md) |
 | Privacy-friendly traffic analytics (`/admin` Analytics tab) | [docs/analytics.md](docs/analytics.md) |
+| Posting photos to Instagram a few a day, automatically | [docs/social.md](docs/social.md) |
 | How the site is hardened (CSP, HSTS, etc.) | [docs/security.md](docs/security.md) |
 | Running locally, npm, dev server, fixtures | [docs/local-dev.md](docs/local-dev.md) |
 | **What personal info ends up in the public repo (and what doesn't)** | [docs/privacy.md](docs/privacy.md) |

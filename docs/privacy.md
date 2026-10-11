@@ -52,6 +52,10 @@ These are real secrets. They're set in **GitHub → Settings → Secrets and var
 | `AZURE_STATIC_WEB_APPS_API_TOKEN` | **Yes, real secret** | Bicep deploy output (`scripts/bootstrap-swa-token.sh` writes it) |
 | `AZURE_STORAGE_ACCOUNT` | Identifier only | Bicep deploy output |
 | `GH_PAT_FOR_SECRETS` (optional) | **Yes, real secret** | A fine-grained PAT you create manually |
+| `IG_ACCESS_TOKEN` (optional) | **Yes, real secret** | Instagram token for [social posting](social.md) |
+| `SOCIAL_SECRET_KEY` (optional) | **Yes, real secret** | Random key that seals the refreshed Instagram token in Blob |
+| `IG_USER_ID` (optional) | Identifies the Instagram account | Only with Facebook Login; kept secret so it's masked in logs |
+| `SOCIAL_OPENAI_API_KEY` / `SOCIAL_ANTHROPIC_API_KEY` (optional) | **Yes, real secret** | Vision model for social captions |
 
 The three "identifier only" Azure IDs are technically not secrets in Microsoft's threat model, knowing them doesn't grant access. They're stored as secrets out of tidiness.
 
@@ -66,6 +70,17 @@ The true credentials with meaningful blast radius are:
 - The SWA deploy token (rotated by re-running the Bicep deploy)
 - The storage connection string (rotate the storage keys, then re-run Infra)
 - Optional fine-grained GitHub PATs (you decide whether to create them)
+
+## Social posting (optional)
+
+If you turn on [social posting](social.md), nothing in this repository or its public Actions logs says which Instagram account it posts to:
+
+- the token and account id are GitHub secrets, which are masked in logs
+- captions, the posting plan and history live in the private `metadata` container
+- images reach Meta through links that expire after two hours, and are deleted after posting
+- the workflows log counts only, through a redactor that strips tokens, ids and signed URLs
+
+The workflow runs themselves are visible, so someone reading the repo can tell the feature is in use, but not where. The photographs are the same ones on the site, so a reverse image search could still connect the two.
 
 ## What lives in **Azure** (not in this repo, not in GitHub)
 

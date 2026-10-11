@@ -1,0 +1,75 @@
+name: Social catalog
+
+# Keeps a private, ready-to-post catalog of every photo on the site:
+# fingerprints new photos, matches them to iNaturalist, drafts captions with a
+# vision model, checks what's already on the account and plans the next week.
+# State lives in the private `metadata` container and logs are counts only, so
+# nothing here shows which account it posts to. Off until SOCIAL_ENABLED is
+# "true". See docs/social.md.
+
+on:
+  schedule:
+    - cron: "23 10 * * *"
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "Most photos to caption this run (use 800 for the first backfill)"
+        default: "60"
+
+concurrency:
+  group: social-catalog
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  catalog:
+    if: vars.SOCIAL_ENABLED == 'true' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # Installed before signing in to anything, like the site build.
+      - name: Install npm deps
+        run: npm ci
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Catalog photos
+        env:
+          LIMIT: ${{ inputs.limit || '60' }}
+          AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
+          # Keyless Azure OpenAI, when the site's deployment exists: the
+          # Azure sign-in above is the credential, so no model key is needed.
+          AZURE_OPENAI_ENDPOINT: ${{ vars.AZURE_OPENAI_ENDPOINT }}
+          AZURE_OPENAI_DEPLOYMENT: ${{ vars.AZURE_OPENAI_DEPLOYMENT }}
+          # Otherwise, model keys separate from the site build's, so setting
+          # them never starts the build drafting session descriptions.
+          OPENAI_API_KEY: ${{ secrets.SOCIAL_OPENAI_API_KEY }}
+          OPENAI_BASE_URL: ${{ vars.SOCIAL_OPENAI_BASE_URL }}
+          ANTHROPIC_API_KEY: ${{ secrets.SOCIAL_ANTHROPIC_API_KEY }}
+          SOCIAL_MODEL: ${{ vars.SOCIAL_MODEL }}
+          SOCIAL_INATURALIST_USER: ${{ vars.SOCIAL_INATURALIST_USER }}
+          SOCIAL_POSTS_PER_DAY: ${{ vars.SOCIAL_POSTS_PER_DAY }}
+          SOCIAL_TALL_IMAGES: ${{ vars.SOCIAL_TALL_IMAGES }}
+          SOCIAL_MIN_WIDTH: ${{ vars.SOCIAL_MIN_WIDTH }}
+          IG_LOGIN_MODE: ${{ vars.IG_LOGIN_MODE }}
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          SOCIAL_SECRET_KEY: ${{ secrets.SOCIAL_SECRET_KEY }}
+        run: node scripts/social/catalog.mjs --limit "$LIMIT"

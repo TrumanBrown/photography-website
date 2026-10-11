@@ -21,7 +21,9 @@ For this project we use it for two distinct purposes:
 .github/workflows/
 ├── infra.yml              # deploy Bicep (manual trigger)
 ├── build-and-deploy.yml   # rebuild + publish site (push, hourly, manual)
-└── lint.yml               # PR quality gate
+├── lint.yml               # PR quality gate
+├── social-catalog.yml     # optional: nightly Instagram catalog (see docs/social.md)
+└── social-post.yml        # optional: publishes the day's Instagram posts
 ```
 
 ### [`infra.yml`](../.github/workflows/infra.yml): deploy Azure infrastructure
@@ -164,6 +166,7 @@ If you've used Node before, none of this is new. If you haven't:
 | `GH_PAT_FOR_SECRETS` | You generate it (optional) | Infra workflow auto-writes other secrets |
 | `AZURE_STATIC_WEB_APPS_API_TOKEN` | Bicep output | `Azure/static-web-apps-deploy@v1` step |
 | `AZURE_STORAGE_ACCOUNT` | Bicep output | `scripts/prebuild.mjs` (env var) |
+| `IG_ACCESS_TOKEN`, `SOCIAL_SECRET_KEY`, `IG_USER_ID`, `SOCIAL_OPENAI_API_KEY` / `SOCIAL_ANTHROPIC_API_KEY` | You create them (optional) | The two social workflows only, see [docs/social.md](social.md#3-secrets-and-variables) |
 
 Runtime-only values (`AZURE_STORAGE_CONNECTION_STRING`, `ANALYTICS_SALT`, and
 `ADMIN_GITHUB_USERS`) live in SWA app settings, not GitHub Actions secrets. The
