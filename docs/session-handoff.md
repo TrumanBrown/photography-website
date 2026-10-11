@@ -10,6 +10,8 @@ A reference for picking up the project on a new machine, in a new chat, or after
 
 Static Astro site deployed to **Azure Static Web Apps** (Free tier). Photos in **Azure Blob Storage** across five containers (`originals` / `derivatives` / `variants` / `metadata` / `hobby-media`). Build is a **GitHub Actions** workflow: hourly cron + push + manual. Auth between GitHub and Azure is **OIDC federation** on a user-assigned managed identity, no long-lived CI secret. Infra defined in **Bicep**, applied via a separate manual workflow. Custom domain registered through **Azure App Service Domain**, bound to SWA via a post-deploy script. Realistic cost: ~$2/mo recurring + $12/yr domain.
 
+**Captions and Instagram (optional).** A second workflow, **Photo captions** (`photos.yml`), looks at each photo once with a keyless Azure OpenAI model, takes species from the owner's iNaturalist observations of that photo, and writes per-photo captions and session descriptions into `_session.json`; the build never calls a model. With `SOCIAL_ENABLED`, the same run plans and writes Instagram posts two weeks ahead, and **Social post** (`social-post.yml`) publishes three a day. A consumption Logic App starts both on time, because GitHub's scheduler skips most scheduled runs here. Private state lives under `metadata/photos/` and `metadata/social/`. See [photos.md](photos.md) and [social.md](social.md).
+
 ## Container roles
 
 | Container | Public? | Contents |
