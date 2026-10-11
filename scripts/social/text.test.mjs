@@ -5,7 +5,12 @@ import {
   placeTag,
   tagify,
 } from "./hashtags.mjs";
-import { finishPost, placeLine } from "./compose.mjs";
+import {
+  assembleCaption,
+  finishPost,
+  placeLine,
+  splitCaption,
+} from "./compose.mjs";
 import {
   compileLexicon,
   displayName,
@@ -193,6 +198,26 @@ describe("caption text", () => {
     );
     expect(communityTag({ taxon: lep("Erebidae") })).toBe("mothsofinstagram");
     expect(communityTag({ group: "moth" })).toBe("mothsofinstagram");
+  });
+
+  it("takes a caption apart again, so a new link line keeps the same body", () => {
+    const parts = {
+      headline: "Agami heron (Agamia agami) with neck extended, Tortuguero",
+      body: "A pale blue crown tops the reddish-brown neck.",
+      gear: "Sony a6700",
+      pointer: "Old link line",
+      hashtags: ["#agamiheron", "#birdsofinstagram"],
+    };
+    expect(
+      splitCaption(assembleCaption({ ...parts, iucn: "Near Threatened" })),
+    ).toEqual({
+      headline: parts.headline,
+      body: parts.body,
+    });
+    expect(splitCaption(assembleCaption({ ...parts, iucn: null }))?.body).toBe(
+      parts.body,
+    );
+    expect(splitCaption("Just one line")).toBeNull();
   });
 
   it("doesn't repeat a place the line already names", () => {

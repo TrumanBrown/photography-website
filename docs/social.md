@@ -29,7 +29,7 @@
 
 | When | Where | What happens |
 |---|---|---|
-| Every night, about 3 am Pacific, and after new photos appear | **Photo captions** workflow ([docs/photos.md](photos.md)) | Analyses photos new to the site once, for the website and Instagram alike. With `SOCIAL_ENABLED=true` it also checks what's already on the Instagram account, plans the next 7 days of posts and writes them |
+| Twice a day (about 3 am and 3 pm Pacific), and after new photos appear | **Photo captions** workflow ([docs/photos.md](photos.md)) | Analyses photos new to the site once, for the website and Instagram alike. With `SOCIAL_ENABLED=true` it also checks what's already on the Instagram account, plans the next two weeks of posts and writes them, so posting carries on even if GitHub skips this workflow for days |
 | Every 30 minutes, about 7 am to midnight Pacific | **Social post** workflow | Checks whether one of today's posting slots is due. If it is, publishes the next planned photo. Most runs find nothing due and finish in seconds |
 | Once a week | inside Social post | Renews the Instagram access token, so it never reaches its 60-day expiry |
 | The morning after a day with no post | inside Social post | Fails one run on purpose, so GitHub emails you |
@@ -167,10 +167,10 @@ Posts are written from the same records as the website's captions, by the **Phot
 
 ```bash
 gh variable set SOCIAL_ENABLED --body true
-gh workflow run photos.yml   # plans the next week and writes those posts
+gh workflow run photos.yml   # plans the next two weeks and writes those posts
 ```
 
-The photos are already analysed, so this run only checks the account, plans the next 7 days and writes those posts: a couple of minutes. Watch it under **Actions → Photo captions**; the log only shows counts. From now on the nightly run keeps a week of posts written ahead.
+The photos are already analysed, so this run only checks the account, plans the next two weeks and writes those posts: a couple of minutes. Watch it under **Actions → Photo captions**; the log only shows counts. From now on it keeps two weeks of posts written ahead.
 
 The Social post workflow also starts running now, in dry-run mode: at each slot it rehearses a post with Instagram, then stops short of publishing. GitHub can take a few hours to start a new schedule, so run it once by hand to see a rehearsal straight away: **Actions → Social post → Run workflow** (leave **force** unticked). The log should end with "Instagram accepted the image and caption, and the account can publish".
 
@@ -263,7 +263,7 @@ Set these as **secrets** (masked in logs) or **variables** under Settings → Se
 
 "Never twice" works on **shots**, meaning presses of the shutter, rather than files. A shot is identified by the camera model and the capture time recorded in the photo. Files without a capture time fall back to a fingerprint of the image. When a shot exists as several files, the one that fits Instagram without borders is posted, then the largest. Your own crops are used exactly as you made them.
 
-Each nightly run plans the next week. Each next post is the best-scoring shot that doesn't repeat something recent:
+Each Photo captions run plans the next two weeks. Each next post is the best-scoring shot that doesn't repeat something recent:
 
 - the same session isn't posted twice within a day
 - the same species isn't posted again within about five days
@@ -313,7 +313,7 @@ Boat-billed heron (Cochlearius cochlearius) peering out from behind a branch, To
 Rain beading on the crown, a bill like an upturned boat, and eyes far too big for its head. Boatbills are nocturnal herons that live in mangrove swamps from Mexico south to Peru and Brazil.
 
 Sony a6700 · E 70-350mm F4.5-6.3 G OSS at 350mm · f/6.3 · 1/50s · ISO 6400
-The rest of this set is on example.com, link in bio
+Full resolution and the rest of this session are on example.com, link in bio
 
 #boatbilledheron #birdsofinstagram #tortuguero #birdphotography #sonya6700
 ```
@@ -322,7 +322,7 @@ The rest of this set is on example.com, link in bio
 - **Body:** written by the model under the rules above.
 - **Red List line:** added when the global IUCN status is Near Threatened or worse.
 - **Gear line:** from the photo's EXIF data.
-- **Link line:** captions can't hold clickable links, so it points to the link in the profile.
+- **Link line:** captions can't hold clickable links, so it sends people to the link in your profile, for the full-resolution photo and the rest of the session. Put the site's address in your bio for it to work. Change the wording with `linkLine` in the [private settings file](#private-settings-file); posts already written are updated around their existing text, with no new model calls.
 - **Alt text:** sent with every post. Instagram and Google both read it.
 
 **Hashtags:** exactly five, because Instagram allows no more since December 2025. They're built from data by [hashtags.mjs](../scripts/social/hashtags.mjs), never made up by the model:

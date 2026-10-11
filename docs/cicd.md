@@ -74,9 +74,9 @@ The prebuild cache cleanup is a disk-capacity requirement, not a cache miss. A p
 
 ### [`photos.yml`](../.github/workflows/photos.yml): photo captions and session descriptions
 
-**When it runs:** nightly, right after a build finds new photos, or by hand (with `limit`, `overwrite` and `dry_run` options). Only when a model is configured.
+**When it runs:** twice a day, right after a build finds new photos, or by hand (with `limit`, `overwrite` and `dry_run` options). Only when a model is configured.
 
-**What it does:** looks at each new photo once with a vision model, matches it to your iNaturalist observations, writes every photo's caption and each session's description into `_session.json`, then starts `build-and-deploy.yml` so they go live. With `SOCIAL_ENABLED=true` it also plans and writes the next week of Instagram posts. Needs `actions: write` for that last dispatch. Full walkthrough: [docs/photos.md](photos.md).
+**What it does:** looks at each new photo once with a vision model, matches it to your iNaturalist observations, writes every photo's caption and each session's description into `_session.json`, then starts `build-and-deploy.yml` so they go live. With `SOCIAL_ENABLED=true` it also plans and writes the next two weeks of Instagram posts. Needs `actions: write` for that last dispatch. Full walkthrough: [docs/photos.md](photos.md).
 
 ### [`lint.yml`](../.github/workflows/lint.yml): PR quality gate
 

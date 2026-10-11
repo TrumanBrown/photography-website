@@ -10,7 +10,7 @@
  *   5. website   per-photo captions (code) and session descriptions (one
  *                text-only call per session), written into each _session.json
  *   6. instagram only with SOCIAL_ENABLED=true: check the account, plan the
- *                next week, and write the posts that plan needs
+ *                next two weeks, and write the posts that plan needs
  *
  * Usage:
  *   node scripts/photos/catalog.mjs [options]
@@ -71,11 +71,13 @@ import {
 import { blobSidecars, mergeWebsiteText } from "./sidecars.mjs";
 import { compileLexicon, loadVoiceRules } from "./text.mjs";
 import {
+  assembleCaption,
   bodyPrompt,
   finishPost,
   mockBody,
   placeLine,
   sessionNames,
+  splitCaption,
 } from "../social/compose.mjs";
 import { buildHashtags } from "../social/hashtags.mjs";
 import { planQueue } from "../social/plan.mjs";
@@ -708,7 +710,7 @@ async function main() {
   await store.writeJson("taxa.json", taxa);
 
   // 6. instagram
-  const ig = { rendered: 0, review: 0, planned: 0 };
+  const ig = { rendered: 0, updated: 0, review: 0, planned: 0 };
   if (args.instagram && process.env.SOCIAL_ENABLED === "true") {
     try {
       await instagramStage();
@@ -778,7 +780,7 @@ async function main() {
     const pointer =
       config.linkLine ??
       (settings.domain
-        ? `The rest of this set is on ${settings.domain}, link in bio`
+        ? `Full resolution and the rest of this session are on ${settings.domain}, link in bio`
         : "");
 
     // Everything in a post that code decides. A post written from different
@@ -808,15 +810,26 @@ async function main() {
         hubTags: config.hubHashtags ?? {},
       });
       const gear = gearLine(file.facts);
+      const iucn = level === "species" ? (taxon.iucn ?? null) : null;
       const basis = sha({
         v: POST_VERSION,
         headline,
         hashtags,
         gear,
         pointer,
-        iucn: level === "species" ? (taxon.iucn ?? null) : null,
+        iucn,
       });
-      return { file, session, taxon, level, headline, hashtags, gear, basis };
+      return {
+        file,
+        session,
+        taxon,
+        level,
+        headline,
+        hashtags,
+        gear,
+        iucn,
+        basis,
+      };
     };
 
     // Where each shot stands for Instagram.
@@ -825,15 +838,45 @@ async function main() {
       const level =
         s.analysis?.idCheck === "conflict" ? null : idLevel(taxonOf(s));
       s.speciesOk = level === "species";
-      const basis = s.analysis ? partsFor(s).basis : null;
-      const stale =
-        s.post &&
-        (s.post.analysedAt !== s.analysis?.at ||
-          s.post.basis !== basis ||
-          (s.redraft && s.redraft > (s.post.draftedAt ?? "")));
-      if (stale) {
-        delete s.post;
-        if (s.status === "ready") s.status = "new";
+      const parts = s.analysis ? partsFor(s) : null;
+      const basis = parts?.basis ?? null;
+      if (s.post) {
+        const written = s.post.body
+          ? { headline: s.post.headline, body: s.post.body }
+          : splitCaption(s.post.caption);
+        // Posts from before versions were stored were all written by version 2.
+        const version = s.post.v ?? (s.post.basis ? 2 : 1);
+        const rewrite =
+          !parts ||
+          !written ||
+          s.post.analysedAt !== s.analysis?.at ||
+          version !== POST_VERSION ||
+          written.headline !== parts.headline ||
+          (s.redraft && s.redraft > (s.post.draftedAt ?? ""));
+        if (rewrite) {
+          delete s.post;
+          if (s.status === "ready") s.status = "new";
+        } else if (s.post.basis !== basis) {
+          // Only parts code fills in changed (the link line, a hashtag, the
+          // gear line): put the same body back together with the new ones.
+          s.post = {
+            ...s.post,
+            caption: assembleCaption({
+              headline: parts.headline,
+              body: written.body,
+              iucn: parts.iucn,
+              gear: parts.gear,
+              pointer,
+              hashtags: parts.hashtags,
+            }),
+            hashtags: parts.hashtags,
+            headline: parts.headline,
+            body: written.body,
+            basis,
+            v: POST_VERSION,
+          };
+          ig.updated++;
+        }
       }
       // A post that failed its checks gets another go once something changes.
       if (
@@ -879,11 +922,13 @@ async function main() {
         shots,
         posted: new Set([...posted, ...failedForGood]),
         recent,
-        count: settings.postsPerDay * 7,
+        // Two weeks of posts written ahead, so posting carries on even if
+        // GitHub skips this workflow's scheduled runs for days.
+        count: settings.postsPerDay * 14,
         postsPerDay: settings.postsPerDay,
       });
 
-    // Write the posts the next week needs, then plan again around any that failed.
+    // Write the posts the plan needs, then plan again around any that failed.
     let items = plan();
     for (let round = 0; round < 2; round++) {
       const missing = items.filter((k) => !shots[k].post?.caption);
@@ -943,6 +988,9 @@ async function main() {
           s.post = {
             caption: finished.caption,
             alt: finished.alt,
+            headline,
+            body: finished.body,
+            v: POST_VERSION,
             hashtags,
             group: s.analysis.group,
             appeal: s.analysis.appeal,
@@ -981,7 +1029,7 @@ async function main() {
       `iNaturalist matches: ${count((s) => s.inat?.via === "frame")} exact frame, ${count((s) => s.inat?.via === "moment")} same moment; ${count((s) => s.analysis?.idCheck === "conflict")} flagged as not matching.`,
       `Website: ${site.captions} captions, ${site.described} descriptions written${site.describeFailed ? `, ${site.describeFailed} failed checks` : ""}, ${site.waiting} sessions still being analysed, ${site.written} session files updated${site.kept ? `, ${site.kept} of your edits left alone` : ""}${sidecars ? "" : " (not written: dry run)"}.`,
       process.env.SOCIAL_ENABLED === "true" && args.instagram
-        ? `Instagram: ${ig.rendered} posts written, ${ig.review} need review, ${ig.planned} planned.`
+        ? `Instagram: ${ig.rendered} posts written, ${ig.updated} updated, ${ig.review} need review, ${ig.planned} planned.`
         : "",
     ]
       .filter(Boolean)

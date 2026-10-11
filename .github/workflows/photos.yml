@@ -6,12 +6,15 @@ name: Photo captions
 # _session.json and redeploys the site. With SOCIAL_ENABLED=true it also plans
 # and writes the Instagram posts (docs/social.md).
 #
-# Runs nightly, right after a build finds new photos, or by hand. State lives
+# Runs twice a day, right after a build finds new photos, or by hand. State lives
 # in the private `metadata` container and logs are counts only.
 
 on:
   schedule:
+    # Twice a day, because GitHub skips scheduled runs when it's busy. A run
+    # with nothing new to do takes a couple of minutes.
     - cron: "23 10 * * *"
+    - cron: "53 21 * * *"
   workflow_dispatch:
     inputs:
       limit:

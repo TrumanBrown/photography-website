@@ -159,7 +159,22 @@ export function finishPost({
     }),
     alt: tidy(alt).slice(0, 1000),
     headline,
+    body,
   };
+}
+
+const IUCN_SENTENCE = / ?Listed as [^.]+ on the IUCN Red List\.$/;
+
+/**
+ * The first line and body of a caption assembleCaption put together, or null
+ * if it can't be taken apart (it was cut short at Instagram's limit).
+ */
+export function splitCaption(caption) {
+  const text = String(caption ?? "");
+  const paragraphs = text.split("\n\n");
+  if (paragraphs.length < 2 || text.endsWith("...")) return null;
+  const body = paragraphs[1].replace(IUCN_SENTENCE, "").trim();
+  return body ? { headline: paragraphs[0], body } : null;
 }
 
 /** The extra place words a post may ground against (the session's own names). */

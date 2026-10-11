@@ -53,7 +53,7 @@ Photo captions workflow  (photos.yml)
 Build and Deploy ──── captions and description live
 ```
 
-Usually 15 to 30 minutes from the first build to the second. The workflow also runs every night, about 3 am Pacific, so anything a run missed is picked up the next day.
+Usually 15 to 30 minutes from the first build to the second. The workflow also runs twice a day, about 3 am and 3 pm Pacific, so anything a run missed is picked up within hours.
 
 The site build itself never calls a model.
 
@@ -192,7 +192,7 @@ Nothing needs doing. These run on your computer, signed in with `az login`. The 
 | `npm run photos -- redo --session <slug>` | ...or every photo in a session |
 | `npm run photos -- redescribe <slug>` | Rewrite this session's description on the next run |
 
-The next run is the nightly one, or start it from **Actions → Photo captions → Run workflow**.
+The next run is the next scheduled one (twice a day), or start it from **Actions → Photo captions → Run workflow**.
 
 ## Settings
 
@@ -218,7 +218,7 @@ Workflow options (Run workflow): `limit` (photos to analyse, default 300), `over
 
 ## Troubleshooting
 
-- **A new session has no captions after an hour.** Open **Actions → Photo captions**. If no run started, check the `AZURE_OPENAI_*` variables (or `PHOTOS_ENABLED`). The nightly run catches up either way.
+- **A new session has no captions after an hour.** Open **Actions → Photo captions**. If no run started, check the `AZURE_OPENAI_*` variables (or `PHOTOS_ENABLED`). The next scheduled run catches up either way.
 - **A caption is wrong.** Edit it in `/admin`; it stays. Or run `npm run photos -- redo <photo>` for a fresh look.
 - **A photo has no caption.** The model's content filter can refuse a harmless photo (one of a person bent over on a slope was refused here). It isn't retried, and `npm run photos -- status` lists it. A photo with an iNaturalist identification still gets a caption from that alone. Write one in `/admin`, or `redo` it to try again. Other failures are retried for three runs.
 - **A species is wrong.** Fix the identification on iNaturalist. The next run follows it.
