@@ -79,6 +79,7 @@ If you turn on [social posting](social.md), nothing in this repository or its pu
 - each photo's record, the posting plan and history live in the private `metadata` container
 - images reach Meta through links that expire after two hours, and are deleted after posting
 - the workflows log counts only, through a redactor that strips tokens, ids and signed URLs
+- the facts in posts come from Wikipedia's public API. Its requests name your site's domain, as Wikimedia's etiquette asks, and never the Instagram account
 
 The workflow runs themselves are visible, so someone reading the repo can tell the feature is in use, but not where. The photographs are the same ones on the site, so a reverse image search could still connect the two, and your Instagram bio links to the site by design. Nothing links the other way.
 

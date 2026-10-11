@@ -5,14 +5,8 @@ import {
   placeTag,
   tagify,
 } from "./hashtags.mjs";
+import { assembleCaption, placeLine } from "./compose.mjs";
 import {
-  assembleCaption,
-  finishPost,
-  placeLine,
-  splitCaption,
-} from "./compose.mjs";
-import {
-  compileLexicon,
   displayName,
   lint,
   speciesLabel,
@@ -169,6 +163,38 @@ describe("caption text", () => {
     expect(lint("Orange hands and a barred yellow side")).toEqual([]);
   });
 
+  it("puts a post together: first line, fact, IUCN line, gear and link, hashtags", () => {
+    const caption = assembleCaption({
+      headline:
+        "Agami heron (Agamia agami) with its neck extended, Tortuguero canals, Limón Province, Costa Rica",
+      body: "It's the only member of the genus Agamia.",
+      iucn: "Near Threatened",
+      gear: gearLine(a6700macro),
+      pointer:
+        "Full resolution and the rest of this session are on example.com, link in bio",
+      hashtags: ["#agamiheron", "#birdsofinstagram"],
+    });
+    const parts = caption.split("\n\n");
+    expect(parts[0]).toMatch(
+      /^Agami heron \(Agamia agami\) with its neck extended/,
+    );
+    expect(parts[1]).toBe(
+      "It's the only member of the genus Agamia. Listed as Near Threatened on the IUCN Red List.",
+    );
+    expect(parts[2]).toMatch(/^Sony a6700 .*\nFull resolution/);
+    expect(parts[3]).toBe("#agamiheron #birdsofinstagram");
+    // No fact to tell: the post simply skips that paragraph.
+    expect(
+      assembleCaption({
+        headline: "Hanging moss",
+        body: "",
+        gear: "",
+        pointer: "",
+        hashtags: ["#forest"],
+      }),
+    ).toBe("Hanging moss\n\n#forest");
+  });
+
   it("keeps place names and people's names inside species names", () => {
     for (const [name, shown] of [
       ["North American River Otter", "North American river otter"],
@@ -198,26 +224,6 @@ describe("caption text", () => {
     );
     expect(communityTag({ taxon: lep("Erebidae") })).toBe("mothsofinstagram");
     expect(communityTag({ group: "moth" })).toBe("mothsofinstagram");
-  });
-
-  it("takes a caption apart again, so a new link line keeps the same body", () => {
-    const parts = {
-      headline: "Agami heron (Agamia agami) with neck extended, Tortuguero",
-      body: "A pale blue crown tops the reddish-brown neck.",
-      gear: "Sony a6700",
-      pointer: "Old link line",
-      hashtags: ["#agamiheron", "#birdsofinstagram"],
-    };
-    expect(
-      splitCaption(assembleCaption({ ...parts, iucn: "Near Threatened" })),
-    ).toEqual({
-      headline: parts.headline,
-      body: parts.body,
-    });
-    expect(splitCaption(assembleCaption({ ...parts, iucn: null }))?.body).toBe(
-      parts.body,
-    );
-    expect(splitCaption("Just one line")).toBeNull();
   });
 
   it("doesn't repeat a place the line already names", () => {
@@ -257,100 +263,5 @@ describe("caption text", () => {
         `${session.title} ${session.location}`,
       ),
     ).toEqual([]);
-  });
-
-  it("assembles a post: website caption first, then body, IUCN line, gear and hashtags", () => {
-    const post = finishPost({
-      headline:
-        "Sylvia's tree frog (Cruziohyla sylviae) on a thin twig at night, Guayacán, Limón Province, Costa Rica",
-      body: "Orange hands, a barred yellow side, and a firm grip on a very thin twig.",
-      alt: "A green frog with orange hands gripping a twig at night",
-      session: { ...session, slug: "costa-rica-crarc-august-2026" },
-      taxon: { ...frog, iucn: "Vulnerable" },
-      level: "species",
-      gear: gearLine(a6700macro),
-      hashtags: ["#sylviastreefrog", "#frogsofinstagram"],
-      pointer: "The rest of this set is on example.com, link in bio",
-    });
-    expect(post.problem).toBeUndefined();
-    expect(post.caption.split("\n")[0]).toBe(
-      "Sylvia's tree frog (Cruziohyla sylviae) on a thin twig at night, Guayacán, Limón Province, Costa Rica",
-    );
-    expect(post.caption).toContain(
-      "Listed as Vulnerable on the IUCN Red List.",
-    );
-    expect(post.caption).toContain("Sony a6700");
-    expect(post.caption.endsWith("#sylviastreefrog #frogsofinstagram")).toBe(
-      true,
-    );
-  });
-
-  it("rejects a body that names a species nobody identified", () => {
-    const lexicon = compileLexicon([
-      "Red-eyed Tree Frog",
-      "Agalychnis callidryas",
-      "Sylvia's Tree Frog",
-      "Cruziohyla sylviae",
-    ]);
-    const base = {
-      headline: "Tree frog on a leaf, Guayacán",
-      alt: "A frog",
-      session: { ...session, slug: "crarc" },
-      gear: "",
-      hashtags: [],
-      pointer: "",
-      lexicon,
-    };
-    const unverified = finishPost({
-      ...base,
-      body: "A red-eyed tree frog, Agalychnis callidryas.",
-      taxon: null,
-      level: null,
-    });
-    expect(unverified.problem).toMatch(/Red-eyed Tree Frog/);
-    const verified = finishPost({
-      ...base,
-      body: "Green back, orange hands. Sylvia's tree frog keeps to the canopy.",
-      taxon: frog,
-      level: "species",
-    });
-    expect(verified.problem).toBeUndefined();
-  });
-
-  it("rejects a body that names a place the facts don't mention", () => {
-    const post = finishPost({
-      headline: "Snow-covered peak above the meadows, Washington Pass",
-      body: "Fresh snow on Mount Shuksan above the meadows.",
-      alt: "Snow",
-      session: {
-        slug: "north-cascades-july-2026",
-        title: "Washington Pass, North Cascades, July 2026",
-        location: "North Cascades, Washington",
-      },
-      taxon: null,
-      level: null,
-      gear: "",
-      hashtags: [],
-      pointer: "",
-    });
-    expect(post.problem).toMatch(/Shuksan/);
-  });
-
-  it("lets the body repeat a name from the species' reference summary", () => {
-    const post = finishPost({
-      headline: "Sylvia's tree frog (Cruziohyla sylviae) on a twig, Guayacán",
-      body: "Orange hands. These frogs live in the canopy from Honduras to Panama.",
-      alt: "A frog",
-      session: { ...session, slug: "crarc" },
-      taxon: {
-        ...frog,
-        summary: "It is found in lowland forest from Honduras to Panama.",
-      },
-      level: "species",
-      gear: "",
-      hashtags: [],
-      pointer: "",
-    });
-    expect(post.problem).toBeUndefined();
   });
 });

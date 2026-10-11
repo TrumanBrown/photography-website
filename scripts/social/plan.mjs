@@ -4,14 +4,32 @@
  * Not chronological: each next post is the best-scoring photo that doesn't
  * repeat something recent. Constraints, relaxed in steps when nothing fits:
  *   - the same session not within the last day's posts
- *   - the same species not within about five days
+ *   - the same species, or for a landscape the same landmark (or outing),
+ *     not within about five days
  *   - frames from the same burst not within about ten days
  * Score: the analysis's appeal rating, a bump for photos identified to species (they're
  * what people search for), a bump for sessions from the last 45 days, and a
  * small penalty for repeating the previous post's kind of subject. A seeded
  * jitter breaks ties so the order is stable but not alphabetical.
+ *
+ * Landscapes and places (mountains, waterfalls, cities) never get the species
+ * bump, so on score alone they'd all wait until the wildlife ran out. With
+ * `sceneEvery` set, one post in every that many is the best landscape left.
  */
 const DAY_MS = 24 * 3600 * 1000;
+
+const SCENES = new Set([
+  "mountain",
+  "forest",
+  "waterfall",
+  "river",
+  "lake",
+  "coast",
+  "glacier",
+  "city",
+  "temple",
+]);
+const isScene = (c) => !c.speciesOk && SCENES.has(c.group);
 
 function jitter(key) {
   let h = 2166136261;
@@ -23,12 +41,18 @@ function jitter(key) {
 }
 
 function facts(key, shot) {
+  const group = shot.analysis?.group ?? shot.post?.group ?? null;
   return {
     key,
     session: shot.session,
     taxon: shot.speciesOk ? shot.inat?.taxon : null,
+    // A landscape's subject: its landmark, or else the outing it's from.
+    view:
+      !shot.speciesOk && SCENES.has(group)
+        ? shot.analysis?.landmark || shot.session
+        : null,
     burst: shot.burst ?? null,
-    group: shot.analysis?.group ?? shot.post?.group ?? null,
+    group,
     location: shot.location ?? null,
     appeal: Number(shot.analysis?.appeal ?? shot.post?.appeal) || 5,
     speciesOk: Boolean(shot.speciesOk),
@@ -40,11 +64,12 @@ function violates(c, seq, w) {
   const tail = (n) => (n > 0 ? seq.slice(-n) : []);
   if (tail(w.session).some((s) => s.session === c.session)) return true;
   if (c.taxon && tail(w.taxon).some((s) => s.taxon === c.taxon)) return true;
+  if (c.view && tail(w.taxon).some((s) => s.view === c.view)) return true;
   if (c.burst && tail(w.burst).some((s) => s.burst === c.burst)) return true;
   return false;
 }
 
-function score(c, seq, now) {
+function score(c, seq, now, sceneEvery = 0) {
   const prev = seq.at(-1);
   const before = seq.at(-2);
   let s = c.appeal;
@@ -54,6 +79,10 @@ function score(c, seq, now) {
   // Keep places rotating: several sessions can share one location string.
   if (prev && c.location && prev.location === c.location) s -= 1.5;
   if (before && c.location && before.location === c.location) s -= 0.75;
+  if (sceneEvery > 1 && isScene(c)) {
+    const due = !seq.slice(-(sceneEvery - 1)).some(isScene);
+    s += due ? 10 : -10;
+  }
   return s + jitter(c.key) * 0.6;
 }
 
@@ -72,9 +101,10 @@ export function isPlannable(shot) {
 }
 
 /**
- * @param shots    catalog shots, keyed by shot key
- * @param posted   Set of shot keys already published (or failed for good)
- * @param recent   shot keys posted most recently, oldest first
+ * @param shots      catalog shots, keyed by shot key
+ * @param posted     Set of shot keys already published (or failed for good)
+ * @param recent     shot keys posted most recently, oldest first
+ * @param sceneEvery one post in every this many is a landscape or place (0: off)
  */
 export function planQueue({
   shots,
@@ -82,6 +112,7 @@ export function planQueue({
   recent = [],
   count,
   postsPerDay,
+  sceneEvery = 0,
   now = new Date(),
 }) {
   const remaining = new Map(
@@ -103,7 +134,7 @@ export function planQueue({
       let best = null;
       for (const c of remaining.values()) {
         if (violates(c, seq, w)) continue;
-        const s = score(c, seq, now);
+        const s = score(c, seq, now, sceneEvery);
         if (!best || s > best.s || (s === best.s && c.key < best.c.key))
           best = { c, s };
       }

@@ -1,4 +1,9 @@
-import { burstGroups, chooseVersion, padFraction, shotKey } from "../photos/shots.mjs";
+import {
+  burstGroups,
+  chooseVersion,
+  padFraction,
+  shotKey,
+} from "../photos/shots.mjs";
 import { countsToward, decide, localParts, previousDay } from "./schedule.mjs";
 import { planQueue } from "./plan.mjs";
 import {
@@ -174,6 +179,66 @@ describe("planQueue", () => {
       postsPerDay: 1,
     });
     expect(order).toEqual(["x", "z", "y"]);
+  });
+
+  it("makes one post in every three a landscape while there are any", () => {
+    const shots = {};
+    for (let i = 0; i < 6; i++)
+      shots[`w${i}`] = shot(`w${i}`, 9, {
+        speciesOk: true,
+        inat: { taxon: i },
+        group: "frog",
+      });
+    for (let i = 0; i < 2; i++)
+      shots[`m${i}`] = shot(`m${i}`, 6, { group: "mountain" });
+    const order = planQueue({
+      shots,
+      posted: new Set(),
+      count: 8,
+      postsPerDay: 3,
+      sceneEvery: 3,
+    });
+    const kinds = order.map((k) => (k.startsWith("m") ? "M" : "w")).join("");
+    expect(kinds).toBe("MwwMwwww");
+    // Off: wildlife first, landscapes when it runs out.
+    const plain = planQueue({
+      shots,
+      posted: new Set(),
+      count: 8,
+      postsPerDay: 3,
+    });
+    expect(plain.slice(0, 6).every((k) => k.startsWith("w"))).toBe(true);
+  });
+
+  it("doesn't post the same landmark again within about five days", () => {
+    const shots = {};
+    for (let i = 0; i < 20; i++)
+      shots[`w${i}`] = shot(`w${i}`, 8, {
+        speciesOk: true,
+        inat: { taxon: i },
+      });
+    shots.b1 = shot("b1", 9, {
+      group: "mountain",
+      analysis: { group: "mountain", appeal: 9, landmark: "Mount Baker" },
+    });
+    shots.b2 = shot("b2", 9, {
+      group: "mountain",
+      analysis: { group: "mountain", appeal: 9, landmark: "Mount Baker" },
+    });
+    shots.z1 = shot("z1", 6, { group: "mountain" });
+    const order = planQueue({
+      shots,
+      posted: new Set(),
+      count: 20,
+      postsPerDay: 3,
+      sceneEvery: 3,
+    });
+    const baker = order.filter((k) => k.startsWith("b"));
+    expect(baker).toHaveLength(2);
+    expect(
+      order.indexOf(baker[1]) - order.indexOf(baker[0]),
+    ).toBeGreaterThanOrEqual(15);
+    expect(order.indexOf("z1")).toBe(3);
   });
 });
 

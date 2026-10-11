@@ -3,6 +3,7 @@ import {
   allowedNames,
   captionFor,
   descriptionProblems,
+  placeAfter,
   placeLabel,
   plural,
   SHAPES,
@@ -58,6 +59,124 @@ describe("website captions", () => {
     expect(captionFor({ analysis: look(), taxon: frog, session: crarc })).toBe(
       "Sylvia's tree frog (Cruziohyla sylviae) on a thin twig at night, Guayacán",
     );
+  });
+
+  it("uses the written first line: the name, then what it's doing, no background", () => {
+    expect(
+      captionFor({
+        analysis: look({ count: 2 }),
+        taxon: frog,
+        session: crarc,
+        line: { action: "resting with its toes on a stem" },
+      }),
+    ).toBe(
+      "Two Sylvia's tree frogs (Cruziohyla sylviae) resting with their toes on a stem, Guayacán",
+    );
+    expect(
+      captionFor({
+        analysis: look(),
+        taxon: frog,
+        session: crarc,
+        line: { action: "clinging to a stem" },
+      }),
+    ).toBe(
+      "Sylvia's tree frog (Cruziohyla sylviae) clinging to a stem, Guayacán",
+    );
+    expect(
+      captionFor({
+        analysis: look({ group: "mountain", subject: "Mount Baker" }),
+        session: baker,
+        line: { text: "Mount Baker from Yellow Aster Butte" },
+      }),
+    ).toBe("Mount Baker from Yellow Aster Butte");
+  });
+
+  it("falls back to the notes when a written line names something nobody wrote down", () => {
+    const caption = captionFor({
+      analysis: look({
+        group: "mountain",
+        subject: "Snow-covered peak",
+        scene: "above a still tarn",
+        conditions: "",
+      }),
+      session: baker,
+      line: { text: "Mount Shuksan above a still tarn" },
+    });
+    expect(caption).toBe(
+      "Snow-covered peak above a still tarn, Yellow Aster Butte",
+    );
+  });
+
+  it("only adds the parts of the place the line hasn't named", () => {
+    expect(
+      placeAfter(
+        "Mount Everest above the clouds",
+        "Everest north face, Tibet, China",
+      ),
+    ).toBe("Tibet, China");
+    expect(
+      placeAfter(
+        "Shanghai skyline across the river at night",
+        "Shanghai, China",
+      ),
+    ).toBe("China");
+    expect(
+      placeAfter(
+        "Heron in the shallows",
+        "Tortuguero canals, Limón Province, Costa Rica",
+      ),
+    ).toBe("Tortuguero canals, Limón Province, Costa Rica");
+  });
+
+  it("keeps a place that only shares a word with the line or the species", () => {
+    expect(
+      placeAfter(
+        "grazing on sparse grass",
+        "Tibetan plateau, Tibet, China",
+        "Tibetan gazelle (Procapra picticaudata)",
+      ),
+    ).toBe("Tibetan plateau, Tibet, China");
+    expect(
+      placeAfter(
+        "standing on a slope",
+        "Tapir Valley, Bijagua, Costa Rica",
+        "Baird's tapir (Tapirus bairdii)",
+      ),
+    ).toBe("Tapir Valley, Bijagua, Costa Rica");
+    expect(
+      placeAfter(
+        "crouching on a leaf",
+        "Tapir Valley, Bijagua, Costa Rica",
+        "Tapir Valley tree frog (Tlalocohyla celeste)",
+      ),
+    ).toBe("Bijagua, Costa Rica");
+    expect(
+      placeAfter(
+        "resting on wet mesh",
+        "Puget Sound tide pools",
+        "Northern kelp crab (Pugettia producta)",
+      ),
+    ).toBe("Puget Sound tide pools");
+    expect(placeAfter("Jagged peaks above rocky slopes", "Gunn Peak")).toBe(
+      "Gunn Peak",
+    );
+    expect(
+      placeAfter("Moss-covered cloud forest in fog", "Monteverde Cloud Forest"),
+    ).toBe("Monteverde Cloud Forest");
+  });
+
+  it("writes 'near' mid-sentence", () => {
+    expect(
+      captionFor({
+        analysis: look({ group: "other", subject: "Slug" }),
+        session: {
+          slug: "june-nearby-seattle-wildlife",
+          title: "Near Seattle, Washington, June 2026",
+          location: "Puget Sound lowlands, Washington",
+        },
+        line: { text: "A slug with its tentacles out" },
+      }),
+    ).toBe("A slug with its tentacles out, near Seattle");
   });
 
   it("counts several of a species", () => {
@@ -269,6 +388,30 @@ describe("website captions", () => {
       }),
     ).toBe("Kauai");
     expect(placeLabel(baker)).toBe("Yellow Aster Butte");
+  });
+
+  it("leaves what you did there out of the place", () => {
+    expect(
+      placeLabel({
+        slug: "costa-rica-tortuguero-night-walk-august-2026",
+        title: "Tortuguero night walk, Costa Rica, September 2026",
+        location: "Limón Province, Costa Rica",
+      }),
+    ).toBe("Tortuguero");
+    expect(
+      placeLabel({
+        slug: "july-macro-eastern-washington",
+        title: "Eastern Washington macro, July 2026",
+        location: "Eastern Washington",
+      }),
+    ).toBe("Eastern Washington");
+    expect(
+      placeLabel({
+        slug: "eastern-washington-camping-memorial-weekend",
+        title: "Shrub-steppe, Eastern Washington, May 2026",
+        location: "Eastern Washington",
+      }),
+    ).toBe("shrub-steppe");
   });
 });
 

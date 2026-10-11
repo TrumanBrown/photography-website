@@ -7,7 +7,7 @@
  *                                         (.cache/social/preview.html; --no-open just writes it)
  *   npm run social -- skip <photo> [why]  never post this shot
  *   npm run social -- unskip <photo>
- *   npm run social -- redraft <photo>     rewrite this post on the next Photo captions run
+ *   npm run social -- redraft <photo>     new first line and a different fact on the next Photo captions run
  *   npm run social -- approve <photo>     only matters with SOCIAL_REQUIRE_APPROVAL=true
  *   npm run social -- retry <photo>|--all clear failed attempts so a photo can be tried again
  *
@@ -230,7 +230,8 @@ async function main() {
       skip: "Skipped it. It won't be posted.",
       unskip:
         "Unskipped it. The next Photo captions run puts it back in the plan.",
-      redraft: "The next Photo captions run rewrites its post.",
+      redraft:
+        "The next Photo captions run writes it a new first line (the website's caption too) and gives its post a different fact.",
     }[command];
     console.log(`${pick}: ${done}`);
     return;

@@ -24,9 +24,9 @@ Each photograph is looked at **once** by a vision model. What it sees is stored 
 
 | Output | Written by | Example |
 |---|---|---|
-| **Photo caption** (alt text, lightbox caption, image search) | Code, from the record | `Turquoise-browed motmot (Eumomota superciliosa) perched on a diagonal branch against blurred greenery, Playa Flamingo` |
+| **Photo caption** (alt text, lightbox caption, image search) | Code, from the record, opening with a first line written once per photo (text only) | `Turquoise-browed motmot (Eumomota superciliosa) perched on a branch, Playa Flamingo` |
 | **Session description** (top of the session page, search snippet) | One text-only model call per session, from every photo's caption | `Jagged gray peaks and forested valleys fill most of these, with patches of snow on the rocky slopes...` |
-| **Instagram posts** (optional, [docs/social.md](social.md)) | Code, plus one text-only call per post | First line is the same caption, then a short body, gear, five hashtags |
+| **Instagram posts** (optional, [docs/social.md](social.md)) | Code, plus a few facts per species or place, written once from Wikipedia | The same first line with the fuller place, one fact, gear, five hashtags |
 
 Because the photo is only ever looked at once, changing how captions or descriptions are worded never means paying to analyse the archive again.
 
@@ -46,6 +46,7 @@ Photo captions workflow  (photos.yml)
   2. group      files of the same shutter press become one "shot"
   3. iNat       match shots to your iNaturalist observations
   4. analyse    one vision call per new shot  ──►  private record
+     lines      one text-only call per outing: each photo's first line
   5. website    captions + session description ──► _session.json
   6. instagram  only with SOCIAL_ENABLED=true
         │
@@ -114,16 +115,36 @@ iNaturalist place names are never used. An observation's place can be a street a
 
 ## Captions
 
-Built by code in [website.mjs](../scripts/photos/website.mjs), in this order:
+Built by code in [website.mjs](../scripts/photos/website.mjs):
 
 ```
-<subject> <scene> <conditions>, <place>
+<first line>, <place>
 ```
 
-- **Subject:** the iNaturalist name with its scientific name, counted when several are visible ("Two harbor seals (Phoca vitulina)"). A species with no English name is led by the model's plain word for what it is, because that's what people search for: "Jumping spider (Corythalia opima)". Otherwise the model's plain subject.
-- **Place:** the first part of the session title ("Yellow Aster Butte"), left off when the subject already is the place.
-- **At most 125 characters,** the length screen readers and image search handle best. Conditions go first when it's too long, then the place.
-- **Light that only describes the flash** ("under bright direct light") is left out.
+**The first line** says what the photo is of and what it's doing, the way a person would say it:
+
+- `Red-eyed tree frog (Agalychnis callidryas) clinging to a stem`
+- `A candy bar held up to Mount Rainier`
+- `Tiger Leaping Gorge with a winding river`
+
+It's written once per photo by [lines.mjs](../scripts/photos/lines.mjs), in one text-only call per outing, from the notes the one look already stored, so no photo is looked at again. Its rules:
+
+- **For an identified organism the model only writes what follows the name** ("clinging to a stem"). The name itself comes from iNaturalist, never the model: the iNaturalist name with its scientific name, counted when several are visible ("Two harbor seals (Phoca vitulina)"). A species with no English name is led by the model's plain word for what it is, because that's what people search for: "Jumping spider (Corythalia opima)".
+- **Never the background, the blur or the framing.** "Clinging to a green stem against a dark background" is how a camera describes a photo, not how a person does. Behind a person or an object, though, a landmark from the notes stays, because it's the point of the photo.
+- **Photos of the same subject from one outing are written together**, so eleven photos of one peak get eleven different lines rather than one line eleven times.
+- **Checked like everything else:** none of the banned or vague words ("object", "illuminated"), no place or species name the record doesn't have. A body part gets its "with its" ("with its mouth open"). A line that fails falls back to one built from the notes: `<subject> <scene> <conditions>`.
+
+To rewrite every first line (after changing the prompt, say), bump `LINE_VERSION` in lines.mjs. The next run rewrites them all, text only, in a few minutes.
+
+**The place** is the first part of the session title ("Yellow Aster Butte"):
+
+- without what you did there: "Tortuguero night walk" gives "Tortuguero"
+- lowercase when it's a habitat rather than a name: "shrub-steppe"
+- left off when the line already names it ("Mount Baker from Yellow Aster Butte"). Sharing a word isn't naming it: "Tibetan gazelle" still gets "Tibetan plateau"
+
+**Also:**
+
+- **At most 125 characters,** the length screen readers and image search handle best. The place is dropped first when it's too long.
 - **No hashtags, no trailing period, none of the words the site's voice rules ban.**
 
 The caption is used as the photo's `alt` text, its lightbox caption, and the `caption` in the page's structured data.
@@ -233,5 +254,7 @@ On this site's deployment (`gpt-6.1-sol`, 50K tokens a minute); times are measur
 | Job | Time | Cost |
 |---|---|---|
 | The whole archive, ~820 shots | about 35 minutes | roughly $10 to $15 (estimate) |
+| Every first line again, ~820 photos, text only | about 8 minutes | under a dollar (estimate) |
 | A new session of 30 photos | 2 to 3 minutes | a few cents |
 | A description rewrite | seconds | under a cent |
+| Instagram facts for a new species or place | seconds | under a cent |

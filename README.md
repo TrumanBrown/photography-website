@@ -248,15 +248,17 @@ pass, and commands to preview or redo anything:
 
 The same pipeline can post the archive to an Instagram account: 3 photos a
 day by default, each one once, in an order that mixes sessions and subjects
-rather than going oldest to newest. Each post is:
+rather than going oldest to newest, with one post in every three a landscape
+or place. Each post is:
 
 - **the whole photo at Instagram's full resolution** (1440 px), never cropped.
   Frames Instagram can't take as they are get plain borders.
 - **a caption written from the photo's own record**: the species from your
-  iNaturalist identification of that exact photo with its scientific name, the
-  place, one checked fact, the camera and lens, five hashtags built from data,
-  alt text, and a last line sending people to the full-resolution photo on
-  your site through the link in your bio.
+  iNaturalist identification of that exact photo with its scientific name and
+  what it's doing, the place, one fact about the species or the place taken
+  from Wikipedia and checked against the article, the camera and lens, five
+  hashtags built from data, alt text, and a last line sending people to the
+  full-resolution photo on your site through the link in your bio.
 
 **What happens when you upload a session**, with nothing else to do:
 
@@ -269,7 +271,7 @@ rather than going oldest to newest. Each post is:
 3. The same run puts the new photos into the Instagram plan alongside the
    rest of the archive. Sessions photographed in the last 45 days get a small
    head start, and the plan never posts the same session twice in a day or
-   the same species within about five days.
+   the same species or landmark within about five days.
 4. Their posts are written as they come up, two weeks ahead, and the posting
    workflow publishes them at the next slots.
 

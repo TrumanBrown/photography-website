@@ -15,13 +15,13 @@ const VOICE_SECTIONS = [
   "Do not write",
 ];
 
-/** The parts of the site's copy rules that apply to captions. */
-export function loadVoiceRules() {
+/** The parts of the site's copy rules that apply to captions (or the sections asked for). */
+export function loadVoiceRules(sections = VOICE_SECTIONS) {
   try {
     const text = readFileSync(VOICE_FILE, "utf8");
     return text
       .split(/^## /m)
-      .filter((s) => VOICE_SECTIONS.some((h) => s.startsWith(h)))
+      .filter((s) => sections.some((h) => s.startsWith(h)))
       .map((s) => `## ${s.trim()}`)
       .join("\n\n");
   } catch {
@@ -64,6 +64,7 @@ const PLACE_PREFIX = new Set([
 const PROPER_PHRASE = Object.fromEntries(
   [
     "Puget Sound",
+    "Tapir Valley",
     "Great Basin",
     "Rocky Mountain",
     "Great Plains",

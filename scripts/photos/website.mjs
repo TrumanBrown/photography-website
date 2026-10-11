@@ -93,18 +93,27 @@ export function allowedNames(session) {
   });
 }
 
+// What a session title says you did there rather than where: "Tortuguero
+// night walk", "Eastern Washington macro".
+const ACTIVITY_TAIL =
+  /\s+(?:night walks?|walks?|macro|camping|hikes?|hiking|birding|wildlife|adventures?|weekend|trip)$/i;
+// A habitat rather than a named place reads lowercase mid-sentence: "…, shrub-steppe, Eastern Washington".
+const HABITAT =
+  /^(?:shrub-steppe|sagebrush steppe|steppe|desert|rainforest|cloud forest|tide ?pools?|wetlands?|grasslands?|old-growth forest)$/i;
+
 /** The most specific place for a caption: "Yellow Aster Butte", "Tortuguero canals". */
 export function placeLabel(session) {
-  if (hasRealTitle(session)) {
-    const first = String(session.title)
-      .replace(MONTH_TAIL, "")
+  const first = (s) =>
+    String(s ?? "")
       .split(",")[0]
       .trim();
-    if (first) return first;
-  }
-  return String(session.location ?? "")
-    .split(",")[0]
-    .trim();
+  const fromTitle = hasRealTitle(session)
+    ? first(String(session.title).replace(MONTH_TAIL, ""))
+        .replace(ACTIVITY_TAIL, "")
+        .trim()
+    : "";
+  if (HABITAT.test(fromTitle)) return fromTitle.toLowerCase();
+  return fromTitle || first(session.location);
 }
 
 const NUMBER_WORDS = [
@@ -257,6 +266,59 @@ function clean(fragment, { allowed, lexicon, taxonText, first = false }) {
   );
 }
 
+const PLACE_GENERIC = new Set([
+  "north",
+  "south",
+  "east",
+  "west",
+  "face",
+  "canals",
+  "night",
+  "walk",
+  "national",
+  "park",
+  "province",
+  "valley",
+  "mount",
+  "mountain",
+  "lake",
+  "river",
+  "forest",
+]);
+
+/**
+ * The parts of a place a caption line hasn't already named: "Mount Everest
+ * above the clouds" + "Everest north face, Tibet, China" -> "Tibet, China".
+ * A part counts as named when the line has every telling word of it, or the
+ * species name has the whole of it ("Tapir Valley tree frog"); a name that
+ * only shares a word ("Baird's tapir", "Tibetan gazelle") doesn't count.
+ */
+export function placeAfter(phrase, place, subject = "") {
+  const words = (s) =>
+    norm(s)
+      .split(/[^a-z0-9]+/)
+      .filter(Boolean);
+  const said = new Set(words(phrase));
+  return String(place ?? "")
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .filter((p) => {
+      if (
+        subject &&
+        ` ${words(subject).join(" ")} `.includes(` ${words(p).join(" ")} `)
+      )
+        return false;
+      const telling = words(p).filter(
+        (w) => w.length > 3 && !PLACE_GENERIC.has(w),
+      );
+      return telling.length
+        ? !telling.every((w) => said.has(w))
+        : !norm(phrase).includes(norm(p));
+    })
+    .join(", ");
+}
+
 /**
  * The website caption for one photo.
  *
@@ -267,6 +329,8 @@ function clean(fragment, { allowed, lexicon, taxonText, first = false }) {
  *                 caption can't name a species nobody identified
  * @param place    the place to end on; Instagram passes a fuller one
  * @param max      longest the line may be
+ * @param line     the written first line (lines.mjs), used when it passes
+ *                 the same checks; otherwise the line is built from the notes
  */
 export function captionFor({
   analysis,
@@ -275,6 +339,7 @@ export function captionFor({
   lexicon = [],
   place = placeLabel(session),
   max = CAPTION_MAX,
+  line = null,
 }) {
   const a = analysis ?? {};
   const level = a.idCheck === "conflict" ? null : idLevel(taxon);
@@ -305,11 +370,40 @@ export function captionFor({
       subject = `${subject} (${taxon.name})`;
     }
   }
+  let phrase = "";
+  let after = "";
+  if (level && line?.action && clean(line.action, ctx)) {
+    // "Two otters resting with its forepaws" -> "with their forepaws".
+    const action =
+      (a.count ?? 1) > 1
+        ? line.action.replace(/\bits\b/g, "their")
+        : line.action;
+    phrase = `${subject} ${action}`;
+    after = placeAfter(action, place, subject);
+  } else if (
+    !level &&
+    line?.text &&
+    clean(line.text, { ...ctx, first: true })
+  ) {
+    phrase = line.text;
+    after = placeAfter(line.text, place);
+  }
+  if (phrase) {
+    // "Near Seattle" is a session title's opening; after a comma it's "near".
+    after = after.replace(/^Near\b/, "near");
+    const full = tidy(after ? `${phrase}, ${after}` : phrase);
+    if (full.length <= max) return full;
+    if (tidy(phrase).length <= max) return tidy(phrase);
+  }
+
   const scene = clean(a.scene, ctx) ? a.scene : "";
   const conditions =
     clean(a.conditions, ctx) && telling(a.conditions) ? a.conditions : "";
   const said = norm(`${subject} ${scene}`);
-  const where = place && !said.includes(norm(place)) ? place : "";
+  const where =
+    place && !said.includes(norm(place))
+      ? place.replace(/^Near\b/, "near")
+      : "";
 
   const build = (parts) =>
     tidy(

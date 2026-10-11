@@ -31,7 +31,7 @@ import { createHash } from "node:crypto";
 import { appendFileSync } from "node:fs";
 import { join } from "node:path";
 import { ROOT } from "./settings.mjs";
-import { loadSettings, siteOwner } from "../social/settings.mjs";
+import { loadSettings } from "../social/settings.mjs";
 import { blobStore, localStore, updateJson } from "./store.mjs";
 import {
   loadSessionsFromIndex,
@@ -67,17 +67,36 @@ import {
   openerOf,
   placeLabel,
   sessionDigest,
+  speciesSubject,
 } from "./website.mjs";
 import { blobSidecars, mergeWebsiteText } from "./sidecars.mjs";
-import { compileLexicon, loadVoiceRules } from "./text.mjs";
+import {
+  compileLexicon,
+  displayName,
+  lint,
+  loadVoiceRules,
+  tidy,
+} from "./text.mjs";
+import {
+  LINE_VERSION,
+  linesPrompt,
+  mockLines,
+  normaliseLine,
+} from "./lines.mjs";
+import {
+  FACTS_VERSION,
+  checkFacts,
+  factKey,
+  factsPrompt,
+  groupName,
+  mockFacts,
+  pickFact,
+} from "./facts.mjs";
+import { wikiClient } from "./wiki.mjs";
 import {
   assembleCaption,
-  bodyPrompt,
-  finishPost,
-  mockBody,
   placeLine,
   sessionNames,
-  splitCaption,
 } from "../social/compose.mjs";
 import { buildHashtags } from "../social/hashtags.mjs";
 import { planQueue } from "../social/plan.mjs";
@@ -88,8 +107,8 @@ import { info, redact, warn } from "./redact.mjs";
 /** Bump when the description prompt changes enough that every session should be redone. */
 const DESCRIPTION_VERSION = 2;
 
-/** Bump when the Instagram body prompt changes enough that planned posts should be rewritten. */
-const POST_VERSION = 2;
+/** Bump when the way posts are put together changes, so planned posts are rebuilt. */
+const POST_VERSION = 3;
 
 function parseArgs(argv) {
   const out = {
@@ -487,6 +506,95 @@ async function main() {
     };
   }
 
+  // 4b. first lines: the caption's opening, said plainly (lines.mjs). Text
+  // only, from the notes above, in batches; redone when a photo is.
+  const levelOf = (s) =>
+    s.analysis?.idCheck === "conflict" ? null : idLevel(taxonOf(s));
+  // `npm run social -- redraft` asks for a new first line and a different fact.
+  const redrafting = (s, since) =>
+    Boolean(s.redraft && s.redraft > (since ?? ""));
+  const needsLine = (s) =>
+    s.analysis &&
+    (s.line?.v !== LINE_VERSION ||
+      s.line?.at !== s.analysis.at ||
+      redrafting(s, s.line?.written));
+  const lineQueue = Object.values(shots).filter(
+    (s) => inScope(s.session) && needsLine(s),
+  );
+  let linesWritten = 0;
+  if (lineQueue.length && provider) {
+    // One outing per batch, same subjects side by side, so the model can
+    // tell eleven photos of one peak apart instead of writing one line eleven times.
+    const bySession = new Map();
+    for (const s of lineQueue) {
+      if (!bySession.has(s.session)) bySession.set(s.session, []);
+      bySession.get(s.session).push(s);
+    }
+    const subjectOf = (s) =>
+      `${s.inat?.taxon ?? ""}|${s.analysis.landmark || s.analysis.subject || ""}`;
+    const batches = [];
+    for (const list of bySession.values()) {
+      list.sort(
+        (a, b) =>
+          subjectOf(a).localeCompare(subjectOf(b)) ||
+          String(a.clock ?? "").localeCompare(String(b.clock ?? "")),
+      );
+      for (let i = 0; i < list.length; i += 40)
+        batches.push(list.slice(i, i + 40));
+    }
+    await pool(batches, 2, async (batch) => {
+      const items = batch.map((s, i) => {
+        const taxon = taxonOf(s);
+        const level = levelOf(s);
+        const session = sessionOf(s.session);
+        return {
+          id: String(i + 1),
+          named:
+            level === "species"
+              ? (s.analysis.count ?? 1) > 1
+                ? speciesSubject(taxon, s.analysis.count)
+                : displayName(taxon.common) || taxon.name
+              : level === "group"
+                ? `${s.analysis.subject} (${taxon.name})`
+                : "",
+          subject: s.analysis.subject,
+          scene: s.analysis.scene,
+          conditions: s.analysis.conditions,
+          landmark: s.analysis.landmark,
+          description: s.analysis.description,
+          place: allowedNames(session).join(", "),
+        };
+      });
+      try {
+        const reply = await askJson({
+          provider,
+          model,
+          prompt: linesPrompt(items),
+          mock: () => mockLines(items),
+        });
+        const byId = new Map((reply.items ?? []).map((x) => [String(x.id), x]));
+        batch.forEach((s, i) => {
+          const got = normaliseLine(byId.get(String(i + 1)), {
+            named: Boolean(items[i].named),
+            plural: (s.analysis.count ?? 1) > 1,
+          });
+          // A line that failed its checks falls back to the notes; it isn't retried.
+          s.line = {
+            v: LINE_VERSION,
+            at: s.analysis.at,
+            written: new Date().toISOString(),
+            ...(got ?? { failed: true }),
+          };
+          if (got) linesWritten++;
+        });
+      } catch (e) {
+        warn(
+          `A batch of first lines failed and will be retried next run. ${redact(e)}`,
+        );
+      }
+    });
+  }
+
   // 5. website
   const fileShot = new Map();
   for (const [key, s] of Object.entries(shots))
@@ -526,6 +634,7 @@ async function main() {
           taxon,
           session,
           lexicon,
+          line: s.line,
         }),
       );
     }
@@ -721,7 +830,7 @@ async function main() {
   await store.writeJson("taxa.json", taxa);
 
   // 6. instagram
-  const ig = { rendered: 0, updated: 0, review: 0, planned: 0 };
+  const ig = { rendered: 0, facts: 0, review: 0, planned: 0 };
   if (args.instagram && process.env.SOCIAL_ENABLED === "true") {
     try {
       await instagramStage();
@@ -787,21 +896,18 @@ async function main() {
       }
     }
 
-    const owner = siteOwner();
     const pointer =
       config.linkLine ??
       (settings.domain
         ? `Full resolution and the rest of this session are on ${settings.domain}, link in bio`
         : "");
 
-    // Everything in a post that code decides. A post written from different
-    // parts (the caption rules changed, a hashtag rule, the link line) is
-    // rewritten the next time it's planned.
+    // Everything in a post besides its fact; all of it decided by code.
     const partsFor = (s) => {
       const file = catalog.files[s.pick];
       const session = sessionOf(s.session);
       const taxon = taxonOf(s);
-      const level = s.analysis.idCheck === "conflict" ? null : idLevel(taxon);
+      const level = levelOf(s);
       const headline = captionFor({
         analysis: s.analysis,
         taxon,
@@ -809,6 +915,7 @@ async function main() {
         lexicon,
         place: placeLine(session, placeLabel(session)),
         max: 220,
+        line: s.line,
       });
       const hashtags = buildHashtags({
         taxon,
@@ -820,84 +927,21 @@ async function main() {
         landmark: s.analysis.landmark,
         hubTags: config.hubHashtags ?? {},
       });
-      const gear = gearLine(file.facts);
-      const iucn = level === "species" ? (taxon.iucn ?? null) : null;
-      const basis = sha({
-        v: POST_VERSION,
-        headline,
-        hashtags,
-        gear,
-        pointer,
-        iucn,
-      });
       return {
-        file,
         session,
         taxon,
         level,
         headline,
         hashtags,
-        gear,
-        iucn,
-        basis,
+        gear: gearLine(file.facts),
+        iucn: level === "species" ? (taxon.iucn ?? null) : null,
       };
     };
 
     // Where each shot stands for Instagram.
     for (const s of Object.values(shots)) {
       const file = catalog.files[s.pick];
-      const level =
-        s.analysis?.idCheck === "conflict" ? null : idLevel(taxonOf(s));
-      s.speciesOk = level === "species";
-      const parts = s.analysis ? partsFor(s) : null;
-      const basis = parts?.basis ?? null;
-      if (s.post) {
-        const written = s.post.body
-          ? { headline: s.post.headline, body: s.post.body }
-          : splitCaption(s.post.caption);
-        // Posts from before versions were stored were all written by version 2.
-        const version = s.post.v ?? (s.post.basis ? 2 : 1);
-        const rewrite =
-          !parts ||
-          !written ||
-          s.post.analysedAt !== s.analysis?.at ||
-          version !== POST_VERSION ||
-          written.headline !== parts.headline ||
-          (s.redraft && s.redraft > (s.post.draftedAt ?? ""));
-        if (rewrite) {
-          delete s.post;
-          if (s.status === "ready") s.status = "new";
-        } else if (s.post.basis !== basis) {
-          // Only parts code fills in changed (the link line, a hashtag, the
-          // gear line): put the same body back together with the new ones.
-          s.post = {
-            ...s.post,
-            caption: assembleCaption({
-              headline: parts.headline,
-              body: written.body,
-              iucn: parts.iucn,
-              gear: parts.gear,
-              pointer,
-              hashtags: parts.hashtags,
-            }),
-            hashtags: parts.hashtags,
-            headline: parts.headline,
-            body: written.body,
-            basis,
-            v: POST_VERSION,
-          };
-          ig.updated++;
-        }
-      }
-      // A post that failed its checks gets another go once something changes.
-      if (
-        s.status === "needs_review" &&
-        (s.problemBasis !== basis ||
-          (s.redraft && s.redraft > (s.problemAt ?? "")))
-      ) {
-        s.status = "new";
-        delete s.problem;
-      }
+      s.speciesOk = levelOf(s) === "species";
       delete s.skipReason;
       if (!s.analysis) {
         s.status = s.unreadable ? "skipped" : undefined;
@@ -917,8 +961,7 @@ async function main() {
       ) {
         s.status = "skipped";
         s.skipReason = "outside-instagram-shape";
-      } else if (s.post?.caption) s.status = "ready";
-      else if (s.status !== "needs_review") s.status = "new";
+      } else s.status = s.post?.caption ? "ready" : "new";
     }
 
     const failedForGood = Object.entries(ledger.failed ?? {})
@@ -928,104 +971,250 @@ async function main() {
       .sort((a, b) => String(a[1].at).localeCompare(String(b[1].at)))
       .slice(-60)
       .map(([k]) => k);
-    const plan = () =>
-      planQueue({
-        shots,
-        posted: new Set([...posted, ...failedForGood]),
-        recent,
-        // Two weeks of posts written ahead, so posting carries on even if
-        // GitHub skips this workflow's scheduled runs for days.
-        count: settings.postsPerDay * 14,
-        postsPerDay: settings.postsPerDay,
-      });
+    const items = planQueue({
+      shots,
+      posted: new Set([...posted, ...failedForGood]),
+      recent,
+      // Two weeks of posts written ahead, so posting carries on even if
+      // GitHub skips this workflow's scheduled runs for days.
+      count: settings.postsPerDay * 14,
+      postsPerDay: settings.postsPerDay,
+      sceneEvery: settings.landscapeEvery,
+    });
 
-    // Write the posts the plan needs, then plan again around any that failed.
-    let items = plan();
-    for (let round = 0; round < 2; round++) {
-      const missing = items.filter((k) => !shots[k].post?.caption);
-      if (!missing.length || !provider) break;
-      await pool(missing, 3, async (key) => {
+    // Facts for the species and places the plan needs (facts.mjs), written
+    // once from Wikipedia and kept privately. A species with nothing usable
+    // falls back to its place; a lookup that found nothing waits 30 days.
+    const factsFile = (await store.readJson("facts.json"))?.data ?? {};
+    const factStore = factsFile.items ?? {};
+    const wiki = wikiClient({ domain: settings.domain });
+    // Facts don't use the first-person voice rules, since they aren't the
+    // photographer's own; they keep the list of words never to write.
+    const factVoice = loadVoiceRules(["Do not write"]);
+    const RETRY_MS = 30 * 24 * 3600 * 1000;
+    const keysFor = (s) => {
+      const level = levelOf(s);
+      return [
+        ...(level
+          ? [factKey({ taxon: taxonOf(s), level, slug: s.session })]
+          : []),
+        ...(s.analysis.landmark
+          ? [factKey({ landmark: s.analysis.landmark, slug: s.session })]
+          : []),
+        factKey({ slug: s.session }),
+      ];
+    };
+    const usable = (key) => {
+      const rec = factStore[key];
+      return rec?.v === FACTS_VERSION && rec.facts?.length ? rec.facts : null;
+    };
+    const tried = (key) => {
+      const rec = factStore[key];
+      return (
+        rec?.v === FACTS_VERSION &&
+        !rec.facts?.length &&
+        Date.now() - new Date(rec.at) < RETRY_MS
+      );
+    };
+    let factsWritten = 0;
+    // Species that fall back to the same genus or family article (two
+    // katydids, say) share its facts, so they rotate instead of repeating.
+    const byArticle = new Map();
+    for (const rec of Object.values(factStore))
+      if (
+        rec?.v === FACTS_VERSION &&
+        rec.facts?.length &&
+        rec.source?.title &&
+        rec.source.about !== "species"
+      )
+        byArticle.set(rec.source.title, Promise.resolve(rec.facts));
+    async function writeFacts(key, s) {
+      const session = sessionOf(s.session);
+      const [kind, id] = [
+        key.slice(0, key.indexOf(":")),
+        key.slice(key.indexOf(":") + 1),
+      ];
+      // Most specific first: the species' own article, then its genus's and
+      // family's, until one has something worth saying. A failed lookup
+      // throws, and the key is tried again next run.
+      const candidates =
+        kind === "taxon"
+          ? wiki.taxonArticles(id)
+          : (async function* () {
+              const a = await wiki.placeArticle({
+                place:
+                  kind === "landmark"
+                    ? s.analysis.landmark
+                    : placeLabel(session),
+                names: allowedNames(session),
+                landmark: kind === "landmark" ? s.analysis.landmark : "",
+                context: String(session.location ?? "")
+                  .split(",")
+                  .map((p) => p.trim())
+                  .filter(Boolean),
+              });
+              if (a) yield a;
+            })();
+      const taxon = kind === "taxon" ? taxa[id] : null;
+      const ask = async (art) => {
+        const name =
+          kind !== "taxon"
+            ? art.title
+            : art.about === "species"
+              ? displayName(taxon?.common) || taxon?.name || art.title
+              : groupName(art);
+        const raw = await askJson({
+          provider,
+          model,
+          prompt: factsPrompt({
+            name,
+            kind: kind === "taxon" ? "species" : "place",
+            art,
+            species:
+              kind === "taxon" && art.about !== "species"
+                ? displayName(taxon?.common, { midSentence: true }) ||
+                  taxon?.name ||
+                  ""
+                : "",
+            voiceRules: factVoice,
+          }),
+          mock: () => mockFacts(art),
+        });
+        return checkFacts(raw, art, { lexicon });
+      };
+      let facts = [];
+      let used = null;
+      for await (const art of candidates) {
+        used = art;
+        if (art.about !== "species") {
+          if (!byArticle.has(art.title)) {
+            const asking = ask(art);
+            byArticle.set(art.title, asking);
+            asking.catch(() => byArticle.delete(art.title));
+          }
+          facts = await byArticle.get(art.title);
+        } else facts = await ask(art);
+        if (facts.length) break;
+      }
+      factStore[key] = {
+        v: FACTS_VERSION,
+        at: new Date().toISOString(),
+        facts,
+        ...(used ? { source: { title: used.title, about: used.about } } : {}),
+      };
+      if (facts.length) factsWritten++;
+    }
+    // A species with nothing usable falls through to its place in the same
+    // run, so a post isn't left without a fact for a day.
+    for (let round = 0; round < 3 && provider; round++) {
+      const wanted = new Map();
+      for (const key of items) {
+        const s = shots[key];
+        for (const k of keysFor(s)) {
+          if (usable(k)) break;
+          if (tried(k)) continue;
+          if (!wanted.has(k)) wanted.set(k, s);
+          break;
+        }
+      }
+      if (!wanted.size) break;
+      await pool([...wanted.entries()], 3, async ([k, s]) => {
         try {
-          await writePost(shots[key]);
+          await writeFacts(k, s);
         } catch (e) {
           warn(
-            `A post draft failed and will be retried next run. ${redact(e)}`,
+            `Facts for a post failed and will be retried next run. ${redact(e)}`,
           );
         }
       });
-      items = plan();
+      await store.writeJson("facts.json", { items: factStore });
     }
-    items = items.filter((k) => shots[k].status === "ready");
-    ig.planned = items.length;
+
+    // Write each planned post, or bring it up to date. A post keeps its fact
+    // while that fact still exists; a new post takes the fact used least by
+    // any post so far.
+    const used = [];
+    for (const s of Object.values(shots))
+      if (s.post?.fact && s.post.factKey) used.push(s.post.fact);
+    const planned = new Set(items);
+    for (const key of items) {
+      const s = shots[key];
+      const parts = partsFor(s);
+      const factKeyUsed = keysFor(s).find((k) => usable(k)) ?? null;
+      const facts = factKeyUsed ? usable(factKeyUsed) : [];
+      const redraft = redrafting(s, s.post?.draftedAt);
+      const keep =
+        !redraft &&
+        s.post?.factKey === factKeyUsed &&
+        facts.includes(s.post?.fact)
+          ? s.post.fact
+          : "";
+      // A redraft takes another fact when there is one.
+      const choices =
+        redraft && facts.length > 1
+          ? facts.filter((f) => f !== s.post?.fact)
+          : facts;
+      const fact = keep || pickFact(choices, used);
+      const basis = sha({
+        v: POST_VERSION,
+        headline: parts.headline,
+        hashtags: parts.hashtags,
+        gear: parts.gear,
+        pointer,
+        iucn: parts.iucn,
+        fact,
+      });
+      if (s.post?.basis === basis) continue;
+      const caption = assembleCaption({
+        headline: parts.headline,
+        body: fact,
+        iucn: parts.iucn,
+        gear: parts.gear,
+        pointer,
+        hashtags: parts.hashtags,
+      });
+      if (lint(caption).length) {
+        s.status = "needs_review";
+        s.problem = lint(caption).join(", ");
+        ig.review++;
+        continue;
+      }
+      if (!keep && fact && factKeyUsed) used.push(fact);
+      s.post = {
+        caption,
+        alt: tidy(s.analysis.description).slice(0, 1000),
+        headline: parts.headline,
+        fact,
+        factKey: factKeyUsed,
+        v: POST_VERSION,
+        hashtags: parts.hashtags,
+        group: s.analysis.group,
+        appeal: s.analysis.appeal,
+        taxon: parts.level ? parts.taxon.id : null,
+        analysedAt: s.analysis.at,
+        basis,
+        draftedAt: new Date().toISOString(),
+      };
+      s.status = "ready";
+      delete s.problem;
+      ig.rendered++;
+    }
+    // Out-of-date posts outside the plan are dropped, and written again when
+    // they're planned. Posts already published stay as the record of them.
+    for (const [key, s] of Object.entries(shots)) {
+      if (planned.has(key) || posted.has(key) || !s.post) continue;
+      if (s.post.v !== POST_VERSION || s.post.analysedAt !== s.analysis?.at) {
+        delete s.post;
+        if (s.status === "ready") s.status = "new";
+      }
+    }
+    const ready = items.filter((k) => shots[k].status === "ready");
+    ig.planned = ready.length;
+    ig.facts = factsWritten;
     await social.writeJson("queue.json", {
       plannedAt: new Date().toISOString(),
-      items,
+      items: ready,
     });
-
-    async function writePost(s) {
-      const { session, taxon, level, headline, hashtags, gear, basis } =
-        partsFor(s);
-      let feedback = null;
-      let finished = null;
-      for (let attempt = 0; attempt < 2; attempt++) {
-        const draft = await askJson({
-          provider,
-          model,
-          prompt: bodyPrompt({
-            owner,
-            session,
-            analysis: s.analysis,
-            headline,
-            clock: s.clock,
-            taxon,
-            voiceRules,
-            feedback,
-          }),
-          mock: mockBody,
-        });
-        finished = finishPost({
-          headline,
-          body: draft.body,
-          alt: s.analysis.description,
-          session,
-          taxon,
-          level,
-          gear,
-          hashtags,
-          pointer,
-          lexicon,
-        });
-        if (!finished.problem) {
-          s.post = {
-            caption: finished.caption,
-            alt: finished.alt,
-            headline,
-            body: finished.body,
-            v: POST_VERSION,
-            hashtags,
-            group: s.analysis.group,
-            appeal: s.analysis.appeal,
-            taxon: level ? taxon.id : null,
-            analysedAt: s.analysis.at,
-            basis,
-            model,
-            draftedAt: new Date().toISOString(),
-          };
-          s.status = "ready";
-          delete s.problem;
-          delete s.problemBasis;
-          delete s.problemAt;
-          ig.rendered++;
-          return;
-        }
-        feedback = finished.problem;
-      }
-      s.status = "needs_review";
-      s.problem = finished?.problem ?? "draft failed";
-      s.problemBasis = basis;
-      s.problemAt = new Date().toISOString();
-      ig.review++;
-    }
   }
 
   await saveCatalog(store, catalog);
@@ -1038,9 +1227,9 @@ async function main() {
       `Photos: ${photos.length} (${scanned} newly scanned${scanFailed ? `, ${scanFailed} unreadable` : ""}).`,
       `Shots: ${all.length}, analysed: ${count((s) => s.analysis)} (${analysed} this run${analyseFailed ? `, ${analyseFailed} failed` : ""}).`,
       `iNaturalist matches: ${count((s) => s.inat?.via === "frame")} exact frame, ${count((s) => s.inat?.via === "moment")} same moment; ${count((s) => s.analysis?.idCheck === "conflict")} flagged as not matching.`,
-      `Website: ${site.captions} captions, ${site.described} descriptions written${site.describeFailed ? `, ${site.describeFailed} failed checks` : ""}, ${site.waiting} sessions still being analysed, ${site.written} session files updated${site.kept ? `, ${site.kept} of your edits left alone` : ""}${sidecars ? "" : " (not written: dry run)"}.`,
+      `Website: ${site.captions} captions (${linesWritten} first lines written), ${site.described} descriptions written${site.describeFailed ? `, ${site.describeFailed} failed checks` : ""}, ${site.waiting} sessions still being analysed, ${site.written} session files updated${site.kept ? `, ${site.kept} of your edits left alone` : ""}${sidecars ? "" : " (not written: dry run)"}.`,
       process.env.SOCIAL_ENABLED === "true" && args.instagram
-        ? `Instagram: ${ig.rendered} posts written, ${ig.updated} updated, ${ig.review} need review, ${ig.planned} planned.`
+        ? `Instagram: ${ig.rendered} posts written, facts for ${ig.facts} new species or places, ${ig.review} need review, ${ig.planned} planned.`
         : "",
     ]
       .filter(Boolean)

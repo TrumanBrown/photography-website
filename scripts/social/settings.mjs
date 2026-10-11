@@ -71,6 +71,8 @@ export function loadSettings(env = process.env) {
     apiVersion: env.IG_API_VERSION || "v25.0",
     postsPerDay,
     slots: parseSlots(env.SOCIAL_SLOTS, postsPerDay),
+    /** One post in every this many is a landscape or place while any are left; 0 turns it off. */
+    landscapeEvery: int(env.SOCIAL_LANDSCAPE_EVERY, 3, 0, 10),
     timezone: env.SOCIAL_TIMEZONE || "America/Los_Angeles",
     /** Never post twice within this many minutes, even when catching up. */
     minGapMinutes: int(env.SOCIAL_MIN_GAP_MINUTES, 150, 30, 720),

@@ -22,7 +22,8 @@
 - Posts photographs from the site to one Instagram account: **3 a day** by default, at 08:30, 12:30 and 18:00 Pacific.
 - **Never posts the same photograph twice**, even when it exists as several files (crops, re-exports, copies in two sessions), and never re-posts anything already on the account.
 - Posts the **whole frame at Instagram's full resolution** (1440 px wide). It never crops. Frames too tall or too wide for Instagram get plain borders instead.
-- **Writes each caption from the photo's record**: the same one-time analysis that writes the website's captions ([docs/photos.md](photos.md)). Each post gets what's in the frame, where it is, the camera and lens, alt text, and five hashtags. For animals and plants it uses **your own iNaturalist identification of that exact photo**.
+- **Writes each caption from the photo's record**: the same one-time analysis that writes the website's captions ([docs/photos.md](photos.md)). Each post gets what the photo is of and what it's doing, where it is, **one true fact about the species or the place** taken from Wikipedia, the camera and lens, alt text, and five hashtags. For animals and plants it uses **your own iNaturalist identification of that exact photo**.
+- **Mixes the feed**: one post in every three is a landscape or place, the rest wildlife.
 - **Picks up new sessions on its own**, the night after they appear on the site.
 - Runs entirely in **GitHub Actions**. Nothing has to run on your computer.
 
@@ -48,7 +49,7 @@ Nothing needs doing when you add photos. After `./scripts/upload-session.sh <fol
 
 1. **Build and Deploy** publishes the photos, notices ones the pipeline hasn't seen, and starts **Photo captions**.
 2. **Photo captions** analyses the new photos, matches them to your iNaturalist observations, writes their website captions and the session description, redeploys the site, and adds them to the Instagram plan.
-3. They're posted as their turn comes. Sessions photographed in the last 45 days get a small head start; the plan never posts one session twice in a day, the same species within about five days, or frames from the same burst within about ten.
+3. They're posted as their turn comes. Sessions photographed in the last 45 days get a small head start; the plan never posts one session twice in a day, the same species or landmark within about five days, or frames from the same burst within about ten.
 
 Adding iNaturalist observations later is fine: the next Photo captions run matches them, and the website captions and any post not yet published pick up the species.
 
@@ -58,6 +59,7 @@ Adding iNaturalist observations later is fine: the next Photo captions run match
 |---|---|---|
 | Which account, and its access token | GitHub secrets, plus an encrypted copy in the private `metadata` storage container | No |
 | Each photo's record (what's in it, its identification, its written post) | `metadata/photos/` in the private container | No |
+| The facts posts draw on, and which Wikipedia article each came from | `metadata/photos/facts.json` in the private container | No |
 | The posting plan, posting history | `metadata/social/` in the private container | No |
 | The images sent to Instagram | Uploaded to the private container, given to Instagram as a link that expires after two hours, deleted after posting | No |
 | Workflow logs | Public, like every Actions log in a public repository | Yes, but they only contain counts and generic messages. Errors pass through [redact.mjs](../scripts/photos/redact.mjs), which strips tokens, account and media ids, signed links and provider ids |
@@ -232,7 +234,7 @@ When you want to steer it, these run on your computer (signed in with `az login`
 | `npm run social -- preview` | Opens the next week of posts in your browser (`--no-open` just writes the page) |
 | `npm run social -- skip DSC01234 [why]` | Never post this shot |
 | `npm run social -- unskip DSC01234` | Undo a skip |
-| `npm run social -- redraft DSC01234` | Rewrite its post on the next Photo captions run |
+| `npm run social -- redraft DSC01234` | On the next Photo captions run, write the photo a new first line (its website caption changes too) and give its post a different fact |
 | `npm run social -- approve DSC01234` | Approve this exact caption (only matters with `SOCIAL_REQUIRE_APPROVAL=true`) |
 | `npm run social -- retry DSC01234` | Clear failed attempts so a photo can be tried again (`--all` for every photo) |
 
@@ -270,6 +272,7 @@ Set these as **secrets** (masked in logs) or **variables** under Settings → Se
 | `SOCIAL_ENABLED` | variable | off | `true` turns on the Instagram stage and the Social post workflow |
 | `SOCIAL_LIVE` | variable | off | `true` publishes; anything else is a dry run |
 | `SOCIAL_POSTS_PER_DAY` | variable | `3` | 1 to 6 |
+| `SOCIAL_LANDSCAPE_EVERY` | variable | `3` | One post in every this many is a landscape or place, while any are left. `0` lets the score alone decide, which puts identified wildlife first |
 | `SOCIAL_SLOTS` | variable | `08:30,12:30,18:00` | Posting times, comma-separated |
 | `SOCIAL_TIMEZONE` | variable | `America/Los_Angeles` | Time zone for the slots |
 | `SOCIAL_MIN_GAP_MINUTES` | variable | `150` | Minimum time between two posts |
@@ -292,11 +295,13 @@ The timer's own settings are parameters of [scheduler.bicep](../infra/modules/sc
 Each Photo captions run plans the next two weeks. Each next post is the best-scoring shot that doesn't repeat something recent:
 
 - the same session isn't posted twice within a day
-- the same species isn't posted again within about five days
+- the same species, or for a landscape the same landmark (or the same outing when there's no landmark), isn't posted again within about five days
 - frames from the same burst aren't posted again within about ten days
 - the same location as the last post or two is penalised, so places rotate
 
 The score is the analysis's 1–10 rating of how likely the frame is to stop someone scrolling, plus a bump for photos identified to species and for sessions from the last 45 days.
+
+On score alone, identified wildlife would fill the feed for months before a landscape came up. So **one post in every three is the best landscape or place left** (mountains, forests, waterfalls, rivers, lakes, coasts, glaciers, cities, temples), which at three a day is one a day. `SOCIAL_LANDSCAPE_EVERY` changes the ratio, and `0` turns it off.
 
 Shots are skipped automatically when they're under 1080 px wide, out of focus, an identifiable person is the subject, or the photo plainly isn't what its iNaturalist identification says.
 
@@ -319,45 +324,57 @@ Both come from the photo's record, made once for the website and Instagram alike
 
 From the identified taxon, [inat.mjs](../scripts/photos/inat.mjs) also keeps the class, order and family, iNaturalist's Wikipedia summary, and the global IUCN Red List status.
 
-### 4. Writing the post
+### 4. The fact
 
-A post is only written once its photo is planned for the coming week, so a change in wording never means rewriting the whole archive. [compose.mjs](../scripts/social/compose.mjs) asks a model, text only, for a one-to-three-sentence body. It receives:
+Each post carries one fact, so it reads like something a person who knows the animal or the place would tell you, rather than a description of the picture. Facts are written once per species or place, kept privately in `facts.json`, and shared by every post of that species or place, so writing a post needs no model call at all.
 
-- the first line, already written
-- the record's description of the frame, its setting and light
-- the session title, location and month
-- for an identified organism, its name and Wikipedia summary
-- the site's voice rules from [site-copy.instructions.md](../.github/instructions/site-copy.instructions.md)
+Where a fact comes from, most specific first ([wiki.mjs](../scripts/photos/wiki.mjs)):
 
-Its rules: start with something specific in the frame, add at most one fact and only from the summary, and never name a place the session doesn't.
+1. **The species' own Wikipedia article**, through the link iNaturalist keeps for the taxon. Taxa are never looked up by name, because names collide ("Zelus" is a Greek god as well as an assassin bug genus).
+2. **Its genus's article, then its family's**, when the species has none or it has nothing worth saying. These have to mention the family or order, and their facts have to be true of the whole group ("Like other cuckoos, they ..."), never something only some of them do, and never where they live.
+3. **The place**, for a landscape or a species with nothing usable: the landmark in the photo ("Mount Baker"), or else the session's place, preferring the national park over the town that shares its name. The article has to mention the wider place (the province, state or country), so a band named after a village doesn't count.
+
+[facts.mjs](../scripts/photos/facts.mjs) asks a model, text only, for up to four facts from the article, most surprising first, in plain sentences the way a guide would say them on a walk. Fewer when the article only has one or two good ones. Each fact is then checked against the article before it's kept:
+
+- the sentence it came from has to be in the article, and so does every number in it
+- no first person: the photographer didn't write these
+- no teaser opening ("Poison comes from dinner."), no closing clause that says it again ("..., that's how they hunt"), no "like this one"
+- no species the article doesn't mention, and none of the words the voice rules ban
+- for a genus or family: nothing only some of them do, nothing about their range
+
+A species posted more than once rotates through its facts, least used first. Species that share a genus or family article share its facts, so two katydids don't say the same thing in the same week. A lookup that finds nothing is tried again after 30 days; until then the post falls back to its place, and if that has nothing either, it goes out without a fact. To rewrite every stored fact (after changing the prompt, say), bump `FACTS_VERSION` in facts.mjs.
+
+Wikipedia is read through its public API, one request at a time, with a user agent naming the site, as Wikimedia's API etiquette asks.
 
 ### 5. The caption
 
 ```
-Boat-billed heron (Cochlearius cochlearius) peering out from behind a branch, Tortuguero, Limón Province, Costa Rica
+Red-eyed tree frog (Agalychnis callidryas) clinging to the side of a stem, Tapir Valley, Bijagua, Costa Rica
 
-Rain beading on the crown, a bill like an upturned boat, and eyes far too big for its head. Boatbills are nocturnal herons that live in mangrove swamps from Mexico south to Peru and Brazil.
+Their embryos can hatch early when predators approach, dropping into the water below to escape.
 
-Sony a6700 · E 70-350mm F4.5-6.3 G OSS at 350mm · f/6.3 · 1/50s · ISO 6400
+Sony a6700 · FE 90mm F2.8 Macro G OSS · f/2.8 · 1/160s · ISO 1250
 Full resolution and the rest of this session are on example.com, link in bio
 
-#boatbilledheron #birdsofinstagram #tortuguero #birdphotography #sonya6700
+#redeyedtreefrog #frogsofinstagram #tapirvalley #macrophotography #sonya6700
 ```
 
-- **First line:** the website's caption for the photo, with the fuller place. Keywords first, because Instagram search and Google read it. Identified species get their scientific name too.
-- **Body:** written by the model under the rules above.
+- **First line:** the photo's first line from the website ([docs/photos.md](photos.md#captions)), with the fuller place. What it is and what it's doing, never the background. Keywords first, because Instagram search and Google read it. Identified species get their scientific name too.
+- **Fact:** one of the species' or place's facts, as above.
 - **Red List line:** added when the global IUCN status is Near Threatened or worse.
 - **Gear line:** from the photo's EXIF data.
-- **Link line:** captions can't hold clickable links, so it sends people to the link in your profile, for the full-resolution photo and the rest of the session. Put the site's address in your bio for it to work. Change the wording with `linkLine` in the [private settings file](#private-settings-file); posts already written are updated around their existing text, with no new model calls.
-- **Alt text:** sent with every post. Instagram and Google both read it.
+- **Link line:** captions can't hold clickable links, so it sends people to the link in your profile, for the full-resolution photo and the rest of the session. Put the site's address in your bio for it to work. Change the wording with `linkLine` in the [private settings file](#private-settings-file); posts already written are updated with it on the next run.
+- **Alt text:** the record's plain description of the frame, sent with every post. Instagram and Google both read it.
+
+A post is only written once its photo is planned for the coming two weeks, and it's put together by code from the parts above, so rewording any part never means rewriting the whole archive. A written post keeps its fact while that fact still exists.
 
 **Hashtags:** exactly five, because Instagram allows no more since December 2025. They're built from data by [hashtags.mjs](../scripts/social/hashtags.mjs), never made up by the model:
 
 | Slot | Comes from | Example |
 |---|---|---|
-| Subject | The species identified on iNaturalist, or a landmark named in the session | `#boatbilledheron` |
-| Community | iNaturalist lineage, or the model's subject group | `#birdsofinstagram` |
-| Place | A place word from the session title or location | `#tortuguero` |
+| Subject | The species identified on iNaturalist, or a landmark named in the session | `#redeyedtreefrog` |
+| Community | iNaturalist lineage, or the model's subject group | `#frogsofinstagram` |
+| Place | A place word from the session title or location | `#tapirvalley` |
 | Genre | Lens and subject | `#birdphotography`, `#macrophotography` |
 | Gear | Camera body | `#sonya6700` |
 
@@ -366,8 +383,8 @@ When there's no subject tag (most landscapes), the broad region takes the slot (
 **Checks before a caption is saved:**
 
 - **Fixed automatically:** em dashes, emoji, exclamation marks, and stray `#` or `@`.
-- **Rejected and rewritten once:** marketing words, place names the session doesn't mention, and species names the photo isn't identified as.
-- **Held back:** a caption that still fails is marked "needs review" and is never posted unprompted.
+- **Already checked on the way in:** the first line and the fact each pass their own checks before they're stored (banned words, names nobody wrote down, species the photo isn't identified as, facts that can't be traced to their article).
+- **Held back:** a caption that still fails the copy checks is marked "needs review" and is never posted unprompted.
 
 ---
 
