@@ -23,6 +23,7 @@ import {
 import {
   allowedNames,
   groundingText,
+  telling,
   ungroundedInProse,
 } from "../photos/website.mjs";
 
@@ -31,15 +32,15 @@ export function placeLine(session, first) {
   const parts = [first, ...String(session.location ?? "").split(",")]
     .map((s) => s?.trim())
     .filter(Boolean);
-  const seen = new Set();
-  return parts
-    .filter((p) => {
-      const k = p.toLowerCase();
-      if (seen.has(k)) return false;
-      seen.add(k);
-      return true;
-    })
-    .join(", ");
+  const kept = [];
+  const words = (p) => p.toLowerCase().split(/\s+/);
+  for (const part of parts) {
+    // "Washington" adds nothing after "Western Washington".
+    if (kept.some((k) => words(part).every((w) => words(k).includes(w))))
+      continue;
+    kept.push(part);
+  }
+  return kept.join(", ");
 }
 
 export function bodyPrompt({
@@ -58,7 +59,9 @@ export function bodyPrompt({
     `- First line of the post, already written (don't repeat it): "${headline}"`,
     `- What's in the frame: ${analysis.description}`,
     analysis.setting ? `- Setting: ${analysis.setting}` : "",
-    analysis.conditions ? `- Light or weather: ${analysis.conditions}` : "",
+    analysis.conditions && telling(analysis.conditions)
+      ? `- Light or weather: ${analysis.conditions}`
+      : "",
     `- Session: "${session.title}"${session.location ? `, ${session.location}` : ""}${when ? `, ${when}` : ""}`,
   ].filter(Boolean);
   const id = level

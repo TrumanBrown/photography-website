@@ -63,6 +63,16 @@ describe("website captions", () => {
   it("counts several of a species", () => {
     expect(speciesSubject(seal, 2)).toBe("Two harbor seals (Phoca vitulina)");
     expect(speciesSubject(seal, 14)).toBe("Harbor seals (Phoca vitulina)");
+    expect(
+      speciesSubject(
+        {
+          name: "Lontra canadensis",
+          common: "North American River Otter",
+          rank: "species",
+        },
+        2,
+      ),
+    ).toBe("Two North American river otters (Lontra canadensis)");
     expect(plural("Canada goose")).toBe("Canada geese");
     expect(plural("rockfish")).toBe("rockfish");
     expect(plural("butterfly")).toBe("butterflies");

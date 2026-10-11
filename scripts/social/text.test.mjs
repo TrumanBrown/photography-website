@@ -1,5 +1,11 @@
-import { buildHashtags, landmarkTag, placeTag, tagify } from "./hashtags.mjs";
-import { finishPost } from "./compose.mjs";
+import {
+  buildHashtags,
+  communityTag,
+  landmarkTag,
+  placeTag,
+  tagify,
+} from "./hashtags.mjs";
+import { finishPost, placeLine } from "./compose.mjs";
 import {
   compileLexicon,
   displayName,
@@ -156,6 +162,52 @@ describe("caption text", () => {
   it("flags banned words and passes plain text", () => {
     expect(lint("A stunning frog")).toEqual(['uses "stunning"']);
     expect(lint("Orange hands and a barred yellow side")).toEqual([]);
+  });
+
+  it("keeps place names and people's names inside species names", () => {
+    for (const [name, shown] of [
+      ["North American River Otter", "North American river otter"],
+      [
+        "La Loma Mushroomtongue Salamander",
+        "La Loma mushroomtongue salamander",
+      ],
+      ["Canada Goose", "Canada goose"],
+      ["Cape May Warbler", "Cape May warbler"],
+      ["Pallas' Leaf Warbler", "Pallas' leaf warbler"],
+      ["Dungeness Crab", "Dungeness crab"],
+      ["Northern Alligator Lizard", "northern alligator lizard"],
+      ["Lake Trout", "lake trout"],
+    ])
+      expect(displayName(name, { midSentence: true })).toBe(shown);
+  });
+
+  it("gives butterflies and moths their own community tags", () => {
+    const lep = (family) => ({
+      lineage: { order: { name: "Lepidoptera" }, family: { name: family } },
+    });
+    expect(communityTag({ taxon: lep("Papilionidae") })).toBe(
+      "butterfliesofinstagram",
+    );
+    expect(communityTag({ taxon: lep("Nymphalidae") })).toBe(
+      "butterfliesofinstagram",
+    );
+    expect(communityTag({ taxon: lep("Erebidae") })).toBe("mothsofinstagram");
+    expect(communityTag({ group: "moth" })).toBe("mothsofinstagram");
+  });
+
+  it("doesn't repeat a place the line already names", () => {
+    expect(placeLine({ location: "Washington" }, "Western Washington")).toBe(
+      "Western Washington",
+    );
+    expect(placeLine({ location: "Tibet, China" }, "Tibetan plateau")).toBe(
+      "Tibetan plateau, Tibet, China",
+    );
+    expect(
+      placeLine(
+        { location: "North Cascades, Washington" },
+        "Yellow Aster Butte",
+      ),
+    ).toBe("Yellow Aster Butte, North Cascades, Washington");
   });
 
   it("keeps demonyms capitalised mid-sentence", () => {

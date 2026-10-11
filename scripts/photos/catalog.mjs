@@ -86,6 +86,9 @@ import { info, redact, warn } from "./redact.mjs";
 /** Bump when the description prompt changes enough that every session should be redone. */
 const DESCRIPTION_VERSION = 2;
 
+/** Bump when the Instagram body prompt changes enough that planned posts should be rewritten. */
+const POST_VERSION = 2;
+
 function parseArgs(argv) {
   const out = {
     local: false,
@@ -806,6 +809,7 @@ async function main() {
       });
       const gear = gearLine(file.facts);
       const basis = sha({
+        v: POST_VERSION,
         headline,
         hashtags,
         gear,

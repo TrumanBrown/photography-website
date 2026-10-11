@@ -27,6 +27,17 @@ export function tagify(text) {
     .slice(0, 40);
 }
 
+/** The butterflies (Papilionoidea); every other lepidopteran is a moth. */
+const BUTTERFLY_FAMILIES = new Set([
+  "Papilionidae",
+  "Hesperiidae",
+  "Pieridae",
+  "Lycaenidae",
+  "Riodinidae",
+  "Nymphalidae",
+  "Hedylidae",
+]);
+
 /** Community tag from iNat lineage (preferred) or the model's group label. */
 export function communityTag({ taxon, group }) {
   const l = taxon?.lineage ?? {};
@@ -44,7 +55,10 @@ export function communityTag({ taxon, group }) {
     if (order === "Crocodylia") return "crocodilians";
     if (cls === "Aves") return "birdsofinstagram";
     if (cls === "Mammalia") return "mammals";
-    if (order === "Lepidoptera") return "lepidoptera";
+    if (order === "Lepidoptera")
+      return BUTTERFLY_FAMILIES.has(l.family?.name)
+        ? "butterfliesofinstagram"
+        : "mothsofinstagram";
     if (order === "Odonata") return "dragonflies";
     if (order === "Coleoptera") return "beetles";
     if (cls === "Insecta") return "insectsofinstagram";
@@ -74,8 +88,8 @@ const GROUP_TAGS = {
   bird: "birdsofinstagram",
   mammal: "mammals",
   insect: "insectsofinstagram",
-  butterfly: "lepidoptera",
-  moth: "lepidoptera",
+  butterfly: "butterfliesofinstagram",
+  moth: "mothsofinstagram",
   dragonfly: "dragonflies",
   beetle: "beetles",
   spider: "spidersofinstagram",

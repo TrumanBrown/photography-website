@@ -31,13 +31,34 @@ export function loadVoiceRules() {
 
 const KEEP_CAPITALISED = new Set(
   (
-    "American African Asian European Australian Chinese Japanese Tibetan Himalayan Indian Mexican " +
-    "Canadian Californian California Oregon Washington Pacific Atlantic Caribbean Andean Amazonian " +
-    "Costa Rican Panamanian Mediterranean Arctic Siberian Mongolian Korean Formosan Taiwanese " +
-    "Malayan Bornean Sumatran Javan Philippine Brazilian Peruvian Hawaiian Alaskan Cascade Sierra " +
-    "Nevada Rocky Appalachian Yunnan Sichuan"
+    "American African Asian Asiatic European Australian Chinese Japanese Tibetan Himalayan Indian " +
+    "Mexican Canadian Canada Californian California Oregon Washington Pacific Atlantic Caribbean " +
+    "Andean Amazonian Amazon Costa Rican Panamanian Panamic Nicaraguan Cuban Tico Mediterranean " +
+    "Arctic Siberian Mongolian Korean Formosan Taiwanese Malayan Bornean Sumatran Javan Philippine " +
+    "Brazilian Peruvian Hawaiian Alaskan Alaska Cascade Cascades Olympic Columbia Sierra Nevada " +
+    "Rocky Appalachian Yunnan Yulong Sichuan Bering Chinook Dungeness Monterey Carolina Virginia " +
+    "Texas Florida Arizona Louisiana Kentucky Tennessee Connecticut Nashville Mississippi Missouri " +
+    "Idaho Utah Montana Colorado Sonoran Mojave Baja Chihuahuan Galapagos Galápagos Cocos Gulf " +
+    "Oriental Moorish Spanish Montezuma Roosevelt Halloween Isabella Paris Thoas Peralta Sabinal " +
+    "Pere Père Sally-Lightfoot"
   ).split(" "),
 );
+
+/** Words that start a place name, so they and the word after them keep capitals: "La Loma", "Cape May". */
+const PLACE_PREFIX = new Set([
+  "La",
+  "El",
+  "Los",
+  "Las",
+  "San",
+  "Santa",
+  "Mount",
+  "Cape",
+  "Rio",
+  "Río",
+  "St.",
+  "Saint",
+]);
 
 /** Place names inside species names, kept capitalised: "Puget Sound garter snake". */
 const PROPER_PHRASE = Object.fromEntries(
@@ -47,6 +68,10 @@ const PROPER_PHRASE = Object.fromEntries(
     "Rocky Mountain",
     "Great Plains",
     "Gulf Coast",
+    "North American",
+    "South American",
+    "Central American",
+    "West Indian",
   ].map((p) => [p.toLowerCase(), p]),
 );
 const PROPER_PHRASES = new RegExp(
@@ -62,26 +87,26 @@ const PROPER_PHRASES = new RegExp(
 export function displayName(common, { midSentence = false } = {}) {
   if (!common) return "";
   const words = common.split(" ");
+  const proper = (word, i) =>
+    // Possessives: Wilson's, Pallas'.
+    /'s?$/i.test(word) ||
+    KEEP_CAPITALISED.has(word) ||
+    /^[A-Z]{2,}$/.test(word) ||
+    (PLACE_PREFIX.has(word) && i < words.length - 1) ||
+    (i > 0 && PLACE_PREFIX.has(words[i - 1])) ||
+    // Demonyms ahead of the noun: Ecuadorian, Caribbean, Chinese.
+    (i < words.length - 1 &&
+      /(?:ian|ean|ese)$/i.test(word) &&
+      !/^ocean$/i.test(word));
   return words
     .map((word, i) => {
       if (i === 0 && !midSentence) return word;
-      if (
-        /'s$/i.test(word) ||
-        KEEP_CAPITALISED.has(word) ||
-        /^[A-Z]{2,}$/.test(word) ||
-        // Demonyms ahead of the noun: Ecuadorian, Caribbean, Chinese.
-        (i < words.length - 1 &&
-          /(?:ian|ean|ese)$/i.test(word) &&
-          !/^ocean$/i.test(word))
-      )
-        return word;
-      return word.toLowerCase();
+      return proper(word, i) ? word : word.toLowerCase();
     })
     .join(" ")
     .replace(PROPER_PHRASES, (m) => PROPER_PHRASE[m.toLowerCase()]);
 }
 
-/** "Sylvia's tree frog (Cruziohyla sylviae)", or just the scientific name if there's no common one. */
 export function speciesLabel(taxon) {
   const common = displayName(taxon.common);
   return common ? `${common} (${taxon.name})` : taxon.name;
