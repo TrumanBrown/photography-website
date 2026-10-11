@@ -213,6 +213,13 @@ const FALLBACK = {
   people: "People",
 };
 
+/** "Under direct light" is just how a flash looks; it says nothing about the scene. */
+export function telling(conditions) {
+  return !/\b(?:direct|bright|harsh|strong|hard|artificial)\s+(?:direct\s+)?light\b|^(?:under|in) (?:bright )?light$/i.test(
+    String(conditions ?? ""),
+  );
+}
+
 /** Every name the photo has a right to use: your session text plus the matched taxon. */
 export function groundingText(session, taxon) {
   return [
@@ -284,7 +291,8 @@ export function captionFor({
     }
   }
   const scene = clean(a.scene, ctx) ? a.scene : "";
-  const conditions = clean(a.conditions, ctx) ? a.conditions : "";
+  const conditions =
+    clean(a.conditions, ctx) && telling(a.conditions) ? a.conditions : "";
   const said = norm(`${subject} ${scene}`);
   const where = place && !said.includes(norm(place)) ? place : "";
 
@@ -337,11 +345,15 @@ export function sessionDigest({ session, shots, taxa = {}, captions = [] }) {
         kind: taxon.lineage?.class?.common ?? taxon.iconic ?? "",
       });
     } else if (level === "group") {
-      bump(groups, `${a.subject || taxon.name} (${taxon.name})`);
+      // From the taxon, never the model's subject, which could be too specific.
+      bump(
+        groups,
+        `${displayName(taxon.common) || taxon.name} (${taxon.name})`,
+      );
     } else if (a.group !== "other" && a.subject) {
       bump(unnamed, a.subject.toLowerCase());
     }
-    bump(conditions, a.conditions);
+    if (telling(a.conditions)) bump(conditions, a.conditions);
     bump(settings, a.setting);
   }
   const top = (map, n) =>
@@ -384,6 +396,46 @@ const monthYear = (date) => {
   const m = /^(\d{4})-(\d{2})/.exec(date ?? "");
   return m ? `${MONTHS[Number(m[2]) - 1]} ${m[1]}` : "";
 };
+
+/**
+ * Shapes a description can take. Each session gets one, picked from its slug,
+ * so thirty descriptions don't all walk the same three steps.
+ */
+export const SHAPES = [
+  "Open with the one photo most worth a second look, then say in a sentence what the rest of the session is mostly of.",
+  "Open with the setting, then name two subjects.",
+  "Open with what most of the photos are of, then single out two subjects.",
+  "Two sentences only: one about the session as a whole, one about a single standout photo.",
+  "Open with a short fragment of three to six words, then two longer sentences.",
+];
+
+export function shapeFor(slug) {
+  let h = 0;
+  for (const ch of String(slug ?? "")) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return SHAPES[h % SHAPES.length];
+}
+
+const words = (text) =>
+  norm(text)
+    .replace(/[^a-z0-9' ]+/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+
+/** A run of `n` words the draft shares with any of `others`, or null. */
+export function sharedPhrase(text, others = [], n = 6) {
+  const grams = new Set();
+  for (const other of others) {
+    const w = words(other);
+    for (let i = 0; i + n <= w.length; i++)
+      grams.add(w.slice(i, i + n).join(" "));
+  }
+  const w = words(text);
+  for (let i = 0; i + n <= w.length; i++) {
+    const gram = w.slice(i, i + n).join(" ");
+    if (grams.has(gram)) return gram;
+  }
+  return null;
+}
 
 /**
  * One text-only call per session, from every photo's caption plus the
@@ -434,7 +486,7 @@ ${digest.highlights
 ${facts.join("\n")}
 
 How to write it:
-- Say what the session is mostly of, then single out two or three subjects worth a second look. Don't walk through the photos one by one.
+- ${shapeFor(session.slug)} Don't walk through the photos one by one.
 - No filler: not "I also photographed", "There's also", "these frames", "this session".
 - First person where it fits. Plain, specific words, sentences of different lengths.
 - Common names mid-sentence are lowercase except proper nouns: "a turquoise-browed motmot", "an Ecuadorian hermit crab".
@@ -474,6 +526,7 @@ export function descriptionProblems(
     lexicon = [],
     openerCounts = new Map(),
     needTitle = false,
+    others = [],
   },
 ) {
   const problems = [];
@@ -511,6 +564,11 @@ export function descriptionProblems(
   if (strangers.length)
     problems.push(
       `It names ${strangers.slice(0, 4).join(", ")}, which the facts don't mention.`,
+    );
+  const repeated = sharedPhrase(text, others);
+  if (repeated)
+    problems.push(
+      `It repeats "${repeated}" from another session's description. Word it differently.`,
     );
   if (needTitle && title && !TITLE_SHAPE.test(title))
     problems.push(

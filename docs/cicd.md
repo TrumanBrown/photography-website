@@ -22,8 +22,8 @@ For this project we use it for two distinct purposes:
 ├── infra.yml              # deploy Bicep (manual trigger)
 ├── build-and-deploy.yml   # rebuild + publish site (push, hourly, manual)
 ├── lint.yml               # PR quality gate
-├── social-catalog.yml     # optional: nightly Instagram catalog (see docs/social.md)
-└── social-post.yml        # optional: publishes the day's Instagram posts
+├── photos.yml             # photo captions + session descriptions, and Instagram planning (see docs/photos.md)
+└── social-post.yml        # optional: publishes the day's Instagram posts (see docs/social.md)
 ```
 
 ### [`infra.yml`](../.github/workflows/infra.yml): deploy Azure infrastructure
@@ -66,10 +66,17 @@ A `concurrency` block cancels older runs on the same branch when a new one arriv
 7. **Sync variants to Blob (trusted events only)**: `scripts/sync-variants.mjs` uploads generated photos to `variants/`, rewrites HTML URLs, and removes those large files from the SWA payload.
 8. **Stage `staticwebapp.config.json`**, save the Astro asset cache, and install the API package's locked dependencies.
 9. **Deploy to SWA (trusted events only)** via `Azure/static-web-apps-deploy@v1` with `skip_app_build: true`.
+10. **Start the photo pipeline** when prebuild found photos it hasn't seen yet (`new_photos` output). The build never calls a model itself; see the next section.
 
 The prebuild cache cleanup is a disk-capacity requirement, not a cache miss. A production run can restore about 5.5 GiB of prebuild inputs and 2.1 GiB of Astro variants. Prebuild copies its cached inputs into `src/content/`, and Astro copies optimized variants into `dist/`; retaining every copy at once can exhaust a GitHub-hosted runner with `ENOSPC` late in image generation. Saving `.cache/prebuild` before deleting the runner's local copy preserves the next run's cache while freeing enough space for Astro and `dist/`.
 
 **PR previews:** trusted same-repo pull requests receive an SWA preview at a unique URL (`pr-<n>-<random>.<region>.azurestaticapps.net`). Dependabot and fork PRs still install, test, build, and validate API dependencies, but skip Azure login, Blob writes, preview deployment, and preview cleanup because GitHub intentionally withholds repository secrets from those events. Once a trusted PR merges or closes, a separate `close_pr` job tears its preview down so it doesn't count against quotas.
+
+### [`photos.yml`](../.github/workflows/photos.yml): photo captions and session descriptions
+
+**When it runs:** nightly, right after a build finds new photos, or by hand (with `limit`, `overwrite` and `dry_run` options). Only when a model is configured.
+
+**What it does:** looks at each new photo once with a vision model, matches it to your iNaturalist observations, writes every photo's caption and each session's description into `_session.json`, then starts `build-and-deploy.yml` so they go live. With `SOCIAL_ENABLED=true` it also plans and writes the next week of Instagram posts. Needs `actions: write` for that last dispatch. Full walkthrough: [docs/photos.md](photos.md).
 
 ### [`lint.yml`](../.github/workflows/lint.yml): PR quality gate
 
@@ -166,7 +173,8 @@ If you've used Node before, none of this is new. If you haven't:
 | `GH_PAT_FOR_SECRETS` | You generate it (optional) | Infra workflow auto-writes other secrets |
 | `AZURE_STATIC_WEB_APPS_API_TOKEN` | Bicep output | `Azure/static-web-apps-deploy@v1` step |
 | `AZURE_STORAGE_ACCOUNT` | Bicep output | `scripts/prebuild.mjs` (env var) |
-| `IG_ACCESS_TOKEN`, `SOCIAL_SECRET_KEY`, `IG_USER_ID`, `SOCIAL_OPENAI_API_KEY` / `SOCIAL_ANTHROPIC_API_KEY` | You create them (optional) | The two social workflows only, see [docs/social.md](social.md#3-secrets-and-variables) |
+| `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` | You create them (optional) | `photos.yml`, only when not using keyless Azure OpenAI, see [docs/photos.md](photos.md#settings) |
+| `IG_ACCESS_TOKEN`, `SOCIAL_SECRET_KEY`, `IG_USER_ID` | You create them (optional) | `photos.yml` and `social-post.yml`, see [docs/social.md](social.md#settings) |
 
 Runtime-only values (`AZURE_STORAGE_CONNECTION_STRING`, `ANALYTICS_SALT`, and
 `ADMIN_GITHUB_USERS`) live in SWA app settings, not GitHub Actions secrets. The

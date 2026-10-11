@@ -99,7 +99,7 @@ If `images` is provided as an array of objects, each can carry a `caption` that 
 ]
 ```
 
-Captions are limited to 500 characters. They can also be edited from `/admin`;
+Captions are limited to 500 characters. You rarely need to write them: the photo pipeline writes one for every photo from the photo itself and your iNaturalist identification ([docs/photos.md](photos.md)), and leaves any you've edited alone. They can also be edited from `/admin`;
 Admin writes the same ordered `images` array back to `_session.json`. A caption
 becomes the photograph's accessible name. Without one, the gallery uses a
 contextual fallback such as “Session title, photo 4 of 20” rather than exposing

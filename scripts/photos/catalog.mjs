@@ -84,7 +84,7 @@ import { createClient } from "../social/instagram.mjs";
 import { info, redact, warn } from "./redact.mjs";
 
 /** Bump when the description prompt changes enough that every session should be redone. */
-const DESCRIPTION_VERSION = 1;
+const DESCRIPTION_VERSION = 2;
 
 function parseArgs(argv) {
   const out = {
@@ -145,6 +145,10 @@ async function saveCatalog(store, catalog) {
           if (theirs && field in theirs) mine[field] = theirs[field];
           else delete mine[field];
         }
+      }
+      for (const [slug, mine] of Object.entries(catalog.sessions ?? {})) {
+        const theirs = stored.sessions?.[slug]?.redescribe;
+        if (theirs) mine.redescribe = theirs;
       }
       return catalog;
     },
@@ -330,11 +334,17 @@ async function main() {
       location: "",
       description: "",
     };
+  // A photo the model refuses (its content filter) or that failed three runs
+  // in a row isn't tried again until someone asks (npm run photos -- redo).
+  const gaveUp = (s) =>
+    (s.unreadable || (s.failures ?? 0) >= 3) &&
+    !(s.redo && s.redo > (s.failedAt ?? ""));
   const needsAnalysis = (s) =>
-    !s.analysis ||
-    s.analysis.v !== ANALYSIS_VERSION ||
-    (s.analysis.taxon ?? null) !== (s.inat?.taxon ?? null) ||
-    (s.redo && s.redo > (s.analysis.at ?? ""));
+    !gaveUp(s) &&
+    (!s.analysis ||
+      s.analysis.v !== ANALYSIS_VERSION ||
+      (s.analysis.taxon ?? null) !== (s.inat?.taxon ?? null) ||
+      (s.redo && s.redo > (s.analysis.at ?? "")));
   const pending = Object.values(shots)
     .filter((s) => inScope(s.session) && needsAnalysis(s))
     .sort(
@@ -357,9 +367,20 @@ async function main() {
       try {
         await analyseShot(s);
         analysed++;
+        delete s.failures;
+        delete s.failedAt;
+        delete s.unreadable;
       } catch (e) {
         analyseFailed++;
-        warn(`An analysis failed and will be retried next run. ${redact(e)}`);
+        s.failures = (s.failures ?? 0) + 1;
+        s.failedAt = new Date().toISOString();
+        if (/content_policy_violation|content_filter/i.test(String(e?.message)))
+          s.unreadable = "content-filter";
+        warn(
+          s.unreadable
+            ? "The model's content filter refused a photo, so it won't be tried again. It keeps any caption its iNaturalist ID gives it."
+            : `An analysis failed and will be retried next run. ${redact(e)}`,
+        );
       }
       if ((analysed + analyseFailed) % 20 === 0) {
         await saveCatalog(store, catalog);
@@ -490,12 +511,14 @@ async function main() {
       const s = key ? shots[key] : null;
       if (!s) continue;
       sessionShots.set(key, s);
-      if (!s.analysis) continue;
+      const taxon = taxonOf(s);
+      if (!s.analysis && !(gaveUp(s) && idLevel(taxon) === "species")) continue;
       captions.set(
         p.file,
         captionFor({
-          analysis: s.analysis,
-          taxon: taxonOf(s),
+          // A photo the model never saw can still be named by its iNaturalist ID.
+          analysis: s.analysis ?? { group: "other", count: 1, idCheck: "fits" },
+          taxon,
           session,
           lexicon,
         }),
@@ -503,7 +526,9 @@ async function main() {
     }
     site.captions += captions.size;
     const list = [...sessionShots.values()];
-    const complete = list.length > 0 && list.every((s) => s.analysis);
+    const complete =
+      list.some((s) => s.analysis) &&
+      list.every((s) => s.analysis || gaveUp(s));
     if (!complete) site.waiting++;
     const digest = complete
       ? sessionDigest({
@@ -527,12 +552,17 @@ async function main() {
       : null;
     const current = session.description ?? "";
     const yours =
-      current && current !== rec.written?.description && !args.overwrite;
+      current &&
+      current !== rec.written?.description &&
+      current !== rec.description &&
+      !args.overwrite;
     const redo =
       digest &&
       provider &&
       !yours &&
-      (rec.inputs !== inputs || !rec.description);
+      (rec.inputs !== inputs ||
+        !rec.description ||
+        (rec.redescribe ?? "") > (rec.at ?? ""));
     plans.push({
       session,
       rec,
@@ -556,6 +586,18 @@ async function main() {
     if (plan?.redo) continue;
     countOpener(plan?.rec.description ?? s.description);
   }
+
+  // What every other session's description says right now, so a new one
+  // doesn't reuse its phrasing (sessions often share photos).
+  const descriptionsInUse = (slug) =>
+    sessions
+      .filter((s) => s.slug !== slug)
+      .map((s) => {
+        const plan = plans.find((p) => p.session.slug === s.slug);
+        if (plan?.redo) return plan.accepted ?? "";
+        return plan?.rec.description ?? s.description ?? "";
+      })
+      .filter(Boolean);
 
   for (const plan of plans.filter((p) => p.redo)) {
     const { session, rec, digest, needTitle, needLocation } = plan;
@@ -594,6 +636,7 @@ async function main() {
           lexicon,
           openerCounts,
           needTitle,
+          others: descriptionsInUse(session.slug),
         });
         if (problems.length) feedback = problems.join(" ");
         else accepted = text;
@@ -603,6 +646,7 @@ async function main() {
       }
     }
     if (accepted) {
+      plan.accepted = accepted.description;
       rec.description = accepted.description;
       if (accepted.title) rec.title = accepted.title;
       if (accepted.location) rec.location = accepted.location;
@@ -655,10 +699,22 @@ async function main() {
     }
   }
 
+  // The website's results are saved before Instagram gets a turn, so nothing
+  // that goes wrong over there can cost a run's analyses or copy.
+  await saveCatalog(store, catalog);
+  await store.writeJson("taxa.json", taxa);
+
   // 6. instagram
   const ig = { rendered: 0, review: 0, planned: 0 };
   if (args.instagram && process.env.SOCIAL_ENABLED === "true") {
-    await instagramStage();
+    try {
+      await instagramStage();
+    } catch (e) {
+      warn(
+        `The Instagram stage failed; the website copy is unaffected. ${redact(e)}`,
+      );
+      process.exitCode = 1;
+    }
   }
 
   async function instagramStage() {

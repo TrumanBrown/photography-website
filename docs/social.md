@@ -21,7 +21,7 @@
 - Posts photographs from the site to one Instagram account: **3 a day** by default, at 08:30, 12:30 and 18:00 Pacific.
 - **Never posts the same photograph twice**, even when it exists as several files (crops, re-exports, copies in two sessions), and never re-posts anything already on the account.
 - Posts the **whole frame at Instagram's full resolution** (1440 px wide). It never crops. Frames too tall or too wide for Instagram get plain borders instead.
-- **Writes each caption from the photo itself**: what's in the frame, where it is, the camera and lens, alt text, and five hashtags. For animals it uses **your own iNaturalist identification of that exact photo**.
+- **Writes each caption from the photo's record**: the same one-time analysis that writes the website's captions ([docs/photos.md](photos.md)). Each post gets what's in the frame, where it is, the camera and lens, alt text, and five hashtags. For animals and plants it uses **your own iNaturalist identification of that exact photo**.
 - **Picks up new sessions on its own**, the night after they appear on the site.
 - Runs entirely in **GitHub Actions**. Nothing has to run on your computer.
 
@@ -29,7 +29,7 @@
 
 | When | Where | What happens |
 |---|---|---|
-| Every night, about 3 am Pacific | **Social catalog** workflow | Finds photos new to the site, fingerprints them, matches animals to your iNaturalist observations, writes their captions with the vision model, checks what's already on the Instagram account, and plans the next 7 days of posts |
+| Every night, about 3 am Pacific, and after new photos appear | **Photo captions** workflow ([docs/photos.md](photos.md)) | Analyses photos new to the site once, for the website and Instagram alike. With `SOCIAL_ENABLED=true` it also checks what's already on the Instagram account, plans the next 7 days of posts and writes them |
 | Every 30 minutes, about 7 am to midnight Pacific | **Social post** workflow | Checks whether one of today's posting slots is due. If it is, publishes the next planned photo. Most runs find nothing due and finish in seconds |
 | Once a week | inside Social post | Renews the Instagram access token, so it never reaches its 60-day expiry |
 | The morning after a day with no post | inside Social post | Fails one run on purpose, so GitHub emails you |
@@ -37,7 +37,7 @@
 
 Two switches, both repository variables:
 
-- `SOCIAL_ENABLED=true` lets both workflows run at all.
+- `SOCIAL_ENABLED=true` turns on the Instagram stage of Photo captions, and the Social post workflow.
 - `SOCIAL_LIVE=true` lets them actually publish. Without it everything happens (captions, planning, rendering the image) except the post itself. That's the **dry run**.
 
 ## What stays private
@@ -45,9 +45,10 @@ Two switches, both repository variables:
 | Thing | Where it lives | Public? |
 |---|---|---|
 | Which account, and its access token | GitHub secrets, plus an encrypted copy in the private `metadata` storage container | No |
-| Captions, the posting plan, posting history | `metadata/social/` in the private container | No |
+| Each photo's record (what's in it, its identification, its written post) | `metadata/photos/` in the private container | No |
+| The posting plan, posting history | `metadata/social/` in the private container | No |
 | The images sent to Instagram | Uploaded to the private container, given to Instagram as a link that expires after two hours, deleted after posting | No |
-| Workflow logs | Public, like every Actions log in a public repository | Yes, but they only contain counts and generic messages. Errors pass through [redact.mjs](../scripts/social/redact.mjs), which strips tokens, account and media ids, signed links and provider ids |
+| Workflow logs | Public, like every Actions log in a public repository | Yes, but they only contain counts and generic messages. Errors pass through [redact.mjs](../scripts/photos/redact.mjs), which strips tokens, account and media ids, signed links and provider ids |
 | This code and these docs | The repository | Yes, by design |
 
 Someone reading the repository can tell the feature exists (the workflow runs are visible), but not which account it posts to. The same photographs are public on the site and on Instagram, so a reverse image search could still connect them. The repository just won't be what gives it away.
@@ -153,23 +154,23 @@ Paste the token only into that prompt, never into a file, chat or issue.
 
 The token lasts 60 days. The post workflow renews it every week and keeps the renewed copy in private storage, encrypted with `SOCIAL_SECRET_KEY`.
 
-### Step 8. Give it a model to write captions
+### Step 8. Make sure the photo pipeline is running
 
-The captions are written by the same Azure OpenAI deployment the site build uses for session descriptions, with no API key. The workflow signs in to Azure the same way the site build does, and that sign-in is the credential.
+Posts are written from the same records as the website's captions, by the **Photo captions** workflow. If the site already has captions, this is done.
 
-- **If that deployment exists** (the Infra workflow with `enableDescribeModel`; see [Turning it on](../README.md#turning-it-on) in the README), the repository variables `AZURE_OPENAI_ENDPOINT` and `AZURE_OPENAI_DEPLOYMENT` are already set. Check with `gh variable list`. There's nothing else to do.
-- **Otherwise**, use an API key instead: `gh secret set SOCIAL_OPENAI_API_KEY` (or `SOCIAL_ANTHROPIC_API_KEY`).
+- Check with `gh variable list` that `AZURE_OPENAI_ENDPOINT` and `AZURE_OPENAI_DEPLOYMENT` are set (the keyless model), or `PHOTOS_ENABLED` with an API key.
+- Otherwise, follow [Setting it up](photos.md#setting-it-up) in docs/photos.md first.
 
-### Step 9. Turn it on, still as a dry run, and caption the archive
+### Step 9. Turn it on, still as a dry run
 
 **Where: a terminal.**
 
 ```bash
 gh variable set SOCIAL_ENABLED --body true
-gh workflow run social-catalog.yml -f limit=800   # captions the whole archive
+gh workflow run photos.yml   # plans the next week and writes those posts
 ```
 
-The first catalog run takes roughly an hour for 800 photos. Watch it under the repository's **Actions → Social catalog**; the log only shows counts. From now on the nightly run handles new photos (60 a night by default).
+The photos are already analysed, so this run only checks the account, plans the next 7 days and writes those posts: a couple of minutes. Watch it under **Actions → Photo captions**; the log only shows counts. From now on the nightly run keeps a week of posts written ahead.
 
 The Social post workflow also starts running now, in dry-run mode. At each slot it picks and renders a photo, then stops short of publishing.
 
@@ -197,7 +198,7 @@ The next due slot publishes. To post one immediately: **Actions → Social post 
 
 ## Day to day
 
-Nothing needs doing. New sessions are captioned overnight and join the plan.
+Nothing needs doing. New sessions are analysed soon after they go live and join the plan.
 
 When you want to steer it, these run on your computer (with `az login` and `AZURE_STORAGE_ACCOUNT` set, as in step 10):
 
@@ -207,7 +208,7 @@ When you want to steer it, these run on your computer (with `az login` and `AZUR
 | `npm run social -- preview` | The next week of posts as a local web page |
 | `npm run social -- skip DSC01234 [why]` | Never post this shot |
 | `npm run social -- unskip DSC01234` | Undo a skip |
-| `npm run social -- redraft DSC01234` | Rewrite its caption on the next catalog run |
+| `npm run social -- redraft DSC01234` | Rewrite its post on the next Photo captions run |
 | `npm run social -- approve DSC01234` | Approve this exact caption (only matters with `SOCIAL_REQUIRE_APPROVAL=true`) |
 | `npm run social -- retry DSC01234` | Clear failed attempts so a photo can be tried again (`--all` for every photo) |
 
@@ -224,8 +225,9 @@ For example after rebuilding the site, moving to a new repository or storage acc
 | Meta app | developers.facebook.com | Keeps working on its own. Only recreate it (steps 2–6) if it was deleted |
 | Access token | `IG_ACCESS_TOKEN` secret, plus the encrypted renewed copy in storage | Generate a new one (step 6) and set the secret again (step 7). A new secret always replaces the stored copy |
 | Encryption key | `SOCIAL_SECRET_KEY` secret | Make a new one (step 7). The stored copy can't be read without the old key, so the next run starts again from `IG_ACCESS_TOKEN` |
-| Captions, plan, history | `metadata/social/` in the site's storage account | The next catalog run rebuilds everything. Photos already on the account are recognised by their fingerprints and not posted again |
-| Caption model | Azure OpenAI deployment, plus the two `AZURE_OPENAI_*` variables | Re-run the Infra workflow (step 8) |
+| Photo records | `metadata/photos/` in the site's storage account | The next Photo captions run analyses everything again ([docs/photos.md](photos.md)) |
+| Plan, history | `metadata/social/` in the site's storage account | The next Photo captions run plans again. Photos already on the account are recognised by their fingerprints and not posted again |
+| Model | Azure OpenAI deployment, plus the two `AZURE_OPENAI_*` variables | Re-run the Infra workflow ([docs/photos.md](photos.md#setting-it-up)) |
 | Switches and settings | Repository variables | Set `SOCIAL_ENABLED`, `SOCIAL_LIVE` and any [settings](#settings) again |
 
 The token stops working if the workflows were switched off for more than about 60 days, or if the app was removed from the Instagram account. Either way, redo steps 6 and 7.
@@ -234,18 +236,14 @@ If you change to a different Instagram account, redo steps 1, 5, 6 and 7.
 
 ## Settings
 
-Set these as **secrets** (masked in logs) or **variables** under Settings → Secrets and variables → Actions. Anything that identifies the account is a secret.
+Set these as **secrets** (masked in logs) or **variables** under Settings → Secrets and variables → Actions. Anything that identifies the account is a secret. The model and the iNaturalist account are shared with the website captions: see [docs/photos.md](photos.md#settings).
 
 | Name | Kind | Default | What it does |
 |---|---|---|---|
 | `IG_ACCESS_TOKEN` | secret | (required) | The Instagram token from step 6 |
 | `SOCIAL_SECRET_KEY` | secret | (required) | Encrypts the renewed token in storage (step 7) |
-| `SOCIAL_ENABLED` | variable | off | `true` lets the workflows run |
+| `SOCIAL_ENABLED` | variable | off | `true` turns on the Instagram stage and the Social post workflow |
 | `SOCIAL_LIVE` | variable | off | `true` publishes; anything else is a dry run |
-| `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_DEPLOYMENT` | variables | set by Infra | Keyless caption model (step 8) |
-| `SOCIAL_OPENAI_API_KEY` / `SOCIAL_ANTHROPIC_API_KEY` | secret | none | Caption model by API key instead. Kept separate from the site build's keys |
-| `SOCIAL_MODEL` | variable | `gpt-6.1-sol` / `claude-sonnet-4-5` | Model name when using a key |
-| `SOCIAL_OPENAI_BASE_URL` | variable | OpenAI | Another OpenAI-compatible endpoint, used with `SOCIAL_OPENAI_API_KEY` |
 | `SOCIAL_POSTS_PER_DAY` | variable | `3` | 1 to 6 |
 | `SOCIAL_SLOTS` | variable | `08:30,12:30,18:00` | Posting times, comma-separated |
 | `SOCIAL_TIMEZONE` | variable | `America/Los_Angeles` | Time zone for the slots |
@@ -254,7 +252,6 @@ Set these as **secrets** (masked in logs) or **variables** under Settings → Se
 | `SOCIAL_TALL_IMAGES` | variable | `pad` | `skip` leaves out frames that would need borders |
 | `SOCIAL_PAD_COLOR` | variable | `auto` | Border colour. `auto` picks black or white from the photo's edges |
 | `SOCIAL_REQUIRE_APPROVAL` | variable | off | `true` posts only captions you've approved |
-| `SOCIAL_INATURALIST_USER` | variable | the hobby pages' account | Which iNaturalist account to match against |
 | `IG_LOGIN_MODE`, `IG_USER_ID` | variable, secret | `instagram` | Only for the [Facebook Login setup](#location-tags-and-tagging-accounts) |
 
 ---
@@ -272,9 +269,9 @@ Each nightly run plans the next week. Each next post is the best-scoring shot th
 - frames from the same burst aren't posted again within about ten days
 - the same location as the last post or two is penalised, so places rotate
 
-The score is the model's 1–10 rating of how likely the frame is to stop someone scrolling, plus a bump for verified species and for sessions from the last 45 days.
+The score is the analysis's 1–10 rating of how likely the frame is to stop someone scrolling, plus a bump for photos identified to species and for sessions from the last 45 days.
 
-Shots are skipped automatically when they're under 1080 px wide, out of focus, or an identifiable person is the subject.
+Shots are skipped automatically when they're under 1080 px wide, out of focus, an identifiable person is the subject, or the photo plainly isn't what its iNaturalist identification says.
 
 ### 2. The image
 
@@ -286,55 +283,26 @@ Instagram only accepts JPEGs between 4:5 (portrait) and 1.91:1 (landscape), at m
 - gives a frame outside them (mostly 2:3 portraits) **plain borders, never a crop**, black or white to match the photo's own edges
 - writes sRGB, 4:4:4 colour, JPEG quality 95, with camera metadata removed
 
-### 3. Animals: your iNaturalist observations
+### 3. What's in the photo, and what it is
 
-Every photo on your iNaturalist observations is fingerprinted once (a 128-bit image fingerprint). A site photo is treated as the photo on an observation when both of these hold:
+Both come from the photo's record, made once for the website and Instagram alike ([docs/photos.md](photos.md)):
 
-- the fingerprints are within 14 bits of each other
-- the observation date is within a day of the capture date
+- **What it is** comes from your iNaturalist observation of that photo, matched by image fingerprint or by time, and used at whatever rank it has. The model never identifies anything. See [Identifications come from iNaturalist](photos.md#identifications-come-from-inaturalist).
+- **What's in the frame** comes from the one look a vision model took at the photo: subject, what it's doing, the light, the setting, a plain description. See [The one look at each photo](photos.md#the-one-look-at-each-photo), including how a mountain photo is handled.
 
-When a date is missing, the fingerprints must be within 6 bits instead.
+From the identified taxon, [inat.mjs](../scripts/photos/inat.mjs) also keeps the class, order and family, iNaturalist's Wikipedia summary, and the global IUCN Red List status.
 
-Those numbers were measured on this archive. Different shots never came closer than 9 bits, and only same-day near-duplicates got that close. True copies sat within 16 bits, and 288 of 290 were observed within a day of capture. Matching by time alone fails here: some camera clocks were off by up to 18 hours, and busy survey nights produce false matches.
+### 4. Writing the post
 
-When there's no fingerprint match, observations made within five minutes of the capture are offered to the vision model with both photos. One is only used if the model is confident it's the same animal. Each session's camera-clock error is learned from its fingerprint matches first.
+A post is only written once its photo is planned for the coming week, so a change in wording never means rewriting the whole archive. [compose.mjs](../scripts/social/compose.mjs) asks a model, text only, for a one-to-three-sentence body. It receives:
 
-From the matched observation, [inat.mjs](../scripts/social/inat.mjs) takes:
-
-- the common and scientific names
-- the class, order and family
-- iNaturalist's Wikipedia summary
-- the global IUCN Red List status
-
-A species name is only used when that observation is **research grade at species level or finer**. Anything else stays at group level ("a tree frog"), the same rule as the site's captions.
-
-As a second check, every caption is compared with the full list of species you've recorded on iNaturalist. A caption that names one without a verified identification for that photo goes back to be rewritten. Identifications are re-checked every night, and a caption whose identification changed is rewritten.
-
-Observation notes aren't used. On this account they're questions to identifiers ("Can someone help confirm this ID?"), not captions.
-
-### 4. The vision model
-
-Every photo, animal or not, is described by a vision model ([model.mjs](../scripts/social/model.mjs)). It receives:
-
-- the photo, downscaled to 1280 px
-- the session title, location and your own session description
-- the camera, lens and capture month
-- the iNaturalist facts, when there are any
+- the first line, already written
+- the record's description of the frame, its setting and light
+- the session title, location and month
+- for an identified organism, its name and Wikipedia summary
 - the site's voice rules from [site-copy.instructions.md](../.github/instructions/site-copy.instructions.md)
 
-It returns:
-
-- the kind of subject
-- a few words on what it's doing
-- the place
-- a one-to-three-sentence description
-- alt text
-- a 1–10 appeal score
-- a skip flag for blurred or people shots
-
-Its rules: describe only what's visible, add at most one fact (and only from the supplied summary), and use place names only if the session title or location already contains them.
-
-**Example, a mountain session.** In "Sunrise, Mount Rainier National Park, July 2026", one frame actually shows a foggy meadow and a creek. The model writes what's in the frame ("Fog over a subalpine meadow and a winding creek"), not what the session is named after. It names Mount Rainier only because the session text does, and borrows context from your own description. A draft that names a peak the session text doesn't mention is rejected and rewritten.
+Its rules: start with something specific in the frame, add at most one fact and only from the summary, and never name a place the session doesn't.
 
 ### 5. The caption
 
@@ -349,7 +317,7 @@ The rest of this set is on example.com, link in bio
 #boatbilledheron #birdsofinstagram #tortuguero #birdphotography #sonya6700
 ```
 
-- **First line:** keywords first, because Instagram search and Google read it. Verified species get their scientific name too.
+- **First line:** the website's caption for the photo, with the fuller place. Keywords first, because Instagram search and Google read it. Identified species get their scientific name too.
 - **Body:** written by the model under the rules above.
 - **Red List line:** added when the global IUCN status is Near Threatened or worse.
 - **Gear line:** from the photo's EXIF data.
@@ -360,7 +328,7 @@ The rest of this set is on example.com, link in bio
 
 | Slot | Comes from | Example |
 |---|---|---|
-| Subject | Research-grade species, or a landmark named in the session | `#boatbilledheron` |
+| Subject | The species identified on iNaturalist, or a landmark named in the session | `#boatbilledheron` |
 | Community | iNaturalist lineage, or the model's subject group | `#birdsofinstagram` |
 | Place | A place word from the session title or location | `#tortuguero` |
 | Genre | Lens and subject | `#birdphotography`, `#macrophotography` |
@@ -371,7 +339,7 @@ When there's no subject tag (most landscapes), the broad region takes the slot (
 **Checks before a caption is saved:**
 
 - **Fixed automatically:** em dashes, emoji, exclamation marks, and stray `#` or `@`.
-- **Rejected and rewritten once:** marketing words, place names that aren't grounded in the session, and unverified species names.
+- **Rejected and rewritten once:** marketing words, place names the session doesn't mention, and species names the photo isn't identified as.
 - **Held back:** a caption that still fails is marked "needs review" and is never posted unprompted.
 
 ---
@@ -412,7 +380,7 @@ When there's no subject tag (most landscapes), the broad region takes the slot (
   - Check that `SOCIAL_ENABLED` and `SOCIAL_LIVE` are both `true`.
   - Run `npm run social -- status` and check "Ready to post".
   - Look for photos "left out after failing twice" in the same output.
-- **A caption is wrong.** Run `npm run social -- skip` or `npm run social -- redraft`. If the mistake came from the session's description, fix that in `/admin` first; the next site build passes it on.
+- **A caption is wrong.** Run `npm run social -- skip` or `npm run social -- redraft`. If the mistake is in what the photo shows or what it is, fix the record instead: `npm run photos -- redo <photo>`, or the identification on iNaturalist ([docs/photos.md](photos.md#troubleshooting)).
 
 ## Optional extras
 
@@ -450,11 +418,11 @@ These live in private storage because they're strategy, not code.
 
 ### Trying it without Azure or Instagram
 
-Both scripts can run locally against the sessions prebuild already downloaded, keeping state in `.cache/social/state`:
+Both can run locally against the sessions prebuild already downloaded, keeping state in `.cache/photos/state` and `.cache/social/state`:
 
 ```bash
-node scripts/social/catalog.mjs --local --provider mock   # mock captions, no model
-node scripts/social/post.mjs --local --force              # renders the next post to a local file
+SOCIAL_ENABLED=true node scripts/photos/catalog.mjs --local --provider mock   # mock records and posts, no model
+node scripts/social/post.mjs --local --force                                  # renders the next post to a local file
 ```
 
 ## Cost
@@ -462,6 +430,6 @@ node scripts/social/post.mjs --local --force              # renders the next pos
 | Item | Cost |
 |---|---|
 | GitHub Actions | Free on public repositories |
-| Caption model | About $1–15 once for the whole archive, then cents a month |
+| Writing posts | Cents a month. Analysing the photos is shared with the website ([docs/photos.md](photos.md#cost-and-speed)) |
 | Storage | Cents |
 | Instagram API | Free |

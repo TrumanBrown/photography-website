@@ -5,7 +5,10 @@ import {
   descriptionProblems,
   placeLabel,
   plural,
+  SHAPES,
   sessionDigest,
+  shapeFor,
+  sharedPhrase,
   slugPlace,
   speciesSubject,
 } from "./website.mjs";
@@ -171,6 +174,46 @@ describe("website captions", () => {
     expect(caption).not.toContain("rain");
   });
 
+  it("leaves out light that only describes the flash", () => {
+    const caption = captionFor({
+      analysis: look({ conditions: "under bright direct light" }),
+      taxon: frog,
+      session: crarc,
+    });
+    expect(caption).toBe(
+      "Sylvia's tree frog (Cruziohyla sylviae) on a thin twig, Guayacán",
+    );
+  });
+
+  it("keeps place names inside species names capitalised", () => {
+    const snake = {
+      name: "Thamnophis sirtalis pickeringii",
+      common: "Puget Sound Garter Snake",
+      rank: "subspecies",
+    };
+    expect(speciesSubject(snake)).toBe(
+      "Puget Sound garter snake (Thamnophis sirtalis pickeringii)",
+    );
+    expect(speciesSubject(snake, 2)).toBe(
+      "Two Puget Sound garter snakes (Thamnophis sirtalis pickeringii)",
+    );
+  });
+
+  it("treats everyday abbreviations as words, not names", () => {
+    const caption = captionFor({
+      analysis: look({
+        group: "other",
+        subject: "Silver SUV",
+        scene: "parked on a dirt track",
+        conditions: "",
+      }),
+      session: baker,
+    });
+    expect(caption).toBe(
+      "Silver SUV parked on a dirt track, Yellow Aster Butte",
+    );
+  });
+
   it("uses the location for an untitled session", () => {
     expect(
       placeLabel({
@@ -290,5 +333,70 @@ describe("session descriptions", () => {
       { session: crarc, digest, needTitle: true },
     );
     expect(problems.join(" ")).toMatch(/Place, Region, Month Year/);
+  });
+
+  it("lists a genus-level photo by its identification, never the model's guess", () => {
+    const lizard = sessionDigest({
+      session: crarc,
+      shots: [
+        {
+          inat: { taxon: 3 },
+          analysis: {
+            ...look({ group: "lizard", subject: "Western fence lizard" }),
+            description: "A lizard.",
+            appeal: 5,
+            setting: "rock",
+            conditions: "",
+          },
+        },
+      ],
+      taxa: { 3: spiny },
+    });
+    expect(lizard.groups).toEqual([
+      { name: "Spiny lizards (Sceloporus)", count: 1 },
+    ]);
+    const lexicon = compileLexicon(["Western Fence Lizard"]);
+    expect(
+      descriptionProblems(
+        {
+          description:
+            "A western fence lizard on a warm rock, and not much else that day.",
+        },
+        { session: crarc, digest: lizard, lexicon },
+      ).join(" "),
+    ).toMatch(/Western Fence Lizard/);
+  });
+
+  it("rejects a description that reuses another session's phrasing", () => {
+    expect(
+      sharedPhrase("A white satin moth faces the camera with broad antennae.", [
+        "Moths on rocks. A white satin moth faces the camera with broad antennae, and a bee.",
+      ]),
+    ).toBe("a white satin moth faces the");
+    expect(sharedPhrase("Herons along the canal.", ["Frogs at night."])).toBe(
+      null,
+    );
+    const problems = check(
+      "Frogs, and most of them at night. A Sylvia's tree frog on a thin twig, and a heron by the canal in Guayacán.",
+      {
+        others: [
+          "Somewhere else, a Sylvia's tree frog on a thin twig at dusk.",
+        ],
+      },
+    );
+    expect(problems.join(" ")).toMatch(/repeats/);
+  });
+
+  it("gives sessions different shapes, the same one every run", () => {
+    expect(shapeFor("gunn-peak-june-2026")).toBe(
+      shapeFor("gunn-peak-june-2026"),
+    );
+    const used = new Set(
+      ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"].map((x) =>
+        shapeFor(`session-${x}`),
+      ),
+    );
+    expect(used.size).toBeGreaterThan(2);
+    expect(SHAPES).toContain(shapeFor("anything"));
   });
 });

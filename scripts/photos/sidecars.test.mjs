@@ -129,4 +129,52 @@ describe("writing website copy into _session.json", () => {
     });
     expect(again.changed).toBe(false);
   });
+
+  it("keeps the page order when only some new photos have captions yet", () => {
+    const { sidecar } = mergeWebsiteText({
+      sidecar: { images: ["L1.jpg", "L2.jpg"] },
+      slug: "t",
+      order: ["L1.jpg", "L2.jpg", "a.jpg", "b.jpg", "c.jpg"],
+      captions: new Map([
+        ["a.jpg", "Heron"],
+        ["c.jpg", "Caiman"],
+      ]),
+    });
+    expect(sidecar.images).toEqual([
+      "L1.jpg",
+      "L2.jpg",
+      { file: "a.jpg", caption: "Heron" },
+      "b.jpg",
+      { file: "c.jpg", caption: "Caiman" },
+    ]);
+  });
+
+  it("recognises its own text even when it lost track of writing it", () => {
+    const first = mergeWebsiteText({
+      sidecar: {
+        description: "Herons.",
+        images: [{ file: "A.jpg", caption: "Heron on a post, Tortuguero" }],
+      },
+      slug: "t",
+      order,
+      captions,
+      text: { description: "Herons." },
+      written: {},
+    });
+    expect(first.written.description).toBe("Herons.");
+    expect(first.written.captions["A.jpg"]).toBe("Heron on a post, Tortuguero");
+    const later = mergeWebsiteText({
+      sidecar: first.sidecar,
+      slug: "t",
+      order,
+      captions: new Map([["A.jpg", "Great egret on a post, Tortuguero"]]),
+      text: { description: "Egrets." },
+      written: first.written,
+    });
+    expect(later.sidecar.description).toBe("Egrets.");
+    expect(later.sidecar.images[0].caption).toBe(
+      "Great egret on a post, Tortuguero",
+    );
+    expect(later.kept).toBe(0);
+  });
 });

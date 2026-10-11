@@ -39,6 +39,21 @@ const KEEP_CAPITALISED = new Set(
   ).split(" "),
 );
 
+/** Place names inside species names, kept capitalised: "Puget Sound garter snake". */
+const PROPER_PHRASE = Object.fromEntries(
+  [
+    "Puget Sound",
+    "Great Basin",
+    "Rocky Mountain",
+    "Great Plains",
+    "Gulf Coast",
+  ].map((p) => [p.toLowerCase(), p]),
+);
+const PROPER_PHRASES = new RegExp(
+  `\\b(?:${Object.keys(PROPER_PHRASE).join("|")})\\b`,
+  "gi",
+);
+
 /**
  * iNat's "Northwestern Garter Snake" -> "Northwestern garter snake", keeping
  * proper nouns. With `midSentence`, the first word is lowercased too unless it's
@@ -62,7 +77,8 @@ export function displayName(common, { midSentence = false } = {}) {
         return word;
       return word.toLowerCase();
     })
-    .join(" ");
+    .join(" ")
+    .replace(PROPER_PHRASES, (m) => PROPER_PHRASE[m.toLowerCase()]);
 }
 
 /** "Sylvia's tree frog (Cruziohyla sylviae)", or just the scientific name if there's no common one. */
@@ -144,6 +160,9 @@ export function lint(text) {
   return problems;
 }
 
+/** Everyday abbreviations that are capitalised without being names. */
+const COMMON_CAPS = new Set(["SUV", "ATV", "UTV", "RV", "TV", "LED", "GPS"]);
+
 /** Capitalised words in `phrase` that don't appear anywhere in the allowed session text. */
 export function ungroundedNames(phrase, allowedText) {
   const allowed = norm(allowedText);
@@ -152,7 +171,7 @@ export function ungroundedNames(phrase, allowedText) {
     .slice(1)
     .filter((w) => /^\p{Lu}/u.test(w))
     .map((w) => w.replace(/[^\p{L}\p{N}'-]/gu, ""))
-    .filter((w) => w && !allowed.includes(norm(w)));
+    .filter((w) => w && !COMMON_CAPS.has(w) && !allowed.includes(norm(w)));
 }
 
 const norm = (s) =>

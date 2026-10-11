@@ -92,8 +92,10 @@ jobs:
           SOCIAL_SECRET_KEY: ${{ secrets.SOCIAL_SECRET_KEY }}
         run: node scripts/photos/catalog.mjs --limit "$LIMIT" $OVERWRITE $DRY_RUN
 
+      # Runs even when the Instagram stage failed the step, so new website
+      # copy always goes live.
       - name: Redeploy the site with the new copy
-        if: steps.photos.outputs.sessions_updated != '' && steps.photos.outputs.sessions_updated != '0'
+        if: ${{ !cancelled() && steps.photos.outputs.sessions_updated != '' && steps.photos.outputs.sessions_updated != '0' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run build-and-deploy.yml --ref main --repo "$GITHUB_REPOSITORY"

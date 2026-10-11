@@ -86,11 +86,14 @@ export function mergeWebsiteText({
   const ours = (current, last) => !current || current === last || overwrite;
 
   if (text.description) {
-    if (ours(next.description, was.description)) {
+    if (next.description === text.description) {
+      // Already says exactly this, so it's ours whatever the record says.
+      now.description = text.description;
+    } else if (ours(next.description, was.description)) {
       next.description = text.description;
       now.description = text.description;
       delete next.descriptionSource;
-    } else if (next.description !== text.description) kept++;
+    } else kept++;
   }
   if (
     text.title &&
@@ -108,8 +111,8 @@ export function mergeWebsiteText({
   const place = (file, current) => {
     const caption = captions.get(file);
     if (!caption) return current;
-    if (!ours(current, was.captions[file])) {
-      if (current !== caption) kept++;
+    if (current !== caption && !ours(current, was.captions[file])) {
+      kept++;
       return current;
     }
     now.captions[file] = caption;
@@ -129,12 +132,14 @@ export function mergeWebsiteText({
         ? { file: entry, caption }
         : { ...entry, caption };
     });
-    // Photos the list doesn't mention are shown after it, in `order`'s order,
-    // so appending them here keeps the page exactly as it was.
-    for (const file of order) {
-      if (covered.has(file)) continue;
-      const caption = place(file, "");
-      if (caption) next.images.push({ file, caption });
+    // Photos the list doesn't mention are shown after it, in `order`'s order.
+    // Once any of them is listed, all of them are, so none changes place.
+    const rest = order.filter((file) => !covered.has(file));
+    if (rest.some((file) => captions.has(file))) {
+      for (const file of rest) {
+        const caption = place(file, "");
+        next.images.push(caption ? { file, caption } : file);
+      }
     }
   } else if (order.some((file) => captions.has(file))) {
     next.images = order.map((file) => {

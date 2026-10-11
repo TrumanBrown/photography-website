@@ -22,6 +22,7 @@ The project started as a photography portfolio and has grown into a small person
 | The optional **Hobbies** section + interactive islands | [docs/hobbies.md](docs/hobbies.md) |
 | Editing session metadata from the browser (`/admin`) | [docs/admin.md](docs/admin.md) |
 | Privacy-friendly traffic analytics (`/admin` Analytics tab) | [docs/analytics.md](docs/analytics.md) |
+| Photo captions and session descriptions, written from the photos | [docs/photos.md](docs/photos.md) |
 | Posting photos to Instagram a few a day, automatically | [docs/social.md](docs/social.md) |
 | How the site is hardened (CSP, HSTS, etc.) | [docs/security.md](docs/security.md) |
 | Running locally, npm, dev server, fixtures | [docs/local-dev.md](docs/local-dev.md) |
@@ -204,196 +205,44 @@ Descriptions render on the **session page only** — the home-page cards show
 title, date, location and photo count. The description was previously on both,
 which duplicated the same sentences across two URLs for no benefit.
 
-Name a species only when it's unmistakable in the frame. Group level ("a tree
-frog", "a heron", "dart frogs") is the correct answer whenever there's doubt:
-a wrong species name is worse than no name at all for a naturalist audience,
-and it can rank the page for something it isn't.
+A species is only ever named from your own iNaturalist observation of that
+photo. Everything else gets plain words ("a tree frog", "a heron"): a wrong
+species name is worse than no name at all for a naturalist audience, and it
+can rank the page for something it isn't.
 
 Changes go live on the next build, click **Run workflow** on `Build and Deploy`
 (or **Rebuild Site** in the admin panel) for a ~5 minute publish, or wait for the cron.
 
 Full pipeline walkthrough: [docs/image-pipeline.md](docs/image-pipeline.md).
 
-### What happens when you upload a session
+### Captions and descriptions, written for you
 
-Say you drop 30 photos into `staging/2026-japan/` with a `_session.json` that
-sets just a title, and run `./scripts/upload-session.sh 2026-japan --build`.
-On the next build, prebuild walks the session and fills in what you left blank:
+After a build publishes new photos, the **Photo captions** workflow looks at
+each one once with a vision model, matches it to your iNaturalist
+observations, and writes:
 
-1. **Photos are downloaded and processed.** RAW and HEIC are converted, every
-   image is read for EXIF (camera, lens, date, caption if one is embedded).
-2. **Your title is kept.** Anything you set by hand always wins. A title that's
-   only the folder name tidied up, which is what `/admin` saves if you never
-   typed one, counts as blank and is replaced by the drafted one.
-3. **The description is written for you.** If `description` is empty, 8 photos
-   are sampled evenly across the session, shown to a vision model, and a
-   description is written from what's actually in them. `location` is filled the
-   same way if you left it blank.
-4. **Each photo gets a caption**, if captions are switched on (see below). A
-   caption becomes that photo's `alt` text. Photos you've already captioned are
-   left alone.
-5. **The results are saved back to `_session.json`** and the description is
-   tagged `"descriptionSource": "auto"`, so everything is generated once and
-   then behaves like any other metadata — edit it in `/admin` whenever you like.
-6. **The site builds** with that copy in the page body, the `<title>`, the meta
-   description, the image `alt` attributes, and the JSON-LD.
+- **a caption for every photo**, e.g. `Northwestern garter snake (Thamnophis
+  ordinoides) coiled on a mossy log, Sauk Mountain`. It's the photo's `alt`
+  text and lightbox caption, which is what image search actually reads.
+- **a description for every session**, written from all of its photos'
+  captions and identifications.
 
-What gets filled in, and what doesn't:
+Both land in the session's `_session.json` and the site rebuilds, usually
+within half an hour of the upload. Edit either in `/admin` and your version
+stays: the pipeline never overwrites text you've changed.
 
 | Field | If you set it | If you leave it blank |
 | --- | --- | --- |
-| `title` | kept as-is | folder name, tidied up, or a drafted one |
-| `location` | kept as-is | drafted from the photos |
-| `description` | kept as-is | **drafted from the photos** |
-| per-image `caption` | kept as-is | **drafted, if captions are switched on** |
+| `title` | kept as-is | drafted, `Place, Region, Month Year` |
+| `location` | kept as-is | drafted |
+| `description` | kept as-is | **written from every photo in the session** |
+| per-image `caption` | kept as-is | **written from the photo and its iNaturalist ID** |
 
-#### Captions, and why they're a separate switch
-
-Captions are off by default even when the API key is set. `DESCRIBE_CAPTIONS`
-takes either a switch or a list of sessions:
-
-| Value | Effect |
-| --- | --- |
-| unset, `0`, `off` | no captions anywhere (default) |
-| `1`, `true`, `on` | caption every session |
-| `gunn-peak-june-2026` | caption only that session |
-| `slug-a,slug-b` | caption only those sessions |
-
-Start with one session. Captioning the whole archive is ~877 photos in one
-build; trialling a single session first tells you whether the quality is worth
-it before you spend that.
-
-They're worth turning on: a caption becomes that photo's `alt` text, which is
-the thing image search actually reads. Without captions all 30 photos in a
-session share one generic `alt` ("session title, location"), so nothing
-distinguishes the heron shot from the caiman shot.
-
-They're a separate switch because the blast radius is different. A description
-is one sentence you can scan; captions are one claim per photograph. On a site
-that's largely wildlife macro, a confidently wrong species name is worse than a
-generic caption — it's wrong information under your name, and it can rank you
-for the wrong thing. The prompt tells the model to describe rather than guess
-("a small green tree frog" over a wrong binomial), but spot-check a session
-before trusting it across the archive.
-
-Captions are generated in batches of 10, skip any photo you've already
-captioned, and are saved into `_session.json` so each photo is only ever
-captioned once. Edit them in `/admin` like any other caption.
-
-#### Turning it on
-
-This needs a vision model. The recommended setup uses no API key at all.
-
-**Azure OpenAI, keyless (recommended, and what this site runs).** Set
-`enableDescribeModel` to `true` in
-[infra/main.parameters.json](infra/main.parameters.json) and run the Infra
-workflow. [infra/modules/ai.bicep](infra/modules/ai.bicep) adds an Azure OpenAI
-account with one model deployment (`gpt-6.1-sol`, processed inside the US data
-zone) and lets the identity GitHub Actions signs in as call that model and
-nothing else. API keys are switched off on the account, so there's nothing to
-store, leak or rotate: the build signs in through the same OIDC login it
-already uses for Blob Storage. Then set two repository variables from the
-deploy outputs:
-
-```
-AZURE_OPENAI_ENDPOINT   = https://<your-resource>.openai.azure.com/   # output describeEndpoint
-AZURE_OPENAI_DEPLOYMENT = gpt-6.1-sol                                  # output describeDeployment
-```
-
-It's billed per use, a few cents per session, and costs nothing while idle. To
-run `npm run describe` from your laptop the same way, give yourself the same
-narrow role once, and your `az login` becomes the credential:
-
-```bash
-az role assignment create \
-  --assignee-object-id "$(az ad signed-in-user show --query id -o tsv)" \
-  --assignee-principal-type User --role "Cognitive Services OpenAI User" \
-  --scope "$(az cognitiveservices account show -g rg-photography-prod -n <your-resource> --query id -o tsv)"
-```
-
-**An API key instead.** `OPENAI_API_KEY` (a repository secret, from
-platform.openai.com) with an optional `OPENAI_MODEL` variable (default
-`gpt-4o-mini`), or `ANTHROPIC_API_KEY`. Azure OpenAI with a key also works
-through the OpenAI path, since its v1 endpoint is OpenAI-compatible:
-
-```
-OPENAI_BASE_URL = https://<your-resource>.openai.azure.com/openai/v1   # variable
-OPENAI_API_KEY  = <your Azure OpenAI key>                              # secret
-OPENAI_MODEL    = <your deployment name>     # deployment, not model name
-```
-
-A key wins over the keyless endpoint if both are set.
-
-Either way, downsampled copies of the photos are sent to the model so it can
-see what's in them. That's worth a conscious decision on a photography site;
-Azure OpenAI is the option that keeps them inside your own tenant.
-
-**Species accuracy.** Set `INATURALIST_USER` (a repository variable, e.g.
-`trumanbrown`) and the generated copy is constrained to species you've actually
-recorded and had verified on iNaturalist. Asked to name a frog, a vision model
-will happily produce a plausible-but-wrong species; an allowlist of
-community-verified identifications removes most of that. Without it the prompts
-forbid species names outright and fall back to group level. A failed lookup
-degrades the same way rather than breaking the build.
-
-**Drafts go live unread, so they're checked first.** The model is shown a few
-of the reviewed descriptions in
-[scripts/session-meta.json](scripts/session-meta.json) to match their voice,
-and each draft is held to the rules
-[scripts/session-copy.test.mjs](scripts/session-copy.test.mjs) enforces on the
-hand-written copy: no em dashes, none of the banned marketing words, and a
-title in the `Place, Region, Month Year` shape. A draft that breaks one goes
-back to the model once, with the specific complaint.
-
-**With no model configured, none of this runs** and descriptions stay empty,
-but not quietly: every session without a description gets a warning on the
-Actions run. A drafting failure warns the same way and is retried on the next
-build; it can never fail a build. Nothing on the live site calls a model: this
-happens at build time only, and a visitor request never touches it.
-
-Treat the output as a first pass. It's usually right about the place, which is
-the part that matters for search, but your own words are worth far more: generic
-copy spread across thirty near-identical gallery pages is the exact pattern
-search engines discount.
-
-#### Backfilling sessions that are already published
-
-Order matters here, once:
-
-1. **Push the copy you've already written first.**
-   `AZURE_STORAGE_ACCOUNT=<account> npm run meta:apply` fills in every session
-   listed in `scripts/session-meta.json`. No API key involved.
-2. **Then** turn on a model. Doing it the other way round means the next
-   build drafts descriptions for every session that's still blank, and
-   `meta:apply` immediately overwrites them — wasted calls for no benefit.
-   Sessions that already have a description are skipped, so once step 1 has run
-   the model only touches new uploads.
-3. **Captions last, one session at a time.** Set `DESCRIBE_CAPTIONS` to a single
-   slug, build, read the results in `/admin`, then widen to a comma-separated
-   list or `1`. Captioning the whole archive at once is several hundred photos
-   in a single build, which is both slow and unreviewed.
-
-#### Reading the copy before it goes live
-
-To review and edit wording before anything publishes, draft it into version
-control instead of letting the build write it:
-
-```bash
-npm run prebuild:remote                  # pull sessions + images from Blob
-AZURE_OPENAI_ENDPOINT=https://<your-resource>.openai.azure.com/ \
-AZURE_OPENAI_DEPLOYMENT=gpt-6.1-sol \
-npm run describe                         # or OPENAI_API_KEY=sk-...; drafts into scripts/session-meta.json
-# edit the wording, remove the "draft": true flags
-AZURE_STORAGE_ACCOUNT=<account> npm run meta:apply
-```
-
-Drafts land in [scripts/session-meta.json](scripts/session-meta.json) marked
-`"draft": true`, and `meta:apply` refuses to publish them until you clear the
-flag. Useful flags: `--force` to redraft, `--only <slug>` for one session,
-`--provider mock` to exercise the flow without an API key.
-
-`meta:apply` merges into each existing `_session.json`, so `cover`, `order`,
-`date` and per-image captions are preserved.
+It needs a vision model. The recommended one is keyless Azure OpenAI in your
+own tenant, so photos never leave it and there's no API key to leak. Setup,
+how identifications work, the checks every caption and description has to
+pass, and commands to preview or redo anything:
+[docs/photos.md](docs/photos.md).
 
 ---
 
@@ -406,7 +255,7 @@ photography-website/
 ├── docs/                      # detailed docs (you are reading the index)
 ├── infra/                     # Bicep IaC, see docs/iac-bicep.md
 ├── public/                    # static assets copied verbatim to the site root
-├── scripts/                   # prebuild + bootstrap shell scripts
+├── scripts/                   # prebuild, bootstrap scripts, photos/ (captions), social/ (Instagram)
 ├── src/
 │   ├── components/            # Astro components (Header, SessionNav, Lightbox, …)
 │   │   └── hobbies/           # interactive island mounts (aquarium, tide pool, fishing)

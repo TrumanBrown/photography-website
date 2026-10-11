@@ -55,7 +55,7 @@ These are real secrets. They're set in **GitHub → Settings → Secrets and var
 | `IG_ACCESS_TOKEN` (optional) | **Yes, real secret** | Instagram token for [social posting](social.md) |
 | `SOCIAL_SECRET_KEY` (optional) | **Yes, real secret** | Random key that seals the refreshed Instagram token in Blob |
 | `IG_USER_ID` (optional) | Identifies the Instagram account | Only with Facebook Login; kept secret so it's masked in logs |
-| `SOCIAL_OPENAI_API_KEY` / `SOCIAL_ANTHROPIC_API_KEY` (optional) | **Yes, real secret** | Vision model for social captions |
+| `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` (optional) | **Yes, real secret** | Vision model for [photo captions](photos.md), only when not using keyless Azure OpenAI |
 
 The three "identifier only" Azure IDs are technically not secrets in Microsoft's threat model, knowing them doesn't grant access. They're stored as secrets out of tidiness.
 
@@ -76,7 +76,7 @@ The true credentials with meaningful blast radius are:
 If you turn on [social posting](social.md), nothing in this repository or its public Actions logs says which Instagram account it posts to:
 
 - the token and account id are GitHub secrets, which are masked in logs
-- captions, the posting plan and history live in the private `metadata` container
+- each photo's record, the posting plan and history live in the private `metadata` container
 - images reach Meta through links that expire after two hours, and are deleted after posting
 - the workflows log counts only, through a redactor that strips tokens, ids and signed URLs
 
@@ -92,6 +92,7 @@ The workflow runs themselves are visible, so someone reading the repo can tell t
 | Site analytics (pageviews) | Custom privacy-friendly pipeline → `pageviews` table in Table Storage. No IP and no cookies stored; unique visitors counted via a daily-rotating salted hash. See [docs/analytics.md](analytics.md). |
 | Contact form submissions | `contactmessages` table in Table Storage (the name, email, and message a sender chose to send you). Rate limiting uses a separate `contactratelimit` table that stores only a salted hash of the sender's IP plus a count, never the raw IP. |
 | Session descriptions and image captions | `_session.json` in the private-to-listing `originals` container. They become public text on the next site build because they describe public photographs. |
+| What the photo pipeline knows about each photo | `metadata/photos/` in the private container: the model's notes on each frame, its iNaturalist match, and what was last written. Captions only ever use place names you wrote yourself, never an iNaturalist observation's place, which can be a street address. See [docs/photos.md](photos.md). |
 
 ## What is published to **the public website**
 

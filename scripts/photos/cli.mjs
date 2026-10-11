@@ -80,6 +80,13 @@ async function status(store) {
   console.log(
     `Flagged as not matching their iNaturalist ID: ${count((s) => s.analysis?.idCheck === "conflict")}`,
   );
+  const refused = Object.values(catalog.shots).filter(
+    (s) => s.unreadable || (s.failures ?? 0) >= 3,
+  );
+  if (refused.length)
+    console.log(
+      `Given up on (the model refused them, or they failed three runs): ${refused.map((s) => s.pick).join(", ")}. Retry with redo.`,
+    );
   console.log(
     `Sessions with a written description: ${sessions.filter((r) => r.description).length}`,
   );
@@ -152,7 +159,7 @@ async function main() {
     await updateJson(store, "catalog.json", (catalog) => {
       const rec = catalog.sessions?.[rest[0]];
       if (!rec) throw new Error(`No session "${rest[0]}" in the catalog.`);
-      delete rec.inputs;
+      rec.redescribe = new Date().toISOString();
       return catalog;
     });
     console.log(
