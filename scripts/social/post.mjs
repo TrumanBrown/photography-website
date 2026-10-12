@@ -33,7 +33,7 @@ import { blobStore, localStore, updateJson } from "../photos/store.mjs";
 import { IN_FLIGHT, decide, localParts, previousDay } from "./schedule.mjs";
 import { isPostable, planQueue } from "./plan.mjs";
 import { resolveToken } from "./token.mjs";
-import { createClient } from "./instagram.mjs";
+import { createClient, notReadyToPublish } from "./instagram.mjs";
 import { renderForInstagram } from "./render.mjs";
 import { info, redact, registerSecret } from "../photos/redact.mjs";
 
@@ -439,6 +439,13 @@ export async function runPost({
       });
     }
     // Otherwise the container stays in flight for the next run to settle.
+    if (
+      notReadyToPublish(e) &&
+      (status === "FINISHED" || status === "IN_PROGRESS")
+    )
+      log(
+        "Instagram accepted the post but kept answering that it wasn't ready to publish, even after a minute of retrying. It's kept as it is, and the next run publishes it.",
+      );
 
     // Fail the run (GitHub emails) once a day; later failures that day are quiet.
     const alreadyReported = (await store.readJson(dayFile(today)))?.data

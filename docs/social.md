@@ -403,6 +403,7 @@ When there's no subject tag (most landscapes), the broad region takes the slot (
 **Failures.**
 
 - **A problem with the photo itself** (Instagram rejecting the image, or a missing or unreadable file) counts as a strike against that photo. Two strikes and it's left out until `npm run social -- retry`.
+- **"Media ID is not available"** (Instagram error 9007). Instagram sometimes says a post is ready, then refuses to publish it for a few seconds. Publishing waits and tries again for about a minute. If it still won't go, the post is kept as it is, the run fails once that day with a log line saying so, and the next run publishes it. It's never counted against the photo.
 - **Anything else** (an expired token, a rate limit, an outage) never counts against a photo. Posting pauses for two hours and the run fails once that day, so you get one email rather than thirty.
 
 **Missed days.** A dropped schedule never fails on its own. So the first run each morning checks for yesterday's post and fails if there wasn't one, which makes GitHub email whoever last edited the schedule. That's one email per missed day.

@@ -14,6 +14,23 @@ import { redact } from "../photos/redact.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * Waits between publish attempts when Instagram answers "Media ID is not
+ * available" (code 9007, subcode 2207027) for a container it has already
+ * reported FINISHED. Its publish side can lag its status side by a few
+ * seconds; about a minute of retrying covers it.
+ */
+export const PUBLISH_RETRY_WAITS = [3000, 5000, 10000, 20000, 30000];
+
+/** Instagram's "the media is not ready for publishing, please wait for a moment". */
+export function notReadyToPublish(e) {
+  return (
+    e?.code === 9007 ||
+    e?.subcode === 2207027 ||
+    /media id is not available/i.test(e?.message ?? "")
+  );
+}
+
 export class GraphError extends Error {
   constructor(status, error) {
     super(
@@ -32,6 +49,7 @@ export function createClient({
   apiVersion = "v25.0",
   userId,
   fetchImpl = fetch,
+  publishRetryWaits = PUBLISH_RETRY_WAITS,
 }) {
   if (!token) throw new Error("No Instagram access token is configured.");
   const host =
@@ -134,12 +152,30 @@ export function createClient({
       }
     },
 
+    /**
+     * Publish a FINISHED container. Retried while Instagram says it isn't
+     * ready yet; if the container turns out to have been published meanwhile,
+     * that counts (the post's id isn't known then, so it returns null).
+     */
     async publish(containerId) {
       const id = await this.userId();
-      const json = await call("POST", `/${id}/media_publish`, {
-        creation_id: containerId,
-      });
-      return String(json.id);
+      for (let attempt = 0; ; attempt++) {
+        try {
+          const json = await call("POST", `/${id}/media_publish`, {
+            creation_id: containerId,
+          });
+          return String(json.id);
+        } catch (e) {
+          if (!notReadyToPublish(e) || attempt >= publishRetryWaits.length)
+            throw e;
+          await sleep(publishRetryWaits[attempt]);
+          const status = await this.containerStatus(containerId).catch(
+            () => null,
+          );
+          if (status === "PUBLISHED") return null;
+          if (status === "ERROR" || status === "EXPIRED") throw e;
+        }
+      }
     },
 
     /** Recent posts on the account, newest first, for "already posted" fingerprinting. */

@@ -121,6 +121,78 @@ describe("Instagram client", () => {
     expect(err.message).not.toContain(TOKEN);
     expect(err.message).not.toContain("17841400000000001");
   });
+
+  describe("when Instagram says a ready post isn't ready to publish", () => {
+    const notReady = [
+      400,
+      {
+        error: {
+          message: "Media ID is not available",
+          code: 9007,
+          error_subcode: 2207027,
+        },
+      },
+    ];
+    const graph = ({ publishes, status = () => "FINISHED" }) => {
+      let n = 0;
+      return fakeGraph({
+        "GET /c1": () => [200, { status_code: status(n) }],
+        "POST /17841400000000001/media_publish": () => publishes[n++],
+      });
+    };
+    const clientFor = (fetchImpl) =>
+      createClient({
+        token: TOKEN,
+        userId: "17841400000000001",
+        fetchImpl,
+        publishRetryWaits: [0, 0, 0],
+      });
+
+    it("waits and tries again", async () => {
+      const { calls, fetchImpl } = graph({
+        publishes: [notReady, notReady, [200, { id: "m1" }]],
+      });
+      expect(await clientFor(fetchImpl).publish("c1")).toBe("m1");
+      expect(
+        calls.filter((c) => c.path.endsWith("/media_publish")),
+      ).toHaveLength(3);
+    });
+
+    it("stops when the post turns out to be published already", async () => {
+      const { calls, fetchImpl } = graph({
+        publishes: [notReady, notReady, notReady],
+        status: (n) => (n >= 1 ? "PUBLISHED" : "FINISHED"),
+      });
+      expect(await clientFor(fetchImpl).publish("c1")).toBeNull();
+      expect(
+        calls.filter((c) => c.path.endsWith("/media_publish")),
+      ).toHaveLength(1);
+    });
+
+    it("gives up after a while, and never retries other errors", async () => {
+      const { calls, fetchImpl } = graph({
+        publishes: [notReady, notReady, notReady, notReady, notReady],
+      });
+      await expect(clientFor(fetchImpl).publish("c1")).rejects.toThrow(
+        /Media ID is not available/,
+      );
+      expect(
+        calls.filter((c) => c.path.endsWith("/media_publish")),
+      ).toHaveLength(4);
+
+      const other = graph({
+        publishes: [
+          [400, { error: { message: "Invalid parameter", code: 100 } }],
+        ],
+      });
+      await expect(clientFor(other.fetchImpl).publish("c1")).rejects.toThrow(
+        /Invalid parameter/,
+      );
+      expect(
+        other.calls.filter((c) => c.path.endsWith("/media_publish")),
+      ).toHaveLength(1);
+    });
+  });
 });
 
 describe("redact", () => {

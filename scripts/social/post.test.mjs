@@ -12,6 +12,7 @@ const TODAY = "2026-10-14";
 
 function fakeClient({
   failPublishOnce = false,
+  notReadyOnce = false,
   statusAfterFailure = "FINISHED",
   limitError = null,
   readyStatus = "FINISHED",
@@ -43,6 +44,13 @@ function fakeClient({
         if (failPublishOnce && !failed) {
           failed = true;
           throw new Error("socket hang up");
+        }
+        if (notReadyOnce && !failed) {
+          failed = true;
+          throw Object.assign(
+            new Error("Instagram API 400: Media ID is not available"),
+            { code: 9007, subcode: 2207027 },
+          );
         }
         published.add(id);
         return `m-${id}`;
@@ -159,6 +167,24 @@ describe("runPost", () => {
     expect(
       Object.keys((await store.readJson("ledger.json")).data.posted),
     ).toEqual(["s1"]);
+  });
+
+  it("explains a post Instagram still wouldn't publish, and publishes it on the next run", async () => {
+    const client = fakeClient({ notReadyOnce: true });
+    const lines = [];
+    await expect(
+      run(client, at(TODAY, "08:35"), { log: (l) => lines.push(l) }),
+    ).rejects.toThrow(/Media ID is not available/);
+    expect(lines.join(" ")).toMatch(/next run publishes it/);
+    const day = (await store.readJson(`days/${TODAY}.json`)).data;
+    expect(day.attempts[0].state).toBe("container");
+    expect(day.pausedUntil).toBeUndefined();
+
+    await run(client, at(TODAY, "09:05"));
+    const after = (await store.readJson(`days/${TODAY}.json`)).data;
+    expect(after.attempts[0].state).toBe("published");
+    expect(client.log.filter((l) => l[0] === "create")).toHaveLength(1);
+    expect((await store.readJson("ledger.json")).data.failed ?? {}).toEqual({});
   });
 
   it("treats a lost publish response as published when Instagram says so", async () => {
