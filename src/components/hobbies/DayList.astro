@@ -2,9 +2,14 @@
 /**
  * Day list - a daily puzzle built on real iNaturalist records.
  *
- * Six species were all recorded at one place in one month. They are revealed
- * commonest-in-the-world first, so each one narrows the map further. The
- * visitor drops a pin and picks a month; reading fewer species scores higher.
+ * Six species were all recorded at one place in one month. The board shows
+ * them one at a time, most widely recorded first, so each one narrows the map
+ * further. The visitor drops a pin, picks a month and locks it in once. Every
+ * extra species lowers the most they can score, and the board shows that
+ * number before they ask (the "Reveal next clue -750" idea from Originle).
+ *
+ * The rules come first and are the largest text on the page, because the
+ * premise is the part people got stuck on.
  *
  * Behaviour lives in @/lib/hobbies/day-list, bound via [data-daylist-*].
  * Photos load from the iNaturalist CDNs already allow-listed in the CSP.
@@ -12,106 +17,128 @@
 interface Props {
   heading?: string;
 }
-const { heading = "Day list" } = Astro.props;
+const { heading = "Today's list" } = Astro.props;
+
+const STEPS = [
+  "You start with one species. It's the most common of the six, so it could be almost anywhere.",
+  "If you're stuck, show the next one. Each is rarer than the last and narrows things down, but it costs you points.",
+  "Whenever you have a hunch, tap the map where you think they were seen and pick a month.",
+  "Lock it in. You only get one guess, and a pin anywhere inside the real place counts as spot on.",
+];
+
+const MONTHS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
 ---
 
-<section class="dl not-prose mt-8" aria-label={heading} data-daylist>
-  <header class="dl-head">
-    <p class="u-label">New list daily</p>
-    <h2 class="dl-title">{heading}</h2>
-    <p class="dl-lede">
-      Somebody kept a list at one place for a month. You get the species, one at
-      a time, and you work out where they were standing.
-    </p>
-  </header>
+<div class="dl not-prose" data-daylist>
+  <section class="dl-how" aria-labelledby="dl-how-title">
+    <div class="shead">
+      <h2 id="dl-how-title">How to play</h2>
+    </div>
+    <ol class="dl-steps" role="list">
+      {STEPS.map((step) => <li>{step}</li>)}
+    </ol>
+  </section>
 
-  <ol class="dl-steps">
-    <li>
-      <span class="dl-steps__n">1</span>
-      <span
-        >The <strong>commonest animals come first</strong>. A house sparrow
-        tells you nothing. The last one is usually local enough to give it away.</span
-      >
-    </li>
-    <li>
-      <span class="dl-steps__n">2</span>
-      <span
-        >Tap the map, pick a month, lock it in. Guess whenever you like.</span
-      >
-    </li>
-    <li>
-      <span class="dl-steps__n">3</span>
-      <span
-        >The fewer you read, the better you score. Anywhere inside the real
-        boundary counts as spot on.</span
-      >
-    </li>
-  </ol>
-
-  <div class="dl-grid">
-    <!-- the notebook -->
-    <div class="dl-book">
-      <div class="dl-book__head">
-        <p class="u-label">What they found</p>
-        <p class="dl-book__count" data-daylist-counter>1 of 6</p>
-      </div>
-      <ol class="dl-clues" data-daylist-clues></ol>
-      <button type="button" class="dl-btn dl-btn--wide" data-daylist-more>
-        Show me the next one
-      </button>
+  <section class="dl-board" aria-labelledby="dl-board-title">
+    <div class="shead">
+      <h2 id="dl-board-title">{heading}</h2>
+      <p class="dl-date" data-daylist-date></p>
     </div>
 
-    <!-- the guess -->
-    <div>
+    <div class="dl-axis" aria-hidden="true">
+      <span>Most common</span><i></i><span>Rarest</span>
+    </div>
+    <ol
+      class="dl-tray"
+      role="list"
+      aria-label="The six species, most common first"
+      data-daylist-clues
+    >
+    </ol>
+    <p class="dl-sr" aria-live="polite" data-daylist-announce></p>
+
+    <div class="dl-play">
       <div
         class="dl-mapwrap"
         data-daylist-mapwrap
         tabindex="0"
         role="application"
-        aria-label="World map. Click or tap to drop a pin where you think the list was written. Arrow keys move the pin."
+        aria-label="World map. Tap where you think the six species were seen. Arrow keys move the pin."
       >
         <canvas data-daylist-map></canvas>
-        <p class="dl-maphint">Tap the map to drop a pin</p>
+        <p class="dl-maphint" aria-hidden="true">Tap the map to drop a pin</p>
       </div>
 
-      <div class="dl-ask">
-        <p class="u-label dl-ask__label">What month was this?</p>
-        <div
-          class="dl-months"
-          data-daylist-months
-          role="group"
-          aria-label="Choose a month"
-        >
+      <div class="dl-panel">
+        <div class="dl-guess" data-daylist-guess>
+          <p class="dl-worth">
+            Up to <span class="dl-worth__n" data-daylist-worth>6,000</span> points
+          </p>
+
+          <fieldset class="dl-months">
+            <legend class="dl-legend">Which month?</legend>
+            <div class="dl-months__grid">
+              {
+                MONTHS.map((name, i) => (
+                  <label class="dl-month">
+                    <input
+                      type="radio"
+                      name="dl-month"
+                      value={i}
+                      autocomplete="off"
+                      data-daylist-month
+                    />
+                    <span class="dl-month__cell" aria-hidden="true">
+                      {name.slice(0, 3)}
+                    </span>
+                    <span class="dl-sr">{name}</span>
+                  </label>
+                ))
+              }
+            </div>
+          </fieldset>
+
+          <p class="dl-readout" aria-live="polite" data-daylist-readout>
+            Drop a pin, then pick a month.
+          </p>
+          <button
+            type="button"
+            class="btn btn-ink dl-lock"
+            data-daylist-lock
+            disabled>Lock it in</button
+          >
         </div>
-      </div>
 
-      <div class="dl-lockrow">
-        <p class="dl-readout" data-daylist-readout>
-          Drop a pin, then pick a month.
-        </p>
-        <button
-          type="button"
-          class="dl-btn dl-btn--go"
-          data-daylist-lock
-          disabled>Lock it in</button
-        >
+        <div class="dl-result" data-daylist-result hidden></div>
       </div>
-
-      <div data-daylist-result></div>
     </div>
-  </div>
+  </section>
+
+  <div data-daylist-roll></div>
 
   <p class="dl-foot">
-    Every species really was recorded at that place in that month, and every
-    place is a real one with a published boundary. The bar shows how often
-    something gets
-    <em>recorded</em> worldwide, which says as much about where people go looking
-    as where the animal lives, so take it as a nudge and not a range map. Introduced
-    and endemic species are flagged, because a kookaburra in Tasmania is a very different
-    clue once you know it was put there. All data from iNaturalist, photos credited
+    Every species on a list really was logged at that place in that month, and
+    every place is a real one with a published boundary. Sighting counts show
+    how often something gets logged worldwide, which follows where people go
+    looking as much as where the animal lives. The full list flags introduced
+    and endemic species, because a kookaburra in Tasmania is a very different
+    clue once you know it was put there. Data from iNaturalist, photos credited
     to whoever took them.
   </p>
-</section>
+</div>
 
 <script>
   import { initDayList } from "@/lib/hobbies/day-list";
@@ -124,234 +151,12 @@ const { heading = "Day list" } = Astro.props;
 <style is:global>
   /* Global rather than scoped, and namespaced under .dl so nothing leaks.
      Astro's scoped styles only reach markup present at build time, and the
-     clue rows, month buttons and result card are all built by the script at
-     runtime, so scoping would silently miss them. */
+     species slots, result and full list are built by the script at runtime,
+     so scoping would silently miss them. Rules that adjust a shared class
+     (.btn, .shead) are prefixed with .dl so they win on specificity. */
 
-  /* Follows the archive's paper/ink palette rather than introducing a new one:
-     rules instead of cards, one accent-free column of type. */
-  .dl {
-    border-top: 1px solid var(--rule);
-    padding-top: 20px;
-  }
-
-  .dl-head {
-    max-width: 62ch;
-  }
-  .dl-title {
-    margin: 4px 0 0;
-    font-size: 20px;
-    font-weight: 500;
-    letter-spacing: -0.01em;
-  }
-  .dl-lede {
-    margin: 6px 0 0;
-    font-size: 14px;
-    line-height: 1.55;
-    color: var(--ink-3);
-  }
-
-  .dl-steps {
-    list-style: none;
-    margin: 16px 0 0;
-    padding: 0;
-    display: grid;
-    gap: 8px;
-    max-width: 72ch;
-  }
-  .dl-steps li {
-    display: flex;
-    gap: 10px;
-    align-items: baseline;
-    font-size: 13px;
-    line-height: 1.5;
-    color: var(--ink-3);
-  }
-  .dl-steps__n {
-    flex: none;
-    width: 18px;
-    height: 18px;
-    border: 1px solid var(--rule);
-    border-radius: 999px;
-    display: inline-grid;
-    place-items: center;
-    font-size: 10px;
-    color: var(--ink-2);
-    transform: translateY(2px);
-  }
-  .dl-steps strong {
-    font-weight: 500;
-    color: var(--ink);
-  }
-
-  .dl-grid {
-    margin-top: 22px;
-    display: grid;
-    gap: 22px;
-    grid-template-columns: 1fr;
-  }
-  @media (min-width: 900px) {
-    .dl-grid {
-      grid-template-columns: minmax(0, 20rem) minmax(0, 1fr);
-      align-items: start;
-    }
-  }
-
-  /* ---------------- notebook ---------------- */
-  .dl-book {
-    border: 1px solid var(--rule);
-  }
-  .dl-book__head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 10px;
-    padding: 10px 12px;
-    border-bottom: 1px solid var(--rule);
-    background: var(--band);
-  }
-  .dl-book__count {
-    margin: 0;
-    font-size: 11px;
-    color: var(--ink-2);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .dl-clues {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-  }
-  .dl-clue {
-    display: flex;
-    gap: 10px;
-    align-items: flex-start;
-    padding: 10px 12px;
-    border-bottom: 1px solid var(--rule-soft);
-  }
-  .dl-clue__num {
-    flex: none;
-    width: 12px;
-    font-size: 10px;
-    color: var(--ink-2);
-    font-variant-numeric: tabular-nums;
-    padding-top: 2px;
-  }
-  .dl-clue__photo {
-    flex: none;
-    width: 46px;
-    height: 46px;
-    object-fit: cover;
-    background: var(--band);
-  }
-  .dl-clue__body {
-    min-width: 0;
-    flex: 1;
-    display: block;
-  }
-  .dl-clue__name {
-    display: block;
-    font-size: 13px;
-    font-weight: 500;
-    line-height: 1.3;
-  }
-  .dl-clue__sci {
-    display: block;
-    font-size: 11px;
-    font-style: italic;
-    color: var(--ink-2);
-    margin-top: 1px;
-  }
-  .dl-clue__bar {
-    display: block;
-    height: 3px;
-    background: var(--rule-soft);
-    margin-top: 6px;
-  }
-  .dl-clue__bar i {
-    display: block;
-    height: 100%;
-    background: var(--ink-2);
-  }
-  .dl-clue__meta {
-    display: block;
-    font-size: 10px;
-    color: var(--ink-2);
-    margin-top: 4px;
-    font-variant-numeric: tabular-nums;
-  }
-  .dl-clue--hidden {
-    color: var(--ink-2);
-  }
-  .dl-clue__wait {
-    font-size: 12px;
-    font-style: italic;
-    color: var(--ink-2);
-  }
-
-  /* ---------------- map ---------------- */
-  .dl-mapwrap {
-    position: relative;
-    border: 1px solid var(--rule);
-    aspect-ratio: 2 / 1;
-    cursor: crosshair;
-    touch-action: manipulation;
-  }
-  .dl-mapwrap canvas {
-    display: block;
-    width: 100%;
-    height: 100%;
-  }
-  .dl-maphint {
-    position: absolute;
-    left: 8px;
-    bottom: 8px;
-    margin: 0;
-    font-size: 11px;
-    color: var(--ink-2);
-    background: color-mix(in srgb, var(--paper) 88%, transparent);
-    border: 1px solid var(--rule);
-    padding: 3px 7px;
-    pointer-events: none;
-    transition: opacity 0.25s;
-  }
-  .dl-mapwrap.is-placed .dl-maphint {
-    opacity: 0;
-  }
-
-  /* ---------------- month ---------------- */
-  .dl-ask {
-    margin-top: 14px;
-  }
-  .dl-ask__label {
-    margin: 0 0 6px;
-    display: block;
-  }
-  .dl-months {
-    display: grid;
-    grid-template-columns: repeat(6, 1fr);
-    gap: 4px;
-  }
-  @media (min-width: 560px) {
-    .dl-months {
-      grid-template-columns: repeat(12, 1fr);
-    }
-  }
-  .dl-month {
-    border: 1px solid var(--rule);
-    background: transparent;
-    color: var(--ink-3);
-    font: inherit;
-    font-size: 11px;
-    padding: 7px 0;
-    cursor: pointer;
-  }
-  .dl-month:hover {
-    background: var(--hover);
-  }
-  .dl-month[aria-pressed="true"] {
-    background: var(--ink);
-    border-color: var(--ink);
-    color: var(--paper);
+  .dl [hidden] {
+    display: none !important;
   }
   .dl-sr {
     position: absolute;
@@ -365,265 +170,570 @@ const { heading = "Day list" } = Astro.props;
     border: 0;
   }
 
-  /* ---------------- actions ---------------- */
-  .dl-lockrow {
-    margin-top: 14px;
+  /* ---------------- how to play ----------------
+     The largest body text on the page. The numbers are a real sequence. */
+  .dl-how {
+    max-width: 46rem;
+  }
+  .dl-steps {
+    counter-reset: dl-step;
+    list-style: none;
+    margin: 16px 0 0;
+    padding: 0;
+    display: grid;
+    gap: 12px;
+  }
+  .dl-steps > li {
+    counter-increment: dl-step;
+    display: grid;
+    grid-template-columns: 2rem minmax(0, 1fr);
+    align-items: baseline;
+    font-size: 18px;
+    line-height: 1.5;
+    color: var(--ink);
+    text-wrap: pretty;
+  }
+  .dl-steps > li::before {
+    content: counter(dl-step);
+    font-weight: 300;
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------------- board ---------------- */
+  .dl-board {
+    margin-top: 44px;
+    padding-top: 18px;
+    border-top: 1px solid var(--rule);
+  }
+  .dl-date {
+    margin: 0;
+    font-size: 12px;
+    color: var(--ink-2);
+  }
+
+  /* Says why the order matters, right where the order is. */
+  .dl-axis {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    flex-wrap: wrap;
+    gap: 10px;
+    margin: 18px 0 10px;
+    font-size: 11px;
+    color: var(--ink-2);
   }
-  .dl-readout {
+  .dl-axis i {
+    position: relative;
+    flex: 1;
+    height: 1px;
+    background: var(--rule);
+  }
+  .dl-axis i::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    top: -3px;
+    border-left: 6px solid var(--ink-2);
+    border-top: 3.5px solid transparent;
+    border-bottom: 3.5px solid transparent;
+  }
+
+  /* ---------------- the six species ---------------- */
+  .dl-tray {
+    list-style: none;
     margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 16px 12px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  @media (min-width: 1024px) {
+    .dl-tray {
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+    }
+  }
+  .dl-slot {
+    min-width: 0;
+  }
+  .dl-slot__fig {
+    margin: 0;
+  }
+  .dl-slot__pic {
+    position: relative;
+    aspect-ratio: 1 / 1;
+    overflow: hidden;
+    background: var(--band);
+  }
+  .dl-slot__pic img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0;
+    transition: opacity 320ms var(--ease);
+  }
+  .dl-slot__pic img.is-loaded {
+    opacity: 1;
+  }
+  .dl-slot__body {
+    display: block;
+    padding-top: 10px;
+  }
+  .dl-slot__name {
+    display: block;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.3;
+    color: var(--ink);
+    overflow-wrap: anywhere;
+  }
+  .dl-slot__sci {
+    display: block;
+    margin-top: 2px;
+    font-size: 12px;
+    font-style: italic;
+    color: var(--ink-2);
+    overflow-wrap: anywhere;
+  }
+  .dl-slot__count {
+    display: block;
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--ink-3);
+    font-variant-numeric: tabular-nums;
+  }
+  /* CC BY and CC BY-NC both require the photographer to be named, so the
+     credit rides with the photo rather than living in a footnote. */
+  .dl-slot__credit {
+    display: block;
+    margin-top: 3px;
+    font-size: 10px;
+    line-height: 1.35;
+    color: var(--ink-2);
+    overflow-wrap: anywhere;
+  }
+  .dl-slot.is-new .dl-slot__body {
+    animation: dl-rise 320ms var(--ease) var(--dl-delay, 0ms) both;
+  }
+  .dl-slot.is-new .dl-slot__pic img {
+    transition-delay: var(--dl-delay, 0ms);
+  }
+  @keyframes dl-rise {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+  }
+
+  /* Still hidden: the same square, empty, with its place in the order. */
+  .dl-slot__blank {
+    display: grid;
+    place-items: center;
+    aspect-ratio: 1 / 1;
+    border: 1px solid var(--rule);
+    font-size: 22px;
+    font-weight: 300;
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* The next square is the button, and says what it costs. */
+  .dl-slot__next {
+    display: grid;
+    place-content: center;
+    gap: 6px;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    padding: 10px;
+    border: 1px dashed var(--ink-2);
+    background: transparent;
+    color: var(--ink);
+    font: inherit;
+    font-size: 14px;
+    line-height: 1.3;
+    text-align: center;
+    cursor: pointer;
+    transition:
+      background-color 150ms var(--ease),
+      border-color 150ms var(--ease);
+  }
+  .dl-slot__next:hover {
+    background: var(--hover);
+    border-style: solid;
+    border-color: var(--ink);
+  }
+  .dl-slot__cta {
+    text-wrap: balance;
+  }
+  .dl-slot__cost {
     font-size: 12px;
     color: var(--ink-2);
     font-variant-numeric: tabular-nums;
   }
-  .dl-btn {
+  .dl-nowrap {
+    white-space: nowrap;
+  }
+
+  /* ---------------- map and guess ---------------- */
+  .dl-play {
+    margin-top: 28px;
+    display: grid;
+    gap: 22px;
+  }
+  @media (min-width: 1024px) {
+    .dl-play {
+      grid-template-columns: minmax(0, 1fr) 18.5rem;
+      gap: 28px;
+      align-items: start;
+    }
+  }
+
+  .dl-mapwrap {
+    position: relative;
+    aspect-ratio: 2 / 1;
     border: 1px solid var(--rule);
-    background: transparent;
-    color: var(--ink);
-    font: inherit;
-    font-size: 12px;
-    padding: 8px 14px;
-    cursor: pointer;
+    cursor: crosshair;
+    touch-action: manipulation;
   }
-  .dl-btn:hover:not(:disabled) {
-    background: var(--hover);
+  .dl-mapwrap.is-done {
+    cursor: default;
   }
-  .dl-btn:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-  }
-  .dl-btn--wide {
+  .dl-mapwrap canvas {
     display: block;
     width: 100%;
-    border: 0;
-    border-top: 1px solid var(--rule);
-    padding: 11px 12px;
+    height: 100%;
   }
-  .dl-btn--go {
+  .dl-maphint {
+    position: absolute;
+    left: 8px;
+    bottom: 8px;
+    margin: 0;
+    padding: 4px 8px;
+    border: 1px solid var(--rule);
+    background: color-mix(in srgb, var(--paper) 88%, transparent);
+    font-size: 12px;
+    color: var(--ink-3);
+    pointer-events: none;
+    transition: opacity 250ms var(--ease);
+  }
+  .dl-mapwrap.is-placed .dl-maphint,
+  .dl-mapwrap.is-done .dl-maphint {
+    opacity: 0;
+  }
+
+  .dl-guess,
+  .dl-result {
+    display: grid;
+    gap: 18px;
+  }
+  /* Under the map on narrower screens; a receipt the full page wide puts
+     each number too far from its label. */
+  .dl-panel {
+    max-width: 32rem;
+  }
+
+  .dl-worth {
+    margin: 0;
+    font-size: 14px;
+    color: var(--ink-3);
+  }
+  .dl-worth__n {
+    display: inline-block;
+    font-size: 28px;
+    font-weight: 300;
+    line-height: 1;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .dl-months {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  .dl-legend {
+    margin: 0 0 8px;
+    padding: 0;
+    font-size: 13px;
+    color: var(--ink);
+  }
+  .dl-months__grid {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 4px;
+  }
+  @media (min-width: 1024px) {
+    .dl-months__grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+  .dl-month {
+    position: relative;
+    display: block;
+    cursor: pointer;
+  }
+  .dl-month input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+  .dl-month__cell {
+    display: grid;
+    place-items: center;
+    min-height: 40px;
+    border: 1px solid var(--rule);
+    font-size: 13px;
+    color: var(--ink-3);
+    transition:
+      background-color 150ms var(--ease),
+      border-color 150ms var(--ease),
+      color 150ms var(--ease);
+  }
+  .dl-month:hover .dl-month__cell {
+    background: var(--hover);
+    border-color: var(--ink-2);
+    color: var(--ink);
+  }
+  .dl-month input:checked + .dl-month__cell {
     background: var(--ink);
     border-color: var(--ink);
     color: var(--paper);
   }
-  .dl-btn--go:hover:not(:disabled) {
-    opacity: 0.88;
-    background: var(--ink);
+  .dl-month input:focus-visible + .dl-month__cell {
+    box-shadow:
+      0 0 0 2px var(--paper),
+      0 0 0 4px var(--ink);
+  }
+
+  .dl-readout {
+    margin: 0;
+    min-height: 2.9em;
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--ink-3);
+    font-variant-numeric: tabular-nums;
+  }
+  .dl .dl-lock {
+    width: 100%;
+    min-height: 44px;
+    font-size: 14px;
+  }
+  /* Outlined until there's a pin and a month, so turning ink means ready. */
+  .dl .dl-lock:disabled {
+    background: transparent;
+    border-color: var(--rule);
+    color: var(--ink-2);
+    opacity: 1;
   }
 
   /* ---------------- result ---------------- */
-  .dl-result {
-    margin-top: 16px;
-    border: 1px solid var(--rule);
+  .dl-verdict {
+    margin: 0;
+    font-size: 13px;
+    color: var(--ink-2);
   }
-  .dl-result__head {
-    display: flex;
-    justify-content: space-between;
-    gap: 16px;
-    flex-wrap: wrap;
-    padding: 12px 14px;
-    border-bottom: 1px solid var(--rule);
-    background: var(--band);
+  .dl-place {
+    margin: 4px 0 0;
+    font-size: 22px;
+    font-weight: 400;
+    line-height: 1.2;
+    color: var(--ink);
+    text-wrap: balance;
   }
-  .dl-result__place {
-    margin: 3px 0 0;
-    font-size: 19px;
-    font-weight: 500;
+  /* Focus lands here after "Lock it in" so the result is read out next. It
+     isn't a control, so it doesn't get the ring. */
+  .dl-place:focus,
+  .dl-place:focus-visible {
+    outline: none;
+    box-shadow: none;
+  }
+  .dl-region {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: var(--ink-3);
+  }
+
+  /* A receipt: where the points came from, so the scoring explains itself. */
+  .dl-receipt {
+    margin: 0;
+    border-top: 1px solid var(--rule);
+  }
+  .dl-receipt > div {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+  .dl-receipt dt {
+    font-size: 13px;
+    color: var(--ink);
+  }
+  .dl-receipt dd {
+    margin: 0;
+  }
+  .dl-receipt__pts {
+    font-size: 13px;
+    text-align: right;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+  .dl-receipt__why {
+    grid-column: 1 / -1;
+    margin-top: 2px;
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--ink-2);
+  }
+  /* A number that counts up in place (rollTo); a one-step change slides. */
+  .dl-num {
+    display: inline-block;
+    font-variant-numeric: tabular-nums;
+  }
+  .dl-receipt > .dl-receipt__total {
+    align-items: baseline;
+    border-bottom: 0;
+  }
+  .dl-score {
+    display: inline-block;
+    font-size: 28px;
+    font-weight: 300;
+    line-height: 1;
     letter-spacing: -0.01em;
   }
-  .dl-result__region {
-    margin: 2px 0 0;
+
+  .dl-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .dl-next {
+    margin: 0;
     font-size: 12px;
     color: var(--ink-2);
   }
-  .dl-result__score {
-    text-align: right;
-  }
-  .dl-result__total {
-    margin: 3px 0 0;
-    font-size: 24px;
-    font-weight: 500;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: -0.02em;
-  }
 
-  .dl-breakdown {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
+  /* ---------------- the full list ---------------- */
+  .dl-roll {
+    margin-top: 44px;
+    padding-top: 18px;
+    border-top: 1px solid var(--rule);
+  }
+  .dl-roll h3 {
     margin: 0;
-    border-bottom: 1px solid var(--rule);
+    font-size: 19px;
+    font-weight: 300;
+    line-height: 1.25;
+    color: var(--ink);
   }
-  .dl-breakdown > div {
-    padding: 10px 14px;
-    border-right: 1px solid var(--rule);
+  .dl-entries {
+    counter-reset: dl-entry;
+    list-style: none;
+    margin: 16px 0 0;
+    padding: 0;
+    display: grid;
+    gap: 22px 28px;
   }
-  .dl-breakdown > div:last-child {
-    border-right: 0;
+  @media (min-width: 640px) {
+    .dl-entries {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
   }
-  .dl-breakdown dt {
-    font-size: 10px;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
+  @media (min-width: 1024px) {
+    .dl-entries {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+  .dl-entry {
+    counter-increment: dl-entry;
+    min-width: 0;
+  }
+  .dl-entry__name {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 500;
+    line-height: 1.3;
+    color: var(--ink);
+  }
+  .dl-entry__name::before {
+    content: counter(dl-entry);
+    display: inline-block;
+    min-width: 1.4em;
+    font-weight: 300;
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+  }
+  .dl-entry__sci {
+    margin: 2px 0 0 1.4em;
+    font-size: 12px;
     color: var(--ink-2);
   }
-  .dl-breakdown dd {
-    margin: 3px 0 0;
-    font-size: 13px;
-    font-variant-numeric: tabular-nums;
+  .dl-entry__sci i {
+    font-style: italic;
   }
-
-  .dl-result__note {
-    margin: 0;
-    padding: 12px 14px;
+  .dl-entry__status {
+    color: var(--ink);
+  }
+  .dl-entry__fact {
+    margin: 8px 0 0 1.4em;
     font-size: 13px;
     line-height: 1.55;
     color: var(--ink-3);
   }
-  .dl-result__note strong {
-    font-weight: 500;
-    color: var(--ink);
-  }
-  .dl-result__note--quiet {
-    border-top: 1px solid var(--rule-soft);
-    font-size: 12px;
-    color: var(--ink-2);
-  }
-  .dl-share {
-    margin: 0;
-    padding: 0 14px;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 15px;
-    letter-spacing: 0.08em;
-    line-height: 1.45;
-  }
-  .dl-actions {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px 14px;
-    flex-wrap: wrap;
-  }
-  .dl-next {
-    font-size: 11px;
-    color: var(--ink-2);
-  }
-
-  /* ---------------- photo credit ---------------- */
-  /* CC BY and CC BY-NC both require the photographer to be named, so the
-     credit rides with the thumbnail rather than living in a footnote. */
-  .dl-clue__credit {
-    display: block;
-    font-size: 9px;
-    line-height: 1.3;
-    color: var(--ink-2);
-    margin-top: 3px;
-  }
-
-  /* ---------------- standing tags ---------------- */
-  .dl-tag {
-    display: inline-block;
-    font-size: 9px;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    border: 1px solid var(--rule);
-    padding: 1px 5px;
-    margin-left: 5px;
-    color: var(--ink-2);
-    vertical-align: 1px;
-    white-space: nowrap;
-  }
-  .dl-tag--introduced {
-    border-color: var(--ink-2);
-    color: var(--ink-3);
-  }
-  .dl-tag--endemic {
-    border-color: var(--ink);
-    color: var(--ink);
-  }
-
-  /* ---------------- the whole list ---------------- */
-  .dl-rollwrap {
-    border-top: 1px solid var(--rule);
-    padding: 12px 14px 4px;
-  }
-  .dl-rollwrap__label {
-    display: block;
-    margin: 0 0 8px;
-  }
-  .dl-rolls {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-  }
-  .dl-roll {
-    display: flex;
-    gap: 12px;
-    padding: 10px 0;
-    border-bottom: 1px solid var(--rule-soft);
-  }
-  .dl-roll:last-child {
-    border-bottom: 0;
-  }
-  .dl-roll__photo {
-    flex: none;
-    width: 64px;
-    height: 64px;
-    object-fit: cover;
-    background: var(--band);
-  }
-  .dl-roll__body {
-    min-width: 0;
-    flex: 1;
-  }
-  .dl-roll__name {
-    margin: 0;
-    font-size: 13px;
-    font-weight: 500;
-    line-height: 1.35;
-  }
-  .dl-roll__sci {
-    margin: 1px 0 0;
-    font-size: 11px;
-    font-style: italic;
-    color: var(--ink-2);
-  }
-  .dl-roll__fact {
-    margin: 5px 0 0;
+  .dl-entry__meta {
+    margin: 6px 0 0 1.4em;
     font-size: 12px;
     line-height: 1.5;
-    color: var(--ink-3);
-  }
-  .dl-roll__meta {
-    margin: 5px 0 0;
-    font-size: 10px;
     color: var(--ink-2);
     font-variant-numeric: tabular-nums;
   }
-  .dl-roll__link {
+  .dl-entry__meta a {
     color: var(--ink-3);
-  }
-  .dl-roll__credit {
-    margin: 3px 0 0;
-    font-size: 9px;
-    color: var(--ink-2);
-  }
-
-  .dl-actions a.dl-btn {
-    text-decoration: none;
-    color: var(--ink);
-  }
-  .dl-actions a.dl-btn:hover {
-    text-decoration: none;
-    background: var(--hover);
   }
 
   .dl-foot {
-    margin: 18px 0 0;
-    font-size: 11px;
+    margin: 40px 0 0;
+    max-width: 72ch;
+    font-size: 12px;
     line-height: 1.6;
     color: var(--ink-2);
-    max-width: 72ch;
+  }
+
+  @media (max-width: 639px) {
+    .dl-steps > li {
+      grid-template-columns: 1.6rem minmax(0, 1fr);
+      font-size: 16px;
+    }
+    .dl-tray {
+      gap: 14px 8px;
+    }
+    .dl-slot__name {
+      font-size: 13px;
+    }
+    .dl-slot__next {
+      font-size: 12px;
+      padding: 6px;
+    }
+    .dl-slot__cost {
+      font-size: 11px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .dl-slot__pic img,
+    .dl-slot__next,
+    .dl-maphint,
+    .dl-month__cell {
+      transition: none;
+    }
+    .dl-slot.is-new .dl-slot__body {
+      animation: none;
+    }
   }
 </style>

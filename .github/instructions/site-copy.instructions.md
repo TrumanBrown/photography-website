@@ -53,6 +53,10 @@ rather than only writing it down here.
   - `Tide pooling quickly became one of my favorite hobbies after moving to WA.`
 - Hobby intros follow: personal history → what the toy does → one imperative on how to play.
   - `I keep returning to mountain trails, from the Cascades to China, Norway, and the Himalaya. Build a trail of your own, then turn the journey into a postcard.`
+- A game with rules to learn (Day list) is the exception. Its intro is the premise in one or two
+  plain sentences, and the rules go in numbered "How to play" steps that use the same words as the
+  buttons. No backstory and no metaphors: people need to know what to do before why it exists.
+  - `Six species were all seen at the same place in the same month. Guess where and when.`
 - Undersell. Use honest hedges instead of hype.
   - `The bioload meter is just for fun, not necessarily entirely accurate.`
   - `A playful estimate, not trail guidance.`

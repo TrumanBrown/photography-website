@@ -338,11 +338,13 @@ gives you a point, which is how field ecologists actually read a habitat (indica
 
 **Files**
 
-- [src/components/hobbies/DayList.astro](../src/components/hobbies/DayList.astro), the markup,
-  the three-step explainer, and the styles.
+- [src/components/hobbies/DayList.astro](../src/components/hobbies/DayList.astro), the markup:
+  the how-to-play steps, the board (species tray, map and guess panel), the month radios, and
+  the styles.
 - [src/lib/hobbies/day-list.ts](../src/lib/hobbies/day-list.ts), the engine: daily round selection,
-  clue reveal, equirectangular map, pin and keyboard guessing, scoring, share string, the full
-  species roll, and `localStorage` persistence so a finished day stays finished.
+  the species tray and its reveal, the points ceiling, equirectangular map, pin and keyboard
+  guessing, scoring, the result receipt, share string, the full list, and `localStorage`
+  persistence so a finished day stays finished.
 - [src/lib/hobbies/day-list.json](../src/lib/hobbies/day-list.json), the puzzle set.
 - [scripts/build-day-list.mjs](../scripts/build-day-list.mjs), the builder.
 - [scripts/resolve-day-list-places.mjs](../scripts/resolve-day-list-places.mjs), a helper that
@@ -359,6 +361,44 @@ by adding:
 
 `HobbyCard` treats a `dayList` block the same as an `interactive` island when choosing its call to
 action, so the card reads "Play it" rather than "Explore".
+
+### How the page reads
+
+People who tried the first version couldn't tell what the game was. It had three explanations with
+three different metaphors, and the cost of each extra species was never shown. The page now leads
+with the rules and uses one set of words throughout:
+
+- **Premise, then steps.** The hobby `intro` is the premise in one line ("Six species were all seen
+  at the same place in the same month. Guess where and when."). Under it, "How to play" is four
+  numbered steps in the largest body text on the page. They use the same words as the controls
+  ("show the next one", "tap the map", "Lock it in") and say that there's only one guess.
+- **The six species are the board.** Six squares sit in a row under a "Most common → Rarest" rule.
+  A shown species gets its photo, name, Latin name, worldwide sighting count and photo credit. The
+  next square is the button and says what it costs ("−600 points"), and the rest wait with their
+  number. Three to a row below 1024px.
+- **The stakes stay on screen.** The guess panel opens with "Up to 6,000 points", the most a perfect
+  guess can still score (`bestPossible`). It rolls down with each species you ask for (`rollTo`).
+- **The result is a receipt.** "Lock it in" swaps the panel for the verdict, the place and where the
+  points came from: Place (distance, and how many species were showing), Month, Total. The full list
+  with facts follows under the board. Wikipedia's bracketed Latin name and IPA pronunciation are
+  trimmed from the facts at render time (`tidyFact`), so the JSON keeps the source text.
+- **The answer lands in one beat.** On the map, a dashed line runs from the pin to the nearest edge
+  of the place over 600ms (`LINE_MS`), the same point the distance is measured to, while the "km
+  off" figure counts up beside it with `rollTo`. The line goes the short way round, so a pin in
+  Hawaii reaches Japan off one side of the map and back in the other. Then the boundary strokes in
+  (`BOX_MS`, 300ms) as the total lands, the place name appears, and the species still hidden fill
+  in 70ms apart. Under `prefers-reduced-motion`, and for a finished day restored on load,
+  everything is drawn at once. After locking in, the map scrolls into view if it's off screen, so
+  on a phone the line can be watched with the result right under it.
+- **Native controls.** The months are radio inputs, so arrow keys and screen readers work with no
+  extra code. The lock button stays outlined until there's a pin and a month, then turns ink. The
+  pin drops on `click`, not `pointerdown`, so a scroll that starts on the map doesn't drop one.
+- **Keyboard and screen readers.** Revealing a species from the keyboard moves focus to the next
+  square, and a polite live region reads out the new species and the new ceiling. Locking in moves
+  focus to the result. A finished day restored on load doesn't move focus or replay anything.
+
+The layout takes its structure from the daily game Originle (a guess card with the stakes on it, and
+a reveal button that shows its cost) and redraws it in the archive's ink on paper.
 
 ### Accuracy rules
 
@@ -384,8 +424,8 @@ The puzzle is aimed at people who know the species, so the builder is strict abo
   builder normalises them.
 - **Photos are openly licensed only.** The builder walks `default_photo` then `taxon_photos` until it
   finds an acceptable licence, because the best-known species often have an all-rights-reserved lead
-  image. The photographer and licence travel with the photo and are rendered both on the clue and in
-  the reveal, since CC BY and CC BY-NC require attribution.
+  image. The photographer and licence travel with the photo and are rendered under it on the
+  board, since CC BY and CC BY-NC require attribution.
 - **Clue order uses worldwide observation counts**, which measure how often a species is _recorded_,
   not how widespread it is. A well-studied European species out-records an equally widespread African
   one. The UI says this plainly rather than implying a range map.
@@ -408,8 +448,8 @@ a set with fewer than ten rounds.
 CDNs already allow-listed in `img-src`, so the island costs nothing per play and keeps working if the
 API is down.
 
-**One gotcha worth remembering.** The clue rows, month buttons and result card are all built by the
-script at runtime, so Astro's scoped styles never reach them. The component uses
+**One gotcha worth remembering.** The species squares, the result receipt and the full list are all
+built by the script at runtime, so Astro's scoped styles never reach them. The component uses
 `<style is:global>` with every selector namespaced under `dl-` instead.
 
 ---
