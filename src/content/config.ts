@@ -38,17 +38,6 @@ const sessions = defineCollection({
      * home page. Empty means "pick one automatically"; see buildLeadFrames.
      */
     showcase: z.array(z.string()).default([]),
-    /**
-     * Where the session was shot, read from the photographs' EXIF GPS during
-     * prebuild. Absent when the camera records no position, in which case the
-     * globe falls back to the gazetteer in src/lib/geo.ts.
-     */
-    coords: z
-      .object({
-        lat: z.number().min(-90).max(90),
-        lon: z.number().min(-180).max(180),
-      })
-      .optional(),
     images: z
       .array(
         z.object({

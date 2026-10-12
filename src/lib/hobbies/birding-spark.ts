@@ -7,6 +7,8 @@
  *
  * Mounted by src/components/hobbies/BirdingSpark.astro via [data-spark] hooks.
  */
+import { coarsePlace } from "./inat-place";
+
 const API = "https://api.inaturalist.org/v1/observations";
 const PHOTO_HOSTS = [
   "https://inaturalist-open-data.s3.amazonaws.com/",
@@ -96,7 +98,7 @@ export function initBirdingSpark(root: HTMLElement): void {
       const caption = document.createElement("span");
       caption.className =
         "block bg-neutral-50 px-3 py-2 text-xs text-neutral-500 dark:bg-neutral-900/60 dark:text-neutral-400";
-      const where = obs.place_guess ? obs.place_guess : "";
+      const where = coarsePlace(obs.place_guess);
       const when = formatObservedOn(obs.observed_on);
       caption.textContent =
         [where, when].filter(Boolean).join(" · ") ||

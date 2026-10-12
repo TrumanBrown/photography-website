@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """
-HEIC → JPEG converter for the prebuild pipeline.
+HEIC → JPEG (or lossless TIFF) converter for the prebuild pipeline.
 
-Usage: heic-to-jpeg.py <input.heic> <output.jpg> [quality]
+Usage: heic-to-jpeg.py <input.heic> <output.jpg|output.tiff> [quality]
+
+prebuild asks for a TIFF, which is lossless, and encodes the final JPEG itself,
+so the photo is compressed exactly once on its way to the site.
 
 Uses pillow-heif, which handles iPhone HDR HEIC (brands like tmap/MiHE/MiHB)
 that older libheif versions in heif-convert / ImageMagick can't decode.
@@ -37,7 +40,10 @@ def main(argv: list[str]) -> int:
         im = ImageOps.exif_transpose(im)
         if im.mode != "RGB":
             im = im.convert("RGB")
-        im.save(dst, "JPEG", quality=quality, optimize=True, progressive=True)
+        if dst.suffix.lower() in (".tif", ".tiff"):
+            im.save(dst, "TIFF")
+        else:
+            im.save(dst, "JPEG", quality=quality, optimize=True, progressive=True)
 
     print(f"converted {src} → {dst} ({im.size[0]}x{im.size[1]})")
     return 0

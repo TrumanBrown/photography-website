@@ -6,6 +6,8 @@
  *
  * Mounted by src/components/hobbies/INatObservations.astro via [data-inat] hooks.
  */
+import { coarsePlace } from './inat-place';
+
 const API = 'https://api.inaturalist.org/v1/observations';
 const PHOTO_HOSTS = [
   'https://inaturalist-open-data.s3.amazonaws.com/',
@@ -80,7 +82,8 @@ export function initINatObservations(root: HTMLElement): void {
         a.rel = 'noopener noreferrer';
         a.className =
           'group block overflow-hidden rounded-md bg-neutral-100 no-underline dark:bg-neutral-900';
-        a.title = name + (o.place_guess ? `, ${o.place_guess}` : '');
+        const place = coarsePlace(o.place_guess);
+        a.title = name + (place ? `, ${place}` : '');
         a.setAttribute('role', 'listitem');
         const img = document.createElement('img');
         img.src = thumb;

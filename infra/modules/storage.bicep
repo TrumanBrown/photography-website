@@ -114,6 +114,17 @@ resource metadata 'Microsoft.Storage/storageAccounts/blobServices/containers@202
   }
 }
 
+// Incoming: where scripts/upload-session.sh puts new photos. Private, because
+// they may still record where they were taken; the build removes that and
+// publishes them to `originals` (scripts/prebuild.mjs, publishIncoming).
+resource incoming 'Microsoft.Storage/storageAccounts/blobServices/containers@2024-01-01' = {
+  parent: blobService
+  name: 'incoming'
+  properties: {
+    publicAccess: 'None'
+  }
+}
+
 resource tableService 'Microsoft.Storage/storageAccounts/tableServices@2024-01-01' = {
   parent: sa
   name: 'default'

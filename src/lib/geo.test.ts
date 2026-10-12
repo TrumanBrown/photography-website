@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { coordsFor, isMapped, LAND } from "./geo";
+import { coordsFor, GAZETTEER_POINTS, isMapped, LAND } from "./geo";
 
 describe("coordsFor", () => {
   it("resolves the exact locations the archive uses", () => {
@@ -36,18 +36,22 @@ describe("coordsFor", () => {
     );
   });
 
-  it("prefers explicit coordinates from EXIF over the table", () => {
-    const exact = { lat: 1.5, lon: 2.5 };
-    expect(coordsFor("Eastern Washington", exact)).toEqual(exact);
+  it("never takes a position from anywhere but the table", () => {
+    // Photos are stripped of GPS before publishing; a pin is always a coarse,
+    // public point picked by hand.
+    expect(coordsFor.length).toBe(1);
+    expect(coordsFor("Oregon Coast, Oregon")).toEqual({
+      lat: 44.6,
+      lon: -124.05,
+    });
+    expect(coordsFor("Kauai, Hawaii")).toEqual({ lat: 22.07, lon: -159.5 });
   });
 
-  it("ignores unusable explicit coordinates", () => {
-    expect(
-      coordsFor("Eastern Washington", { lat: Number.NaN, lon: 0 }),
-    ).toEqual({
-      lat: 47.1,
-      lon: -119.3,
-    });
+  it("keeps every point coarse: two decimal places at most", () => {
+    for (const { lat, lon } of GAZETTEER_POINTS) {
+      expect(Math.round(lat * 100) / 100).toBe(lat);
+      expect(Math.round(lon * 100) / 100).toBe(lon);
+    }
   });
 
   it("gives up rather than guessing", () => {

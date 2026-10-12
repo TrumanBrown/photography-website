@@ -26,7 +26,7 @@ export function buildPlaces(sessions: Session[]): GlobePlace[] {
   for (const entry of sessions) {
     const location = entry.data.location?.trim();
     if (!location) continue;
-    const coords = coordsFor(location, entry.data.coords ?? null);
+    const coords = coordsFor(location);
     if (!coords) continue;
 
     const existing = byLocation.get(location);

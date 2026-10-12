@@ -22,6 +22,14 @@ jobs:
 
       - run: npm ci
 
+      # exiftool lets the tests prove that removing a photo's location leaves
+      # its image data byte for byte (scripts/location.test.mjs); without it
+      # those tests are skipped.
+      - name: Install exiftool
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libimage-exiftool-perl
+
       - name: Unit tests
         run: npm test
 

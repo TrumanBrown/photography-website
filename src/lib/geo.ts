@@ -14,12 +14,15 @@ export interface Coords {
 }
 
 /**
- * Fallback coordinates for the places that appear in session `location` fields.
+ * Coordinates for the places that appear in session `location` fields: the
+ * only source of the globe's pins.
  *
- * Sessions whose photographs carry GPS in their EXIF get exact coordinates from
- * prebuild instead, and never consult this table. It exists so the globe still
- * works for sessions shot on gear that doesn't record position, and so the site
- * degrades to "no pin" rather than "no globe" when somewhere new shows up.
+ * Photographs never supply a position. Phones record one to within a few
+ * metres, and the photos are stripped of it before they're published
+ * (scripts/location.mjs), so a pin is always one of these deliberately coarse,
+ * public points. Keep new entries to two decimal places at most, and to a town,
+ * park or region rather than a spot. The site degrades to "no pin" rather than
+ * "no globe" when somewhere new shows up.
  *
  * Keys are matched loosely — case, accents and punctuation are ignored, and a
  * location falls back to its broader parts ("Bijagua, Costa Rica" → "Costa
@@ -60,7 +63,10 @@ const GAZETTEER: Record<string, Coords> = {
 
   // Broad fallbacks, so somewhere new still lands on the right continent.
   california: { lat: 36.78, lon: -119.42 },
+  "oregon coast, oregon": { lat: 44.6, lon: -124.05 },
   oregon: { lat: 43.8, lon: -120.55 },
+  "kauai, hawaii": { lat: 22.07, lon: -159.5 },
+  hawaii: { lat: 20.8, lon: -156.33 },
   alaska: { lat: 64.2, lon: -149.5 },
   "british columbia": { lat: 53.73, lon: -127.65 },
   mexico: { lat: 23.63, lon: -102.55 },
@@ -89,23 +95,12 @@ function normalize(value: string): string {
 }
 
 /**
- * Resolve a session to a point on the globe.
+ * Resolve a session's location string to a point on the globe.
  *
- * Explicit coordinates (from EXIF GPS) always win. Otherwise the location
- * string is looked up whole, then progressively from the broadest part inwards,
- * so an unknown town still lands in the right country.
+ * The string is looked up whole, then progressively from the broadest part
+ * inwards, so an unknown town still lands in the right country.
  */
-export function coordsFor(
-  location: string,
-  explicit?: Coords | null,
-): Coords | undefined {
-  if (
-    explicit &&
-    Number.isFinite(explicit.lat) &&
-    Number.isFinite(explicit.lon)
-  ) {
-    return explicit;
-  }
+export function coordsFor(location: string): Coords | undefined {
   if (!location) return undefined;
 
   const key = normalize(location);
@@ -138,6 +133,9 @@ function escapeRegex(value: string): string {
 }
 
 /** True when the site knows where a location is, used to decide on a pin. */
-export function isMapped(location: string, explicit?: Coords | null): boolean {
-  return coordsFor(location, explicit) !== undefined;
+export function isMapped(location: string): boolean {
+  return coordsFor(location) !== undefined;
 }
+
+/** Every gazetteer point, for tests that keep the table coarse. */
+export const GAZETTEER_POINTS: readonly Coords[] = Object.values(GAZETTEER);

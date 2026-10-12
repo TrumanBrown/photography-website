@@ -1,0 +1,60 @@
+name: Photo locations
+
+# Finds photos in the public storage containers that still record where they
+# were taken, and removes the location (scripts/location.mjs). Uploads and
+# every build already do this; this cleans up what was published before they
+# did, and checks once a month that nothing has slipped past them. exiftool
+# rewrites only metadata: same URLs, identical pixels, camera settings kept.
+# The log shows counts only.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "41 9 3 * *"
+
+concurrency:
+  group: photo-locations
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  clean:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # Installed before signing in to anything, like the other workflows.
+      - name: Install npm deps
+        run: npm ci
+
+      - name: Install exiftool
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libimage-exiftool-perl
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_DEPLOY_CLIENT_ID || secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # A scheduled run that finds anything fails after cleaning it, so GitHub
+      # emails you: something got past the upload and build checks.
+      - name: Remove photo locations
+        env:
+          AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
+          FAIL_IF_FOUND: ${{ github.event_name == 'schedule' && '--fail-if-found' || '' }}
+        run: node scripts/location.mjs blobs --apply $FAIL_IF_FOUND

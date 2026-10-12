@@ -11,6 +11,8 @@
  *                    scripts/generate-fixtures.mjs to seed dev content.
  *
  * What it does in remote mode:
+ *   0. Publish new uploads from the private incoming/ container to originals/,
+ *      removing any GPS position first (publishIncoming).
  *   1. Read metadata/manifest.json (last-seen blob etags).
  *   2. List session prefixes under originals/.
  *   3. For each prefix:
@@ -21,18 +23,28 @@
  *            * RAW without derivative → dcraw_emu → sharp → upload to
  *              derivatives/<session>/<name>.jpg with source-etag metadata.
  *            * Other → download into src/content/sessions/<slug>/images/.
+ *        - Strip GPS from every photo that records one, everywhere it's
+ *          published (keepLocationsPrivate, scripts/location.mjs).
  *        - Write src/content/sessions/<slug>.json.
  *   4. Save updated manifest back to metadata/manifest.json.
  *
  * Exit code 0 even when no sessions exist — the site renders an empty state.
  */
-import { mkdir, writeFile, readFile, rm, access, copyFile as fsCopyFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, writeFile, readFile, rm, access, copyFile as fsCopyFile } from 'node:fs/promises';
 import { appendFileSync, existsSync } from 'node:fs';
 import { dirname, join, basename, extname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawn } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
+import {
+  exiftoolVersion,
+  filesWithLocation,
+  IMAGE_EXTS as LOCATION_EXTS,
+  INSTALL_HINT,
+  probeBytes,
+  stripLocation,
+} from './location.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -53,6 +65,16 @@ const SESSION_JSON = '_session.json';
 const ORIGINALS_CACHE_CONTROL = 'public, max-age=31536000, immutable';
 
 const ORIGINALS = 'originals';
+// Private: where uploads wait until a build has removed their location. The
+// first path segment names the public container a file is published to:
+// incoming/originals/<session>/<file>, incoming/hobby-media/<hobby>/full/<file>.
+const INCOMING = 'incoming';
+const HOBBY_MEDIA = 'hobby-media';
+// Bump when RAW/HEIC conversion changes, so every derivative is made again once.
+const DERIVATIVE_VERSION = '2';
+// A converted photo's only lossy step: one JPEG encode, from lossless input,
+// at full resolution, with full colour resolution (no chroma subsampling).
+const DERIVATIVE_JPEG = { quality: 95, mozjpeg: true, chromaSubsampling: '4:4:4' };
 const DERIVATIVES = 'derivatives';
 const METADATA = 'metadata';
 const MANIFEST_BLOB = 'manifest.json';
@@ -91,6 +113,15 @@ async function main() {
 
   // Auto-create metadata container if missing (others must exist via IaC).
   await metadataClient.createIfNotExists();
+
+  // New uploads wait, private, in incoming/ until they're clean (no GPS).
+  await publishIncoming({
+    incomingClient: service.getContainerClient(INCOMING),
+    destinations: {
+      [ORIGINALS]: originalsClient,
+      [HOBBY_MEDIA]: service.getContainerClient(HOBBY_MEDIA),
+    },
+  });
 
   const manifest = await loadManifest(metadataClient);
   const nextManifest = { blobs: {}, generatedAt: new Date().toISOString(), account };
@@ -307,8 +338,8 @@ async function processSession({ prefix, originalsClient, derivativesClient, serv
   const images = [];
   const targetBySource = new Map(blobs.map((blob) => [blob.base, targetFileForBlob(blob)]));
   let earliestExifDate;
-  /** First GPS fix found in the session's photographs, if any. */
-  let sessionCoords;
+  /** Every photo's working copy, for the location check after the loop. */
+  const published = [];
 
   for (const b of blobs) {
     const isRaw = RAW_EXTS.has(b.ext);
@@ -371,23 +402,9 @@ async function processSession({ prefix, originalsClient, derivativesClient, serv
     let exifSettings;
     try {
       const { default: exifr } = await import('exifr');
-      const exif = await exifr.parse(localPath, { tiff: true, ifd0: true, exif: true, gps: true });
+      const exif = await exifr.parse(localPath, { tiff: true, ifd0: true, exif: true });
       captureDate = exif?.DateTimeOriginal || exif?.CreateDate || exif?.ModifyDate;
       exifSettings = buildExifSettings(exif);
-      // First photograph with a position fixes the session on the globe. Most
-      // cameras record nothing, in which case src/lib/geo.ts falls back to the
-      // location string.
-      if (
-        !sessionCoords &&
-        Number.isFinite(exif?.latitude) &&
-        Number.isFinite(exif?.longitude) &&
-        (exif.latitude !== 0 || exif.longitude !== 0)
-      ) {
-        sessionCoords = {
-          lat: Number(exif.latitude.toFixed(5)),
-          lon: Number(exif.longitude.toFixed(5)),
-        };
-      }
     } catch {
       // ignore — synthetic JPEGs and stripped images may have no EXIF
     }
@@ -407,7 +424,16 @@ async function processSession({ prefix, originalsClient, derivativesClient, serv
     });
 
     nextManifest.blobs[b.name] = { etag: b.etag, target: targetFile, derivative: willConvert ? `${slug}/${targetFile}` : undefined };
+    published.push({ blob: b, localPath, targetFile, willConvert, derivName: `${slug}/${targetFile}` });
   }
+
+  await keepLocationsPrivate({
+    items: published,
+    manifest,
+    nextManifest,
+    originalsClient,
+    derivativesClient,
+  });
 
   // Sort images by filename for stable ordering (override via sidecar.images if provided).
   const orderedImages = Array.isArray(sidecar.images)
@@ -446,7 +472,6 @@ async function processSession({ prefix, originalsClient, derivativesClient, serv
     ...(sidecar.bannerFocus ? { bannerFocus: sidecar.bannerFocus } : {}),
     ...(sidecar.order != null ? { order: sidecar.order } : {}),
     ...(showcase.length ? { showcase } : {}),
-    ...(sessionCoords ? { coords: sessionCoords } : {}),
     images: orderedImages,
   };
 
@@ -508,7 +533,7 @@ async function processRawBlob({ blob, originalsClient, derivativesClient, slug, 
   // Check if a derivative with matching source-etag already exists.
   try {
     const props = await derivClient.getProperties();
-    if (props.metadata && props.metadata.sourceetag === stripQuotes(blob.etag)) {
+    if (derivativeIsCurrent(props.metadata, blob)) {
       const tmp = join(CACHE_DIR, hashKey(cacheKey));
       await derivClient.downloadToFile(tmp);
       await copyFile(tmp, localPath);
@@ -535,7 +560,7 @@ async function processRawBlob({ blob, originalsClient, derivativesClient, slug, 
   }
 
   const { default: sharp } = await import('sharp');
-  await sharp(generatedTiff).keepExif().jpeg({ quality: 95, mozjpeg: true }).toFile(localPath);
+  await sharp(generatedTiff).keepExif().jpeg(DERIVATIVE_JPEG).toFile(localPath);
 
   // Upload to derivatives/ with source-etag metadata.
   const upload = derivativesClient.getBlockBlobClient(derivBlobName);
@@ -545,7 +570,7 @@ async function processRawBlob({ blob, originalsClient, derivativesClient, slug, 
       blobContentType: 'image/jpeg',
       blobCacheControl: 'public, max-age=31536000, immutable',
     },
-    metadata: { sourceetag: stripQuotes(blob.etag) },
+    metadata: { sourceetag: stripQuotes(blob.etag), derivative: DERIVATIVE_VERSION },
   });
   console.log(`  upload:   ${derivBlobName}`);
 
@@ -567,7 +592,7 @@ async function processConvertBlob({ blob, originalsClient, derivativesClient, sl
 
   try {
     const props = await derivClient.getProperties();
-    if (props.metadata && props.metadata.sourceetag === stripQuotes(blob.etag)) {
+    if (derivativeIsCurrent(props.metadata, blob)) {
       const tmp = join(CACHE_DIR, hashKey(cacheKey));
       await derivClient.downloadToFile(tmp);
       await copyFile(tmp, localPath);
@@ -590,15 +615,15 @@ async function processConvertBlob({ blob, originalsClient, derivativesClient, sl
     // iPhone HEIC files with HDR tone-mapping (brands like tmap/MiHE/MiHB)
     // can't be decoded by Ubuntu's heif-convert or ImageMagick's libheif
     // delegate. pillow-heif handles them reliably; we shell out to a tiny
-    // Python helper that does the conversion.
-    const tmpJpg = `${tmpSrc}.jpg`;
-    await runCmd('python3', [join(__dirname, 'heic-to-jpeg.py'), tmpSrc, tmpJpg, '92']);
-    // sharp re-encode polishes the JPEG (mozjpeg for ~10% smaller files).
-    await sharp(tmpJpg).keepExif().jpeg({ quality: 92, mozjpeg: true }).toFile(localPath);
-    await rm(tmpJpg, { force: true }).catch(() => {});
+    // Python helper that decodes to a lossless TIFF, so the JPEG encode
+    // below is the one and only lossy step.
+    const tmpTiff = `${tmpSrc}.tiff`;
+    await runCmd('python3', [join(__dirname, 'heic-to-jpeg.py'), tmpSrc, tmpTiff]);
+    await sharp(tmpTiff).jpeg(DERIVATIVE_JPEG).toFile(localPath);
+    await rm(tmpTiff, { force: true }).catch(() => {});
   } else {
     // TIFF and friends: sharp handles natively.
-    await sharp(tmpSrc).rotate().keepExif().jpeg({ quality: 92, mozjpeg: true }).toFile(localPath);
+    await sharp(tmpSrc).rotate().keepExif().jpeg(DERIVATIVE_JPEG).toFile(localPath);
   }
 
   const upload = derivativesClient.getBlockBlobClient(derivBlobName);
@@ -608,12 +633,275 @@ async function processConvertBlob({ blob, originalsClient, derivativesClient, sl
       blobContentType: 'image/jpeg',
       blobCacheControl: 'public, max-age=31536000, immutable',
     },
-    metadata: { sourceetag: stripQuotes(blob.etag) },
+    metadata: { sourceetag: stripQuotes(blob.etag), derivative: DERIVATIVE_VERSION },
   });
   console.log(`  upload:   ${derivBlobName}`);
 
   await copyFile(localPath, join(CACHE_DIR, hashKey(cacheKey)));
   await rm(tmpSrc, { force: true }).catch(() => {});
+}
+
+const realLocationTools = { exiftoolVersion, filesWithLocation, stripLocation };
+
+/**
+ * Publish what the upload scripts left in the private `incoming` container.
+ *
+ * Uploads land there rather than in a public container, so a photo is never
+ * readable by URL while it still records where it was taken. Each file moves
+ * to its public container once any location is removed (exiftool, installed by
+ * the build), and only then leaves `incoming`. exiftool rewrites metadata
+ * only: the image data published is byte for byte what was uploaded.
+ * A photo that records a location when exiftool is missing, or that can't be
+ * cleaned, stops the build and stays private. Safe to rerun: a build that
+ * stops part-way leaves the rest for the next one.
+ */
+export async function publishIncoming({
+  incomingClient,
+  destinations,
+  tools = realLocationTools,
+  batchSize = 8,
+}) {
+  const waiting = [];
+  try {
+    for await (const blob of incomingClient.listBlobsFlat()) {
+      const [container, ...rest] = blob.name.split('/');
+      if (destinations[container] && rest.length > 0) {
+        waiting.push({ ...blob, container, target: rest.join('/') });
+      } else {
+        console.warn(`  ${INCOMING}: leaving ${blob.name}; it doesn't start with ${Object.keys(destinations).join('/ or ')}/`);
+      }
+    }
+  } catch (e) {
+    if (e.statusCode === 404) return 0; // no inbox yet, so nothing uploaded through it
+    throw e;
+  }
+  if (waiting.length === 0) return 0;
+
+  const scratch = await mkdtemp(join(tmpdir(), 'incoming-'));
+  let published = 0;
+  let cleaned = 0;
+  try {
+    for (let i = 0; i < waiting.length; i += batchSize) {
+      const batch = [];
+      await Promise.all(
+        waiting.slice(i, i + batchSize).map(async (blob, j) => {
+          const path = join(scratch, `${i + j}${extname(blob.name).toLowerCase()}`);
+          try {
+            await incomingClient
+              .getBlobClient(blob.name)
+              .downloadToFile(path, 0, undefined, { conditions: { ifMatch: blob.properties.etag } });
+          } catch (e) {
+            // Replaced, or published by another build, since the listing.
+            if (e.statusCode === 404 || e.statusCode === 412) return;
+            throw e;
+          }
+          batch.push({ blob, path, photo: LOCATION_EXTS.has(extname(path)) });
+        }),
+      );
+
+      const located = await tools.filesWithLocation(batch.filter((f) => f.photo).map((f) => f.path));
+      if (located.size > 0) {
+        if (!tools.exiftoolVersion()) {
+          throw new Error(
+            `${located.size} uploaded photo(s) record where they were taken; they stay private in ${INCOMING}/. ${INSTALL_HINT}`,
+          );
+        }
+        for (const path of located) await tools.stripLocation(path);
+        const still = await tools.filesWithLocation([...located]);
+        if (still.size > 0) {
+          throw new Error(
+            `${still.size} uploaded photo(s) still record a location after stripping; they stay private in ${INCOMING}/.`,
+          );
+        }
+        cleaned += located.size;
+      }
+
+      await Promise.all(
+        batch.map(async ({ blob, path, photo }) => {
+          await destinations[blob.container].getBlockBlobClient(blob.target).uploadFile(path, {
+            blobHTTPHeaders: {
+              blobContentType: blob.properties.contentType || undefined,
+              ...(photo ? { blobCacheControl: ORIGINALS_CACHE_CONTROL } : {}),
+            },
+          });
+          try {
+            await incomingClient
+              .getBlobClient(blob.name)
+              .deleteIfExists({ conditions: { ifMatch: blob.properties.etag } });
+          } catch (e) {
+            // Uploaded again meanwhile: the next build publishes the new one.
+            if (e.statusCode !== 412) throw e;
+          }
+          await rm(path, { force: true });
+          published++;
+        }),
+      );
+    }
+  } finally {
+    await rm(scratch, { recursive: true, force: true });
+  }
+  console.log(
+    `${INCOMING}: published ${published} file(s)${cleaned ? `, removing the location from ${cleaned}` : ''}`,
+  );
+  return published;
+}
+
+/**
+ * Where a photo was taken never goes public (scripts/location.mjs).
+ *
+ * Every image container but `metadata` can be read by anyone with a URL, and
+ * Astro copies some working copies byte for byte into variants/. So once per
+ * photo and ETag this checks the working copy Astro will read and, for
+ * converted photos, the HEIC/RAW source too, whose URL is easy to guess from
+ * the derivative's. Whatever records a position is stripped everywhere it's
+ * published: the working copy, the derivative and the original. exiftool
+ * rewrites only metadata, each blob keeps its name, headers and metadata, and
+ * blob soft delete keeps the previous bytes for 7 days. A working copy,
+ * derivative, linked original or new RAW/HEIC source that can't be cleaned
+ * stops the build rather than going out with its position. A RAW/HEIC source
+ * published by an earlier build gets a warning and another try next build,
+ * since stopping wouldn't hide it.
+ *
+ * Uploads through scripts/upload-session.sh are already clean by now
+ * (publishIncoming); this catches anything put in `originals` another way, and
+ * photos published before the check existed.
+ */
+export async function keepLocationsPrivate({
+  items,
+  manifest,
+  nextManifest,
+  originalsClient,
+  derivativesClient,
+  cacheDir = CACHE_DIR,
+  tools = realLocationTools,
+}) {
+  const pending = items.filter(({ blob, targetFile }) => {
+    const seen = manifest[blob.name];
+    const verified = seen?.private === true && seen.etag === blob.etag && seen.target === targetFile;
+    if (verified) nextManifest.blobs[blob.name].private = true;
+    return !verified;
+  });
+  if (pending.length === 0) return;
+
+  const scratch = await mkdtemp(join(tmpdir(), 'location-'));
+  try {
+    const localLocated = await tools.filesWithLocation(pending.map((item) => item.localPath));
+
+    // Converted sources are never linked from the site, so only their header
+    // is read here unless it turns out to need cleaning.
+    const probes = new Map();
+    for (const item of pending) {
+      const size = item.blob.contentLength ?? 0;
+      if (!item.willConvert || size === 0) continue;
+      const probe = join(scratch, `probe-${probes.size}${item.blob.ext}`);
+      const head = await originalsClient
+        .getBlobClient(item.blob.name)
+        .downloadToBuffer(0, Math.min(size, probeBytes(item.blob.ext)));
+      await writeFile(probe, head);
+      probes.set(item, probe);
+    }
+    const sourceLocated = await tools.filesWithLocation([...probes.values()]);
+
+    const located = pending.filter(
+      (item) => localLocated.has(item.localPath) || sourceLocated.has(probes.get(item)),
+    );
+    if (located.length > 0) {
+      console.log(`  location: removing it from ${located.length} photo(s)`);
+      if (!tools.exiftoolVersion()) {
+        throw new Error(
+          `${located.length} photo(s) record where they were taken, and every container they're published from is public. ${INSTALL_HINT}`,
+        );
+      }
+    }
+
+    for (const item of pending) {
+      const { blob } = item;
+      const localHas = localLocated.has(item.localPath);
+      const sourceHas = sourceLocated.has(probes.get(item));
+      let etag = blob.etag;
+      let sourceFailed = false;
+      try {
+        if (localHas) await tools.stripLocation(item.localPath);
+        if (!item.willConvert && localHas) {
+          // The working copy is the original's own bytes, so it goes back as the original.
+          etag = await replaceBlob(originalsClient, blob.name, item.localPath, blob.etag);
+        }
+        if (sourceHas) {
+          try {
+            const full = join(scratch, `source${blob.ext}`);
+            const clean = join(scratch, `clean${blob.ext}`);
+            await rm(full, { force: true });
+            await rm(clean, { force: true });
+            await originalsClient
+              .getBlobClient(blob.name)
+              .downloadToFile(full, 0, undefined, { conditions: { ifMatch: blob.etag } });
+            await tools.stripLocation(full, clean);
+            etag = await replaceBlob(originalsClient, blob.name, clean, blob.etag);
+          } catch (e) {
+            if (e.statusCode === 412) throw e;
+            // A source this build is about to publish for the first time stops
+            // the build, so its derivative's link never gives the URL away. One
+            // already published can't be hidden that way; stopping would only
+            // hold back everything else.
+            if (!manifest[blob.name]) throw e;
+            console.warn(
+              `::warning::Couldn't remove the GPS position from ${blob.name} (${e.message}). The next build tries again; node scripts/location.mjs blobs --apply does it by hand.`,
+            );
+            sourceFailed = true;
+          }
+        }
+        if (item.willConvert && (localHas || etag !== blob.etag)) {
+          // Keep the derivative matched to its source, so it isn't converted again.
+          const metadata = { sourceetag: stripQuotes(etag) };
+          if (localHas) {
+            await replaceBlob(derivativesClient, item.derivName, item.localPath, undefined, metadata);
+          } else {
+            const derivative = derivativesClient.getBlobClient(item.derivName);
+            const { metadata: current } = await derivative.getProperties();
+            await derivative.setMetadata({ ...current, ...metadata });
+          }
+        }
+      } catch (e) {
+        if (e.statusCode !== 412) throw e;
+        // Replaced while this ran. The working copy is clean; the next build checks the new file.
+        console.warn(`  location: ${blob.name} changed during the check; checking it next build`);
+        continue;
+      }
+      if (localHas || etag !== blob.etag) {
+        await copyFile(item.localPath, join(cacheDir, hashKey(`${blob.name}@${etag}@${item.targetFile}`)));
+      }
+      if (etag !== blob.etag) {
+        // The old ETag's copy would never be read again; the cache is gigabytes already.
+        await rm(join(cacheDir, hashKey(`${blob.name}@${blob.etag}@${item.targetFile}`)), { force: true });
+      }
+      Object.assign(nextManifest.blobs[blob.name], { etag, ...(sourceFailed ? {} : { private: true }) });
+    }
+  } finally {
+    await rm(scratch, { recursive: true, force: true });
+  }
+}
+
+/**
+ * Upload `path` over an existing blob, keeping its headers and metadata (with
+ * `metadata` merged in), and only if it's still the version this build read.
+ * Returns the new ETag.
+ */
+async function replaceBlob(containerClient, name, path, ifMatch, metadata) {
+  const client = containerClient.getBlockBlobClient(name);
+  const props = await client.getProperties(ifMatch ? { conditions: { ifMatch } } : undefined);
+  const response = await client.uploadFile(path, {
+    blobHTTPHeaders: {
+      blobContentType: props.contentType,
+      blobCacheControl: props.cacheControl,
+      blobContentDisposition: props.contentDisposition,
+      blobContentEncoding: props.contentEncoding,
+      blobContentLanguage: props.contentLanguage,
+    },
+    metadata: { ...props.metadata, ...metadata },
+    conditions: { ifMatch: props.etag },
+  });
+  console.log(`  location: cleaned ${containerClient.containerName}/${name}`);
+  return response.etag;
 }
 
 function blobPublicUrl(containerClient, blobPath) {
@@ -838,6 +1126,11 @@ function stripExt(name) {
 function stripQuotes(s) {
   if (!s) return s;
   return s.replace(/^"+|"+$/g, '');
+}
+
+/** A derivative made from this exact source, by the current conversion. */
+export function derivativeIsCurrent(metadata, blob) {
+  return metadata?.sourceetag === stripQuotes(blob.etag) && metadata?.derivative === DERIVATIVE_VERSION;
 }
 
 /**

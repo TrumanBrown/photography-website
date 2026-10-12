@@ -5,13 +5,17 @@
  * It fetches the user's Reptilia and Amphibia observations from the public iNat
  * API and draws them on a canvas at three zoom levels:
  *   - World: a real world map (country outlines from committed public-domain
- *     geometry) with a HEAT MAP of every observation's true coordinates. Click a
- *     country that has data to zoom in.
+ *     geometry) with a HEAT MAP of the observations. Click a country that has
+ *     data to zoom in.
  *   - US states: clicking the US opens a US map (state outlines + Hawaii inset)
  *     with the same heat map; click a state to zoom to it.
- *   - State / country detail: that region's outline blown up with a PIN at every
- *     observation's true (or iNat-obscured) coordinate, and a grid below listing
- *     each observation's species, place, and date before you click through.
+ *   - State / country detail: that region's outline blown up with a PIN for
+ *     each observation, and a grid below listing each observation's species,
+ *     town or region, and date before you click through.
+ *
+ * Positions are snapped to a 0.1° grid and places cut down to a town or region
+ * (inat-place.ts) before anything is drawn: an unobscured observation is exact
+ * to metres, and a reptile's spot, or a backyard, shouldn't be mapped.
  *
  * A Reptiles / Amphibians / All toggle switches datasets. No map tiles and no
  * runtime geo fetch — the boundaries are baked/committed (scripts/build-herp-geo.mjs),
@@ -21,6 +25,7 @@
  * Mounted by src/components/hobbies/INatHerpMap.astro via [data-herpmap] hooks.
  */
 import geoData from "./herp-geo.json";
+import { coarseCoord, coarsePlace } from "./inat-place";
 
 const API = "https://api.inaturalist.org/v1/observations";
 const PHOTO_HOSTS = [
@@ -351,7 +356,8 @@ export function initHerpMap(root: HTMLElement): void {
   let panX = 0;
   let panY = 0;
   const MIN_ZOOM = 1;
-  const MAX_ZOOM = 14;
+  // Pins sit on a 0.1° grid, so zooming further would only spread the grid out.
+  const MAX_ZOOM = 6;
   let rafPending = false;
 
   function scheduleRender(): void {
@@ -868,8 +874,9 @@ export function initHerpMap(root: HTMLElement): void {
           cls,
           state,
           country,
-          lng,
-          lat,
+          // Drawn on a 0.1° grid, never at the spot itself (inat-place.ts).
+          lng: lng == null ? null : coarseCoord(lng),
+          lat: lat == null ? null : coarseCoord(lat),
           obscured: !!o.obscured,
           name:
             o.taxon?.preferred_common_name ||
@@ -877,7 +884,7 @@ export function initHerpMap(root: HTMLElement): void {
             o.species_guess ||
             "Observation",
           sci: o.taxon?.name || "",
-          place: o.place_guess || "",
+          place: coarsePlace(o.place_guess),
           date: o.observed_on || "",
           thumb,
         });

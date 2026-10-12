@@ -13,9 +13,16 @@
  *   --width <px>    Max width of the inline "display" images (default: 1600)
  *
  * For each image it uploads two blobs:
- *   - full/<name>      full-resolution (original bytes for web formats; a
- *                      high-quality JPEG for HEIC/TIFF) — opened in the lightbox
- *   - display/<name>.jpg  a smaller, orientation-baked JPEG shown inline
+ *   - full/<name>      full-resolution, opened in the lightbox: the original
+ *                      bytes for web formats; HEIC/TIFF, which browsers can't
+ *                      show, become one high-quality JPEG at full size. These
+ *                      go to the private `incoming` container first: phones
+ *                      record where each photo was taken, hobby photos are
+ *                      often shot at home, and the next build removes that
+ *                      (metadata only, the image itself is untouched) before
+ *                      publishing them to hobby-media/ (scripts/prebuild.mjs).
+ *   - display/<name>.jpg  a smaller, orientation-baked JPEG shown inline, with
+ *                      no metadata, uploaded straight to hobby-media/
  * then rewrites the hobby JSON's `media` field (hero + gallery).
  *
  * Photos live in `hobby-media`, NEVER `originals/`, so the photography prebuild
@@ -30,6 +37,8 @@ import { BlobServiceClient } from '@azure/storage-blob';
 import { DefaultAzureCredential } from '@azure/identity';
 
 const CONTAINER = 'hobby-media';
+// Private; the build publishes incoming/hobby-media/... to hobby-media/.
+const INBOX = 'incoming';
 const WEB_FULL = new Set(['.jpg', '.jpeg', '.png', '.webp']);
 const CONVERT = new Set(['.tif', '.tiff', '.heic', '.heif']);
 const CONTENT_TYPE = {
@@ -99,7 +108,13 @@ async function main() {
 
   const origin = `https://${account}.blob.core.windows.net`;
   const blobBase = `${origin}/${CONTAINER}`;
-  const container = new BlobServiceClient(origin, new DefaultAzureCredential()).getContainerClient(CONTAINER);
+  const service = new BlobServiceClient(origin, new DefaultAzureCredential());
+  const container = service.getContainerClient(CONTAINER);
+  const inbox = service.getContainerClient(INBOX);
+  await inbox.createIfNotExists();
+  if ((await inbox.getProperties()).blobPublicAccess) {
+    throw new Error(`The ${INBOX} container allows public access; it must be private. Nothing was uploaded.`);
+  }
 
   console.log(`Uploading ${files.length} photo(s) from ${srcDir} to ${CONTAINER}/${slug}/ ...`);
   const items = [];
@@ -113,12 +128,16 @@ async function main() {
     let fullExt;
     let fullType;
     if (WEB_FULL.has(ext)) {
-      fullBuffer = input; // keep the original bytes for web-friendly formats
+      fullBuffer = input; // the original bytes, exactly
       fullExt = ext;
       fullType = CONTENT_TYPE[ext];
     } else {
-      // HEIC/TIFF are not browser-displayable; bake to a high-quality JPEG.
-      fullBuffer = await sharp(input).rotate().jpeg({ quality: 92, mozjpeg: true }).toBuffer();
+      // HEIC/TIFF are not browser-displayable: one JPEG encode at full size,
+      // the same settings the photography build uses for its HEIC copies.
+      fullBuffer = await sharp(input)
+        .rotate()
+        .jpeg({ quality: 95, mozjpeg: true, chromaSubsampling: '4:4:4' })
+        .toBuffer();
       fullExt = '.jpg';
       fullType = 'image/jpeg';
     }
@@ -138,7 +157,7 @@ async function main() {
 
     const fullName = `${slug}/full/${stem}${fullExt}`;
     const displayName = `${slug}/display/${stem}.jpg`;
-    await uploadBlob(container, fullName, fullBuffer, fullType);
+    await uploadBlob(inbox, `${CONTAINER}/${fullName}`, fullBuffer, fullType);
     await uploadBlob(container, displayName, displayBuffer, 'image/jpeg');
 
     items.push({
@@ -165,6 +184,9 @@ async function main() {
 
   console.log(`\nWrote ${items.length} photo(s) into ${jsonPath} (hero: ${items[idx].file}).`);
   console.log('Add captions in the JSON if you like, then commit + push to deploy.');
+  console.log(
+    `Full-size photos wait privately in ${INBOX}/ until that build removes any GPS position and publishes them, so the lightbox links work from then.`,
+  );
 }
 
 main().catch((err) => {

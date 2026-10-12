@@ -22,8 +22,17 @@
 # Photos nested in subfolders (iCloud bulk downloads wrap everything in an
 # "iCloud Photos" folder) are flattened into the session prefix, so the session
 # name still supplies the location + date. Zips are unpacked to a scratch folder
-# first; extraction is lossless and the original bytes are what get uploaded.
-# Videos and other unsupported files are counted, reported, and left alone.
+# first; extraction is lossless. Videos and other unsupported files are
+# counted, reported, and left alone.
+#
+# Photos go to the private `incoming` container (as incoming/originals/...),
+# not straight to the public `originals`: phones (and cameras paired with one)
+# write where each photo was taken into it, and anyone with a public file's URL
+# can download it. The next build removes the GPS position and publishes them
+# to `originals` (scripts/prebuild.mjs, publishIncoming). That rewrites
+# metadata only: what's published is byte for byte the image you uploaded, and
+# nothing extra needs installing here. Until that build runs, uploaded photos
+# aren't public at all.
 #
 # The session name becomes the session's web address, so a misspelled state,
 # country or island in it ("crater-lake-oreogn") stops the upload with the
@@ -50,7 +59,9 @@ fi
 
 # --- config: environment and .env can override these values
 STORAGE_ACCOUNT="${AZURE_STORAGE_ACCOUNT:-stphotoprodnowiur}"
-CONTAINER="originals"
+# Private inbox; the build publishes incoming/originals/... to originals/ (above).
+CONTAINER="incoming"
+DESTINATION="originals"
 GH_REPO="${GITHUB_REPOSITORY:-TrumanBrown/photography-website}"
 # Space-separated staging folders that --all must never treat as a session.
 SKIP_DIRS="${UPLOAD_SKIP_DIRS:-fishing}"
@@ -412,7 +423,7 @@ fi
 
 echo
 echo "About to upload ${#planned[@]} session(s):"
-echo "  Destination: https://${STORAGE_ACCOUNT}.blob.core.windows.net/${CONTAINER}/"
+echo "  Destination: ${CONTAINER}/${DESTINATION}/ on ${STORAGE_ACCOUNT} (private; the next build removes GPS and publishes to ${DESTINATION}/)"
 for i in "${!planned[@]}"; do
   printf '    %-42s %5s files  %10s\n' "${planned[$i]}/" "${planned_files[$i]}" "$(human_size "${planned_size[$i]}")"
   if [ -n "${planned_nested[$i]}" ]; then
@@ -436,6 +447,20 @@ if [ "$auto_yes" != true ]; then
   esac
 fi
 
+# The inbox must exist and must not be public: it holds photos that may still
+# record where they were taken. Creating it is a no-op when it already exists.
+if ! az storage container create --account-name "$STORAGE_ACCOUNT" --name "$CONTAINER" \
+  --auth-mode login --output none 2>/dev/null; then
+  echo "Couldn't create or reach the $CONTAINER container on $STORAGE_ACCOUNT. Check az login and your Storage Blob Data role." >&2
+  exit 1
+fi
+access=$(az storage container show --account-name "$STORAGE_ACCOUNT" --name "$CONTAINER" \
+  --auth-mode login --query properties.publicAccess -o tsv 2>/dev/null | tr -d '\r' || true)
+if [ -n "$access" ] && [ "$access" != "None" ] && [ "$access" != "off" ]; then
+  echo "The $CONTAINER container allows public access ($access); it must be private. Nothing was uploaded." >&2
+  exit 1
+fi
+
 # az storage blob upload-batch's --pattern doesn't support brace expansion, so
 # we upload from the per-session manifest built above. A single connection per
 # file is plenty fast for personal session sizes and gives clear per-file output.
@@ -451,7 +476,7 @@ for i in "${!planned[@]}"; do
       --account-name "$STORAGE_ACCOUNT" \
       --auth-mode login \
       --container-name "$CONTAINER" \
-      --name "$session/$blobname" \
+      --name "$DESTINATION/$session/$blobname" \
       --file "$path" \
       --overwrite true \
       --output none 2>/dev/null; then
@@ -495,8 +520,8 @@ if [ "$trigger_build" = true ]; then
   echo "Live site: https://trumanbrown.com"
 else
   echo
-  echo "The next build will pick this up. Either:"
-  echo "  - wait up to ~1 hour for the cron"
+  echo "The photos stay private until the next build removes GPS and publishes them. Either:"
+  echo "  - wait for the hourly cron (GitHub often skips it, so this can take a few hours)"
   echo "  - re-run with --build next time"
   echo "  - or go to https://github.com/$GH_REPO/actions/workflows/build-and-deploy.yml and click 'Run workflow'"
 fi
