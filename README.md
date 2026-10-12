@@ -24,9 +24,11 @@ The project started as a photography portfolio and has grown into a small person
 | Privacy-friendly traffic analytics (`/admin` Analytics tab) | [docs/analytics.md](docs/analytics.md) |
 | Photo captions and session descriptions, written from the photos | [docs/photos.md](docs/photos.md) |
 | Posting photos to Instagram a few a day, automatically | [docs/social.md](docs/social.md) |
-| How the site is hardened (CSP, HSTS, etc.) | [docs/security.md](docs/security.md) |
-| Running locally, npm, dev server, fixtures | [docs/local-dev.md](docs/local-dev.md) |
+| How the site is hardened (CSP, HSTS, CI identities, photo location) | [docs/security.md](docs/security.md) |
+| Reporting a vulnerability | [SECURITY.md](SECURITY.md) |
+| Running locally, npm, dev server, fixtures, tests | [docs/local-dev.md](docs/local-dev.md) |
 | **What personal info ends up in the public repo (and what doesn't)** | [docs/privacy.md](docs/privacy.md) |
+| Picking the project up cold: hard-won lessons, scripts, open items | [docs/session-handoff.md](docs/session-handoff.md) |
 | Glossary of every term used here | [docs/glossary.md](docs/glossary.md) |
 
 ---
@@ -34,15 +36,15 @@ The project started as a photography portfolio and has grown into a small person
 ## Tech at a glance
 
 - **Frontend:** Astro 5 + Tailwind v3 (static build, near-zero JS), see [docs/architecture.md](docs/architecture.md)
-- **Interactive hobbies:** hand-drawn canvas pixel-art islands (aquarium, tide-pooling, fishing) with zero runtime dependencies, see [docs/hobbies.md](docs/hobbies.md)
+- **Interactive hobbies:** hand-drawn canvas islands (aquarium, tide pooling, fishing, birding selfie-to-bird, herping night drive, hiking trail studio) plus the Day list daily puzzle, each card illustrated with a stipple plate drawn from one of the photos, see [docs/hobbies.md](docs/hobbies.md)
 - **Dynamic API:** three Azure Functions bundled with SWA (contact form, admin session manager, analytics beacon), see [docs/architecture.md](docs/architecture.md)
 - **Admin + analytics:** browser `/admin` panel gated by GitHub sign-in, cookieless traffic metrics, see [docs/admin.md](docs/admin.md) and [docs/analytics.md](docs/analytics.md)
 - **Hosting:** Azure Static Web Apps (Free tier), see [docs/azure.md](docs/azure.md)
-- **Storage:** Azure Blob Storage across five containers (`originals`, `derivatives`, `variants`, `metadata`, `hobby-media`), see [docs/image-pipeline.md](docs/image-pipeline.md)
-- **Galleries:** sessions open on a banner crop then a justified grid; the lightbox always ends on the untouched original while painting in ~80 ms, see [docs/image-pipeline.md#viewing-full-resolution-without-the-wait](docs/image-pipeline.md#viewing-full-resolution-without-the-wait)
+- **Storage:** Azure Blob Storage across six containers (`originals`, `derivatives`, `variants`, `hobby-media`, plus private `metadata` and `incoming`), see [docs/image-pipeline.md](docs/image-pipeline.md)
+- **Galleries:** sessions open on a banner crop then a justified grid; the lightbox always ends on the full-resolution original, image data untouched, while painting in ~80 ms, see [docs/image-pipeline.md#viewing-full-resolution-without-the-wait](docs/image-pipeline.md#viewing-full-resolution-without-the-wait)
 - **Domain + DNS:** Azure App Service Domain + Azure DNS
 - **IaC:** Bicep, see [docs/iac-bicep.md](docs/iac-bicep.md)
-- **CI/CD:** GitHub Actions, OIDC federation (no long-lived secrets), see [docs/cicd.md](docs/cicd.md)
+- **CI/CD:** GitHub Actions, OIDC federation (no long-lived secrets) with a blob-only identity for builds and a separate one for the manual infra deploy, see [docs/cicd.md](docs/cicd.md)
 - **Cost target:** ~$2–3/month at personal traffic (incl. `.com` domain), see [docs/azure.md#monthly-cost](docs/azure.md#monthly-cost)
 - **What about your name/address/etc. in this repo?** See [docs/privacy.md](docs/privacy.md)
 
@@ -60,6 +62,15 @@ npm run dev                # → http://localhost:4321
 
 `npm run fixtures:many` generates ~40 sessions across 5 years so you can see how the sidebar feels at scale.
 
+Before pushing, run what CI runs:
+
+```bash
+npm test                   # Vitest: site helpers, API functions, prebuild, photo + social pipelines
+npm run lint               # ESLint
+npm run check              # CSP hash drift + astro check (types and content schemas)
+npm run build              # production build into dist/
+```
+
 ---
 
 ## First-time Azure setup
@@ -76,7 +87,7 @@ Full walkthrough with explanations in [docs/azure.md](docs/azure.md) and [docs/c
 ### 1. Fill in placeholders
 
 Edit [site.config.ts](site.config.ts):
-- `ownerName`, your full name (drives footer + EXIF copyright; **becomes public when you push**)
+- `ownerName`, your full name (drives the footer, page metadata and structured data; **becomes public when you push**)
 - `siteTitle`, `siteDescription`, taste
 - `domain`, apex domain you'll register (e.g. `<yourname>.com`)
 - `copyrightStartYear`, current year on first deploy
@@ -98,11 +109,16 @@ It prints three values. Add them as repo secrets (Settings → Secrets and varia
 - `AZURE_TENANT_ID`
 - `AZURE_SUBSCRIPTION_ID`
 
-What this does and why: [docs/cicd.md](docs/cicd.md#oidc-federation-no-long-lived-secrets).
+This identity can change the whole subscription, so it trusts only the `prod`
+GitHub Environment that the Infra workflow deploys from. Create that environment
+under **Settings → Environments** and limit its deployment branches to `main`.
+Everything else (builds, captions, Instagram) signs in as a second identity that
+the first Infra run creates, with access to the site's blobs only. What this
+does and why: [docs/cicd.md](docs/cicd.md#two-identities-least-privilege-by-job).
 
 ### 3. (Optional) Add a PAT for secret auto-write
 
-If you want the **Infra (Bicep)** workflow to auto-write `AZURE_STATIC_WEB_APPS_API_TOKEN` etc. back into repo secrets, add a fine-grained PAT with `Secrets: read/write` on this repo as `GH_PAT_FOR_SECRETS`. Otherwise run `./scripts/bootstrap-swa-token.sh` by hand after the first deploy.
+If you want the **Infra (Bicep)** workflow to auto-write `AZURE_STATIC_WEB_APPS_API_TOKEN`, `AZURE_STORAGE_ACCOUNT` and `AZURE_DEPLOY_CLIENT_ID` (the build identity) back into repo secrets, add a fine-grained PAT with `Secrets: read/write` on this repo as `GH_PAT_FOR_SECRETS`. Otherwise run `./scripts/bootstrap-swa-token.sh <resource-group> <swa-name> <owner/repo>` by hand after the first deploy.
 
 ### 4. Run the Infra workflow
 
@@ -132,7 +148,7 @@ Then set `domainName` in `infra/main.parameters.json` and re-run the Infra workf
 
 ### 6. Update `site.config.ts` with the real Blob host
 
-After the first infra deploy, set `blobHost` in [site.config.ts](site.config.ts) to the actual storage account hostname (printed in the deploy output). Commit and push.
+After the first infra deploy, set `blobHost` in [site.config.ts](site.config.ts) to the actual storage account hostname (printed in the deploy output), and put the same host in the two `blob.core.windows.net` sources of the Content-Security-Policy in [staticwebapp.config.json](staticwebapp.config.json) (`npm run check:csp` fails until they match). For uploads, set `AZURE_STORAGE_ACCOUNT` in `.env`. Commit and push.
 
 ---
 
@@ -150,10 +166,18 @@ cp ~/photos/japan/*.jpg staging/2026-japan/
 ```
 
 The script handles Azure auth (auto-switches tenant via `.env`), filters to
-accepted file types (JPG, HEIC, PNG, TIFF, RAW), uploads to the `originals`
-container, and optionally triggers the build. See [staging/README.md](staging/README.md).
+accepted file types (JPG, HEIC, PNG, TIFF, RAW), uploads to a private inbox
+(the `incoming` container), and optionally triggers the build. See [staging/README.md](staging/README.md).
 The argument must name one direct child of `staging/`; every session folder must
 map to a unique public slug and contain at least one image.
+
+Phones write where each photo was taken into the file, and anyone with a
+published photo's link can download it. So uploads wait in that private inbox,
+and the build removes the GPS position before publishing them to `originals`.
+Only metadata changes: the published file is byte for byte the image you shot,
+at full resolution, camera settings included. It all runs in GitHub Actions, so
+uploading needs nothing beyond `az` (and `gh` for `--build`). Details:
+[docs/security.md](docs/security.md#photo-locations).
 
 The folder name becomes the session's web address, and captions read place
 names from it. So the script stops on a misspelled state, country or island
@@ -307,21 +331,26 @@ Preview what's coming with `npm run social -- preview`.
 
 ```
 photography-website/
-├── .github/workflows/         # CI/CD, see docs/cicd.md
-├── api/                       # Azure Functions: contact, sessionmgr, track
-├── docs/                      # detailed docs (you are reading the index)
+├── .github/
+│   ├── workflows/             # CI/CD, see docs/cicd.md
+│   ├── instructions/          # voice rules for every visitor-facing string
+│   └── skills/stipple-plates/ # agent skill that draws the hobby card plates
+├── api/                       # Azure Functions: contact, sessionmgr, track (+ shared/ helpers)
+├── docs/                      # detailed docs (this README is the index)
 ├── infra/                     # Bicep IaC, see docs/iac-bicep.md
 ├── public/                    # static assets copied verbatim to the site root
-├── scripts/                   # prebuild, bootstrap scripts, photos/ (captions), social/ (Instagram)
+├── scripts/                   # prebuild, upload + bootstrap scripts, photos/ (captions), social/ (Instagram)
 ├── src/
-│   ├── components/            # Astro components (Header, SessionNav, Lightbox, …)
-│   │   └── hobbies/           # interactive island mounts (aquarium, tide pool, fishing)
-│   ├── content/               # content collections (sessions + hobbies)
+│   ├── assets/                # committed images: stipple plates, fishing catch photos
+│   ├── components/            # Astro components (Header, ArchiveRail, Lightbox, PlateArt, …)
+│   │   └── hobbies/           # interactive island mounts, one per hobby
+│   ├── content/               # content collections (sessions generated by prebuild, hobbies committed)
 │   ├── layouts/               # page shells
-│   ├── lib/                   # blob URL helper, session sort, theme, admin, analytics
-│   │   └── hobbies/           # canvas pixel-art engines (zero dependencies)
-│   ├── pages/                 # route definitions (incl. /admin and /hobbies)
+│   ├── lib/                   # blob URLs, sessions, archive + globe, theme, admin, analytics
+│   │   └── hobbies/           # canvas engines and their data (zero runtime dependencies)
+│   ├── pages/                 # routes: /, /sessions, /places, /hobbies, /admin, sitemap
 │   └── styles/                # Tailwind entry
+├── staging/                   # gitignored drop zone for photos before upload (README kept)
 ├── site.config.ts             # display config (committed; not for secrets)
 ├── site.config.example.ts     # template for new clones
 ├── staticwebapp.config.json   # SWA headers + routing, see docs/security.md

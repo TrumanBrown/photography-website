@@ -18,9 +18,21 @@ The static site generator this project uses. Reads source code, outputs `dist/` 
 
 Azure's hosted DNS service. Holds the records for your domain (A, CNAME, TXT). Charged $0.50/month per zone.
 
+### Azure Functions (managed)
+
+Small server-side functions that run only when called. SWA hosts three of them for this site under `/api/*` (contact form, analytics beacon, admin session manager); the code is in `api/`. On the Free tier they can't use a managed identity, which is why they authenticate to storage with a connection string.
+
+### Azure OpenAI
+
+Azure's hosted OpenAI models. Optional here: the photo pipeline uses one vision model deployment to write captions and session descriptions. API keys are disabled on the account, so callers sign in with Entra ID (OIDC in GitHub Actions). See [photos.md](photos.md).
+
 ### Azure Static Web Apps (SWA)
 
 Microsoft's managed hosting for static sites. Free tier includes 100 GB/month bandwidth, global CDN, auto TLS, preview environments. We deploy `dist/` into it.
+
+### Azure Table Storage
+
+A cheap key/value table service inside the storage account. Holds contact messages, pageview rows, and hashed rate-limit counters.
 
 ### Bicep
 
@@ -40,11 +52,11 @@ A global network of edge servers that cache your site's files close to visitors.
 
 ### Container (Azure Blob)
 
-A top-level "folder" inside a storage account. We use three: `originals`, `derivatives`, `metadata`.
+A top-level "folder" inside a storage account. We use six: `originals`, `derivatives`, `variants` and `hobby-media` (all readable by anyone who knows a file's URL, none listable), and the private `metadata` and `incoming` (new uploads, until a build has removed their GPS position and published them).
 
 ### CORS (Cross-Origin Resource Sharing)
 
-A browser security rule: by default, JavaScript on `yoursite.com` can't `fetch()` data from `someother.com`. The target site sends CORS headers to allow specific origins. We've pre-configured CORS on the storage account for future admin-upload use; the lightbox today uses `<img>` tags, which don't trigger CORS.
+A browser security rule: by default, JavaScript on `yoursite.com` can't `fetch()` data from `someother.com`. The target site sends CORS headers to allow specific origins. The storage account allows `GET`/`HEAD` from the site's own hostnames, which the lightbox's download button needs: it `fetch()`es the original from Blob. Plain `<img>` tags don't trigger CORS.
 
 ### CSP (Content Security Policy)
 
@@ -62,10 +74,6 @@ GitHub's automated dependency-update service. Watches `npm` and `github-actions`
 
 The JPEG sidecar generated from a RAW file. Stored in the `derivatives` container in Blob, regenerated on demand, never committed to git.
 
-### EXIF
-
-The metadata embedded in image files by cameras, capture date, camera model, settings, GPS, etc. Our prebuild reads EXIF to derive a session's earliest date when no `_session.json` provides one. We also embed a copyright EXIF tag during RAW conversion.
-
 ### Entra (Microsoft Entra)
 
 The new name for what was Azure Active Directory (AAD). Microsoft's identity service. Managed identities, service principals, federated credentials all live here.
@@ -73,6 +81,10 @@ The new name for what was Azure Active Directory (AAD). Microsoft's identity ser
 ### ETag
 
 A unique "fingerprint" Azure assigns to each blob. Changes whenever the blob's content changes. We use ETags to skip re-downloading unchanged photos and skip RAW reconversion when the source hasn't changed.
+
+### EXIF
+
+The metadata embedded in image files by cameras: capture date, camera model, settings, GPS, etc. Our prebuild reads EXIF for a session's earliest date (when no `_session.json` provides one) and each photo's camera settings. GPS is removed from every photo before it's published, see [security.md](security.md#photo-locations).
 
 ### Federated credential
 
@@ -102,6 +114,10 @@ Defining your cloud infrastructure in text files instead of clicking through a p
 
 Running the same operation twice has the same result as running it once. Bicep deployments are idempotent, re-applying a template is safe.
 
+### iNaturalist
+
+A community science site for recording wildlife observations. The hobby pages show the owner's public observations through its API, and the photo pipeline takes species names only from the owner's own iNaturalist identification of a photo.
+
 ### Jamstack
 
 "JavaScript + APIs + Markup." A label for the static-files-behind-a-CDN approach. Astro is a Jamstack tool.
@@ -113,6 +129,10 @@ A signed token containing claims. GitHub Actions mints JWTs about each workflow 
 ### Lightbox
 
 A UI overlay that displays an image at full size with navigation controls. We use PhotoSwipe v5.
+
+### Logic App
+
+Azure's workflow-automation service. The optional timer in `infra/modules/scheduler.bicep` is a consumption Logic App that starts the Instagram and photo workflows on GitHub at set times, because GitHub's own cron is best effort.
 
 ### LRS (Locally Redundant Storage)
 
@@ -162,6 +182,10 @@ A signed URL with embedded permissions and expiry. Could be used to gate blob ac
 
 The image-processing library Astro uses under the hood. Pure-native, very fast. We also call it directly from `scripts/prebuild.mjs` to JPEG-encode RAW-derived TIFFs.
 
+### Sidecar (`_session.json`)
+
+A small JSON file next to a session's photos in `originals/<session>/` that holds its title, date, location, description, cover, banner, display order and per-photo captions. The admin panel and the photo pipeline both write it; prebuild reads it.
+
 ### Site config (`site.config.ts`)
 
 The committed TypeScript file that holds display values (owner name, copyright, site title, domain). Edited by humans, picked up by the build, not for secrets.
@@ -182,9 +206,13 @@ See "Azure Static Web Apps."
 
 The configuration file SWA reads at the root of a deployed site. Defines routes, headers, MIME types, 404 mapping. Our copy ships the security headers.
 
+### Stipple plate
+
+A pen-and-ink dot drawing made from one of the owner's photographs. They illustrate the hobby cards; the `stipple-plates` agent skill in `.github/skills/` renders them into `src/assets/plates/`.
+
 ### Storage account
 
-The top-level Azure storage resource. Holds blob containers, queues, tables, file shares. We use only blobs.
+The top-level Azure storage resource. Holds blob containers, queues, tables, file shares. We use blobs (photos, variants, private metadata) and tables (contact messages, pageviews, rate-limit counters).
 
 ### Subscription (Azure)
 
@@ -202,6 +230,10 @@ The "S" in HTTPS. SWA auto-issues and auto-renews TLS certificates for your doma
 
 Output format used by `az` CLI for scripts. `--query "..." -o tsv` returns a single value cleanly.
 
+### Variants
+
+The resized WebP/JPEG copies Astro generates for every photo (several widths each). `scripts/sync-variants.mjs` moves them to the `variants` blob container after each build so the SWA upload stays tiny.
+
 ### WAF (Web Application Firewall)
 
 Filters malicious HTTP traffic. Worth it for sites with logins/forms; overkill (and ~$35/mo) for a static portfolio. We don't use one.
@@ -209,6 +241,10 @@ Filters malicious HTTP traffic. Worth it for sites with logins/forms; overkill (
 ### Workflow (GitHub Actions)
 
 A YAML file in `.github/workflows/` describing automated jobs and the events that trigger them.
+
+### workflow_dispatch / repository_dispatch
+
+Two ways to start a GitHub Actions workflow through GitHub's API instead of a push or cron. `workflow_dispatch` is the **Run workflow** button (and what the admin panel's Rebuild button and the Logic App timer call); `repository_dispatch` carries a custom event type, here `blob-changed`, reserved for a future storage-event hook.
 
 ### Zod
 

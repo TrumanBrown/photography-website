@@ -8,13 +8,16 @@ Anything committed to git is public the moment you push. This repo deliberately 
 
 | What | Where | Why it's okay |
 |---|---|---|
-| **Your full name** | [site.config.ts](../site.config.ts) `ownerName` | Rendered into the footer + EXIF copyright on every photo, the entire point of a personal portfolio is to attribute it to you. |
+| **Your full name** | [site.config.ts](../site.config.ts) `ownerName` | Rendered into the footer, page metadata and structured data; the entire point of a personal portfolio is to attribute it to you. |
 | **Your apex domain** | [site.config.ts](../site.config.ts) `domain` | Public anyway, anyone can `whois` it. |
 | **Your GitHub username** | [infra/main.parameters.json](../infra/main.parameters.json) `githubOwner` | Already public on the GitHub profile that owns the repo. |
 | **The Azure region** | [infra/main.parameters.json](../infra/main.parameters.json) `location` | Not sensitive. |
 | **The storage account hostname** | [site.config.ts](../site.config.ts) `blobHost` (after first deploy) | Public-by-design, the lightbox uses it to fetch full-res images. |
+| **Your iNaturalist username** | `userId` in [src/content/hobbies/](../src/content/hobbies/) | The hobby pages link to your public observations by design. They show them at town or region level, on a grid of about 11 km, never at the spot ([security.md](security.md#photo-locations)). |
+| **Hobby records** | [src/lib/hobbies/](../src/lib/hobbies/) and [src/content/hobbies/](../src/content/hobbies/) | Fish you've caught by named water, birds you've seen, the waters and parks you visit. Named public places only, never coordinates of a spot. |
+| **Commit metadata** | Every commit's author name and email | Public on GitHub forever. Commit with your GitHub noreply address, see [security.md](security.md#secret-hygiene). |
 
-That's the entire list. **No address, no phone, no email, no subscription/tenant IDs, no keys.**
+Nothing else about you is committed: **no address, no phone, no subscription/tenant IDs, no keys.**
 
 ## What is in this repo about *the project* (not you)
 
@@ -39,6 +42,7 @@ None of that is sensitive, it's documentation by design.
 | **Local prebuild cache** | `.cache/` | Downloaded blob copies, keyed by ETag. |
 | **`node_modules/`** | top-level | npm install output. |
 | **`.env*`** | anywhere | Gitignored. Read locally by helper scripts (e.g. `scripts/upload-session.sh` uses it to pick the Azure tenant/account for uploads). Never committed. |
+| **Local credentials** | `local.settings.json`, `*.pem`, `*.key`, `*.pfx`, `*.p12` | Gitignored, so an Azure Functions settings file or a certificate can't be committed by accident. |
 
 ## What lives in **GitHub Actions secrets** (vault, never in code)
 
@@ -93,6 +97,9 @@ git log --all -p | grep -iE 'your_handle|your-app-name'         # every commit e
 git log --all -p | grep -E 'IGAA[A-Za-z0-9_-]{20,}|EAA[A-Za-z0-9]{30,}|github_pat_|AccountKey='
 gh run list --limit 100 --json databaseId --jq '.[].databaseId' |
   xargs -I{} sh -c 'gh run view {} --log | grep -iE "your_handle|your-app-name|IGAA"'
+git log --all --format='%ae %ce' | sort -u                     # every email commits were signed with
+node scripts/location.mjs blobs                                 # public photos that still record a position (az login first;
+                                                                # or Actions → Photo locations → Run workflow)
 ```
 
 ## What lives in **Azure** (not in this repo, not in GitHub)
@@ -101,7 +108,7 @@ gh run list --limit 100 --json databaseId --jq '.[].databaseId' |
 |---|---|
 | Your domain registration's WHOIS record | Azure's registrar partner (GoDaddy under the hood). Privacy protection on by default → your real address is hidden from public WHOIS lookups but still on file with the registrar. |
 | The bootstrap managed identity's principal ID | Azure RBAC tables. |
-| Your actual photos | The `originals` + `derivatives` containers in Blob Storage. **Anyone who knows the URL can read individual blobs.** The container itself cannot be listed by anonymous users, there's no directory index, so URLs cannot be enumerated. |
+| Your actual photos | The `originals` + `derivatives` containers in Blob Storage. **Anyone who knows the URL can read individual blobs.** The container itself cannot be listed by anonymous users, there's no directory index, so URLs cannot be enumerated. Every photo is stripped of its GPS position before it's readable, so a photo taken at home doesn't carry the address ([security.md](security.md#photo-locations)). |
 | Site analytics (pageviews) | Custom privacy-friendly pipeline → `pageviews` table in Table Storage. No IP and no cookies stored; unique visitors counted via a daily-rotating salted hash. See [docs/analytics.md](analytics.md). |
 | Contact form submissions | `contactmessages` table in Table Storage (the name, email, and message a sender chose to send you). Rate limiting uses a separate `contactratelimit` table that stores only a salted hash of the sender's IP plus a count, never the raw IP. |
 | Session descriptions and image captions | `_session.json` in the private-to-listing `originals` container. They become public text on the next site build because they describe public photographs. |
@@ -111,12 +118,16 @@ gh run list --limit 100 --json databaseId --jq '.[].databaseId' |
 
 | What | Where |
 |---|---|
-| Your name (footer + meta tags + EXIF) | Every page |
-| Every photo you upload | The relevant gallery page + as a lightbox URL pointing at Blob |
+| Your name (footer, meta tags, structured data) | Every page |
+| Every photo you upload, minus its GPS position | The relevant gallery page + as a lightbox URL pointing at Blob |
+| Each photo's camera, lens and exposure settings, and its caption | Under the photo in the lightbox, and in the page's structured data |
+| Roughly where each session was | A globe pin from a hand-kept table of public places, never a photo's GPS ([src/lib/geo.ts](../src/lib/geo.ts)) |
+| Your iNaturalist observations | Hobby pages, at town or region level and on an ~11 km grid |
 | The site's full set of pages | Indexable by search engines (`robots.txt` allows it) |
 
 ## Specifically NOT collected, exposed, or stored
 
+- No photo locations. GPS is removed from every photo before it's public, and nothing on the site derives a position from one.
 - No visitor IP addresses are stored. The analytics endpoint uses the IP only to compute a daily-salted hash for unique-visitor counting, then discards it; the raw IP is never persisted.
 - No visitor cookies (analytics uses an ephemeral `sessionStorage` id only, cleared when the tab closes).
 - No visitor accounts. The site owner's `/admin` access uses SWA GitHub OAuth and a server-side allowlist.
@@ -126,7 +137,7 @@ gh run list --limit 100 --json databaseId --jq '.[].databaseId' |
 
 ## TL;DR
 
-**Public:** your name, your domain, your GitHub username, your storage hostname.
+**Public:** your name, your domain, your GitHub and iNaturalist usernames, your storage hostname, your photos (without their GPS), and whatever email your commits are signed with.
 **Private (lives only on your machine):** your address, phone, email.
 **Private (lives only in GitHub vault):** the SWA deploy token.
 **Private (lives only in Azure):** contact messages, analytics rows, runtime credentials, and private metadata. Individual public photo URLs are intentionally readable when known, but their containers are not anonymously listable.

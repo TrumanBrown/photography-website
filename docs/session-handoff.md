@@ -8,7 +8,7 @@ A reference for picking up the project on a new machine, in a new chat, or after
 
 ## Architecture in one paragraph
 
-Static Astro site deployed to **Azure Static Web Apps** (Free tier). Photos in **Azure Blob Storage** across five containers (`originals` / `derivatives` / `variants` / `metadata` / `hobby-media`). Build is a **GitHub Actions** workflow: hourly cron + push + manual. Auth between GitHub and Azure is **OIDC federation** on a user-assigned managed identity, no long-lived CI secret. Infra defined in **Bicep**, applied via a separate manual workflow. Custom domain registered through **Azure App Service Domain**, bound to SWA via a post-deploy script. Realistic cost: ~$2/mo recurring + $12/yr domain.
+Static Astro site deployed to **Azure Static Web Apps** (Free tier). Photos in **Azure Blob Storage** across six containers (`originals` / `derivatives` / `variants` / `hobby-media`, plus private `metadata` and `incoming`). Build is a **GitHub Actions** workflow: hourly cron + push + manual. Auth between GitHub and Azure is **OIDC federation** on two user-assigned managed identities (a blob-only one for builds, a subscription-level one for the manual infra deploy), no long-lived CI secret. Infra defined in **Bicep**, applied via a separate manual workflow. Custom domain registered through **Azure App Service Domain**, bound to SWA via a post-deploy script. Realistic cost: ~$2/mo recurring + $12/yr domain.
 
 **Captions and Instagram (optional).** A second workflow, **Photo captions** (`photos.yml`), looks at each photo once with a keyless Azure OpenAI model, takes species from the owner's iNaturalist observations of that photo, and writes per-photo captions and session descriptions into `_session.json`; the build never calls a model. With `SOCIAL_ENABLED`, the same run plans and writes Instagram posts two weeks ahead, and **Social post** (`social-post.yml`) publishes three a day. A consumption Logic App starts both on time, because GitHub's scheduler skips most scheduled runs here. Private state lives under `metadata/photos/` and `metadata/social/`. See [photos.md](photos.md) and [social.md](social.md).
 
@@ -16,7 +16,8 @@ Static Astro site deployed to **Azure Static Web Apps** (Free tier). Photos in *
 
 | Container | Public? | Contents |
 |---|---|---|
-| `originals/` | Blob (anon read of known URLs, no list) | Source-of-truth uploads. JPG/HEIC/RAW. |
+| `incoming/` | Private | New uploads from `upload-session.sh` (`incoming/originals/...`) and `upload-hobby-media.mjs` (`incoming/hobby-media/...`). Prebuild removes any GPS position, publishes them, and empties it. |
+| `originals/` | Blob (anon read of known URLs, no list) | Source-of-truth photos, published from `incoming/`. JPG/HEIC/RAW, exactly as uploaded minus any GPS position. |
 | `derivatives/` | Blob | JPEG sidecars from RAW/HEIC sources, written by prebuild with a `source-etag` metadata tag for cache invalidation. |
 | `variants/` | Blob | Astro responsive WebP/JPEG outputs, moved here by [scripts/sync-variants.mjs](../scripts/sync-variants.mjs) after each build. Also stores admin thumbnails under `thumbs/<slug>/`. **Critical for staying under SWA Free's 250 MB app cap**: without this, ~50-photo sessions blow the limit. |
 | `metadata/` | Private | Prebuild's `manifest.json` (blob name → etag + target) and `admin-index.json` (resolved session metadata the admin panel reads, see lesson 19). |
@@ -26,9 +27,11 @@ Static Astro site deployed to **Azure Static Web Apps** (Free tier). Photos in *
 
 Set in the repo (Settings → Secrets and variables → Actions):
 
-- `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, OIDC pointers (technically identifiers, not secrets).
+- `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, OIDC pointers (technically identifiers, not secrets). `AZURE_CLIENT_ID` is the bootstrap identity, used by the Infra workflow.
+- `AZURE_DEPLOY_CLIENT_ID`, the build identity the other workflows sign in as (an identifier).
 - `AZURE_STATIC_WEB_APPS_API_TOKEN`, real secret; rotated by re-running the Bicep deploy.
 - `AZURE_STORAGE_ACCOUNT`, storage account name.
+- Optional: `GH_PAT_FOR_SECRETS`, and the photo/Instagram secrets. Full table: [cicd.md](cicd.md#secrets-cheat-sheet).
 
 GitHub-side billing note: the **Actions account budget must be > $0 with stop-usage on**. The default $0 budget blocks all Actions runs, even on free public repos. Card-on-file is also required regardless.
 
@@ -56,7 +59,7 @@ Set manually only when needed:
 8. **`az storage blob upload-batch --pattern` doesn't support brace expansion.** Silently matches zero files when given `{*.jpg,*.png}`. Use `find` + per-file `az storage blob upload` instead. Fixed in [scripts/upload-session.sh](../scripts/upload-session.sh).
 9. **iPhone HEIC files use HDR tone-mapping** (ftyp brands `tmap` / `MiHE` / `MiHB`) that Ubuntu's `heif-convert` + ImageMagick libheif delegate both fail to decode with "Metadata not correctly assigned to image." **`pillow-heif` handles them cleanly.** [scripts/heic-to-jpeg.py](../scripts/heic-to-jpeg.py) wraps it; workflow apt-installs `python3-pip` + pip-installs `pillow pillow-heif --break-system-packages`.
 10. **Prebuild cache key must include the target filename**, not just source name+etag. When HEIC→jpg conversion was added later, the cache key (source name+etag) was unchanged so the prebuild reused HEIC bytes for a .jpg local file, breaking Astro's image pipeline.
-11. **CSP `script-src` blocks inline scripts** unless you add `'unsafe-inline'` or per-script hashes. Dark mode + theme toggle use SHA-256 hashes in [staticwebapp.config.json](../staticwebapp.config.json); `npm run check:csp` verifies both hashes during check and build.
+11. **CSP `script-src` blocks inline scripts** unless you add `'unsafe-inline'` or per-script hashes. Dark mode, the theme toggle and the home page's lead-photo chooser use SHA-256 hashes in [staticwebapp.config.json](../staticwebapp.config.json); `npm run check:csp` verifies all three, and that the policy's storage host matches `blobHost`, during check and build.
 12. **SWA Free has a 250 MB app-size limit** (Standard is 500 MB; both insufficient for many photos). Solution: [scripts/sync-variants.mjs](../scripts/sync-variants.mjs) runs after `astro build`, moves all responsive image variants from `dist/_astro/` to the `variants/` blob container, rewrites HTML refs to point at Blob. dist drops from 539 MB → ~330 KB regardless of photo count.
 13. **`upload-session.sh` only uploaded 1 file** because the `while read` loop fed the file list via stdin, but `az storage blob upload` also reads stdin, consuming remaining entries after the first iteration. Fixed by reading from file descriptor 3 (`read <&3 ... done 3< "$TMPLIST"`).
 14. **Windows `az` CLI under WSL appends `\r`** to query output. The tenant-switching comparison (`$current_tenant != $AZURE_TENANT_ID`) always failed, triggering a login prompt every run. Fixed with `tr -d '\r'`.
@@ -88,10 +91,14 @@ storage, salt, and admin settings. Set `GITHUB_TOKEN` (fine-grained PAT,
 
 | Script | When |
 |---|---|
-| [scripts/setup-federated-credential.sh](../scripts/setup-federated-credential.sh) | One-time, creates the bootstrap MI used by CI. |
-| [scripts/bootstrap-swa-token.sh](../scripts/bootstrap-swa-token.sh) | After Bicep deploy, populates GH secrets. |
+| [scripts/setup-federated-credential.sh](../scripts/setup-federated-credential.sh) | One-time, creates the bootstrap MI the Infra workflow deploys as. Re-run it to print cleanup commands for rights earlier versions granted. |
+| [scripts/bootstrap-swa-token.sh](../scripts/bootstrap-swa-token.sh) | After Bicep deploy, populates GH secrets (deploy token, storage account, build identity). |
 | [scripts/bind-domain.sh](../scripts/bind-domain.sh) | Once, after `infra` workflow + domain registered. |
-| [scripts/upload-session.sh](../scripts/upload-session.sh) `<slug>... \| --all [--build]` | Routine: ship one, several, or every staged session from `staging/` to Blob. |
+| [scripts/upload-session.sh](../scripts/upload-session.sh) `<slug>... \| --all [--build]` | Routine: ship one, several, or every staged session from `staging/` to the private `incoming/` container; the next build removes GPS and publishes it. Needs only `az` (and `gh` for `--build`). |
+| [scripts/upload-hobby-media.mjs](../scripts/upload-hobby-media.mjs) `<hobby-slug>` | Hobby gallery photos to `hobby-media/`, and the gallery into the hobby's JSON. |
+| [scripts/upload-fishing-catches.mjs](../scripts/upload-fishing-catches.mjs) | The fishing page's catch photos: small committed copies, and full-size originals through the private inbox. |
+| [scripts/location.mjs](../scripts/location.mjs) `check \| strip \| blobs [--apply]` | Find or remove GPS positions in local photos, or in every public container. The **Photo locations** workflow runs the container sweep monthly in Actions. |
+| `npm run photos -- <command>`, `npm run social -- <command>` | Status, previews and overrides for the caption and Instagram pipelines ([photos.md](photos.md), [social.md](social.md)). |
 | [scripts/prebuild.mjs](../scripts/prebuild.mjs) | Runs in CI; locally with `AZURE_STORAGE_ACCOUNT=... node scripts/prebuild.mjs`. |
 | [scripts/sync-variants.mjs](../scripts/sync-variants.mjs) | Runs in CI between `astro build` and SWA deploy. |
 | [scripts/heic-to-jpeg.py](../scripts/heic-to-jpeg.py) | Called by prebuild; not invoked directly. |
@@ -100,9 +107,12 @@ storage, salt, and admin settings. Set `GITHUB_TOKEN` (fine-grained PAT,
 
 ## Workflow triggers (current)
 
-- [build-and-deploy.yml](../.github/workflows/build-and-deploy.yml), push to main, hourly cron, manual dispatch, `repository_dispatch: blob-changed`. Concurrency-grouped per ref so newer pushes cancel older runs.
-- [infra.yml](../.github/workflows/infra.yml), manual only. Re-run when Bicep changes.
+- [build-and-deploy.yml](../.github/workflows/build-and-deploy.yml), push to main, same-repo PRs (with preview environments), hourly cron, manual dispatch, `repository_dispatch: blob-changed`. Concurrency-grouped per ref so newer pushes cancel older runs.
+- [infra.yml](../.github/workflows/infra.yml), manual only, in the `prod` environment. Re-run when Bicep changes.
 - [lint.yml](../.github/workflows/lint.yml), pushes to main and PRs targeting main.
+- [photos.yml](../.github/workflows/photos.yml), twice a day on GitHub's cron, at 3:02 am from the Logic App timer, after a build finds new photos, or manual.
+- [social-post.yml](../.github/workflows/social-post.yml), half-hourly from the timer (GitHub's cron as backup), or manual; publishes only with `SOCIAL_LIVE=true`.
+- [photo-locations.yml](../.github/workflows/photo-locations.yml), monthly or manual; removes GPS from anything public that still has it.
 
 ## Setting up on a new machine
 
@@ -128,6 +138,5 @@ Photos in Blob, secrets in GH, infra in Azure: none is per-machine state. The on
 
 ## Open items (not blocking anything)
 
-- README "Adding a session" still references the portal-only workflow; should mention `staging/` + `upload-session.sh`.
 - A dormant cleanup item: a leftover service principal from an unrelated project may still have sub-scope perms. Audit periodically with `az role assignment list --include-inherited`.
-- The per-app MI created by Bicep is unused; the CI pipeline currently uses the bootstrap MI. Either start using the per-app MI (and remove the bootstrap MI's blob role) or drop it from Bicep.
+- The workflows now prefer the Bicep build identity (`AZURE_DEPLOY_CLIENT_ID`) and fall back to the bootstrap MI until that secret exists. Once a build has passed with it, remove the bootstrap MI's `github-main`/`github-pull-request` credentials and its User Access Administrator role (re-run `setup-federated-credential.sh` for the exact commands), and the build identity's unused Storage Table Data Contributor role ([cicd.md](cicd.md#two-identities-least-privilege-by-job)).

@@ -4,43 +4,59 @@
 
 ## Architecture in one diagram
 
-```
-GitHub repo ──push / hourly cron──► GitHub Actions
-                                          │
-                                  OIDC ───┤
-                                          ▼
-                       ┌────────────────────────────────┐
-                       │  Azure Blob Storage            │
-                       │   originals/  derivatives/     │
-                       │   variants/   metadata/        │
-                       └──────────┬─────────────────────┘
-                                  │ reads sources, writes derivatives
-                                  ▼
-                       Astro build → dist/
-                                  │
-                                  ▼
-                       ┌────────────────────────────────┐
-                       │  Azure Static Web Apps (CDN)   │
-                       │  yourdomain.com  (custom TLS)  │
-                       └──────────┬─────────────────────┘
-                                  │ HTTPS
-                                  ▼
-                          Visitor's browser
-                                  │ click → full-res
-                                  ▼ direct anonymous read
-                          Azure Blob (originals/derivatives)
+```mermaid
+flowchart TB
+    VIS["Visitors"]
+
+    subgraph GH["GitHub Actions"]
+        WF["Build and Deploy<br/>Photo captions<br/>Social post"]
+        INFRA["Infra (Bicep)<br/>environment: prod"]
+    end
+
+    subgraph BOOT["rg-photography-bootstrap"]
+        BID["id-photography-bootstrap<br/>Contributor + limited RBAC admin<br/>on the subscription"]
+    end
+
+    subgraph RG["rg-photography-prod"]
+        DID["id-photography-deploy-prod<br/>Blob Data Contributor, Reader,<br/>OpenAI User"]
+        SA[("Storage account<br/>originals, derivatives, variants,<br/>hobby-media: readable by URL<br/>metadata, incoming: private<br/>tables: messages, pageviews")]
+        SWA["Static Web App, Free<br/>CDN, TLS, 3 Functions"]
+        OAI["Azure OpenAI<br/>optional"]
+        LOGIC["Logic App timer<br/>optional"]
+        DNS["App Service Domain<br/>+ Azure DNS zone"]
+        LOG["Log Analytics<br/>optional"]
+    end
+
+    INFRA -- "OIDC" --> BID
+    BID -. "deploys and assigns roles" .-> RG
+    WF -- "OIDC" --> DID
+    DID -- "read and write blobs" --> SA
+    DID -- "captions" --> OAI
+    WF -- "deploy token" --> SWA
+    SWA -- "Functions: connection string" --> SA
+    LOGIC -- "workflow_dispatch" --> WF
+    DNS -. "A, CNAME, TXT" .-> SWA
+    SA -. "metrics" .-> LOG
+    VIS -- "HTTPS pages, /api" --> SWA
+    VIS -- "photos by URL" --> SA
 ```
 
 Two paths to the visitor: optimized responsive variants are generated during
 the Astro build and moved to Blob before deployment; full-resolution originals
 also stay in Blob and load only when the lightbox opens. SWA serves the HTML,
-CSS, JavaScript, and other small static assets.
+CSS, JavaScript, and other small static assets, and runs the three Functions
+(contact form, analytics beacon, admin API). Every photo is stripped of its GPS
+position before it's readable by URL ([security.md](security.md#photo-locations)).
+
+The two identities exist so the workflows that run third-party code can only
+touch blobs, while the one that can change the subscription runs only the
+manual Infra deploy ([cicd.md](cicd.md#two-identities-least-privilege-by-job)).
 
 ---
 
 ## Resources Bicep creates
 
-All inside resource group `rg-photography-prod`.
+All inside resource group `rg-photography-prod`, except the bootstrap identity (last row), which the setup script creates outside Bicep.
 
 | Resource | Purpose |
 |---|---|
@@ -50,16 +66,18 @@ All inside resource group `rg-photography-prod`.
 | ↳ Container `variants` | Responsive WebP/JPEG outputs and tiny admin thumbnails. Same access. |
 | ↳ Container `hobby-media` | Full/display hobby-gallery photos, kept separate from sessions. Same access. |
 | ↳ Container `metadata` | Private. Build manifest, the admin index, the photo pipeline's records (`photos/`) and the Instagram poster's state (`social/`). |
-| ↳ Tables | Contact messages, pageviews, and hashed contact rate-limit counters. |
+| ↳ Container `incoming` | Private. New uploads wait here until the build removes any GPS position and publishes them to `originals` or `hobby-media`. |
+| ↳ Tables | Contact messages, pageviews, and hashed contact rate-limit counters. Bicep creates `contactmessages`; the Functions create the other two on first write. |
 | **Static Web App** `swa-photography-prod` (Free SKU) | Hosting + global CDN + auto-TLS + PR previews. |
-| ↳ Custom domain bindings (apex + `www`) | Created only when `domainName` is set. |
-| **User-assigned managed identity** `id-photography-deploy-<env>` | Service account GitHub Actions assumes via OIDC. RBAC: `Storage Blob Data Contributor` on the storage account, `Reader` on the RG, and `Cognitive Services OpenAI User` on the Azure OpenAI account when that's deployed. |
+| ↳ Custom domain bindings (apex + `www`) | Created by [scripts/bind-domain.sh](../scripts/bind-domain.sh) after the domain is registered, not by Bicep (the apex validation token only exists once binding starts). |
+| **User-assigned managed identity** `id-photography-deploy-<env>` | The build identity: Build and Deploy, Photo captions and Social post sign in as it via OIDC (`AZURE_DEPLOY_CLIENT_ID`). RBAC: `Storage Blob Data Contributor` on the storage account, `Reader` on the RG, and `Cognitive Services OpenAI User` on the Azure OpenAI account when that's deployed. No table access. |
 | ↳ Federated credentials `github-main`, `github-pull-request` | Trust JWTs from this specific repo + branch. No long-lived secrets. |
-| **Azure OpenAI account** `oai-photography-<env>-<suffix>` | Created only when `enableDescribeModel=true`. One model deployment (`gpt-6.1-sol`, US data zone) that the photo pipeline uses to look at each photo once and write captions and session descriptions ([docs/photos.md](photos.md)). API keys are disabled; workflows reach it through their OIDC login, as `id-photography-bootstrap`, which has inference-only access. |
+| **Azure OpenAI account** `oai-photography-<env>-<suffix>` | Created only when `enableDescribeModel=true`. One model deployment (`gpt-6.1-sol`, US data zone) that the photo pipeline uses to look at each photo once and write captions and session descriptions ([docs/photos.md](photos.md)). API keys are disabled; workflows reach it through their OIDC login, with inference-only access. |
 | **Logic App** `logic-photography-<env>-scheduler` | Created only when `enableSocialScheduler=true`. A timer that starts the Instagram posting and photo workflows on GitHub, because GitHub's own scheduler skips many runs ([docs/social.md](social.md#what-runs-automatically)). Uses the Static Web App's `GITHUB_TOKEN` setting. |
 | **App Service Domain** `yourdomain.com` | `.com` registration. Only created when `domainName` is set; first-time purchase needs `az appservice domain create --accept-terms` once. |
 | **Azure DNS zone** `yourdomain.com` | Holds `A` (apex → SWA), `CNAME` `www`, `TXT` (SWA ownership token). |
 | **Log Analytics workspace** `log-photography-prod` | Created only when `enableDiagnostics=true`; receives storage transaction metrics with a 1 GB/day cap. |
+| **Bootstrap identity** `id-photography-bootstrap` (resource group `rg-photography-bootstrap`) | Created by [scripts/setup-federated-credential.sh](../scripts/setup-federated-credential.sh), not Bicep. The identity the Infra workflow deploys as: `Contributor` on the subscription, plus `Role Based Access Control Administrator` limited to assigning the build identity's roles. Trusts only the `prod` GitHub Environment. |
 
 Full module-by-module breakdown: [iac-bicep.md#what-the-bicep-deploys-resource-by-resource](iac-bicep.md#what-the-bicep-deploys-resource-by-resource).
 

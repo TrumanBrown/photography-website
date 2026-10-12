@@ -6,8 +6,10 @@
 
 - **Node.js 22**: see [.nvmrc](../.nvmrc). On Ubuntu 24.04: install via [NodeSource](https://github.com/nodesource/distributions); on macOS via `brew install node@22`; with `nvm` use `nvm install && nvm use`.
 - **npm 10+** ships with Node 22.
-- (Optional) **`az` CLI** if you want to test the prebuild against a real Azure account.
-- (Optional) **`gh` CLI** for the bootstrap scripts.
+- (Optional) **`az` CLI** if you want to test the prebuild against a real Azure account, upload photos, or use the `photos`/`social` commands.
+- (Optional) **`gh` CLI** for the bootstrap scripts and `upload-session.sh --build`.
+- (Optional, only for `npm run prebuild:remote` against real RAW or HEIC photos) the converters CI installs: `dcraw_emu` from `libraw-bin` (`sudo apt install libraw-bin`) for RAW, and Python 3 with `pillow` + `pillow-heif` (`pip install pillow pillow-heif`) for iPhone HEIC.
+- (Optional) **exiftool** (`sudo apt install libimage-exiftool-perl` or `brew install exiftool`), only to run `scripts/location.mjs` or `prebuild:remote` on photos that record a GPS position yourself, and for the tests that need it, which are skipped without it. Uploading doesn't need it: the build removes GPS in GitHub Actions ([security.md](security.md#photo-locations)).
 
 ## First-time setup
 
@@ -22,16 +24,21 @@ npm ci            # exact dependency install from package-lock.json
 | Command | What it does |
 |---|---|
 | `npm run dev` | Astro dev server with hot reload on http://localhost:4321 |
-| `npm run build` | Production build into `dist/` |
+| `npm run build` | Production build into `dist/` (copies the Birding WASM runtime and checks CSP hashes first) |
 | `npm run preview` | Serve `dist/` locally (mimics SWA) |
 | `npm run check` | Verify inline CSP hashes, then type-check Astro + content schemas |
-| `npm run check:csp` | Verify the two inline theme scripts match `staticwebapp.config.json` |
-| `npm test` | Run Vitest coverage for API helpers, prebuild validation, session/date logic, Blob/HTML helpers, and hobby engines |
+| `npm run check:csp` | Verify the three inline scripts (two theme scripts, the lead-photo chooser) match `staticwebapp.config.json` |
+| `npm test` | Run the Vitest suite: site helpers, API functions, prebuild validation, session/date logic, Blob/HTML helpers, hobby engines, and the photo + social pipelines |
 | `npm run test:watch` | Same suite in watch mode while developing |
+| `npm run lint` | ESLint over the whole repo (blocking in CI) |
 | `npm run fixtures` | Generate two synthetic sessions in `src/content/sessions/` |
 | `npm run fixtures:many` | Generate ~40 synthetic sessions across 5 years (great for testing the sidebar at scale) |
 | `npm run prebuild:remote` | Sync sessions from real Blob Storage (needs `AZURE_STORAGE_ACCOUNT` env and `az login`) |
 | `npm run prebuild:local` | Run prebuild in local-only mode; auto-seeds fixtures if no sessions exist |
+| `npm run photos -- <command>` | Photo caption pipeline: `status`, `preview`, `redo`, `redescribe` ([photos.md](photos.md#day-to-day)) |
+| `npm run social -- <command>` | Instagram plan: `status`, `preview`, `skip`, `approve`, `retry` ([social.md](social.md#day-to-day)) |
+| `npm run fetch:tidepool-photos`, `npm run fetch:herping-photos` | Refresh the CC-licensed reveal-card photos ([hobbies.md](hobbies.md)) |
+| `npm run build:herp-geo`, `npm run build:day-list` | Regenerate the committed herping map geometry and Day list puzzle data |
 | `npm run format` | Prettier write |
 | `npm run format:check` | Prettier check (currently advisory in CI) |
 
@@ -70,8 +77,11 @@ The dev server hot-reloads on any file change. Component edits appear instantly;
 - `node_modules/`, npm install output
 - `dist/`, build output
 - `.astro/`, Astro's type cache
-- `.cache/prebuild/`, incremental cache for the prebuild script
+- `.cache/`, local caches: `prebuild/` (downloaded blobs keyed by ETag), `astro/` (image variants), `photos/` and `social/` (pipeline previews and local state)
 - `src/content/sessions/*`, populated by `npm run fixtures` or `npm run prebuild:*`
+- `staging/*`, photos waiting to be uploaded (only `staging/README.md` is tracked)
+- `public/birding/wasm/`, the MediaPipe runtime copied from `node_modules` by `npm run dev`/`build`
+- `mocks/`, `scripts-local/`, throwaway design mocks and their prep scripts
 - `contact.json`, domain registration contact info (only relevant on the deploy machine)
 - `.env*`, read by `scripts/upload-session.sh` for local Azure tenant/subscription/account overrides
 

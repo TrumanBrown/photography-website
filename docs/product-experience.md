@@ -39,7 +39,7 @@ The integrated browser runs in a hidden tab, which suppresses the Largest Conten
 
 ### Clearer first impression
 
-The homepage now has a compact `Photography` H1, the existing site description, and a live session/photo count. This fixes the missing page-level heading and tells visitors what archive they are looking at without pushing the first photograph out of the viewport.
+The homepage now has a compact `Photographs` H1, the existing site description, and a live session/photo count. This fixes the missing page-level heading and tells visitors what archive they are looking at without pushing the first photograph out of the viewport.
 
 The mobile header uses two rows below the desktop breakpoint. The full site name now has its own row instead of collapsing to `T…` beside four competing controls.
 
@@ -49,7 +49,7 @@ Only the first visible homepage cover and first session-gallery photograph use e
 
 ### Better discovery and continuity
 
-Session descriptions appear on cards when supplied. Session pages include previous/next links in the configured archive order after the gallery, giving mobile visitors a direct continuation path without reopening the session drawer.
+Session descriptions appear at the top of the session page. (They were briefly on the home-page cards too; that duplicated the same sentences across two URLs, so cards now show only title, date, location and photo count.) Session pages include previous/next links in the configured archive order after the gallery, giving mobile visitors a direct continuation path without reopening the session drawer.
 
 The homepage uses the first session cover for Open Graph and Twitter previews. Social image alternative text, site name, locale, and richer generated session descriptions are included. Admin is explicitly `noindex`.
 

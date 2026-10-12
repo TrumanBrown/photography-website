@@ -72,8 +72,10 @@ staging/
 Either way the archive is unpacked to a scratch folder under `staging/` that is
 deleted when the run ends; your zip is never modified. Extraction verifies every
 entry's CRC, so a bad or truncated archive aborts the whole run instead of
-uploading half a session. **Nothing is re-encoded or resampled** — the exact
-bytes from the archive are what land in Blob. Needs `unzip` or `python3`.
+uploading half a session. **Nothing is re-encoded or resampled** — the image
+data from the archive is exactly what gets published, at full resolution. The
+one change is that a GPS position, if a photo records one, is removed before
+it's public (below). Needs `unzip` or `python3`.
 
 If both `<name>/` and `<name>.zip` exist, the folder wins and the script says so.
 
@@ -93,6 +95,20 @@ If both `<name>/` and `<name>.zip` exist, the folder wins and the script says so
 All fields are optional; sensible defaults are derived from filenames + EXIF if
 absent. `date` must be a real `YYYY-MM-DD` date. Invalid JSON or field types fail
 the build rather than being silently ignored.
+
+## Photo locations are removed, without touching the photo
+
+Phones (or a camera paired with one) write where each photo was taken into the
+file, to within a few metres, and anyone with a published photo's link can
+download it. So uploads go to a private inbox, the `incoming` container, which
+nobody can read. The next build removes the GPS position and only then
+publishes each photo to `originals`.
+
+Removing it rewrites metadata only. The published file is byte for byte the
+image you uploaded, at full resolution, with its camera, lens, exposure and
+capture time; the files here in `staging/` aren't changed. It all happens in
+GitHub Actions, so there's nothing to install for it. Until a build runs, your
+new photos are private and not on the site.
 
 ## Upload to Blob
 
@@ -121,10 +137,11 @@ and anything with no accepted image files. It prints the full plan with
 per-session file counts and sizes, notes any folders it flattened, lists what it
 is skipping, and asks once before transferring anything.
 
-The script requires at least one accepted image, uploads to `originals` under
-the matching prefix, and honors Azure overrides from `.env`. The site picks it
-up on the next hourly cron, or immediately if you pass `--build` (or click "Run
-workflow" in GitHub Actions).
+The script requires at least one accepted image, uploads to the private inbox
+(`incoming/originals/<session>/`), and honors Azure overrides from `.env`. The
+next build publishes it to `originals/<session>/` and the site picks it up: pass
+`--build` to start that build straight away (or click "Run workflow" in GitHub
+Actions), or wait for the hourly cron, which GitHub often skips.
 
 Do not include both a converted source and another image that would produce the
 same filename, such as `DSC0123.ARW` and `DSC0123.jpg`. Prebuild rejects that
@@ -143,8 +160,16 @@ AZURE_STORAGE_ACCOUNT=<account> \
   node scripts/upload-hobby-media.mjs aquarium-keeping --hero DSC1234.jpg
 ```
 
-It uploads to the `hobby-media` container and writes the gallery into
-`src/content/hobbies/<slug>.json`. Details: [docs/hobbies.md](../docs/hobbies.md#photo-galleries-hobby-media).
+The full-size photos go through the same private inbox (published to
+`hobby-media` by the next build, exactly as uploaded minus any GPS position),
+the smaller inline copies straight to `hobby-media`, and it writes the gallery
+into `src/content/hobbies/<slug>.json`. Details: [docs/hobbies.md](../docs/hobbies.md#photo-galleries-hobby-media).
+
+The fishing page's "Fish I've caught" photos have their own folder,
+`staging/fishing/`, named after each catch's `photo` in
+`src/lib/hobbies/fishing-catches.json`. `node scripts/upload-fishing-catches.mjs`
+publishes them the same way: full size through the private inbox, plus a small
+committed copy for the page ([docs/hobbies.md](../docs/hobbies.md#reference-implementation-the-fishing-island)).
 
 ## After successful upload
 

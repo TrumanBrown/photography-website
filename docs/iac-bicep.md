@@ -29,7 +29,7 @@ Bicep doesn't execute anything itself. The flow is:
 3. The `az deployment ... create` command sends that JSON to Azure's deployment engine.
 4. Azure compares "what you declared" against "what currently exists" and applies the diff.
 
-Re-running with the same input does **nothing** if reality already matches. This is called "idempotent," and it's what makes it safe to run repeatedly (e.g., on every push to `main`).
+Re-running with the same input does **nothing** if reality already matches. This is called "idempotent," and it's what makes it safe to run repeatedly (e.g., every time you click **Run workflow** on `Infra (Bicep)`).
 
 ---
 
@@ -41,10 +41,10 @@ infra/
 ├── main.bicep                # resource-group-scope: orchestrates the modules
 ├── main.parameters.json      # values passed into subscription.bicep
 └── modules/
-    ├── storage.bicep         # storage account + 5 containers + tables + CORS
-    ├── swa.bicep             # Static Web App + custom domains
-    ├── identity.bicep        # managed identity + RBAC + GitHub OIDC
-    ├── domain.bicep          # App Service Domain + DNS records
+    ├── storage.bicep         # storage account + 6 containers + contactmessages table + CORS
+    ├── swa.bicep             # Static Web App (custom domains are bound later by scripts/bind-domain.sh)
+    ├── identity.bicep        # build managed identity + RBAC + GitHub OIDC
+    ├── domain.bicep          # www CNAME in the DNS zone the domain purchase created
     ├── monitoring.bicep      # optional Log Analytics workspace
     ├── ai.bicep              # optional Azure OpenAI model for photo captions and descriptions
     └── scheduler.bicep       # optional timer that starts the Instagram and photo workflows
@@ -73,16 +73,17 @@ Created by [`modules/storage.bicep`](../infra/modules/storage.bicep). Configured
 - `minimumTlsVersion: TLS1_2`, `supportsHttpsTrafficOnly: true`, never accept plaintext or old TLS.
 - 7-day blob soft-delete, accidental delete is undoable for a week.
 
-### 3. Five blob containers and three tables
+### 3. Six blob containers and three tables
 
 - `originals`, your uploads. Public-read on known URLs only (cannot be listed by anonymous users).
 - `derivatives`, RAW→JPEG sidecars written by the build pipeline. Same access.
 - `variants`, responsive WebP/JPEG build outputs plus admin thumbnails. Same access.
 - `hobby-media`, full/display hobby-gallery images kept out of the photography session scanner. Same access.
-- `metadata`, fully private. Holds the build manifest and consolidated admin index.
-- Tables are created or populated for `contactmessages`, `pageviews`, and `contactratelimit`.
+- `metadata`, fully private. Holds the build manifest, the consolidated admin index, and the photo and Instagram pipelines' state (`photos/`, `social/`).
+- `incoming`, fully private. New uploads wait here until a build removes any GPS position and publishes them to `originals` or `hobby-media` ([security.md](security.md#photo-locations)). The upload scripts also create it if it doesn't exist yet.
+- Bicep creates the `contactmessages` table. The Functions create `pageviews` and `contactratelimit` themselves on first write.
 
-The choice of "Blob" public-access level (vs. "Container") is deliberate, see [security.md](security.md#blob-access).
+The choice of "Blob" public-access level (vs. "Container") is deliberate, see [security.md](security.md#blob-storage-access-controls).
 
 ### 4. CORS rule
 
@@ -92,34 +93,35 @@ Lets browsers on `yoursite.com` make `GET`/`HEAD` requests against the Blob endp
 
 Created by [`modules/swa.bicep`](../infra/modules/swa.bicep). Free SKU. SWA Free is only available in a handful of regions; the module maps your chosen resource-group region (e.g. `westus3`) onto a nearby SWA-supported region automatically.
 
-When `domainName` is set, the module also creates child resources for the apex + `www` custom-domain bindings with managed certificates.
+The custom-domain bindings (apex + `www`) are deliberately **not** in Bicep. The apex binding's validation needs a TXT record holding a token that only exists once the binding has started, so a single deployment deadlocks. [scripts/bind-domain.sh](../scripts/bind-domain.sh) creates both bindings after the domain is registered; SWA then issues and renews their certificates.
 
 ### 6. User-assigned managed identity: `id-photography-deploy-<env>`
 
-Created by [`modules/identity.bicep`](../infra/modules/identity.bicep). This is the "service account" the build workflow assumes to download originals and write derivatives.
+Created by [`modules/identity.bicep`](../infra/modules/identity.bicep). This is the **build identity**: the build, photo and posting workflows sign in as it (the `AZURE_DEPLOY_CLIENT_ID` secret) to read originals, write derivatives, variants and the private metadata, and call the caption model.
 
 It has two federated credentials:
 - `github-main`, trusts JWTs from `repo:<owner>/<repo>:ref:refs/heads/main`. Scoped tightly to your repo + branch.
 - `github-pull-request`, trusts JWTs from `repo:<owner>/<repo>:pull_request`. Needed for SWA preview deploys.
 
 And two role assignments:
-- `Storage Blob Data Contributor` on the storage account, read originals, write derivatives.
-- `Reader` on the resource group, look up resource properties during deploy.
+- `Storage Blob Data Contributor` on the storage account: read originals, write everything the build publishes.
+- `Reader` on the resource group, so the OIDC sign-in can select the subscription.
 
-With `enableDescribeModel` on, [`modules/ai.bicep`](../infra/modules/ai.bicep)
-also grants it `Cognitive Services OpenAI User` on the Azure OpenAI account (see 10).
+No table role: contact messages and analytics stay out of its reach. With `enableDescribeModel` on, [`modules/ai.bicep`](../infra/modules/ai.bicep) also grants it `Cognitive Services OpenAI User` on the Azure OpenAI account (see 10).
 
-Full mechanism: [cicd.md](cicd.md#oidc-federation-no-long-lived-secrets).
+The Infra workflow itself deploys as a different identity, `id-photography-bootstrap`, which [scripts/setup-federated-credential.sh](../scripts/setup-federated-credential.sh) creates outside Bicep with subscription-level rights and trusts only for the `prod` GitHub Environment. Why two: [cicd.md](cicd.md#two-identities-least-privilege-by-job).
 
-### 7. App Service Domain (only if `domainName` is set)
+### 7. App Service Domain and its DNS zone (only if `domainName` is set)
 
-The domain registration itself. Bicep can manage it after first-time interactive purchase via `az appservice domain create --accept-terms`. Privacy protection on (your address isn't in public WHOIS lookups). Auto-renew on (don't lose the domain to forgetfulness).
+The domain itself is bought once, outside Bicep, with `az appservice domain create --accept-terms` (see the README). That purchase creates the Azure DNS zone and, by default, WHOIS privacy and auto-renew. Bicep never creates, renews or deletes the registration.
+
+[`modules/domain.bicep`](../infra/modules/domain.bicep) only references that existing zone and adds the record that doesn't depend on SWA's validation token.
 
 ### 8. DNS records in the auto-created zone
 
-- `A` (alias) at apex → SWA hostname (created by [scripts/bind-domain.sh](../scripts/bind-domain.sh) because alias-to-SWA isn't representable in pure Bicep)
-- `CNAME` `www` → SWA hostname
-- `TXT` at apex → SWA validation token (proves to SWA that you own the domain)
+- `A` (alias) at apex → SWA resource (created by [scripts/bind-domain.sh](../scripts/bind-domain.sh) because alias-to-SWA isn't representable in pure Bicep)
+- `CNAME` `www` → SWA hostname (created by `domain.bicep`)
+- `TXT` at apex → SWA validation token, proving to SWA that you own the domain (created by `bind-domain.sh`)
 
 ### 9. Optional Log Analytics workspace
 
@@ -142,11 +144,10 @@ at each photo once and write its caption and its session's description
 - `disableLocalAuth: true`: API keys don't exist, so there's nothing to store or
   rotate. Callers sign in with Entra ID, which is also why the account needs its
   own custom subdomain.
-- Inference-only access (`Cognitive Services OpenAI User`) for the identity
-  GitHub Actions signs in as, `id-photography-bootstrap` from
-  [scripts/setup-federated-credential.sh](../scripts/setup-federated-credential.sh),
-  and for `id-photography-deploy-<env>`. It can call the deployment and nothing
-  else.
+- Inference-only access (`Cognitive Services OpenAI User`) for the build
+  identity, `id-photography-deploy-<env>`, which `photos.yml` signs in as, and
+  for `id-photography-bootstrap`, which the workflows fall back to until
+  `AZURE_DEPLOY_CLIENT_ID` is set. It can call the deployment and nothing else.
 - Billed per token. Capacity (50K tokens/minute) is a rate ceiling, not a charge.
 
 ### 11. Optional timer: `logic-photography-<env>-scheduler`
@@ -172,13 +173,13 @@ when `enableSocialScheduler=true`. A consumption Logic App that starts
 The deployment emits values your scripts/workflows need:
 - `storageAccountName`, `blobEndpoint`
 - `swaName`, `swaDefaultHostname`
-- `managedIdentityClientId`, `managedIdentityPrincipalId`
+- `managedIdentityClientId` (the `AZURE_DEPLOY_CLIENT_ID` secret), `managedIdentityPrincipalId`
 - `describeEndpoint`, `describeDeployment` (empty unless `enableDescribeModel`
   is on), the values for the `AZURE_OPENAI_ENDPOINT` and
   `AZURE_OPENAI_DEPLOYMENT` repository variables
 - `schedulerEnabled`: whether the timer found a token and is running
 
-The Infra workflow uses these to populate repo secrets (`AZURE_STATIC_WEB_APPS_API_TOKEN`, `AZURE_STORAGE_ACCOUNT`) and writes the runtime storage connection, analytics salt, and initial admin directly to SWA app settings.
+The Infra workflow uses these to populate repo secrets (`AZURE_STATIC_WEB_APPS_API_TOKEN`, `AZURE_STORAGE_ACCOUNT`, `AZURE_DEPLOY_CLIENT_ID`) and writes the runtime storage connection, analytics salt, and initial admin directly to SWA app settings.
 
 ---
 
@@ -225,4 +226,4 @@ App Service Domain registration **is not** deleted by this, that's intentional; 
 - **First-time domain purchase needs interactive consent.** You cannot do it through Bicep on the first deploy; run `az appservice domain create --accept-terms` once, then Bicep can manage it.
 - **Storage account name must be globally unique** across all of Azure, 3–24 lowercase chars, digits/letters only. The module appends a short `uniqueString()` suffix to make collisions essentially impossible.
 - **SWA Free has region restrictions.** Not every Azure region offers SWA Free; the module maps your RG region to a supported SWA region.
-- **Some warnings are intentional.** [`modules/domain.bicep`](../infra/modules/domain.bicep) declares a `contact` parameter that's unused inside Bicep. It's just there so you can pass contact info through to the bootstrap script's `az appservice domain create` call. The module suppresses the lint warning with `#disable-next-line`.
+- **Some warnings are intentional.** [`main.bicep`](../infra/main.bicep) declares a `domainContact` parameter that's unused inside Bicep, kept so the parameters file can carry it for the one-time `az appservice domain create` call, and [`modules/domain.bicep`](../infra/modules/domain.bicep) accepts `tags` that DNS record sets can't use. Both suppress the lint warning with `#disable-next-line no-unused-params`.

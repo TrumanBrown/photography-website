@@ -60,7 +60,7 @@ flowchart TB
 
     subgraph CI["GitHub Actions: Build and Deploy"]
         direction TB
-        PRE["prebuild.mjs<br/>sync originals, RAW to JPEG"]
+        PRE["prebuild.mjs<br/>sync originals, RAW to JPEG,<br/>strip any GPS"]
         BUILD["astro build<br/>HTML/CSS/JS + image variants"]
         SYNCV["sync-variants.mjs<br/>move variants to Blob"]
         DEPLOY["SWA deploy<br/>dist/ + api/"]
@@ -71,6 +71,7 @@ flowchart TB
         direction TB
         subgraph SA["Storage account"]
             direction TB
+            INC[("incoming/ (private)")]
             ORIG[("originals/")]
             DERIV[("derivatives/")]
             VAR[("variants/")]
@@ -88,7 +89,7 @@ flowchart TB
             FMGR["/api/sessionmgr"]
             AUTHN["Built-in auth<br/>(GitHub OAuth + API allowlist)"]
         end
-        IDENT["Managed identity<br/>OIDC federation + RBAC"]
+        IDENT["Build identity<br/>OIDC, blob access only"]
         MON["Log Analytics<br/>(optional storage diagnostics)"]
         DNS["App Service Domain + Azure DNS<br/>trumanbrown.com"]
     end
@@ -102,8 +103,10 @@ flowchart TB
 
     %% build-time (write path)
     CAM --> STAGE
-    STAGE -- "upload-session.sh" --> ORIG
-    STAGE -- "upload-hobby-media.mjs" --> HMEDIA
+    STAGE -- "upload scripts" --> INC
+    STAGE -- "hobby display copies" --> HMEDIA
+    PRE -- "publish, GPS removed" --> ORIG
+    PRE -. "reads new uploads" .-> INC
     CODE -- "git push" --> REPO
     REPO -- "push / hourly cron / dispatch" --> PRE
     SECRETS -. "OIDC + deploy token" .-> CI
@@ -114,7 +117,7 @@ flowchart TB
     DEPLOY -- "publish" --> STATIC
     DEPLOY -- "deploy functions" --> FCON
     IDENT -. "trusts GitHub OIDC" .-> CI
-    IDENT -. "RBAC on storage" .-> SA
+    IDENT -. "Blob Data Contributor" .-> SA
 
     %% run-time (read path)
     BROWSER -- "HTTPS pages" --> STATIC
@@ -141,7 +144,7 @@ flowchart TB
     class REPO,SECRETS github;
     class PRE,BUILD,SYNCV,DEPLOY build;
     class STATIC,FCON,FTRK,FMGR,AUTHN,IDENT,MON,DNS azure;
-    class ORIG,DERIV,VAR,META,HMEDIA,TMSG,TPV,TRL store;
+    class INC,ORIG,DERIV,VAR,META,HMEDIA,TMSG,TPV,TRL store;
     class BROWSER,ADMIN runtime;
     class INAT third;
 ```
@@ -155,7 +158,7 @@ Two phases matter, and the split is the key to the whole design:
 
 ### What happens on a build
 
-A push to `main`, the hourly cron, a manual run, or a `blob-changed` dispatch all kick off the same pipeline.
+A push to `main`, the hourly cron, a manual run (including `upload-session.sh --build`, the admin panel's Rebuild button, and the photo pipeline after it writes captions), or a `blob-changed` dispatch all kick off the same pipeline.
 
 ```mermaid
 sequenceDiagram
@@ -167,14 +170,66 @@ sequenceDiagram
     participant SWA as Static Web App
     Note over GH,GA: Triggers: push to main, hourly cron,<br/>manual dispatch, or blob-changed
     GH->>GA: Start "Build and Deploy"
-    GA->>GA: npm ci, then unit tests
-    GA->>AZ: OIDC login (managed identity)
-    GA->>AZ: prebuild.mjs reads originals/, writes derivatives/
-    GA->>GA: astro build (HTML + responsive variants)
-    GA->>AZ: sync-variants.mjs uploads variants/
+    GA->>GA: npm ci (site and api/), then unit tests
+    GA->>AZ: OIDC login (build identity)
+    GA->>AZ: prebuild.mjs publishes incoming/ to originals/ (GPS removed),<br/>reads originals/, writes derivatives/
+    GA->>GA: az logout, then astro build (HTML + responsive variants)
+    GA->>AZ: OIDC login again, sync-variants.mjs uploads variants/
     GA->>SWA: deploy dist/ + api/ functions
     SWA-->>Dev: Live at trumanbrown.com (about 3 minutes)
 ```
+
+### The photo and Instagram pipelines
+
+The build never calls a model or posts anything. Two more workflows do, on their
+own schedule, and only once they're switched on ([photos.md](photos.md),
+[social.md](social.md)).
+
+```mermaid
+flowchart LR
+    classDef github fill:#e9d5ff,stroke:#7c3aed,color:#2e1065;
+    classDef azure fill:#99f6e4,stroke:#0f766e,color:#063b35;
+    classDef store fill:#fed7aa,stroke:#c2410c,color:#3d1d05;
+    classDef third fill:#e5e7eb,stroke:#6b7280,color:#1f2937;
+
+    TIMER["Logic App timer<br/>half-hourly 7 am to 10:32 pm,<br/>and 3:02 am Pacific"]
+    BUILD["Build and Deploy"]
+    subgraph PIPE["GitHub Actions"]
+        PHOTOS["Photo captions<br/>photos.yml"]
+        SOCIAL["Social post<br/>social-post.yml"]
+    end
+    OAI["Azure OpenAI<br/>vision model, keyless"]
+    subgraph STORE["Storage account"]
+        ORIG[("originals/<br/>_session.json")]
+        META[("metadata/, private<br/>photos/, social/")]
+    end
+    INAT["iNaturalist API<br/>your identifications"]
+    WIKI["Wikipedia API<br/>one fact per species or place"]
+    IG["Instagram API"]
+
+    BUILD -- "new photos found" --> PHOTOS
+    TIMER -- "3:02 am" --> PHOTOS
+    TIMER -- "every half hour" --> SOCIAL
+    PHOTOS -- "look at each photo once" --> OAI
+    PHOTOS -- "match observations" --> INAT
+    PHOTOS -- "facts for posts" --> WIKI
+    PHOTOS -- "records, plan, written posts" --> META
+    PHOTOS -- "captions, descriptions" --> ORIG
+    PHOTOS -- "redeploy" --> BUILD
+    SOCIAL -- "next post, history" --> META
+    SOCIAL -- "image link that expires in 2 h" --> IG
+
+    class PHOTOS,SOCIAL,BUILD github;
+    class TIMER,OAI azure;
+    class ORIG,META store;
+    class INAT,WIKI,IG third;
+```
+
+Both sign in as the build identity, so they can reach blobs and the model and
+nothing else. The model runs in your own tenant, everything it writes lands in
+the private `metadata` container or in `_session.json`, and the workflow logs
+show counts only. GitHub's own scheduler skipped most runs on this repository,
+which is why a Logic App starts the posting workflow on time.
 
 ### Components at a glance
 
@@ -189,7 +244,12 @@ sequenceDiagram
 | Admin panel | `src/pages/admin/`, `src/lib/admin.ts` + `api/sessionmgr/` | [admin.md](admin.md) |
 | Interactive hobbies | `src/components/hobbies/`, `src/lib/hobbies/` | [hobbies.md](hobbies.md) |
 | Admin auth | SWA built-in auth (GitHub OAuth), `staticwebapp.config.json` | [security.md](security.md) |
-| GitHub-to-Azure trust | OIDC federation on a managed identity, `infra/modules/identity.bicep` | [cicd.md](cicd.md) |
+| GitHub-to-Azure trust | OIDC federation on two managed identities: the build identity (`infra/modules/identity.bicep`) and the Infra-only bootstrap identity (`scripts/setup-federated-credential.sh`) | [cicd.md](cicd.md#two-identities-least-privilege-by-job) |
+| Photo captions + session descriptions | `.github/workflows/photos.yml`, `scripts/photos/`, optional Azure OpenAI (`infra/modules/ai.bicep`) | [photos.md](photos.md) |
+| Instagram posting | `.github/workflows/social-post.yml`, `scripts/social/`, optional timer (`infra/modules/scheduler.bicep`) | [social.md](social.md) |
+| Photo location privacy | `scripts/location.mjs`, used by the upload scripts and prebuild | [security.md](security.md#photo-locations) |
+| Globe, places pages, image sitemap | `src/lib/globe.ts`, `src/lib/geo.ts`, `src/pages/places/`, `src/pages/image-sitemap.xml.ts` | this doc |
+| Hobby card stipple plates | `src/components/PlateArt.astro`, drawn by the `.github/skills/stipple-plates/` agent skill | [hobbies.md](hobbies.md) |
 | Optional storage diagnostics | Log Analytics, `infra/modules/monitoring.bicep` | [azure.md](azure.md) |
 | Domain + DNS | App Service Domain + Azure DNS, `infra/modules/domain.bicep` | [azure.md](azure.md) |
 
@@ -273,7 +333,7 @@ Full image-pipeline mechanics: [image-pipeline.md](image-pipeline.md).
 
 **Why this one:** no framework dependency, accessible, touch-friendly. Loaded only on gallery pages, the home page doesn't pay for it.
 
-**How it is wired:** each slide moves through three tiers — the already-cached grid thumbnail, a size-capped WebP bridge, then the untouched original, which is fetched only for the photograph actually on screen. That keeps full resolution without making the first paint wait on a 20 MB file. Details, measurements and tradeoffs: [image-pipeline.md](image-pipeline.md#viewing-full-resolution-without-the-wait).
+**How it is wired:** each slide moves through three tiers — the already-cached grid thumbnail, a size-capped WebP bridge, then the full-size original (image data exactly as uploaded), which is fetched only for the photograph actually on screen. That keeps full resolution without making the first paint wait on a 20 MB file. Details, measurements and tradeoffs: [image-pipeline.md](image-pipeline.md#viewing-full-resolution-without-the-wait).
 
 ### Azure Blob Storage: the photo album
 
@@ -281,7 +341,7 @@ Full image-pipeline mechanics: [image-pipeline.md](image-pipeline.md).
 
 Terminology:
 - **Storage account** = your top-level Azure storage resource (one per project usually).
-- **Container** = a top-level "folder" inside a storage account. We use five: `originals/`, `derivatives/`, `variants/`, `metadata/`, and `hobby-media/`.
+- **Container** = a top-level "folder" inside a storage account. We use six: `originals/`, `derivatives/`, `variants/`, `hobby-media/`, and the private `metadata/` and `incoming/`.
 - **Blob** = a single file inside a container. Each blob has a public URL like `https://stphotographyprod.blob.core.windows.net/originals/china-2025/IMG_4421.jpg`.
 
 **Why split images out of the website's build folder?**
@@ -319,8 +379,10 @@ Why use Azure's registrar? One vendor, one bill, one set of credentials, one Bic
 
 **Why we use it (and how) in this project:**
 - The **infra workflow** deploys Bicep, only run manually, only when you change infrastructure.
-- The **build-and-deploy workflow** rebuilds the site, triggered by pushes (code changes) or by an hourly cron (picks up new photos in Blob without you doing anything).
-- The **lint workflow** runs on PRs to catch broken templates before merge.
+- The **build-and-deploy workflow** rebuilds the site, triggered by pushes (code changes), uploads and the admin panel's Rebuild button, or an hourly cron (picks up new photos in Blob without you doing anything).
+- The **lint workflow** runs tests, ESLint and type checks on pushes to `main` and on PRs, to catch broken templates before merge.
+- The **photos workflow** writes captions and session descriptions with a vision model, and plans Instagram posts.
+- The **social-post workflow** publishes the planned Instagram posts at set times.
 
 Full workflow detail with annotated YAML: [cicd.md](cicd.md).
 
@@ -345,10 +407,13 @@ Full Bicep tour: [iac-bicep.md](iac-bicep.md).
 |---|---|---|
 | Astro (vs. Next.js, Hugo, Eleventy) | Best built-in image pipeline + near-zero JS shipped | Next.js (overkill); Hugo (weaker images); Eleventy (more DIY) |
 | Static Web Apps Free (vs. Front Door, App Service, Container Apps) | Free, includes CDN + TLS + previews | Front Door (~$35/mo base); App Service (overkill); Container Apps (not needed) |
-| Blob Storage (vs. images in git) | No 500 MB deploy cap; no git bloat; uploads don't need a code change | Git LFS (works but defeats the "drop a folder" workflow) |
+| Blob Storage (vs. images in git) | Stays under SWA Free's 250 MB app cap; no git bloat; uploads don't need a code change | Git LFS (works but defeats the "drop a folder" workflow) |
 | Bicep (vs. Terraform, ARM, Pulumi) | One cloud, no state file, native Azure tooling | Terraform (state-file overhead); ARM (too verbose); Pulumi (extra runtime) |
 | OIDC federation (vs. service principal secrets) | No long-lived secrets in GitHub; rotation is automatic | Service principal with `client_secret` (works but leaks if exposed) |
-| Hourly cron rebuild (vs. Event Grid → webhook) | Simple, free, "good enough" for personal portfolio | Event Grid + Azure Function (works but adds parts; trigger already wired for future) |
+| Two CI identities (vs. one) | The workflows that run third-party npm code can only reach blobs; the subscription-level identity only runs the manual Infra deploy | One identity for everything (simpler, but every build would hold subscription Owner-level rights) |
+| Private upload inbox, GPS removed in CI (vs. stripping on your machine, or keeping originals private) | Nothing is public until it's clean, nothing to install locally, and the lightbox still ends on the exact image you uploaded (exiftool rewrites only metadata) | Stripping in the upload script (needs exiftool and Node on every machine you upload from); private originals with re-encoded public copies (no longer the original image) |
+| Hourly cron rebuild (vs. Event Grid → webhook) | Simple, free, "good enough" for personal portfolio; uploads trigger a build directly anyway | Event Grid + Azure Function (works but adds parts; trigger already wired for future) |
+| Logic App timer for Instagram (vs. GitHub cron alone) | GitHub skipped most scheduled runs here; posts need set times; costs cents | GitHub cron only (kept as a backup) |
 | No WAF / Front Door | Bounded Functions use throttling and allowlisted auth; a ~$35/mo edge tier is disproportionate at personal traffic | WAF would cost more than everything else combined |
 
 ---

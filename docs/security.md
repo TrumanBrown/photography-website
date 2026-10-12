@@ -11,9 +11,10 @@ analytics, and admin operations, so the runtime surface is intentionally narrow
 but not zero. What we focus on:
 
 - Lock down the storage account so attackers can't enumerate or modify it.
+- Never publish where a photo was taken: GPS is stripped from every photo before it's public, and the globe and maps only use coarse, hand-picked points. See [Photo locations](#photo-locations).
 - Send strong HTTP security headers so visitors' browsers refuse to be misused.
 - Gate every admin API operation with a fail-closed GitHub-principal allowlist.
-- Use short-lived OIDC credentials for CI and isolate the unavoidable runtime connection string in SWA app settings.
+- Use short-lived OIDC credentials for CI, with a least-privilege identity for everything that runs third-party code, and isolate the unavoidable runtime connection string in SWA app settings. See [GitHub Actions and Azure identities](#github-actions-and-azure-identities).
 - Collect analytics **without retaining raw IPs or cookie identifiers**, see [docs/analytics.md](analytics.md).
 - Be honest about what's worth defending vs. what would just inflate the bill.
 
@@ -55,10 +56,10 @@ Delivered via [staticwebapp.config.json](../staticwebapp.config.json) `globalHea
 
 ```
 default-src 'self';
-img-src 'self' https://*.blob.core.windows.net https://static.inaturalist.org https://inaturalist-open-data.s3.amazonaws.com data: blob:;
+img-src 'self' https://<account>.blob.core.windows.net https://static.inaturalist.org https://inaturalist-open-data.s3.amazonaws.com data: blob:;
 script-src 'self' 'wasm-unsafe-eval';
 worker-src 'self' blob:;
-connect-src 'self' https://*.blob.core.windows.net https://api.inaturalist.org;
+connect-src 'self' https://<account>.blob.core.windows.net https://api.inaturalist.org;
 style-src 'self' 'unsafe-inline';
 font-src 'self' data:;
 object-src 'none';
@@ -67,14 +68,14 @@ base-uri 'self';
 form-action 'self'
 ```
 
-(The live policy in [staticwebapp.config.json](../staticwebapp.config.json) also carries three `sha256` hashes in `script-src`, two for the dark-mode inline scripts and one for the home page's lead photograph chooser; they are omitted above for readability.)
+(The live policy in [staticwebapp.config.json](../staticwebapp.config.json) names the real storage account, `blobHost` in [site.config.ts](../site.config.ts), and also carries three `sha256` hashes in `script-src`, two for the dark-mode inline scripts and one for the home page's lead photograph chooser; they are omitted above for readability.)
 
 Translation:
 - **`default-src 'self'`**: load resources only from the site's own origin unless overridden.
-- **`img-src ... data: blob:`**: also allow images from any Azure Blob endpoint (lightbox full-res, hobby photos), the iNaturalist photo CDNs (the tide-pooling observations grid and species photos), `data:` URIs (inlined SVG icons), and `blob:` object URLs (the Birding island's local selfie preview).
+- **`img-src ... data: blob:`**: also allow images from the site's own storage account (lightbox full-res, hobby photos), the iNaturalist photo CDNs (the tide-pooling observations grid and species photos), `data:` URIs (inlined SVG icons), and `blob:` object URLs (the Birding island's local selfie preview). Naming the one account, rather than `*.blob.core.windows.net`, means injected markup can't load from, or send data to, some other storage account.
 - **`script-src 'self' 'wasm-unsafe-eval'`**: own-origin scripts only. `'wasm-unsafe-eval'` lets the Birding island compile the self-hosted MediaPipe WASM; it permits WebAssembly only, **not** JavaScript `eval`.
 - **`worker-src 'self' blob:`**: the MediaPipe runtime spawns a same-origin worker (and a `blob:` worker) to run the landmark model off the main thread.
-- **`connect-src 'self' ...`**: own origin (the Birding model + WASM are fetched from `/birding/`, so `'self'` covers them), Blob (lightbox original download), and the public iNaturalist API.
+- **`connect-src 'self' ...`**: own origin (the Birding model + WASM are fetched from `/birding/`, so `'self'` covers them), the site's storage account (lightbox original download), and the public iNaturalist API.
 - **`style-src 'self' 'unsafe-inline'`**: `'unsafe-inline'` is required by Astro's scoped style blocks. Can be tightened later with hashes; modest risk.
 - **`object-src 'none'`**: no `<object>` / `<embed>` / Flash-era nonsense.
 - **`frame-ancestors 'none'`**: modern equivalent of `X-Frame-Options: DENY`.
@@ -82,38 +83,82 @@ Translation:
 - **`form-action 'self'`**: forms can only submit to the site's own origin (contact form, admin).
 
 `npm run check:csp` verifies every inline script (the two dark-mode ones and
-the lead photograph chooser) against the configured hashes. It runs as part of `npm run check` and `npm run build`, so changing an
-inline script without updating the policy fails before deployment. If you add
+the lead photograph chooser) against the configured hashes, and that the
+policy's storage host is exactly `blobHost` from `site.config.ts`. It runs as
+part of `npm run check` and `npm run build`, so changing an inline script or the
+storage account without updating the policy fails before deployment. If you add
 another inline script, add its hash rather than enabling `'unsafe-inline'`.
+
+The JSON-LD blocks on the home, session and places pages go through
+`jsonForScript` in [src/lib/html.ts](../src/lib/html.ts), which escapes `<`, so
+a title or caption containing `</script>` can't end the block and inject markup.
 
 ### Contact form abuse
 
 The public contact endpoint (`api/contact`) has layered protection:
 
 - **Honeypot field.** A hidden `website` input that humans never see. Bots that fill it get a fake success and are silently dropped.
-- **Server-side validation.** Name, email, and message are length-checked and the email is format-checked before anything is stored.
+- **Server-side validation.** Name, email, and message are length-checked and the email is format-checked before anything is stored. Nothing is emailed, so there are no mail headers to inject.
 - **Per-IP rate limit.** Each client is capped at five messages per hour. The limiter stores only a secret-salted, truncated hash of the IP, never the raw IP, in a `contactratelimit` table. ETag-conditional updates prevent parallel requests from overwriting the count. It fails open on a storage outage so a legitimate message is not rejected solely because the limiter is unavailable.
+- **Limits of the limit.** The client IP is the first `X-Forwarded-For` entry SWA hands the Function ([api/shared/client-ip.js](../api/shared/client-ip.js)). SWA doesn't document whether a client-supplied value can survive there, so treat the limit as a speed bump against floods, not a guarantee.
 
 ### Blob storage access controls
 
 | Surface | Mitigation |
 |---|---|
 | Shared access keys leaking | Shared-key access is enabled because SWA Free managed Functions cannot use a managed identity for these data-plane calls. The connection string is stored only as a masked SWA app setting and is never emitted to git or GitHub secrets. Build-time access still uses short-lived OIDC credentials. Rotate storage keys and re-run Infra if exposure is suspected. |
-| Anonymous enumeration of all your photos | Containers use public-access level `Blob`, **not** `Container`. Anonymous users can `GET` a blob if they know its URL; they cannot list the container's contents. |
-| Pipeline credentials sitting in env vars | The build pipeline authenticates as a managed identity via OIDC federation. No keys, no PATs. The token is short-lived and scoped to one branch of one repo. See [cicd.md](cicd.md#oidc-federation-no-long-lived-secrets). |
-| Unauthorized writes to `originals/` | RBAC: only the managed identity has `Storage Blob Data Contributor`. Public users have read-only access to known URLs. |
-| Accidental delete | 7-day blob soft-delete enabled. Recover via `az storage blob undelete`. |
+| Anonymous enumeration of all your photos | Containers use public-access level `Blob`, **not** `Container`. Anonymous users can `GET` a blob if they know its URL; they cannot list the container's contents. `metadata` (manifest, admin index, pipeline state, the sealed Instagram token) and `incoming` (new uploads waiting for a build) are fully private. |
+| Pipeline credentials sitting in env vars | Workflows authenticate as managed identities via OIDC federation. No keys, no PATs. Tokens are short-lived, and the identity that runs third-party build code can only touch blobs in this one storage account. See [GitHub Actions and Azure identities](#github-actions-and-azure-identities). |
+| Unauthorized writes to `originals/` | RBAC: the build identity has `Storage Blob Data Contributor` on this account only; the admin Function writes `_session.json` through the connection string after its allowlist check. Public users have read-only access to known URLs. |
+| Contact messages and analytics rows | Live in Table Storage, which only the Functions (connection string) and you can read. The CI identities have no table role. |
+| Accidental delete or overwrite | 7-day blob soft-delete enabled, which also keeps the previous bytes as a snapshot when a blob is overwritten. Recover via `az storage blob undelete` (and, for an overwrite, copy the restored snapshot back over the blob). |
+
+### Photo locations
+
+Phones, and cameras paired with one, write where each frame was taken into the
+file, to within a few metres. The photo containers are readable by anyone with
+a URL, the lightbox links straight to full-size originals, and Astro copies the
+originals byte for byte into `variants/`. So a photo taken at home would
+publish the address. The rule is that no published file records a position.
+[scripts/location.mjs](../scripts/location.mjs) does the removing, with
+exiftool: it deletes the EXIF GPS block and XMP geotags and rewrites nothing
+else, so the compressed image data stays byte for byte what was uploaded (a
+test checks exactly that), at full resolution, with camera, lens, exposure and
+capture time kept. All of it runs in GitHub Actions; nothing is needed on your
+machine.
+
+| Where | What happens |
+|---|---|
+| Upload ([scripts/upload-session.sh](../scripts/upload-session.sh), [scripts/upload-hobby-media.mjs](../scripts/upload-hobby-media.mjs)) | Photos go to the private `incoming` container, unreadable by URL. Nothing is changed on your machine. |
+| Every build, first ([scripts/prebuild.mjs](../scripts/prebuild.mjs), `publishIncoming`) | Removes the position from anything in `incoming` that records one, then publishes it to `originals` (or `hobby-media`) and deletes it from `incoming`. A photo that can't be cleaned stops the build and stays private. |
+| Every build, per photo (`keepLocationsPrivate`) | A backstop for photos put in `originals` some other way (Storage Explorer, `az`) and ones published before any of this existed. Once per photo and ETag it checks the working copy Astro reads and, for HEIC/RAW, the source file (its URL is easy to guess from the derivative's), and strips whatever records a position everywhere it's published, keeping each blob's name and headers. A working copy, derivative, linked original or new HEIC/RAW source that can't be cleaned fails the build; a HEIC/RAW source an earlier build already published gets a warning and another try. |
+| Monthly, or on demand ([`photo-locations.yml`](../.github/workflows/photo-locations.yml)) | Scans every public container, including Astro's old copies in `variants/`, and strips anything that still records a position. A scheduled run that finds something fails, so GitHub emails you. The log shows counts only. `node scripts/location.mjs blobs` does the same from your machine if you'd rather. |
+
+The only image a build re-encodes at full size is a HEIC or RAW photo, which
+browsers can't display: it becomes a full-resolution JPEG in one step from a
+lossless decode, at quality 95 with full colour resolution, and the HEIC/RAW
+itself stays in `originals`. The smaller copies the pages show first (grid
+images, the lightbox's quick preview) are resized on purpose; the lightbox
+always ends on the full-size file.
+
+Nothing derives a position from photos any more: the home-page globe pins each
+session from a hand-kept table of coarse, public points
+([src/lib/geo.ts](../src/lib/geo.ts), two decimal places at most), and the
+herping map and iNaturalist embeds snap observations to a 0.1° grid (about
+11 km) and show a town or region, never `place_guess`'s street address
+([src/lib/hobbies/inat-place.ts](../src/lib/hobbies/inat-place.ts)).
+
+Browser caches and search engines that fetched a file before it was cleaned
+keep what they fetched; that can't be recalled.
 
 ### Hotlinking and scraping
 
 "Hotlinking" = someone embeds your photo on their site by linking to its URL, eating your bandwidth without credit. "Scraping" = bot downloads everything.
 
 What we do (cheap, reasonable):
-- EXIF copyright tag embedded into every derivative JPEG during prebuild.
-- Visible "© <Year> <Owner Name>" footer on every page.
-- Per-image credit text near each lightbox.
-- Right-click context-menu suppression on the lightbox image (mild deterrent, not security, anyone with DevTools can grab the URL anyway).
+- Visible "© <Year> <Owner Name>" footer on every page, and the all-rights-reserved notice for photographs in the [README](../README.md#license).
 - `robots.txt` allows search engines to crawl page URLs but doesn't promote the blob origin.
+- Blob containers can't be listed, so only photos a page links to can be found.
 
 What we don't do (expensive, low value):
 - **Rate limiting per IP.** Needs Front Door + WAF (~$35/mo). Vast overspend for a personal portfolio.
@@ -137,20 +182,42 @@ traffic. Revisit if admin upload or broader accounts ship.
 
 ### Secret hygiene
 
-- **No secrets in the repo, ever.** The only configurable values committed live in `site.config.ts` (display config) and `infra/main.parameters.json` (resource names + your GitHub username). Neither is sensitive.
+- **No secrets in the repo, ever.** The only configurable values committed live in `site.config.ts` (display config) and `infra/main.parameters.json` (resource names + your GitHub username). Neither is sensitive. [.gitignore](../.gitignore) also covers `.env*`, `contact.json`, Azure Functions' `local.settings.json`, and key and certificate files (`*.pem`, `*.key`, `*.pfx`, `*.p12`).
 - **GitHub → Azure auth** is OIDC federation. No `client_secret` exists for an attacker to steal.
-- **One real secret in GitHub Actions:** `AZURE_STATIC_WEB_APPS_API_TOKEN`, the SWA deploy token. Rotated by re-running the Bicep deploy.
+- **One required secret in GitHub Actions:** `AZURE_STATIC_WEB_APPS_API_TOKEN`, the SWA deploy token, rotated by re-running the Bicep deploy. The optional features add their own (`GH_PAT_FOR_SECRETS`, the Instagram token and its sealing key, a model API key); the full list is in [cicd.md](cicd.md#secrets-cheat-sheet). The `AZURE_*` IDs are identifiers, not credentials.
 - **Runtime secrets stay in SWA app settings:** the storage connection string and optional GitHub rebuild PAT. The Infra workflow masks the connection string before writing it.
 - **Domain registration contact info** (`contact.json`, contains your real address and phone) is gitignored.
+- **Commit metadata is public too.** Every commit records an author email. Commit with your GitHub noreply address (`git config --global user.email <id>+<user>@users.noreply.github.com`) and turn on **Settings → Emails → Block command line pushes that expose my email**. An address already in history stays visible unless the history is rewritten.
 - **Dependabot** is enabled for the `npm` and `github-actions` ecosystems, auto-PRs when a dependency has a CVE.
+
+### GitHub Actions and Azure identities
+
+Workflows sign in to Azure with OIDC, so there is no Azure password anywhere. Two managed identities split the work by how much code each one runs:
+
+| Identity | Created by | Signs in for | Can do | Trusts tokens from |
+|---|---|---|---|---|
+| `id-photography-deploy-<env>` | [infra/modules/identity.bicep](../infra/modules/identity.bicep) | Build and Deploy, Photo captions, Social post, Photo locations (`AZURE_DEPLOY_CLIENT_ID`) | `Storage Blob Data Contributor` on the site's storage account, `Reader` on its resource group, `Cognitive Services OpenAI User` on the caption model | `main`, and pull requests from branches in this repository |
+| `id-photography-bootstrap` | [scripts/setup-federated-credential.sh](../scripts/setup-federated-credential.sh) | Infra (Bicep) only (`AZURE_CLIENT_ID`) | `Contributor` on the subscription, plus `Role Based Access Control Administrator` limited by a condition to assigning those three roles to service principals | the `prod` GitHub Environment only |
+
+The workflows that install hundreds of npm packages therefore hold a token that can, at worst, change blobs in one storage account (7-day soft delete keeps the previous bytes). Contact messages, analytics, DNS, the deploy token and role assignments are out of reach. The identity that can change the subscription runs only `azure/arm-deploy`, from a manual workflow, behind an environment you can restrict to `main` and to required reviewers.
+
+Other guards in the workflows:
+
+- **Packages install before any sign-in**, and Build and Deploy signs out of Azure while `astro build` runs Astro, Vite and their plugins, signing in again only to upload the variants. Social post signs out before `npm ci` for the same reason.
+- **Least-privilege `GITHUB_TOKEN`**: each workflow declares `permissions:`; the one job that can push (Social post's keepalive commit) runs no packages.
+- **No secrets for untrusted code**: fork and Dependabot pull requests build from fixtures with no Azure access; nothing uses `pull_request_target`; no event text is interpolated into `run:` scripts.
+- **Masked outputs**: the storage connection string, analytics salt and deploy token are masked before use; the photo and posting pipelines log counts only, through [redact.mjs](../scripts/photos/redact.mjs).
+
+Moving an existing setup onto this model (one-time): run the Infra workflow with `GH_PAT_FOR_SECRETS` set, or `./scripts/bootstrap-swa-token.sh`, to create the `AZURE_DEPLOY_CLIENT_ID` secret; let one build pass; then re-run `./scripts/setup-federated-credential.sh`, which prints the commands that remove the bootstrap identity's old `main`/pull-request trust and its User Access Administrator role. Details in [cicd.md](cicd.md#two-identities-least-privilege-by-job).
 
 ### Supply chain
 
 | Surface | Mitigation |
 |---|---|
-| Malicious npm package | `npm ci` against committed `package-lock.json`; Dependabot alerts; no autopilot updates. |
+| Malicious npm package | `npm ci` against committed `package-lock.json`; Dependabot alerts; no autopilot updates. In CI, packages install and the site builds without Azure credentials, and the credential the build does hold reaches blobs only. |
 | Compromised GitHub Action version | All third-party actions pinned to major version (e.g. `@v4`). Consider full SHA pinning if you become more paranoid. |
 | Compromised npm registry mirror | Currently we trust the public registry; nothing avoids this at this scale. |
+| Image tools installed in CI | `libraw-bin` and `exiftool` come from Ubuntu's apt archive; `pillow` and `pillow-heif` from PyPI, unpinned, before any sign-in. |
 
 ### Data we collect
 
@@ -175,7 +242,11 @@ curl -I https://yourdomain.com
 
 # Confirm you can't list the storage container
 curl -s 'https://<account>.blob.core.windows.net/originals?restype=container&comp=list' | head -5
-# Should return AuthorizationFailure or AuthenticationFailed
+# Should return 404 ResourceNotFound
+
+# Confirm no published photo records where it was taken:
+# GitHub → Actions → Photo locations → Run workflow (or, with az login:)
+node scripts/location.mjs blobs
 ```
 
 Aim for an A or A+ on both securityheaders.com and ssllabs.com on first deploy.
@@ -188,3 +259,5 @@ In rough order:
 1. **CSP `'unsafe-inline'` tightening** via Astro's hash mode, easy win once we stop iterating on styles.
 2. **`Cross-Origin-Opener-Policy: same-origin`** + **`Cross-Origin-Embedder-Policy: require-corp`** if we ever need full cross-origin isolation.
 3. **WAF + stricter edge rate limiting** the moment the site gets an upload endpoint or broader login model.
+4. **Allowlist admins by SWA `userId`** instead of GitHub username: a username freed by a rename can be registered by someone else.
+5. **Full SHA pinning** for third-party actions, and hash-pinned `pip` installs in the build.
