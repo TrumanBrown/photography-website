@@ -42,27 +42,24 @@ const {
   data-inat-iconic={iconicTaxa}
   data-inat-taxon={taxonId}
 >
-  <div class="mb-4 flex items-end justify-between gap-3">
-    <div>
-      <h2 class="text-lg font-medium">{heading}</h2>
-      {blurb && <p class="mt-1 max-w-prose text-sm text-neutral-600 dark:text-neutral-400">{blurb}</p>}
+  <div class="mb-4">
+    <div class="shead">
+      <h2>{heading}</h2>
+      <a href={url} target="_blank" rel="noopener noreferrer" class="shead-link"
+        ><span class="draw">View all on iNaturalist</span> →</a
+      >
     </div>
-    <a
-      href={url}
-      target="_blank"
-      rel="noopener noreferrer"
-      class="shrink-0 rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium no-underline hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
-    >View all on iNaturalist →</a>
+    {blurb && <p class="shead-blurb">{blurb}</p>}
   </div>
 
   <div data-inat-grid role="list" class="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
     {
       Array.from({ length: limit }).map(() => (
-        <div class="aspect-square animate-pulse rounded-md bg-neutral-200 dark:bg-neutral-800" />
+        <div class="aspect-square animate-pulse bg-rule-soft" />
       ))
     }
   </div>
-  <p data-inat-status class="mt-2 text-xs text-neutral-500 dark:text-neutral-500"></p>
+  <p data-inat-status class="mt-2 text-xs text-ink-2"></p>
 </section>
 
 <script>

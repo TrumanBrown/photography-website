@@ -81,7 +81,7 @@ export function initINatObservations(root: HTMLElement): void {
         a.target = '_blank';
         a.rel = 'noopener noreferrer';
         a.className =
-          'group block overflow-hidden rounded-md bg-neutral-100 no-underline dark:bg-neutral-900';
+          'group block overflow-hidden bg-band no-underline';
         const place = coarsePlace(o.place_guess);
         a.title = name + (place ? `, ${place}` : '');
         a.setAttribute('role', 'listitem');

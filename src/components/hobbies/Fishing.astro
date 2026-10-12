@@ -71,20 +71,19 @@ const groups = [
 ---
 
 <section data-fishing aria-label="Fishing map" class="not-prose">
-  <div
-    class="mb-3 flex gap-1 rounded-lg bg-neutral-100 p-1 text-sm md:hidden dark:bg-neutral-800"
-    role="tablist"
-    aria-label="Choose a state"
-  >
-    <button type="button" data-fish-tab="mn" class="flex-1 rounded-md bg-white px-3 py-1.5 font-medium shadow-sm dark:bg-neutral-700">Minnesota</button>
-    <button type="button" data-fish-tab="wa" class="flex-1 rounded-md px-3 py-1.5 text-neutral-500">Washington</button>
+  <div class="mb-4 md:hidden">
+    <div class="utabs" role="radiogroup" aria-label="Choose a state" data-utabs>
+      <button type="button" role="radio" aria-checked="true" data-fish-tab="mn" data-value="mn">Minnesota</button>
+      <button type="button" role="radio" aria-checked="false" data-fish-tab="wa" data-value="wa">Washington</button>
+      <span class="utabs-bar" aria-hidden="true"></span>
+    </div>
   </div>
 
   <div class="grid gap-4 md:grid-cols-2 md:items-start">
     <div data-fish-map="mn" class="is-active space-y-3">
       <div>
-        <div class="mb-1 text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">Minnesota</div>
-        <div class="overflow-hidden rounded-xl border border-neutral-200 bg-[#e9eff0] dark:border-neutral-800">
+        <div class="u-label mb-1">Minnesota</div>
+        <div class="overflow-hidden border border-rule bg-[#e9eff0]">
           <canvas
             data-fish-canvas="mn"
             class="block w-full"
@@ -94,8 +93,8 @@ const groups = [
         </div>
       </div>
       <div>
-        <div class="mb-1 text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">Twin Cities metro</div>
-        <div class="overflow-hidden rounded-xl border border-neutral-200 bg-[#e9eff0] dark:border-neutral-800">
+        <div class="u-label mb-1">Twin Cities metro</div>
+        <div class="overflow-hidden border border-rule bg-[#e9eff0]">
           <canvas
             data-fish-canvas="metro"
             class="block w-full"
@@ -106,8 +105,8 @@ const groups = [
       </div>
     </div>
     <div data-fish-map="wa">
-      <div class="mb-1 text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">Washington</div>
-      <div class="overflow-hidden rounded-xl border border-neutral-200 bg-[#e9eff0] dark:border-neutral-800">
+      <div class="u-label mb-1">Washington</div>
+      <div class="overflow-hidden border border-rule bg-[#e9eff0]">
         <canvas
           data-fish-canvas="wa"
           class="block w-full"
@@ -117,46 +116,44 @@ const groups = [
       </div>
     </div>
   </div>
-  <p class="mt-2 text-xs text-neutral-500 dark:text-neutral-500">
+  <p class="mt-2 max-w-[72ch] text-xs leading-relaxed text-ink-2">
     Each fish marks a real lake or river. Tap one to see what swims there. The boxed Twin Cities area gets its
     own zoomed map, since that area is small and I spent most my time there.
   </p>
 
   <!-- species panel -->
-  <div data-fish-panel class="fish-panel fixed inset-0 z-50 items-center justify-center bg-black/50 p-4">
-    <div class="w-full max-w-md rounded-xl border border-neutral-200 bg-white p-5 shadow-xl dark:border-neutral-700 dark:bg-neutral-900">
-      <div class="flex items-start justify-between gap-4">
-        <div class="min-w-0">
-          <h3 data-fish-panel-title class="text-lg font-semibold leading-tight"></h3>
-          <p data-fish-panel-kind class="text-xs text-neutral-500 dark:text-neutral-400"></p>
-        </div>
-        <button
-          type="button"
-          data-fish-panel-close
-          class="shrink-0 rounded-lg border border-neutral-300 px-3 py-1.5 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
-        >Close</button>
+  <div data-fish-panel class="fish-panel fixed inset-0 z-50 items-center justify-center p-4">
+    <div class="fish-card w-full max-w-md p-5" role="dialog" aria-modal="true" aria-labelledby="fish-panel-title">
+      <div class="min-w-0">
+        <h3 id="fish-panel-title" data-fish-panel-title class="text-[17px] font-normal leading-tight"></h3>
+        <p data-fish-panel-kind class="u-label mt-1"></p>
       </div>
       <div data-fish-panel-list class="mt-4 max-h-[60vh] space-y-3 overflow-y-auto"></div>
+      <div class="mt-4 flex justify-end border-t border-rule pt-3">
+        <button type="button" data-fish-panel-close class="btn">Back to the map</button>
+      </div>
     </div>
   </div>
 
   <!-- personal catch gallery -->
   <section class="mt-12" aria-label="Fish I've caught">
-    <h2 class="text-lg font-medium">Fish I've caught</h2>
-    <p class="mt-1 max-w-prose text-sm text-neutral-600 dark:text-neutral-400">
+    <div class="shead">
+      <h2>Fish I've caught</h2>
+    </div>
+    <p class="shead-blurb">
       The real fish I've caught alongside their pixel counterparts. Tap a photo to take a closer look.
     </p>
     <div id="fishing-catches" class="mt-6 space-y-8">
       {
         groups.map((g) => (
           <div>
-            <div class="mb-3 text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+            <div class="u-label mb-3">
               {g.label}
             </div>
             <ul class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
               {g.cards.map((card) => (
-                <li class="overflow-hidden rounded-lg border border-neutral-200 dark:border-neutral-800">
-                  <div class="flex items-center justify-center bg-sky-50 py-2 dark:bg-neutral-800/60">
+                <li class="overflow-hidden border border-rule">
+                  <div class="flex items-center justify-center border-b border-rule bg-band py-2">
                     <canvas
                       data-fish-sprite={card.fishId}
                       width="84"
@@ -178,12 +175,12 @@ const groups = [
                       src={card.thumb}
                       alt={`${card.name} caught at ${card.where}`}
                       loading="lazy"
-                      class="block aspect-[4/3] w-full bg-neutral-100 object-cover transition-opacity duration-300 group-hover:opacity-90 dark:bg-neutral-900"
+                      class="block aspect-[4/3] w-full bg-band object-cover transition-opacity duration-300 group-hover:opacity-90"
                     />
                   </a>
                   <div class="p-2">
-                    <div class="text-xs font-medium leading-tight">{card.name}</div>
-                    <div class="text-[11px] text-neutral-500 dark:text-neutral-400">{card.where}</div>
+                    <div class="text-xs leading-tight text-ink">{card.name}</div>
+                    <div class="mt-0.5 text-[11px] text-ink-2">{card.where}</div>
                   </div>
                 </li>
               ))}
@@ -199,6 +196,12 @@ const groups = [
 <style>
   .fish-panel {
     display: none;
+    background: color-mix(in srgb, var(--paper) 72%, transparent);
+  }
+  .fish-card {
+    border: 1px solid var(--ink);
+    background: var(--paper);
+    color: var(--ink);
   }
   .fish-panel.is-open {
     display: flex;
@@ -215,6 +218,9 @@ const groups = [
 
 <script>
   import { initFishing } from '@/lib/hobbies/fishing';
+  import { initAllUnderlineTabs } from '@/lib/motion';
+
+  initAllUnderlineTabs();
 
   const root = document.querySelector<HTMLElement>('[data-fishing]');
   if (root) initFishing(root);

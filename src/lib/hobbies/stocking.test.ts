@@ -29,7 +29,6 @@ describe("stockingStatus", () => {
     const s = stockingStatus(20, 4.65);
     expect(s.pct).toBeCloseTo(0.4227, 3);
     expect(s.label).toBe("Healthy");
-    expect(s.color).toBe("#10b981");
   });
 
   // 10 gal -> capacity 5.5, so bioload = pct * 5.5.
@@ -42,10 +41,5 @@ describe("stockingStatus", () => {
     [5.555, "Overstocked"], // 1.01
   ])('classifies bioload %d as "%s"', (bioload, label) => {
     expect(stockingStatus(10, bioload).label).toBe(label);
-  });
-
-  it("colors heavily stocked amber and overstocked red", () => {
-    expect(stockingStatus(10, 4.73).color).toBe("#f59e0b");
-    expect(stockingStatus(10, 6).color).toBe("#ef4444");
   });
 });

@@ -23,6 +23,7 @@ import {
   type HerpCategory,
 } from "./herping-species";
 import photoData from "./herping-photos.json";
+import { rollTo, setHair } from "@/lib/motion";
 
 /** Optional real photos per species id (CC-licensed). See herping-photos.json. */
 const PHOTOS = (photoData.species ?? {}) as Record<
@@ -264,7 +265,8 @@ export function initHerping(root: HTMLElement): void {
   const factEl = root.querySelector<HTMLElement>("[data-hp-fact]");
   const badgeEl = root.querySelector<HTMLElement>("[data-hp-badge]");
   const closeBtn = root.querySelector<HTMLButtonElement>("[data-hp-close]");
-  const progressEl = root.querySelector<HTMLElement>("[data-hp-progress]");
+  const countEl = root.querySelector<HTMLElement>("[data-hp-count]");
+  const lastEl = root.querySelector<HTMLElement>("[data-hp-last]");
   const barEl = root.querySelector<HTMLElement>("[data-hp-bar]");
   const resetBtn = root.querySelector<HTMLButtonElement>("[data-hp-reset]");
   const photoEl = root.querySelector<HTMLImageElement>("[data-hp-photo]");
@@ -279,7 +281,7 @@ export function initHerping(root: HTMLElement): void {
     !factEl ||
     !badgeEl ||
     !closeBtn ||
-    !progressEl ||
+    !countEl ||
     !barEl
   ) {
     return;
@@ -744,6 +746,7 @@ export function initHerping(root: HTMLElement): void {
       saveDiscovered(discovered);
       updateJournal();
     }
+    showLastFind(sp);
     // drift the found animal off after a moment so it doesn't linger forever
     setTimeout(() => {
       a.y = H + 100;
@@ -752,8 +755,8 @@ export function initHerping(root: HTMLElement): void {
   }
 
   function paintRevealSprite(sp: HerpSpecies): void {
-    if (photoEl) photoEl.classList.add("hp-hidden");
-    revealCanvas!.classList.remove("hp-hidden");
+    if (photoEl) photoEl.classList.add("is-hidden");
+    revealCanvas!.classList.remove("is-hidden");
     const size = 120;
     revealCanvas!.width = size * dpr;
     revealCanvas!.height = size * dpr;
@@ -828,21 +831,21 @@ export function initHerping(root: HTMLElement): void {
     const photo = sp.photo ?? override?.photo;
     const credit = sp.photoCredit ?? override?.credit ?? "";
     if (photo && photoEl) {
-      photoEl.classList.remove("hp-hidden");
-      revealCanvas!.classList.add("hp-hidden");
+      photoEl.classList.remove("is-hidden");
+      revealCanvas!.classList.add("is-hidden");
       photoEl.onerror = () => {
         paintRevealSprite(sp);
-        if (creditEl) creditEl.classList.add("hp-hidden");
+        if (creditEl) creditEl.classList.add("is-hidden");
       };
       photoEl.alt = sp.common;
       photoEl.src = photo;
       if (creditEl) {
         creditEl.textContent = credit;
-        creditEl.classList.toggle("hp-hidden", !credit);
+        creditEl.classList.toggle("is-hidden", !credit);
       }
     } else {
       paintRevealSprite(sp);
-      if (creditEl) creditEl.classList.add("hp-hidden");
+      if (creditEl) creditEl.classList.add("is-hidden");
     }
 
     nameEl!.textContent = sp.common;
@@ -851,16 +854,39 @@ export function initHerping(root: HTMLElement): void {
     badgeEl!.textContent = sp.nonNative
       ? "Non-native"
       : isNew
-        ? "New find!"
+        ? "New to your journal"
         : "Found again";
-    badgeEl!.classList.toggle("hp-badge-new", isNew && !sp.nonNative);
-    badgeEl!.classList.toggle("hp-badge-warn", !!sp.nonNative);
-    card!.classList.add("hp-open");
+    badgeEl!.classList.toggle("is-warn", !!sp.nonNative);
+    openCard();
+  }
+
+  // The card is a modal: focus moves to its button, Escape or the scrim
+  // closes it, and focus goes back where it was.
+  let returnFocus: HTMLElement | null = null;
+  function openCard(): void {
+    if (!card!.classList.contains("is-open")) {
+      returnFocus =
+        document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : null;
+    }
+    card!.classList.add("is-open");
+    closeBtn!.focus({ preventScroll: true });
+  }
+  function closeCard(): void {
+    if (!card!.classList.contains("is-open")) return;
+    card!.classList.remove("is-open");
+    returnFocus?.focus({ preventScroll: true });
+    returnFocus = null;
+  }
+
+  function showLastFind(sp: HerpSpecies): void {
+    if (lastEl) lastEl.textContent = `Last find: ${sp.common}`;
   }
 
   function updateJournal(): void {
-    progressEl!.textContent = `${discovered.size} / ${total} species`;
-    barEl!.style.width = `${(discovered.size / total) * 100}%`;
+    rollTo(countEl!, discovered.size);
+    setHair(barEl!, discovered.size / total);
   }
 
   /** Topmost tappable (at least partly lit) animal under a point. */
@@ -881,14 +907,19 @@ export function initHerping(root: HTMLElement): void {
   }
 
   // -------------------------------------------------------------- wiring
-  function pointToCanvas(e: PointerEvent): { x: number; y: number } {
+  function pointToCanvas(e: MouseEvent): { x: number; y: number } {
     const rect2 = canvas!.getBoundingClientRect();
     return { x: e.clientX - rect2.left, y: e.clientY - rect2.top };
   }
 
   canvas.addEventListener("pointerdown", (e: PointerEvent) => {
+    beamTargetX = pointToCanvas(e).x;
+  });
+  // Stop and ID on click, not pointerdown. The card opens over the road, so a
+  // tap's click would land on its scrim and close it again, and the mousedown
+  // that follows a pointerdown would pull focus off the card's button.
+  canvas.addEventListener("click", (e: MouseEvent) => {
     const p = pointToCanvas(e);
-    beamTargetX = p.x;
     const a = hitTest(p.x, p.y);
     if (a) reveal(a);
   });
@@ -901,9 +932,19 @@ export function initHerping(root: HTMLElement): void {
     }
   });
 
-  closeBtn.addEventListener("click", () => card.classList.remove("hp-open"));
+  closeBtn.addEventListener("click", closeCard);
   card.addEventListener("click", (e) => {
-    if (e.target === card) card.classList.remove("hp-open");
+    if (e.target === card) closeCard();
+  });
+  card.addEventListener("keydown", (e) => {
+    // One control in the card, so Tab stays on it.
+    if (e.key === "Tab") {
+      e.preventDefault();
+      closeBtn.focus();
+    }
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeCard();
   });
   resetBtn?.addEventListener("click", () => {
     sceneSalt++;
@@ -934,6 +975,11 @@ export function initHerping(root: HTMLElement): void {
   // --------------------------------------------------------------- init
   fit();
   updateJournal();
+  // The journal saves in the order things were found, so its last entry is
+  // the most recent new find.
+  const lastId = [...discovered].pop();
+  const lastSpecies = SPECIES.find((s) => s.id === lastId);
+  if (lastSpecies) showLastFind(lastSpecies);
   render();
   start();
   preloadPhotos();

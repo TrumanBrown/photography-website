@@ -16,78 +16,21 @@
  * The bioload meter is a *playful approximation* of real stocking math (waste
  * scales with adult size; planted tanks buy a little headroom) — NOT advice.
  *
- * Mounted by src/components/hobbies/AquariumTank.astro. The loop pauses when
- * offscreen or the tab is hidden, and honors prefers-reduced-motion.
+ * Mounted by src/components/hobbies/AquariumTank.astro, which renders the
+ * species picker from SPECIES at build time; this engine binds to its
+ * [data-aquarium-add] buttons. The loop pauses when offscreen or the tab is
+ * hidden, and honors prefers-reduced-motion.
  *
- * Tuning lives in three places: SPECIES (roster + balance), the constants
- * below (PIX / capacity / starter), and the draw* functions (look).
+ * Tuning lives in three places: SPECIES in ./aquarium-species (roster +
+ * balance), the constants below (PIX / capacity / starter), and the draw*
+ * functions (look).
  */
 
+import { rollTo, setHair } from '@/lib/motion';
+import { SPECIES, type Shape, type Species, type Zone } from './aquarium-species';
 import { stockingStatus } from './stocking';
 
-export type Zone = 'top' | 'mid' | 'bottom';
-export type Shape = 'fish' | 'tall' | 'long' | 'gourami' | 'betta' | 'angelfish' | 'shrimp' | 'snail';
-
-export interface Species {
-  id: string;
-  name: string;
-  emoji: string;
-  /** Approx adult length in inches — drives on-screen size and bioload. */
-  adultInches: number;
-  /** Relative bioload (waste) contributed per individual. */
-  bioload: number;
-  /** Suggested minimum tank in gallons; a gentle warning shows if exceeded. */
-  minGallons: number;
-  zone: Zone;
-  shape: Shape;
-  /** Primary body color. */
-  color: string;
-  /** Secondary color for fins / stripe / detail. */
-  accent: string;
-}
-
-/** Curated common planted-tank species, spanning a wide bioload range. */
-export const SPECIES: Species[] = [
-  // --- bottom: inverts + catfish + loaches ---
-  { id: 'cherry-shrimp', name: 'Cherry shrimp', emoji: '🦐', adultInches: 1.2, bioload: 0.05, minGallons: 5, zone: 'bottom', shape: 'shrimp', color: '#e23b3b', accent: '#ff8a8a' },
-  { id: 'amano-shrimp', name: 'Amano shrimp', emoji: '🦐', adultInches: 2.0, bioload: 0.12, minGallons: 10, zone: 'bottom', shape: 'shrimp', color: '#9aa888', accent: '#d8cba2' },
-  { id: 'ghost-shrimp', name: 'Ghost shrimp', emoji: '🦐', adultInches: 1.5, bioload: 0.08, minGallons: 5, zone: 'bottom', shape: 'shrimp', color: '#cfd6dd', accent: '#9aa6b0' },
-  { id: 'nerite-snail', name: 'Nerite snail', emoji: '🐌', adultInches: 1.0, bioload: 0.1, minGallons: 5, zone: 'bottom', shape: 'snail', color: '#b9904f', accent: '#42301a' },
-  { id: 'mystery-snail', name: 'Mystery snail', emoji: '🐌', adultInches: 2.0, bioload: 0.35, minGallons: 10, zone: 'bottom', shape: 'snail', color: '#e7b84a', accent: '#7a531b' },
-  { id: 'pygmy-cory', name: 'Pygmy cory', emoji: '🐟', adultInches: 1.3, bioload: 0.35, minGallons: 10, zone: 'bottom', shape: 'fish', color: '#9aa7b0', accent: '#39454e' },
-  { id: 'bronze-cory', name: 'Bronze cory', emoji: '🐟', adultInches: 2.5, bioload: 0.7, minGallons: 15, zone: 'bottom', shape: 'long', color: '#9c8961', accent: '#d9c79a' },
-  { id: 'panda-cory', name: 'Panda cory', emoji: '🐟', adultInches: 2.0, bioload: 0.55, minGallons: 15, zone: 'bottom', shape: 'fish', color: '#e9e9e9', accent: '#222222' },
-  { id: 'kuhli-loach', name: 'Kuhli loach', emoji: '🐟', adultInches: 3.5, bioload: 0.6, minGallons: 15, zone: 'bottom', shape: 'long', color: '#d99a3a', accent: '#3a2412' },
-  { id: 'otocinclus', name: 'Otocinclus', emoji: '🐟', adultInches: 1.6, bioload: 0.3, minGallons: 10, zone: 'bottom', shape: 'long', color: '#b6a079', accent: '#46371f' },
-  { id: 'bristlenose-pleco', name: 'Bristlenose pleco', emoji: '🐟', adultInches: 4.5, bioload: 3.2, minGallons: 25, zone: 'bottom', shape: 'long', color: '#4a4036', accent: '#211c16' },
-  // --- mid: tetras, rasboras, danios, livebearers, barbs ---
-  { id: 'ember-tetra', name: 'Ember tetra', emoji: '🐟', adultInches: 1.0, bioload: 0.25, minGallons: 10, zone: 'mid', shape: 'fish', color: '#e8631f', accent: '#ffb06b' },
-  { id: 'neon-tetra', name: 'Neon tetra', emoji: '🐟', adultInches: 1.5, bioload: 0.3, minGallons: 10, zone: 'mid', shape: 'fish', color: '#2bb6d6', accent: '#e3354e' },
-  { id: 'cardinal-tetra', name: 'Cardinal tetra', emoji: '🐟', adultInches: 2.0, bioload: 0.35, minGallons: 15, zone: 'mid', shape: 'fish', color: '#1fa7c2', accent: '#d52240' },
-  { id: 'rummynose-tetra', name: 'Rummynose tetra', emoji: '🐟', adultInches: 2.0, bioload: 0.4, minGallons: 20, zone: 'mid', shape: 'fish', color: '#d7dbde', accent: '#c0392b' },
-  { id: 'black-neon-tetra', name: 'Black neon tetra', emoji: '🐟', adultInches: 1.6, bioload: 0.3, minGallons: 15, zone: 'mid', shape: 'fish', color: '#b9c2c7', accent: '#1c2a33' },
-  { id: 'harlequin-rasbora', name: 'Harlequin rasbora', emoji: '🐟', adultInches: 1.8, bioload: 0.35, minGallons: 10, zone: 'mid', shape: 'fish', color: '#df8b3c', accent: '#2a1a12' },
-  { id: 'chili-rasbora', name: 'Chili rasbora', emoji: '🐟', adultInches: 0.7, bioload: 0.12, minGallons: 5, zone: 'mid', shape: 'fish', color: '#d22b2b', accent: '#7a1414' },
-  { id: 'celestial-pearl-danio', name: 'Celestial pearl danio', emoji: '🐟', adultInches: 1.0, bioload: 0.2, minGallons: 10, zone: 'mid', shape: 'fish', color: '#3a4a5a', accent: '#e9c46a' },
-  { id: 'zebra-danio', name: 'Zebra danio', emoji: '🐟', adultInches: 2.0, bioload: 0.4, minGallons: 10, zone: 'mid', shape: 'fish', color: '#c7cdd2', accent: '#2b4a7a' },
-  { id: 'guppy', name: 'Guppy', emoji: '🐠', adultInches: 2.0, bioload: 0.5, minGallons: 10, zone: 'mid', shape: 'fish', color: '#34b3a0', accent: '#f4a93b' },
-  { id: 'endlers', name: "Endler's livebearer", emoji: '🐠', adultInches: 1.0, bioload: 0.3, minGallons: 5, zone: 'mid', shape: 'fish', color: '#2fa86f', accent: '#f0a93b' },
-  { id: 'platy', name: 'Platy', emoji: '🐠', adultInches: 2.5, bioload: 0.6, minGallons: 10, zone: 'mid', shape: 'fish', color: '#f0682e', accent: '#ffd17a' },
-  { id: 'molly', name: 'Molly', emoji: '🐠', adultInches: 4.0, bioload: 1.0, minGallons: 20, zone: 'mid', shape: 'fish', color: '#2a2a2a', accent: '#cfcfcf' },
-  { id: 'cherry-barb', name: 'Cherry barb', emoji: '🐟', adultInches: 2.0, bioload: 0.45, minGallons: 15, zone: 'mid', shape: 'fish', color: '#c0392b', accent: '#e8a0a0' },
-  { id: 'tiger-barb', name: 'Tiger barb', emoji: '🐟', adultInches: 2.8, bioload: 0.8, minGallons: 20, zone: 'mid', shape: 'fish', color: '#e0a73b', accent: '#2a2a2a' },
-  // --- mid: gouramis + cichlids (tall, laterally compressed) ---
-  { id: 'honey-gourami', name: 'Honey gourami', emoji: '🐟', adultInches: 2.0, bioload: 0.9, minGallons: 10, zone: 'mid', shape: 'gourami', color: '#f0b53d', accent: '#c97b1c' },
-  { id: 'dwarf-gourami', name: 'Dwarf gourami', emoji: '🐠', adultInches: 3.5, bioload: 1.2, minGallons: 15, zone: 'mid', shape: 'gourami', color: '#2f6fb0', accent: '#d8542e' },
-  { id: 'pearl-gourami', name: 'Pearl gourami', emoji: '🐠', adultInches: 4.5, bioload: 1.6, minGallons: 30, zone: 'mid', shape: 'gourami', color: '#cdb89a', accent: '#8a5a3a' },
-  { id: 'betta', name: 'Betta', emoji: '🐟', adultInches: 2.7, bioload: 1.0, minGallons: 5, zone: 'mid', shape: 'betta', color: '#3550d6', accent: '#d63b86' },
-  { id: 'german-blue-ram', name: 'German blue ram', emoji: '🐠', adultInches: 2.5, bioload: 1.3, minGallons: 20, zone: 'mid', shape: 'tall', color: '#3a7bd5', accent: '#f2c84b' },
-  { id: 'bolivian-ram', name: 'Bolivian ram', emoji: '🐠', adultInches: 3.0, bioload: 1.4, minGallons: 20, zone: 'mid', shape: 'tall', color: '#c2a25a', accent: '#d9572b' },
-  { id: 'angelfish', name: 'Angelfish', emoji: '🐠', adultInches: 6.0, bioload: 3.0, minGallons: 29, zone: 'mid', shape: 'angelfish', color: '#dcdcdc', accent: '#2b2b2b' },
-  // --- top swimmers ---
-  { id: 'hatchetfish', name: 'Hatchetfish', emoji: '🐟', adultInches: 1.8, bioload: 0.35, minGallons: 15, zone: 'top', shape: 'fish', color: '#cfd3c8', accent: '#7a6a3a' },
-  { id: 'killifish', name: 'Killifish', emoji: '🐠', adultInches: 2.2, bioload: 0.5, minGallons: 10, zone: 'top', shape: 'fish', color: '#d98a3d', accent: '#3a7bd5' },
-];
+export { SPECIES, type Shape, type Species, type Zone };
 
 /** CSS pixels per drawn "pixel" block — the chunkiness of the 8-bit look. */
 const PIX = 4;
@@ -418,19 +361,20 @@ function makeRng(seed: number): () => number {
 
 export function initAquarium(root: HTMLElement): void {
   const canvas = root.querySelector<HTMLCanvasElement>('[data-aquarium-canvas]');
-  const palette = root.querySelector<HTMLElement>('[data-aquarium-palette]');
+  const addButtons = root.querySelectorAll<HTMLButtonElement>('[data-aquarium-add]');
   const gallonsInput = root.querySelector<HTMLInputElement>('[data-aquarium-gallons]');
   const gallonsLabel = root.querySelector<HTMLElement>('[data-aquarium-gallons-label]');
   const bioloadBar = root.querySelector<HTMLElement>('[data-aquarium-bioload-bar]');
-  const bioloadLabel = root.querySelector<HTMLElement>('[data-aquarium-bioload-label]');
+  const bioloadPct = root.querySelector<HTMLElement>('[data-aquarium-bioload-pct]');
+  const bioloadWord = root.querySelector<HTMLElement>('[data-aquarium-bioload-word]');
   const stockList = root.querySelector<HTMLElement>('[data-aquarium-stock]');
   const emptyNote = root.querySelector<HTMLElement>('[data-aquarium-empty]');
   const warnNote = root.querySelector<HTMLElement>('[data-aquarium-warn]');
   const resetBtn = root.querySelector<HTMLButtonElement>('[data-aquarium-reset]');
 
   if (
-    !canvas || !palette || !gallonsInput || !gallonsLabel || !bioloadBar ||
-    !bioloadLabel || !stockList || !emptyNote || !warnNote || !resetBtn
+    !canvas || !gallonsInput || !gallonsLabel || !bioloadBar || !bioloadPct ||
+    !bioloadWord || !stockList || !emptyNote || !warnNote || !resetBtn
   ) {
     return;
   }
@@ -661,10 +605,19 @@ export function initAquarium(root: HTMLElement): void {
 
   // -------------------------------------------------------------- UI sync
   function syncUI(): void {
-    const { pct, label, color } = stockingStatus(gallons, totalBioload());
-    bioloadBar!.style.width = `${Math.max(0, Math.min(1, pct)) * 100}%`;
-    bioloadBar!.style.backgroundColor = color;
-    bioloadLabel!.textContent = fish.length === 0 ? '0%' : `${Math.round(pct * 100)}% · ${label}`;
+    const { pct, label } = stockingStatus(gallons, totalBioload());
+    const empty = fish.length === 0;
+    rollTo(bioloadPct!, empty ? 0 : Math.round(pct * 100));
+    bioloadWord!.textContent = empty ? 'Empty' : label;
+    setHair(bioloadBar!, empty ? 0 : Math.min(1, pct));
+
+    // The rows are rebuilt on every change, which would drop keyboard focus
+    // from a remove button. Remember it so it can land on the same species, or
+    // the row that takes its place.
+    const active = document.activeElement;
+    const hadFocus = active instanceof HTMLElement && stockList!.contains(active);
+    const focusId = hadFocus ? active.dataset.species : undefined;
+    const focusRow = hadFocus ? Array.from(stockList!.children).findIndex((li) => li.contains(active)) : -1;
 
     const c = counts();
     stockList!.replaceChildren();
@@ -674,22 +627,32 @@ export function initAquarium(root: HTMLElement): void {
       if (!n) continue;
       if (s.minGallons > gallons && !tooSmall) tooSmall = `${s.name} likes ${s.minGallons}+ gallons`;
       const li = document.createElement('li');
-      li.className = 'flex items-center justify-between gap-2';
-      const leftLabel = document.createElement('span');
-      leftLabel.textContent = `${s.emoji} ${s.name} ×${n}`;
+      const name = document.createElement('span');
+      name.className = 'aq-stock-name';
+      name.textContent = s.name;
+      const count = document.createElement('span');
+      count.className = 'aq-stock-n';
+      count.textContent = `×${n}`;
       const remove = document.createElement('button');
       remove.type = 'button';
-      remove.className =
-        'rounded px-1.5 leading-none text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 dark:hover:bg-neutral-800 dark:hover:text-neutral-200';
+      remove.className = 'aq-stock-rm';
+      remove.dataset.species = s.id;
       remove.setAttribute('aria-label', `Remove one ${s.name}`);
       remove.textContent = '−';
       remove.addEventListener('click', () => removeOne(s.id));
-      li.append(leftLabel, remove);
+      li.append(name, count, remove);
       stockList!.append(li);
     }
-    emptyNote!.hidden = fish.length > 0;
-    warnNote!.textContent = tooSmall ? `⚠ ${tooSmall}` : '';
+    emptyNote!.hidden = !empty;
+    warnNote!.textContent = tooSmall ?? '';
     warnNote!.hidden = !tooSmall;
+
+    if (hadFocus) {
+      const removes = Array.from(stockList!.querySelectorAll<HTMLButtonElement>('.aq-stock-rm'));
+      const next =
+        removes.find((b) => b.dataset.species === focusId) ?? removes[Math.min(focusRow, removes.length - 1)];
+      (next ?? resetBtn!).focus();
+    }
   }
 
   // -------------------------------------------------------------- drawing
@@ -852,20 +815,9 @@ export function initAquarium(root: HTMLElement): void {
   }
 
   // ------------------------------------------------------------- wiring
-  for (const s of SPECIES) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className =
-      'inline-flex items-center gap-1.5 rounded-full border border-neutral-300 px-3 py-1.5 text-sm hover:border-sky-400 hover:bg-sky-50 dark:border-neutral-700 dark:hover:border-sky-500 dark:hover:bg-sky-950';
-    btn.setAttribute('aria-label', `Add ${s.name}`);
-    const em = document.createElement('span');
-    em.setAttribute('aria-hidden', 'true');
-    em.textContent = s.emoji;
-    const nm = document.createElement('span');
-    nm.textContent = s.name;
-    btn.append(em, nm);
-    btn.addEventListener('click', () => addFish(s));
-    palette.append(btn);
+  for (const btn of addButtons) {
+    const s = SPECIES.find((x) => x.id === btn.dataset.aquariumAdd);
+    if (s) btn.addEventListener('click', () => addFish(s));
   }
 
   let rebuildT = 0;

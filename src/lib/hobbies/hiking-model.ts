@@ -75,7 +75,7 @@ export const BIOMES: readonly Biome[] = [
     id: "cascades",
     label: "Cascades",
     postcardLabel: "THE CASCADES",
-    defaultTitle: "A Trail Above the Trees",
+    defaultTitle: "A trail above the trees",
     profile: {
       peak: [0.68, 0.96],
       saddle: [0.24, 0.56],
@@ -97,7 +97,7 @@ export const BIOMES: readonly Biome[] = [
     id: "fjord",
     label: "Fjord country",
     postcardLabel: "FJORD COUNTRY",
-    defaultTitle: "Long Light over the Fjord",
+    defaultTitle: "Long light over the fjord",
     profile: {
       peak: [0.78, 0.96],
       saddle: [0.12, 0.38],
@@ -119,7 +119,7 @@ export const BIOMES: readonly Biome[] = [
     id: "karst",
     label: "Karst forest",
     postcardLabel: "KARST FOREST",
-    defaultTitle: "Through the Stone Forest",
+    defaultTitle: "Through the stone forest",
     profile: {
       peak: [0.74, 0.94],
       saddle: [0.1, 0.32],
@@ -141,7 +141,7 @@ export const BIOMES: readonly Biome[] = [
     id: "himalaya",
     label: "High Himalaya",
     postcardLabel: "HIGH HIMALAYA",
-    defaultTitle: "Where the Air Turns Thin",
+    defaultTitle: "Where the air turns thin",
     profile: {
       peak: [0.82, 0.96],
       saddle: [0.34, 0.66],

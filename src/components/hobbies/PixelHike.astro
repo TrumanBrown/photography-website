@@ -2,305 +2,189 @@
 /**
  * Interactive hike builder and postcard studio. The controls are static and
  * accessible; @/lib/hobbies/hiking owns the scene state and canvas behavior.
+ *
+ * Dressed like the rest of the archive with the shared .u-label, .btn,
+ * .linkbtn, .draw and .utabs parts from src/styles/global.css. Every colour
+ * is an ink/paper token, so dark mode needs nothing extra here.
  */
-import {
-  Binoculars,
-  CloudFog,
-  CloudSun,
-  Download,
-  Droplets,
-  Flower2,
-  Footprints,
-  Image,
-  Mountain,
-  Play,
-  RotateCcw,
-  Route,
-  Share2,
-  Shuffle,
-  Snowflake,
-  Sparkles,
-  SunMedium,
-  Tent,
-  Trees,
-  TrendingUp,
-  Undo2,
-  WavesHorizontal,
-  X,
-} from "@lucide/astro";
+const biomes = [
+  { id: "cascades", label: "Cascades" },
+  { id: "fjord", label: "Fjords" },
+  { id: "karst", label: "Karst" },
+  { id: "himalaya", label: "Himalaya" },
+];
+
+const lights = [
+  { id: "dawn", label: "Dawn", title: "Dawn" },
+  { id: "day", label: "Day", title: "Daylight" },
+  { id: "golden", label: "Gold", title: "Golden hour" },
+];
+
+const moments = [
+  { id: "forest", label: "Forest", title: "Add a dense forest corridor" },
+  { id: "meadow", label: "Meadow", title: "Add an open meadow bench" },
+  { id: "lake", label: "Alpine lake", title: "Carve an alpine lake basin" },
+  { id: "waterfall", label: "Waterfall", title: "Cut a waterfall crossing" },
+  {
+    id: "wildflowers",
+    label: "Wildflowers",
+    title: "Add a flowering trail bench",
+  },
+  { id: "snowfield", label: "Snowfield", title: "Add a high snow crossing" },
+  { id: "camp", label: "Camp", title: "Flatten a sheltered campsite" },
+  { id: "lookout", label: "Lookout", title: "Raise a lookout spur" },
+];
 
 const hikerColors = ["#d5523f", "#e1a13a", "#247d72", "#355f9b", "#7d4f8f"];
 ---
 
 <section data-pixel-hike aria-label="Build an imaginary hike" class="not-prose">
-  <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
-    <div>
-      <p
-        class="text-xs font-semibold uppercase text-emerald-800 dark:text-emerald-300"
-      >
-        Trail studio
-      </p>
-      <h2 class="mt-1 text-xl font-semibold">Build a hike worth remembering</h2>
-    </div>
-    <p data-hike-save-state class="text-xs text-neutral-500" aria-live="polite">
-      Saved on this device
-    </p>
-  </div>
-
-  <div
-    class="relative isolate overflow-hidden rounded-lg border border-neutral-300 bg-neutral-100 shadow-[0_18px_60px_-35px_rgba(15,23,42,0.65)] dark:border-neutral-700 dark:bg-neutral-900"
-  >
+  <div class="hike-stage">
     <canvas
       data-hike-canvas
-      class="block h-[clamp(18rem,58vw,38rem)] w-full select-none"
-      style="touch-action:none"
+      class="hike-canvas"
       tabindex="0"
       role="img"
       aria-label="An editable mountain route with draggable ridgeline and trail moments"
     ></canvas>
-    <div
-      class="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-3 p-3 sm:p-4"
-    >
-      <span
-        data-hike-region-label
-        class="rounded bg-black/55 px-2.5 py-1 text-[11px] font-semibold uppercase text-white backdrop-blur-sm"
-        >Cascades</span
-      >
-      <span
-        data-hike-stage-stat
-        class="rounded bg-white/85 px-2.5 py-1 text-xs font-medium text-neutral-800 shadow-sm backdrop-blur-sm dark:bg-neutral-950/75 dark:text-neutral-100"
+    <div class="hike-overlay">
+      <span data-hike-region-label class="hike-chip u-label">Cascades</span>
+      <span data-hike-stage-stat class="hike-chip hike-stat"
         >9.2 mi · 3 mountains · 3,050 ft</span
       >
     </div>
   </div>
+  <p data-hike-save-state class="hike-save" aria-live="polite">
+    Saved on this device
+  </p>
 
-  <div class="mt-5 grid gap-7 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-9">
-    <div class="min-w-0">
-      <fieldset>
-        <legend
-          class="text-xs font-semibold uppercase text-neutral-500 dark:text-neutral-400"
+  <div class="hike-studio">
+    <div class="hike-controls">
+      <div class="hike-field">
+        <span class="u-label hike-label" id="hike-landscape-label"
+          >Landscape</span
         >
-          Landscape
-        </legend>
-        <div class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <button
-            type="button"
-            data-hike-biome="cascades"
-            aria-pressed="true"
-            class="hike-choice"
-          >
-            <Mountain size={17} aria-hidden="true" />
-            <span>Cascades</span>
-          </button>
-          <button
-            type="button"
-            data-hike-biome="fjord"
-            aria-pressed="false"
-            class="hike-choice"
-          >
-            <WavesHorizontal size={17} aria-hidden="true" />
-            <span>Fjords</span>
-          </button>
-          <button
-            type="button"
-            data-hike-biome="karst"
-            aria-pressed="false"
-            class="hike-choice"
-          >
-            <Trees size={17} aria-hidden="true" />
-            <span>Karst</span>
-          </button>
-          <button
-            type="button"
-            data-hike-biome="himalaya"
-            aria-pressed="false"
-            class="hike-choice"
-          >
-            <TrendingUp size={17} aria-hidden="true" />
-            <span>Himalaya</span>
-          </button>
-        </div>
-      </fieldset>
-
-      <fieldset class="mt-6">
-        <legend
-          class="text-xs font-semibold uppercase text-neutral-500 dark:text-neutral-400"
+        <div
+          class="utabs"
+          role="radiogroup"
+          aria-labelledby="hike-landscape-label"
+          data-utabs
         >
-          Trail moments
-        </legend>
-        <div class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <button
-            type="button"
-            data-hike-feature="forest"
-            class="hike-choice"
-            title="Add a dense forest corridor"
-          >
-            <Trees size={17} aria-hidden="true" />
-            <span>Forest</span>
-          </button>
-          <button
-            type="button"
-            data-hike-feature="meadow"
-            class="hike-choice"
-            title="Add an open meadow bench"
-          >
-            <Sparkles size={17} aria-hidden="true" />
-            <span>Meadow</span>
-          </button>
-          <button
-            type="button"
-            data-hike-feature="lake"
-            class="hike-choice"
-            title="Carve an alpine lake basin"
-          >
-            <WavesHorizontal size={17} aria-hidden="true" />
-            <span>Alpine lake</span>
-          </button>
-          <button
-            type="button"
-            data-hike-feature="waterfall"
-            class="hike-choice"
-            title="Cut a waterfall crossing"
-          >
-            <Droplets size={17} aria-hidden="true" />
-            <span>Waterfall</span>
-          </button>
-          <button
-            type="button"
-            data-hike-feature="wildflowers"
-            class="hike-choice"
-            title="Add a flowering trail bench"
-          >
-            <Flower2 size={17} aria-hidden="true" />
-            <span>Wildflowers</span>
-          </button>
-          <button
-            type="button"
-            data-hike-feature="snowfield"
-            class="hike-choice"
-            title="Add a high snow crossing"
-          >
-            <Snowflake size={17} aria-hidden="true" />
-            <span>Snowfield</span>
-          </button>
-          <button
-            type="button"
-            data-hike-feature="camp"
-            class="hike-choice"
-            title="Flatten a sheltered campsite"
-          >
-            <Tent size={17} aria-hidden="true" />
-            <span>Camp</span>
-          </button>
-          <button
-            type="button"
-            data-hike-feature="lookout"
-            class="hike-choice"
-            title="Raise a lookout spur"
-          >
-            <Binoculars size={17} aria-hidden="true" />
-            <span>Lookout</span>
-          </button>
-        </div>
-      </fieldset>
-
-      <div
-        class="mt-5 border-y border-neutral-200 py-4 dark:border-neutral-800"
-      >
-        <div class="flex items-center justify-between gap-3">
-          <h3 class="text-sm font-medium">On your trail</h3>
-          <span
-            data-hike-feature-count
-            class="text-xs tabular-nums text-neutral-500">3 / 10 moments</span
-          >
-        </div>
-        <div data-hike-itinerary class="mt-2 flex min-h-8 flex-wrap gap-2">
+          {
+            biomes.map((biome) => (
+              <button
+                type="button"
+                role="radio"
+                aria-checked={biome.id === "cascades" ? "true" : "false"}
+                data-hike-biome={biome.id}
+              >
+                {biome.label}
+              </button>
+            ))
+          }
         </div>
       </div>
 
-      <details class="mt-4 group">
-        <summary
-          class="cursor-pointer text-sm font-medium marker:text-neutral-400"
-        >
-          <span data-hike-terrain-summary>Fine-tune 13 terrain points</span>
-        </summary>
+      <div class="hike-field">
+        <span class="u-label hike-label" id="hike-light-label">Light</span>
         <div
-          data-hike-terrain-controls
-          class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6"
+          class="utabs"
+          role="radiogroup"
+          aria-labelledby="hike-light-label"
+          data-utabs
+        >
+          {
+            lights.map((light) => (
+              <button
+                type="button"
+                role="radio"
+                aria-checked={light.id === "golden" ? "true" : "false"}
+                data-hike-light={light.id}
+                title={light.title}
+              >
+                {light.label}
+              </button>
+            ))
+          }
+        </div>
+      </div>
+
+      <fieldset class="hike-field">
+        <legend class="u-label">Trail moments</legend>
+        <div class="hike-moments">
+          {
+            moments.map((moment) => (
+              <button
+                type="button"
+                class="btn hike-moment"
+                data-hike-feature={moment.id}
+                title={moment.title}
+              >
+                <span class="hike-plus" aria-hidden="true">
+                  +
+                </span>
+                <span>{moment.label}</span>
+              </button>
+            ))
+          }
+        </div>
+      </fieldset>
+
+      <div class="hike-trail">
+        <div class="hike-trail-head">
+          <p id="hike-trail-label" class="hike-trail-label">On your trail</p>
+          <span data-hike-feature-count class="hike-count">3 / 10 moments</span>
+        </div>
+        <div
+          data-hike-itinerary
+          class="hike-itinerary"
+          role="group"
+          aria-labelledby="hike-trail-label"
         >
         </div>
+      </div>
+
+      <details class="hike-fine">
+        <summary>
+          <span data-hike-terrain-summary>Fine-tune 13 terrain points</span>
+        </summary>
+        <div data-hike-terrain-controls class="hike-points"></div>
       </details>
     </div>
 
-    <aside
-      class="min-w-0 border-t border-neutral-200 pt-6 lg:border-l lg:border-t-0 lg:pl-7 lg:pt-0 dark:border-neutral-800"
-    >
-      <label class="block">
-        <span
-          class="text-xs font-semibold uppercase text-neutral-500 dark:text-neutral-400"
-          >Route name</span
-        >
+    <aside class="hike-route">
+      <label class="hike-block">
+        <span class="u-label hike-label">Route name</span>
         <input
           data-hike-name
           type="text"
           maxlength="48"
-          value="A Trail Above the Trees"
-          class="mt-2 w-full border-0 border-b border-neutral-300 bg-transparent px-0 pb-2 text-lg font-semibold outline-none focus:border-emerald-700 focus:ring-0 dark:border-neutral-700 dark:focus:border-emerald-400"
+          value="A trail above the trees"
+          autocomplete="off"
+          class="hike-name"
         />
       </label>
 
-      <dl
-        class="mt-5 grid grid-cols-3 divide-x divide-neutral-200 border-y border-neutral-200 py-3 dark:divide-neutral-800 dark:border-neutral-800"
-      >
-        <div class="pr-2">
-          <dt
-            class="flex items-center gap-1 text-[10px] uppercase text-neutral-500"
-          >
-            <Route size={12} aria-hidden="true" /> Miles
-          </dt>
-          <dd
-            data-hike-distance-stat
-            class="mt-1 text-sm font-semibold tabular-nums"
-          >
-            9.2
-          </dd>
+      <dl class="hike-stats">
+        <div>
+          <dt class="u-label">Miles</dt>
+          <dd data-hike-distance-stat>9.2</dd>
         </div>
-        <div class="px-2">
-          <dt
-            class="flex items-center gap-1 text-[10px] uppercase text-neutral-500"
-          >
-            <TrendingUp size={12} aria-hidden="true" /> Gain
-          </dt>
-          <dd
-            data-hike-gain-stat
-            class="mt-1 text-sm font-semibold tabular-nums"
-          >
-            3,050
-          </dd>
+        <div>
+          <dt class="u-label">Gain</dt>
+          <dd><span data-hike-gain-stat>3,050</span> ft</dd>
         </div>
-        <div class="pl-2">
-          <dt
-            class="flex items-center gap-1 text-[10px] uppercase text-neutral-500"
-          >
-            <Footprints size={12} aria-hidden="true" /> Feel
-          </dt>
-          <dd data-hike-effort-stat class="mt-1 truncate text-sm font-semibold">
-            Big day
-          </dd>
+        <div>
+          <dt class="u-label">Feel</dt>
+          <dd data-hike-effort-stat>Big day</dd>
         </div>
       </dl>
-      <p class="mt-2 text-[11px] text-neutral-500">
-        A playful estimate, not trail guidance.
-      </p>
+      <p class="hike-est">A playful estimate, not trail guidance.</p>
 
-      <label class="mt-5 block">
-        <span
-          class="flex items-center justify-between gap-3 text-sm font-medium"
-        >
-          Route length
-          <span data-hike-distance-label class="tabular-nums text-neutral-500"
-            >9.2 mi</span
-          >
+      <label class="hike-block hike-length">
+        <span class="hike-length-row">
+          <span>Route length</span>
+          <span data-hike-distance-label class="hike-length-value">9.2 mi</span>
         </span>
         <input
           data-hike-distance
@@ -309,13 +193,13 @@ const hikerColors = ["#d5523f", "#e1a13a", "#247d72", "#355f9b", "#7d4f8f"];
           max="18"
           step="0.1"
           value="9.2"
-          class="mt-2 w-full accent-emerald-700 dark:accent-emerald-400"
+          class="hike-range"
         />
       </label>
 
-      <div class="mt-5 grid grid-cols-2 gap-3">
-        <label class="block text-sm font-medium">
-          Season
+      <div class="hike-selects">
+        <label>
+          <span class="u-label">Season</span>
           <select data-hike-season class="hike-select">
             <option value="spring">Spring</option>
             <option value="summer" selected>Summer</option>
@@ -323,8 +207,8 @@ const hikerColors = ["#d5523f", "#e1a13a", "#247d72", "#355f9b", "#7d4f8f"];
             <option value="winter">Winter</option>
           </select>
         </label>
-        <label class="block text-sm font-medium">
-          Weather
+        <label>
+          <span class="u-label">Weather</span>
           <select data-hike-weather class="hike-select">
             <option value="clear">Clear</option>
             <option value="clouds" selected>Clouds</option>
@@ -333,47 +217,9 @@ const hikerColors = ["#d5523f", "#e1a13a", "#247d72", "#355f9b", "#7d4f8f"];
         </label>
       </div>
 
-      <fieldset class="mt-5">
-        <legend class="text-sm font-medium">Light</legend>
-        <div
-          class="mt-2 grid grid-cols-3 overflow-hidden rounded border border-neutral-300 dark:border-neutral-700"
-        >
-          <button
-            type="button"
-            data-hike-light="dawn"
-            aria-pressed="false"
-            class="hike-segment"
-            title="Dawn"
-          >
-            <CloudSun size={16} aria-hidden="true" />
-            <span>Dawn</span>
-          </button>
-          <button
-            type="button"
-            data-hike-light="day"
-            aria-pressed="false"
-            class="hike-segment"
-            title="Daylight"
-          >
-            <SunMedium size={16} aria-hidden="true" />
-            <span>Day</span>
-          </button>
-          <button
-            type="button"
-            data-hike-light="golden"
-            aria-pressed="true"
-            class="hike-segment"
-            title="Golden hour"
-          >
-            <CloudFog size={16} aria-hidden="true" />
-            <span>Gold</span>
-          </button>
-        </div>
-      </fieldset>
-
-      <fieldset class="mt-5">
-        <legend class="text-sm font-medium">Hiker jacket</legend>
-        <div class="mt-2 flex gap-2">
+      <fieldset class="hike-jacket">
+        <legend class="u-label">Hiker jacket</legend>
+        <div class="hike-swatches">
           {
             hikerColors.map((color, index) => (
               <button
@@ -383,9 +229,7 @@ const hikerColors = ["#d5523f", "#e1a13a", "#247d72", "#355f9b", "#7d4f8f"];
                 aria-pressed={index === 0 ? "true" : "false"}
                 class="hike-swatch"
                 style={`--hike-swatch:${color}`}
-              >
-                <span class="sr-only">Jacket color {index + 1}</span>
-              </button>
+              />
             ))
           }
         </div>
@@ -393,252 +237,427 @@ const hikerColors = ["#d5523f", "#e1a13a", "#247d72", "#355f9b", "#7d4f8f"];
     </aside>
   </div>
 
-  <div
-    class="mt-7 flex flex-col-reverse gap-3 border-t border-neutral-200 pt-5 sm:flex-row sm:items-center sm:justify-between dark:border-neutral-800"
-  >
-    <div class="flex items-center gap-1">
-      <button
-        type="button"
-        data-hike-undo
-        class="hike-tool"
-        aria-label="Undo"
-        title="Undo"
-        disabled
+  <div class="hike-acts">
+    <div class="hike-tools">
+      <button type="button" data-hike-undo class="linkbtn draw" disabled
+        ><span>Undo</span></button
       >
-        <Undo2 size={18} aria-hidden="true" />
-      </button>
       <button
         type="button"
         data-hike-shuffle
-        class="hike-tool"
-        aria-label="Make another trail"
-        title="Make another trail"
+        class="linkbtn draw"
+        title="Make another trail"><span>Shuffle</span></button
       >
-        <Shuffle size={18} aria-hidden="true" />
-      </button>
-      <button
-        type="button"
-        data-hike-reset
-        class="hike-tool"
-        aria-label="Reset trail"
-        title="Reset trail"
+      <button type="button" data-hike-reset class="linkbtn draw"
+        ><span>Start over</span></button
       >
-        <RotateCcw size={18} aria-hidden="true" />
-      </button>
     </div>
-    <div class="flex flex-col gap-2 sm:flex-row">
-      <button
-        type="button"
-        data-hike-walk
-        class="hike-action hike-action-secondary"
+    <div class="hike-go">
+      <button type="button" data-hike-walk class="btn"
+        ><span>Walk the trail</span></button
       >
-        <Play size={17} aria-hidden="true" />
-        <span>Walk the trail</span>
-      </button>
-      <button
-        type="button"
-        data-hike-develop
-        class="hike-action hike-action-primary"
+      <button type="button" data-hike-develop class="btn btn-ink"
+        >Develop postcard</button
       >
-        <Image size={17} aria-hidden="true" />
-        <span>Develop postcard</span>
-      </button>
     </div>
   </div>
 
-  <dialog data-hike-dialog class="hike-dialog">
-    <div
-      class="flex items-center justify-between gap-4 border-b border-neutral-200 px-4 py-3 sm:px-5 dark:border-neutral-800"
-    >
+  <dialog
+    data-hike-dialog
+    class="hike-dialog"
+    aria-labelledby="hike-dialog-label hike-dialog-title"
+  >
+    <div class="hike-dialog-head">
       <div>
-        <p
-          class="text-xs font-semibold uppercase text-emerald-800 dark:text-emerald-300"
+        <p id="hike-dialog-label" class="u-label">Your postcard</p>
+        <h2
+          id="hike-dialog-title"
+          data-hike-dialog-title
+          class="hike-dialog-title"
         >
-          Your postcard
-        </p>
-        <h2 data-hike-dialog-title class="mt-0.5 text-lg font-semibold">
-          A Trail Above the Trees
+          A trail above the trees
         </h2>
       </div>
-      <button
-        type="button"
-        data-hike-close
-        class="hike-tool"
-        aria-label="Close postcard"
-        title="Close postcard"
+      <button type="button" data-hike-close class="linkbtn draw"
+        ><span>Back to the trail</span></button
       >
-        <X size={19} aria-hidden="true" />
-      </button>
     </div>
-    <div class="bg-neutral-200 p-3 sm:p-5 dark:bg-neutral-950">
+    <div class="hike-well">
       <canvas
         data-hike-postcard
         width="2400"
         height="1600"
-        class="block aspect-[3/2] w-full bg-white shadow-xl"
+        class="hike-postcard"
         role="img"
         aria-label="Your generated hiking postcard"></canvas>
     </div>
-    <div
-      class="flex flex-col gap-3 border-t border-neutral-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5 dark:border-neutral-800"
-    >
-      <p
-        data-hike-export-status
-        class="text-xs text-neutral-500"
-        aria-live="polite"
-      >
-        Rendered on your device at 2400 × 1600.
+    <div class="hike-dialog-foot">
+      <p data-hike-export-status class="hike-export" aria-live="polite">
+        Rendered on your device at 2,400 × 1,600.
       </p>
-      <div class="flex flex-wrap gap-2">
-        <button
-          type="button"
-          data-hike-share
-          class="hike-action hike-action-secondary"
-          hidden
+      <div class="hike-dialog-acts">
+        <button type="button" data-hike-share class="btn" hidden>Share</button>
+        <button type="button" data-hike-download class="btn btn-ink"
+          >Download PNG</button
         >
-          <Share2 size={17} aria-hidden="true" />
-          <span>Share</span>
-        </button>
-        <button
-          type="button"
-          data-hike-download
-          class="hike-action hike-action-primary"
-        >
-          <Download size={17} aria-hidden="true" />
-          <span>Download PNG</span>
-        </button>
       </div>
     </div>
   </dialog>
 </section>
 
 <style>
-  .hike-choice {
+  /* Ink on paper like the rest of the archive: hairline rules, tracked caps
+     labels, square corners, no fills beyond --hover and --band. */
+
+  .hike-stage {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--rule);
+    background: var(--band);
+  }
+
+  .hike-canvas {
+    display: block;
+    width: 100%;
+    height: clamp(18rem, 58vw, 38rem);
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  .hike-canvas[data-moment="true"] {
+    cursor: grab;
+  }
+
+  .hike-canvas[data-dragging="moment"] {
+    cursor: grabbing;
+  }
+
+  .hike-canvas[data-dragging="terrain"] {
+    cursor: ns-resize;
+  }
+
+  /* The two labels that sit on the artwork. They stack on narrow screens
+     rather than squeezing the stat onto three lines. */
+  .hike-overlay {
+    position: absolute;
+    inset: 0 0 auto;
     display: flex;
-    min-height: 2.75rem;
-    align-items: center;
-    gap: 0.5rem;
-    border: 1px solid rgb(212 212 212);
-    border-radius: 0.375rem;
-    padding: 0.625rem 0.75rem;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 6px 12px;
+    padding: 12px;
+    pointer-events: none;
+  }
+
+  .hike-chip {
+    padding: 3px 8px;
+    background: color-mix(in srgb, var(--paper) 88%, transparent);
+    color: var(--ink);
+    line-height: 18px;
+    white-space: nowrap;
+  }
+
+  .hike-stat {
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .hike-save {
+    margin: 8px 0 0;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--ink-2);
+  }
+
+  .hike-studio {
+    display: grid;
+    gap: 28px;
+    margin-top: 22px;
+  }
+
+  .hike-controls,
+  .hike-route {
+    min-width: 0;
+  }
+
+  .hike-field {
+    min-inline-size: 0;
+    margin: 20px 0 0;
+  }
+
+  .hike-field:first-child {
+    margin-top: 0;
+  }
+
+  .hike-label {
+    display: block;
+    margin-bottom: 6px;
+  }
+
+  .hike-moments {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .hike-moment {
+    justify-content: flex-start;
+    padding-inline: 12px;
     text-align: left;
-    font-size: 0.8125rem;
-    font-weight: 500;
-    color: rgb(64 64 64);
-    transition:
-      border-color 150ms ease,
-      background-color 150ms ease,
-      color 150ms ease;
   }
 
-  .hike-choice:hover {
-    border-color: rgb(63 111 82);
-    background: rgb(240 253 244);
-    color: rgb(20 83 45);
+  .hike-plus {
+    color: var(--ink-2);
   }
 
-  .hike-choice[aria-pressed="true"] {
-    border-color: rgb(22 101 52);
-    background: rgb(220 252 231);
-    color: rgb(20 83 45);
-    box-shadow: inset 0 0 0 1px rgb(22 101 52 / 0.12);
+  .hike-trail {
+    margin-top: 22px;
+    padding: 10px 0 12px;
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .hike-trail-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .hike-trail-label {
+    margin: 0;
+    font-size: 13px;
+  }
+
+  .hike-count {
+    font-size: 12px;
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .hike-itinerary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    min-height: 32px;
+    margin-top: 8px;
+  }
+
+  .hike-fine {
+    margin-top: 8px;
+  }
+
+  .hike-fine > summary {
+    width: fit-content;
+    padding: 6px 0;
+    font-size: 13px;
+    line-height: 20px;
+    color: var(--ink);
+    cursor: pointer;
+  }
+
+  .hike-fine > summary::marker {
+    color: var(--ink-2);
+  }
+
+  .hike-fine > summary::-webkit-details-marker {
+    color: var(--ink-2);
+  }
+
+  .hike-points {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px 16px;
+    margin-top: 4px;
+  }
+
+  .hike-route {
+    padding-top: 22px;
+    border-top: 1px solid var(--rule);
+  }
+
+  .hike-block {
+    display: block;
+  }
+
+  .hike-name {
+    display: block;
+    width: 100%;
+    padding: 4px 0 8px;
+    border: 0;
+    border-bottom: 1px solid var(--rule);
+    border-radius: 0;
+    background: transparent;
+    color: var(--ink);
+    font: inherit;
+    font-size: 19px;
+    font-weight: 300;
+  }
+
+  /* The ink rule replaces the global focus ring here. */
+  .hike-name:focus-visible {
+    border-bottom-color: var(--ink);
+    box-shadow: none;
+  }
+
+  .hike-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin: 16px 0 0;
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .hike-stats > div {
+    min-width: 0;
+    padding: 8px 0;
+  }
+
+  .hike-stats dd {
+    margin: 2px 0 0;
+    overflow: hidden;
+    font-size: 15px;
+    font-variant-numeric: tabular-nums;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .hike-est {
+    margin: 6px 0 0;
+    font-size: 11px;
+    color: var(--ink-2);
+  }
+
+  .hike-length {
+    margin-top: 18px;
+  }
+
+  .hike-length-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 13px;
+  }
+
+  .hike-length-value {
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .hike-range {
+    display: block;
+    width: 100%;
+    height: 32px;
+    margin: 0;
+    accent-color: var(--ink);
+  }
+
+  .hike-selects {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .hike-selects label {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
   }
 
   .hike-select {
-    margin-top: 0.5rem;
     width: 100%;
-    border: 1px solid rgb(212 212 212);
-    border-radius: 0.375rem;
-    background: transparent;
-    padding: 0.5rem 0.625rem;
-    font-size: 0.8125rem;
+    padding: 6px 8px;
+    border: 1px solid var(--rule);
+    border-radius: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font: inherit;
+    font-size: 13px;
   }
 
-  .hike-segment {
+  /* Windows draws the open list in system colours unless told otherwise. */
+  .hike-select option {
+    background: var(--paper);
+    color: var(--ink);
+  }
+
+  .hike-jacket {
+    min-inline-size: 0;
+    margin: 18px 0 0;
+  }
+
+  .hike-swatches {
     display: flex;
-    min-width: 0;
-    align-items: center;
-    justify-content: center;
-    gap: 0.25rem;
-    border-right: 1px solid rgb(212 212 212);
-    padding: 0.5rem 0.25rem;
-    font-size: 0.6875rem;
-    color: rgb(82 82 82);
-  }
-
-  .hike-segment:last-child {
-    border-right: 0;
-  }
-
-  .hike-segment[aria-pressed="true"] {
-    background: rgb(23 78 55);
-    color: white;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 8px;
   }
 
   .hike-swatch {
-    width: 1.75rem;
-    height: 1.75rem;
-    border: 3px solid white;
-    border-radius: 50%;
+    --hike-ring: var(--rule);
+    position: relative;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 2px solid var(--paper);
+    border-radius: 0;
     background: var(--hike-swatch);
-    box-shadow: 0 0 0 1px rgb(163 163 163);
+    box-shadow: 0 0 0 1px var(--hike-ring);
+    cursor: pointer;
+  }
+
+  /* A 32px target around the 22px swatch. */
+  .hike-swatch::before {
+    content: "";
+    position: absolute;
+    inset: -7px;
   }
 
   .hike-swatch[aria-pressed="true"] {
+    --hike-ring: var(--ink);
+  }
+
+  /* The swatch's own ring outranks the global one, so restate it. */
+  .hike-swatch:focus-visible {
     box-shadow:
-      0 0 0 2px rgb(23 78 55),
-      0 0 0 4px white;
+      0 0 0 1px var(--hike-ring),
+      0 0 0 3px var(--paper),
+      0 0 0 5px var(--ink);
   }
 
-  .hike-tool {
-    display: inline-flex;
-    width: 2.5rem;
-    height: 2.5rem;
+  .hike-acts {
+    display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    justify-content: center;
-    border-radius: 0.375rem;
-    color: rgb(82 82 82);
+    justify-content: space-between;
+    gap: 12px 24px;
+    margin-top: 28px;
+    padding-top: 14px;
+    border-top: 1px solid var(--rule);
   }
 
-  .hike-tool:hover:not(:disabled) {
-    background: rgb(245 245 245);
-    color: rgb(23 23 23);
+  .hike-tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 18px;
   }
 
-  .hike-tool:disabled {
-    cursor: not-allowed;
-    opacity: 0.35;
+  .hike-go {
+    display: flex;
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 10px;
   }
 
-  .hike-action {
-    display: inline-flex;
-    min-height: 2.625rem;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    border-radius: 0.375rem;
-    padding: 0.625rem 1rem;
-    font-size: 0.8125rem;
-    font-weight: 600;
-  }
-
-  .hike-action-primary {
-    background: rgb(23 78 55);
-    color: white;
-  }
-
-  .hike-action-primary:hover {
-    background: rgb(20 65 46);
-  }
-
-  .hike-action-secondary {
-    border: 1px solid rgb(212 212 212);
-    color: rgb(64 64 64);
-  }
-
-  .hike-action-secondary:hover {
-    border-color: rgb(115 115 115);
-    background: rgb(250 250 250);
+  .hike-go > .btn {
+    flex: 1 1 auto;
   }
 
   .hike-dialog {
@@ -646,118 +665,182 @@ const hikerColors = ["#d5523f", "#e1a13a", "#247d72", "#355f9b", "#7d4f8f"];
     max-height: calc(100dvh - 1.5rem);
     margin: auto;
     overflow: auto;
-    border: 1px solid rgb(212 212 212);
-    border-radius: 0.5rem;
-    background: white;
     padding: 0;
-    color: rgb(23 23 23);
-    box-shadow: 0 24px 80px rgb(0 0 0 / 0.35);
+    border: 1px solid var(--rule);
+    border-radius: 0;
+    background: var(--paper);
+    color: var(--ink);
   }
 
   .hike-dialog::backdrop {
-    background: rgb(10 16 14 / 0.78);
-    backdrop-filter: blur(5px);
+    background: color-mix(in srgb, #000 55%, transparent);
   }
 
-  [data-hike-canvas][data-moment="true"] {
-    cursor: grab;
+  .hike-dialog-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--rule);
   }
 
-  [data-hike-canvas][data-dragging="moment"] {
-    cursor: grabbing;
+  .hike-dialog-title {
+    margin: 2px 0 0;
+    font-size: 19px;
+    font-weight: 300;
+    line-height: 1.3;
   }
 
-  [data-hike-canvas][data-dragging="terrain"] {
-    cursor: ns-resize;
+  .hike-well {
+    padding: 12px;
+    background: var(--band);
+  }
+
+  .hike-postcard {
+    display: block;
+    width: 100%;
+    aspect-ratio: 3 / 2;
+  }
+
+  .hike-dialog-foot {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px 16px;
+    border-top: 1px solid var(--rule);
+  }
+
+  .hike-export {
+    margin: 0;
+    font-size: 12px;
+    color: var(--ink-2);
+  }
+
+  .hike-dialog-acts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
   }
 
   [data-pixel-hike] [hidden] {
     display: none !important;
   }
 
-  :global(.dark) .hike-choice {
-    border-color: rgb(64 64 64);
-    color: rgb(212 212 212);
+  /* Four landscapes need a little less air on the narrowest phones. */
+  @media (max-width: 359px) {
+    .hike-field .utabs {
+      gap: 16px;
+    }
   }
 
-  :global(.dark) .hike-choice:hover {
-    border-color: rgb(74 222 128);
-    background: rgb(20 83 45 / 0.24);
-    color: rgb(187 247 208);
+  @media (min-width: 640px) {
+    .hike-overlay {
+      padding: 16px;
+    }
+
+    .hike-moments,
+    .hike-points {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .hike-go > .btn {
+      flex: none;
+    }
+
+    .hike-dialog-head,
+    .hike-dialog-foot {
+      padding: 14px 20px;
+    }
+
+    .hike-dialog-foot {
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .hike-well {
+      padding: 20px;
+    }
   }
 
-  :global(.dark) .hike-choice[aria-pressed="true"] {
-    border-color: rgb(74 222 128);
-    background: rgb(20 83 45 / 0.42);
-    color: rgb(220 252 231);
+  @media (min-width: 1024px) {
+    .hike-studio {
+      grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+      gap: 34px;
+    }
+
+    .hike-route {
+      padding: 0 0 0 26px;
+      border-top: 0;
+      border-left: 1px solid var(--rule);
+    }
+
+    .hike-points {
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+    }
+  }
+</style>
+
+<style is:global>
+  /* The itinerary tags and terrain sliders are built at runtime by
+     src/lib/hobbies/hiking.ts, so Astro's scoped attribute never reaches
+     them. Global, but only inside the hike builder. */
+  [data-pixel-hike] .hike-tag {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px;
+    border: 1px solid var(--rule);
+    border-radius: 0;
+    background: transparent;
+    color: var(--ink);
+    font: inherit;
+    font-size: 12px;
+    line-height: 18px;
+    cursor: pointer;
+    transition: border-color 150ms var(--ease);
   }
 
-  :global(.dark) .hike-select {
-    border-color: rgb(64 64 64);
-    color: rgb(229 229 229);
+  /* The tag stays small; its target grows to 32px. */
+  [data-pixel-hike] .hike-tag::before {
+    content: "";
+    position: absolute;
+    inset: -4px 0;
   }
 
-  :global(.dark) .hike-select option {
-    background: rgb(23 23 23);
+  [data-pixel-hike] .hike-tag:hover {
+    border-color: var(--ink);
   }
 
-  :global(.dark) .hike-segment {
-    border-color: rgb(64 64 64);
-    color: rgb(212 212 212);
+  [data-pixel-hike] .hike-tag-x {
+    color: var(--ink-2);
   }
 
-  :global(.dark) .hike-segment[aria-pressed="true"] {
-    background: rgb(187 247 208);
-    color: rgb(20 83 45);
+  [data-pixel-hike] .hike-empty {
+    font-size: 12px;
+    color: var(--ink-2);
   }
 
-  :global(.dark) .hike-swatch {
-    border-color: rgb(23 23 23);
+  [data-pixel-hike] .hike-point {
+    display: grid;
+    min-width: 0;
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--ink-2);
   }
 
-  :global(.dark) .hike-swatch[aria-pressed="true"] {
-    box-shadow:
-      0 0 0 2px rgb(134 239 172),
-      0 0 0 4px rgb(10 10 10);
-  }
-
-  :global(.dark) .hike-tool {
-    color: rgb(212 212 212);
-  }
-
-  :global(.dark) .hike-tool:hover:not(:disabled) {
-    background: rgb(38 38 38);
-    color: white;
-  }
-
-  :global(.dark) .hike-action-primary {
-    background: rgb(187 247 208);
-    color: rgb(20 83 45);
-  }
-
-  :global(.dark) .hike-action-primary:hover {
-    background: rgb(134 239 172);
-  }
-
-  :global(.dark) .hike-action-secondary {
-    border-color: rgb(64 64 64);
-    color: rgb(229 229 229);
-  }
-
-  :global(.dark) .hike-action-secondary:hover {
-    border-color: rgb(115 115 115);
-    background: rgb(38 38 38);
-  }
-
-  :global(.dark) .hike-dialog {
-    border-color: rgb(64 64 64);
-    background: rgb(23 23 23);
-    color: rgb(245 245 245);
+  /* 32px tall for touch; the track stays centred in the box. */
+  [data-pixel-hike] .hike-point > input {
+    width: 100%;
+    height: 32px;
+    margin: 0;
+    accent-color: var(--ink);
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .hike-choice,
-    .hike-action {
+    [data-pixel-hike] .hike-tag {
       transition: none;
     }
   }
@@ -765,8 +848,12 @@ const hikerColors = ["#d5523f", "#e1a13a", "#247d72", "#355f9b", "#7d4f8f"];
 
 <script>
   import { initHikeBuilder } from "@/lib/hobbies/hiking";
+  import { initAllUnderlineTabs } from "@/lib/motion";
 
   document
     .querySelectorAll<HTMLElement>("[data-pixel-hike]")
-    .forEach((root) => initHikeBuilder(root));
+    .forEach((root) => {
+      initAllUnderlineTabs(root);
+      initHikeBuilder(root);
+    });
 </script>

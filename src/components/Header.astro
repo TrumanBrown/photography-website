@@ -9,8 +9,8 @@ interface Props {
 
 const { section = "photography" } = Astro.props;
 const linkBase = "no-underline hover:underline";
-const activeClass = "font-medium text-neutral-900 dark:text-neutral-100";
-const idleClass = "text-neutral-500 dark:text-neutral-400";
+const activeClass = "text-ink";
+const idleClass = "text-ink-2 hover:text-ink";
 ---
 
 <header class="border-b" style="border-color: var(--rule)">
@@ -60,7 +60,7 @@ const idleClass = "text-neutral-500 dark:text-neutral-400";
           section === "photography" ? activeClass : idleClass,
         ]}
         aria-current={section === "photography" ? "page" : undefined}
-        >Photography</a
+        >Photographs</a
       >
       {
         siteConfig.sections.hobbies && (
@@ -72,7 +72,7 @@ const idleClass = "text-neutral-500 dark:text-neutral-400";
             ]}
             aria-current={section === "hobbies" ? "page" : undefined}
           >
-            Hobbies
+            Things to try
           </a>
         )
       }

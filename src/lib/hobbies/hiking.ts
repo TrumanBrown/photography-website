@@ -234,13 +234,13 @@ export function initHikeBuilder(root: HTMLElement): void {
       const details = trailFeatureById(feature.type);
       const button = document.createElement("button");
       button.type = "button";
-      button.className =
-        "inline-flex items-center gap-1.5 rounded-full border border-neutral-300 bg-white px-2.5 py-1 text-xs text-neutral-700 hover:border-red-300 hover:text-red-700 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:border-red-700 dark:hover:text-red-300";
+      button.className = "hike-tag";
       button.setAttribute("aria-label", `Remove ${details.label}`);
       button.title = `${details.effect}. Click to remove.`;
       const label = document.createElement("span");
       label.textContent = details.label;
       const remove = document.createElement("span");
+      remove.className = "hike-tag-x";
       remove.setAttribute("aria-hidden", "true");
       remove.textContent = "×";
       button.append(label, remove);
@@ -253,7 +253,7 @@ export function initHikeBuilder(root: HTMLElement): void {
     }
     if (sorted.length === 0) {
       const empty = document.createElement("span");
-      empty.className = "py-1 text-xs text-neutral-500";
+      empty.className = "hike-empty";
       empty.textContent = "An open trail";
       itinerary.append(empty);
     }
@@ -291,8 +291,7 @@ export function initHikeBuilder(root: HTMLElement): void {
       terrainControls.replaceChildren();
       state.terrain.forEach((height, index) => {
         const label = document.createElement("label");
-        label.className =
-          "grid gap-1 text-[11px] text-neutral-500 dark:text-neutral-400";
+        label.className = "hike-point";
         const name = document.createElement("span");
         name.textContent = terrainControlLabel(index);
         const input = document.createElement("input");
@@ -300,7 +299,6 @@ export function initHikeBuilder(root: HTMLElement): void {
         input.min = "8";
         input.max = "96";
         input.value = String(Math.round(height * 100));
-        input.className = "w-full accent-emerald-700 dark:accent-emerald-400";
         input.dataset.hikeTerrain = String(index);
         input.setAttribute("aria-label", name.textContent);
         label.append(name, input);
@@ -321,15 +319,17 @@ export function initHikeBuilder(root: HTMLElement): void {
   }
 
   function syncUI(): void {
+    // Landscape and light are radio groups (.utabs); the bar follows
+    // aria-checked, so setting it here also moves the underline.
     biomeButtons.forEach((button) => {
       button.setAttribute(
-        "aria-pressed",
+        "aria-checked",
         String(button.dataset.hikeBiome === state.biome),
       );
     });
     lightButtons.forEach((button) => {
       button.setAttribute(
-        "aria-pressed",
+        "aria-checked",
         String(button.dataset.hikeLight === state.light),
       );
     });
@@ -467,7 +467,9 @@ export function initHikeBuilder(root: HTMLElement): void {
       const next = cloneHike(state);
       next.biome = id;
       next.terrain = generateTerrainProfile(id, next.distance, next.seed);
-      if (next.routeName === oldBiome.defaultTitle)
+      // Saved trails may still hold the old Title Case default, so compare
+      // without case to keep renaming those along with the biome.
+      if (next.routeName.toLowerCase() === oldBiome.defaultTitle.toLowerCase())
         next.routeName = newBiome.defaultTitle;
       applyState(next);
     });
@@ -545,7 +547,7 @@ export function initHikeBuilder(root: HTMLElement): void {
 
   nameInput.addEventListener("focus", beginContinuous);
   nameInput.addEventListener("input", () => {
-    state.routeName = nameInput.value.slice(0, 48) || "My Imagined Trail";
+    state.routeName = nameInput.value.slice(0, 48) || "My imagined trail";
     dialogTitle.textContent = state.routeName;
     scheduleSave();
   });
@@ -700,12 +702,12 @@ export function initHikeBuilder(root: HTMLElement): void {
   });
 
   function createPostcard(): void {
-    exportStatus.textContent = "Developing at 2400 × 1600...";
+    exportStatus.textContent = "Developing at 2,400 × 1,600...";
     dialogTitle.textContent = state.routeName;
     if (!dialog.open) dialog.showModal();
     requestAnimationFrame(() => {
       renderHikePostcard(postcard, state);
-      exportStatus.textContent = "Rendered on your device at 2400 × 1600.";
+      exportStatus.textContent = "Rendered on your device at 2,400 × 1,600.";
     });
   }
 
@@ -765,7 +767,7 @@ export function initHikeBuilder(root: HTMLElement): void {
       );
       await navigator.share({
         title: state.routeName,
-        text: "An imagined hike from the Trail Studio",
+        text: "An imagined hike I built, as a postcard",
         files: [file],
       });
       exportStatus.textContent = "Postcard shared.";

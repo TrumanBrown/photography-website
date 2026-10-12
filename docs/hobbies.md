@@ -4,27 +4,29 @@ A second, **optional** top-level section beside Photography. Photography is unch
 
 This doc covers how the section is wired, how to add a hobby, the conventions every interactive follows, and the aquarium island as the original reference implementation. It is written so a future session (or you) can pick the work back up cold.
 
-> Status: shell + six islands + one daily puzzle are live: **Aquarium Keeping**, **Tide Pooling**, **Fishing**, **Birding** (selfie to bird), **Herping** (night-drive road cruising), **Hiking** (trail builder + postcard studio), and **Day list** (a daily where-and-when puzzle, mounted by its `dayList` content rather than an `interactive` island). More are planned (travel map and repo explorer) and meant to be built **one at a time**.
+> Status: shell + six islands + one daily puzzle are live: **Aquarium keeping**, **Tide pooling**, **Fishing**, **Birding** (selfie to bird), **Herping** (night-drive road cruising), **Hiking** (trail builder + postcard studio), and **Day list** (a daily where-and-when puzzle, mounted by its `dayList` content rather than an `interactive` island). More are planned (travel map and repo explorer) and meant to be built **one at a time**.
 
 ---
 
 ## At a glance
 
-| Thing                   | Where                                                                                                                          |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| On/off toggle           | [site.config.ts](../site.config.ts) → `sections.hobbies` (boolean)                                                             |
-| Content (one per hobby) | `src/content/hobbies/<slug>.json`, a **committed** content collection                                                          |
-| Schema                  | [src/content/config.ts](../src/content/config.ts) → `hobbies` collection                                                       |
-| Landing grid            | [src/pages/hobbies/index.astro](../src/pages/hobbies/index.astro)                                                              |
-| Per-hobby page          | [src/pages/hobbies/[slug].astro](../src/pages/hobbies/%5Bslug%5D.astro)                                                        |
-| Card                    | [src/components/HobbyCard.astro](../src/components/HobbyCard.astro)                                                            |
-| Slug + sort helpers     | [src/lib/hobbies.ts](../src/lib/hobbies.ts)                                                                                    |
-| Nav + sidebar behavior  | [src/components/Header.astro](../src/components/Header.astro), [src/layouts/BaseLayout.astro](../src/layouts/BaseLayout.astro) |
+| Thing                   | Where                                                                                                                                        |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| On/off toggle           | [site.config.ts](../site.config.ts) → `sections.hobbies` (boolean)                                                                           |
+| Content (one per hobby) | `src/content/hobbies/<slug>.json`, a **committed** content collection                                                                        |
+| Schema                  | [src/content/config.ts](../src/content/config.ts) → `hobbies` collection                                                                     |
+| Landing grid            | [src/pages/hobbies/index.astro](../src/pages/hobbies/index.astro)                                                                            |
+| Per-hobby page          | [src/pages/hobbies/[slug].astro](../src/pages/hobbies/%5Bslug%5D.astro)                                                                      |
+| Card                    | [src/components/HobbyCard.astro](../src/components/HobbyCard.astro)                                                                          |
+| Slug + sort helpers     | [src/lib/hobbies.ts](../src/lib/hobbies.ts)                                                                                                  |
+| Facts line under titles | [src/lib/hobby-facts.ts](../src/lib/hobby-facts.ts)                                                                                          |
+| Shared UI parts         | [src/styles/global.css](../src/styles/global.css), [src/lib/motion.ts](../src/lib/motion.ts), see [Shared parts](#shared-parts-and-the-look) |
+| Nav + sidebar behavior  | [src/components/Header.astro](../src/components/Header.astro), [src/layouts/BaseLayout.astro](../src/layouts/BaseLayout.astro)               |
 
 Key differences from the Photography (`sessions`) collection:
 
 - Hobbies JSON is **hand-authored and committed** to git. Sessions are gitignored and generated by `scripts/prebuild.mjs` from Blob Storage. Core hobby content and interactive engines need no prebuild or Azure service; optional photo galleries and optimized catch-photo variants use the documented `hobby-media` Blob pipeline.
-- A hobby page does **not** show the sessions sidebar. `BaseLayout` takes a `section` prop (`'photography'` default | `'hobbies'`); when `'hobbies'` it hides the `ArchiveRail` session list and its mobile drawer, and the Header highlights the Hobbies nav item.
+- A hobby page does **not** show the sessions sidebar. `BaseLayout` takes a `section` prop (`'photography'` default | `'hobbies'`); when `'hobbies'` it hides the `ArchiveRail` session list and its mobile drawer, and the Header highlights its "Things to try" nav item (the same two labels as the archive rail: "Photographs" and "Things to try").
 
 The `sections.hobbies` flag only controls the **header nav link** (discoverability). The pages still build when it's off, turning it off "ships dark," it doesn't remove the routes.
 
@@ -76,6 +78,32 @@ Markup lives in a `.astro` component under `src/components/hobbies/`; non-trivia
 
 ---
 
+## Shared parts and the look
+
+The hobby pages are dressed like the photography archive: ink on paper, hairline rules, tracked caps labels, square corners, one typeface. Every color comes from the tokens in [src/styles/global.css](../src/styles/global.css) (`--paper`, `--band`, `--ink`, `--ink-2`, `--ink-3`, `--rule`, `--rule-soft`, `--hover`), which switch for dark mode on their own. The same tokens are Tailwind colors (`text-ink-2`, `border-rule`, `bg-band`, `hover:bg-hover`...) in [tailwind.config.mjs](../tailwind.config.mjs). The Astro Tailwind integration reads that config once, so restart `npm run dev` after editing it.
+
+Things the hobby UI deliberately doesn't use, because they read as generated: Tailwind's default hues (sky, emerald, lime, amber...), pills and `rounded-*` chrome, drop shadows and blur, an icon on every control, emoji, a badge above a headline, and Title Case. The toys' own pixel art and photographs are the only color.
+
+A few interaction details come from React component libraries (Cult UI, Watermelon UI, Skiper UI). The site is Astro with no React, so each one is rewritten in plain CSS or TypeScript, keeping the mechanic and dropping the library's look:
+
+| Part                                                                                                                 | Where                                              | From                                                          | Used for                                                                 |
+| -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `.draw` drawn underline: a 1px rule draws in from the left on hover or focus                                         | `global.css`                                       | Skiper UI `skiper40` (CssLink)                                | Back links, "View all on iNaturalist", card titles, every `.linkbtn`     |
+| `rollTo(node, value)`: a count eases to its new value; a single step rolls the digit                                 | `motion.ts`                                        | Cult UI `rolling-number`                                      | Field journal counts, aquarium bioload %                                 |
+| `.hair` + `setHair()`: progress as a 1px ink rule moved with `transform`, beside a label that changes with it        | `global.css`, `motion.ts`                          | Watermelon UI `labeled-progress-indicator`                    | Field journal, aquarium bioload                                          |
+| `.utabs` + `initUnderlineTabs()`: one bar slides to the chosen option; arrow, Home and End keys move between options | `global.css`, `motion.ts`                          | Cult UI `direction-aware-tabs`, Watermelon UI `discrete-tabs` | Hiking landscape and light, herp map filter, fishing's mobile map switch |
+| Hover frames on a still                                                                                              | [PlateArt.astro](../src/components/PlateArt.astro) | Cult UI `hover-video-player`                                  | The stipple plates' hover "boil"                                         |
+
+`.utabs` groups pick one value, so they're `role="radiogroup"` with `<button role="radio" aria-checked>` options. The bar follows `aria-checked` however it changes, so an engine that restores state (undo, start over) only has to set the attribute. Everything above settles instantly under `prefers-reduced-motion`.
+
+The other shared pieces:
+
+- `.u-label` (the archive's tracked caps label), `.btn` / `.btn-ink` (square, a rule for a border; ink for the one primary action), `.linkbtn` (a text button, 32px tall), and `.shead` / `.shead-blurb` / `.shead-link` (a light section heading with a plain count or link on the right). All in `global.css`.
+- [FieldJournal.astro](../src/components/hobbies/FieldJournal.astro) and [SpecimenCard.astro](../src/components/hobbies/SpecimenCard.astro): the journal row and the reveal card shared by tide pooling and herping, driven through `data-tp-*` / `data-hp-*` hooks. The card is a modal: focus moves to its button, Escape or the scrim closes it, and focus returns.
+- The page header in [src/pages/hobbies/[slug].astro](../src/pages/hobbies/%5Bslug%5D.astro): "← Things to try", a light sentence-case title, one tracked line of facts from [hobby-facts.ts](../src/lib/hobby-facts.ts) (counts are computed from each toy's data, so adding a species updates it), then the intro.
+
+---
+
 ## Reference implementation: the hiking trail studio
 
 A creative **build → walk → develop** experience. Visitors shape a route, add up to ten trail moments, change landscape, season, weather, light, distance, and jacket color, then watch a tiny hiker traverse it. Route length controls the scale of the world: a 3-mile outing is an intimate single mountain, while an 18-mile route expands into a seven-mountain chain with smaller, denser scenery. The same scene recipe develops into a more detailed `2400 × 1600` postcard for local download or the device share sheet.
@@ -88,7 +116,7 @@ A creative **build → walk → develop** experience. Visitors shape a route, ad
 - [src/lib/hobbies/hiking.ts](../src/lib/hobbies/hiking.ts), DOM binding, undo, pointer/keyboard editing, local persistence, animation lifecycle, responsive sizing, and PNG/share export.
 - [src/lib/hobbies/hiking-model.test.ts](../src/lib/hobbies/hiking-model.test.ts), pure model coverage including variable mountain counts, silhouette variety, moment deformation and placement, distance resizing, legacy migration, and untrusted saved-state normalization.
 
-The control icons use the small build-time `@lucide/astro` package. The model, animation, both canvas renderers, persistence, and export path remain dependency-free and make no runtime network requests.
+The controls are plain HTML (radio groups, buttons, a text field, native selects and ranges) styled with the shared parts above; there are no icons and no UI dependencies. The model, animation, both canvas renderers, persistence, and export path remain dependency-free and make no runtime network requests.
 
 **Variety is deterministic, not a fixed template.** Mileage determines a target of one through seven mountains. Seeded generation then chooses nonuniform horizontal spacing, height progression, and a form for every mountain: narrow spire, one-sided shoulder, broad massif, or near-plateau, weighted differently for Cascades, fjord, karst, and Himalayan terrain. Shuffle changes both seed and mileage; changing landscape regenerates the current route using that biome's morphology. Dragging the length slider resamples the authored profile into a larger or smaller world instead of merely changing a number.
 
@@ -98,7 +126,7 @@ The control icons use the small build-time `@lucide/astro` package. The model, a
 
 **Persistence and sharing.** The normalized scene is saved under `trail-studio-v2` in `localStorage`; a saved v1 five-point route is migrated and blended into the new distance-scaled profile on first load. Export uses `canvas.toBlob()` rather than a base64 data URL. Browsers supporting file sharing receive a real PNG through `navigator.share`; other browsers always retain the download action.
 
-**Input parity.** Every generated terrain point has a visible canvas handle and a dynamically generated native range control under “Fine-tune the terrain”; points support direct pointer dragging and arrow-key editing on the focusable canvas. Moment buttons are immediate commands; moment handles support pointer dragging and itinerary chips support removal. Every visual option is a real button, select, or slider, and reduced-motion users get an immediate completed walk instead of a forced animation.
+**Input parity.** Every generated terrain point has a visible canvas handle and a dynamically generated native range control under “Fine-tune the terrain”; points support direct pointer dragging and arrow-key editing on the focusable canvas. Moment buttons are immediate commands; moment handles support pointer dragging and the itinerary tags remove a moment. Landscape and light are underline-tab radio groups (arrow keys move between them), and every other option is a real button, select, or slider. Reduced-motion users get an immediate completed walk instead of a forced animation.
 
 ---
 
@@ -108,10 +136,11 @@ A planted-tank **stocking sandbox**. Tap a species to add it, resize the tank, a
 
 **Files**
 
-- [src/components/hobbies/AquariumTank.astro](../src/components/hobbies/AquariumTank.astro), the markup (canvas + controls) and the mounting `<script>`.
-- [src/lib/hobbies/aquarium.ts](../src/lib/hobbies/aquarium.ts), the whole engine: species data, the stocking math, the canvas pixel rendering, and the UI sync. **Zero dependencies.**
+- [src/components/hobbies/AquariumTank.astro](../src/components/hobbies/AquariumTank.astro), the markup (canvas, the species picker rendered at build time, the tank panel) and the mounting `<script>`.
+- [src/lib/hobbies/aquarium-species.ts](../src/lib/hobbies/aquarium-species.ts), the species data: a pure module, so the page can render the picker from it at build time.
+- [src/lib/hobbies/aquarium.ts](../src/lib/hobbies/aquarium.ts), the whole engine: the canvas pixel rendering, adding and removing fish, and the UI sync. **Zero dependencies.**
 
-**Single source of truth.** The `SPECIES` array in `aquarium.ts` (~35 freshwater species) drives everything. The palette buttons and the stocking list are built from it at runtime, so the markup carries no species data. Each entry stores an approximate adult length (inches), a relative `bioload` weight, a sensible `minGallons`, a swim `zone` (top/mid/bottom), a body `shape`, and two colors.
+**Single source of truth.** The `SPECIES` array in `aquarium-species.ts` (35 freshwater species) drives everything. The picker lists them grouped by where they swim (top, middle, bottom), each with a two-color swatch taken from its own sprite colors and its minimum tank size; the stocking list is built from it at runtime. Each entry stores an approximate adult length (inches), a relative `bioload` weight, a sensible `minGallons`, a swim `zone` (top/mid/bottom), a body `shape`, and two colors.
 
 ### How the stocking math works
 
@@ -124,14 +153,14 @@ load%    = Σ(bioload of every fish in the tank) / capacity
 
 So a 20-gallon tank has a capacity of `20 × 0.55 = 11` units. Seven neon tetras at `0.3` each (`2.1`) plus four pygmy cory at `0.35` (`1.4`) plus five cherry shrimp at `0.05` (`0.25`) plus one honey gourami at `0.9` come to `~4.65`, or about 42% of capacity, which reads **Healthy**. The formula lives in [src/lib/hobbies/stocking.ts](../src/lib/hobbies/stocking.ts), a pure module split out from the canvas engine and unit-tested in `stocking.test.ts`.
 
-The meter colors and labels come straight from `load%`:
+The meter label comes straight from `load%`. The meter itself is a 1px ink rule (`.hair`) with the percent rolling to its new value, so the word carries the state rather than a color:
 
-| Load      | Label           | Color |
-| --------- | --------------- | ----- |
-| `< 40%`   | Lightly stocked | green |
-| `40–85%`  | Healthy         | green |
-| `85–100%` | Heavily stocked | amber |
-| `> 100%`  | Overstocked     | red   |
+| Load      | Label           |
+| --------- | --------------- |
+| `< 40%`   | Lightly stocked |
+| `40–85%`  | Healthy         |
+| `85–100%` | Heavily stocked |
+| `> 100%`  | Overstocked     |
 
 Separately, each species carries a `minGallons`. If the current tank is smaller than any stocked species likes, a note appears (for example "Angelfish likes 29+ gallons"). That check is independent of the bioload percentage, because some fish need swimming room regardless of waste.
 
@@ -154,21 +183,20 @@ Everything you see in the tank (fish, plants, rocks, driftwood, bubbles, light) 
 - **Fish are procedural.** Each one is built from its species params: a body drawn as horizontal pixel rows of an ellipse (`fishBody`), a tail, fins, a lateral stripe or vertical bars, and a small eye. A `shade()` helper mixes the body color toward white for the top rows and toward black for the bottom for a bit of lighting. There are eight silhouettes: `fish` (tetras/barbs/livebearers), `gourami` (oval body with its signature trailing pelvic feelers), `betta` (small body, big flowing fins), `angelfish` (tall diamond with long swept-back dorsal/anal fins + ventral filaments), `tall` (oval cichlids/rams), `long` (cories/loaches/plecos, with a downturned barbeled snout), `shrimp`, and `snail`, routed in `drawFish` by `shape`. Fish are drawn back-to-front by depth `zone` for layering.
 - **The scene is layered for performance.** A **baked** offscreen background (water gradient, dark silhouette plants for depth, four rocks, two driftwood pieces, gravel substrate, and a carpet of plants along the front) is rendered once and only redrawn on resize. Each animation frame just blits that image and then draws the moving parts: slanted caustic light, two swaying foreground plant types (tall vallisneria and stems), fish, floating surface plants with dangling roots, and rising bubbles.
 - **Layout is seeded, not random each frame.** Plant, rock, and bubble positions come from a tiny seeded pseudo-random generator (`makeRng`) keyed to the tank width, so the scene is stable but adapts when the canvas resizes.
-- Meter bar colors are set as **inline styles**, not Tailwind classes, because Tailwind's build step would purge class names it can't see in the source.
 
 ### Mobile and performance
 
 - The canvas resizes to its container via `ResizeObserver`; height clamps to 220–460px and fish scale with canvas width.
 - Because the static background is baked and blitted, only fish, foreground plants, floaters, and bubbles are recomputed per frame.
 - The loop pauses when the canvas scrolls offscreen (`IntersectionObserver`) or the tab is hidden (`visibilitychange`), so it costs nothing when not in view.
-- Touch friendly: native range slider, tappable palette buttons, and tap-to-add (after picking a species, tapping in the tank drops one at that point).
+- Touch friendly: native range slider, a species list with 32px rows, and tap-to-add (after picking a species, tapping in the tank drops one at that point).
 - `prefers-reduced-motion` slows everything and stops the plant sway.
 - A hard cap of 55 fish keeps the loop smooth on phones.
 - It all runs in the visitor's browser, so frame rate depends on their device, not on the hosting tier.
 
 ### Tweaking it later
 
-- Species roster and balance: the `SPECIES` array.
+- Species roster and balance: the `SPECIES` array in [aquarium-species.ts](../src/lib/hobbies/aquarium-species.ts). The picker, the swatches and the "35 species to stock" line all follow it.
 - Overall stocking feel: `PLANTED_CAPACITY_PER_GALLON` (now in [src/lib/hobbies/stocking.ts](../src/lib/hobbies/stocking.ts), unit-tested).
 - How tank size scales the visuals: `fishScale()` (fish shrink in bigger tanks) and `plantFactor()` (denser planting).
 - Starting community shown on load: `STARTER`.
@@ -180,7 +208,7 @@ A **"flip a rock" beach.** A pixel Pacific Northwest shoreline at low tide, scat
 
 **Files**
 
-- [src/components/hobbies/TidePool.astro](../src/components/hobbies/TidePool.astro), the markup (journal bar, beach canvas, the reveal popup card) and the mounting `<script>`.
+- [src/components/hobbies/TidePool.astro](../src/components/hobbies/TidePool.astro), the beach canvas and its caption, plus the shared [FieldJournal](../src/components/hobbies/FieldJournal.astro) row and [SpecimenCard](../src/components/hobbies/SpecimenCard.astro) reveal card, and the mounting `<script>`.
 - [src/lib/hobbies/tidepool.ts](../src/lib/hobbies/tidepool.ts), the engine: scene building, the flip mechanic, every pixel sprite, the reveal card, and the journal. **Zero dependencies.**
 - [src/lib/hobbies/tidepool-species.ts](../src/lib/hobbies/tidepool-species.ts), the species dataset (the single source of truth).
 - [src/lib/hobbies/tidepool-photos.json](../src/lib/hobbies/tidepool-photos.json), optional real photos per species (see “Real photos in the reveal card” below).
@@ -274,7 +302,7 @@ A **road-cruising game**: a dark, wet Pacific Northwest back road scrolls toward
 
 **Files**
 
-- [src/components/hobbies/HerpingNight.astro](../src/components/hobbies/HerpingNight.astro), the markup (canvas + reveal card + journal) and the mounting `<script>`.
+- [src/components/hobbies/HerpingNight.astro](../src/components/hobbies/HerpingNight.astro), the road canvas and its caption, plus the same shared journal row and reveal card as tide pooling, and the mounting `<script>`.
 - [src/lib/hobbies/herping.ts](../src/lib/hobbies/herping.ts), the whole engine: the scrolling road, the headlight lighting, the eyeshine tells, the pixel sprites, tap-to-reveal, and the journal. **Zero dependencies, no runtime fetch.**
 - [src/lib/hobbies/herping-species.ts](../src/lib/hobbies/herping-species.ts), the ~20-species PNW roster (salamander-forward — 12 of the 20 are salamanders/newts — led by the real animals the author has logged), each with a sprite `category`, `rarity`, `eyeshine` colour, and a couple of real facts.
 - [src/lib/hobbies/herping-photos.json](../src/lib/hobbies/herping-photos.json), the CC-licensed reveal photos (falls back to the pixel sprite if a photo fails to load).
@@ -285,7 +313,7 @@ A **road-cruising game**: a dark, wet Pacific Northwest back road scrolls toward
 
 **Salamander-forward on purpose.** The whole conceit is finding salamanders on a wet night, so a `CATEGORY_WEIGHT` table biases spawning heavily toward caudates (salamander 10, newt 7, frog/toad 2, snake/lizard 1.2), multiplied by each species' rarity weight. So the road is mostly salamanders with the occasional frog and a rare snake, and the ~20-species journal fills salamander-first.
 
-**Where the species and facts come from.** Hand-picked PNW herps you'd actually meet cruising a rainy road west of the Cascades, led by the salamanders the author has logged on iNaturalist (Ensatina, Western Red-backed, Dunn's, Northwestern, Rough-skinned Newt, Pacific Giant), plus more PNW caudates (Cope's Giant, Cascade Torrent, Van Dyke's, Clouded, Western Tiger, Long-toed). Facts are curated from standard references and are meant to be interesting, not authoritative. The American Bullfrog is flagged `nonNative` and badged accordingly in the card.
+**Where the species and facts come from.** Hand-picked PNW herps you'd actually meet cruising a rainy road west of the Cascades, led by the salamanders the author has logged on iNaturalist (Ensatina, Western Red-backed, Dunn's, Northwestern, Rough-skinned Newt, Pacific Giant), plus more PNW caudates (Cope's Giant, Cascade Torrent, Van Dyke's, Clouded, Western Tiger, Long-toed). Facts are curated from standard references and are meant to be interesting, not authoritative. The American Bullfrog is flagged `nonNative`, and its card reads "Non-native" where others read "New to your journal" or "Found again".
 
 **Real photos.** Identical pattern to tide pooling. The helper [scripts/fetch-herping-photos.mjs](../scripts/fetch-herping-photos.mjs) (`npm run fetch:herping-photos`) first tries each species' iNaturalist **taxon default photo** — the community-curated, clearly-representative ID shot — then falls back to research-grade / most-faved observations, all restricted to `cc0,cc-by,cc-by-nc`. `--place 46` prefers Washington photos, and the default `--size medium` (~500px, ~120KB) is the sweet spot for the card banner — big enough to look crisp, a quarter the weight of `large`. `--wire inat` writes the iNat photo URLs into `herping-photos.json` (allow-listed hosts); `--wire blob` points at self-hosted `hobby-media` copies instead. Attribution travels with each photo and is shown in the card.
 

@@ -1,0 +1,156 @@
+---
+/**
+ * The reveal card shared by the tide pool and herping toys, set like a
+ * specimen label: a square picture, the name, the Latin name, one fact and
+ * the photo credit, with one button that stays in the fiction. The engine
+ * fills it through the data-<prefix>-* hooks, opens it by adding "is-open"
+ * to the [data-<prefix>-card] scrim, and hides the photo or sprite with
+ * "is-hidden".
+ */
+interface Props {
+  /** Hook prefix the engine queries: "tp" for tide pooling, "hp" for herping. */
+  prefix: "tp" | "hp";
+  /** The dismiss button ("Keep looking"). */
+  closeLabel: string;
+}
+
+const { prefix, closeLabel } = Astro.props;
+const hook = (name: string) => ({ [`data-${prefix}-${name}`]: "" });
+const nameId = `${prefix}-specimen-name`;
+---
+
+<div class="specimen-scrim" {...hook("card")}>
+  <div
+    class="specimen"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby={nameId}
+  >
+    <div class="specimen-pic">
+      <canvas
+        {...hook("reveal")}
+        width="120"
+        height="120"
+        style="image-rendering: pixelated"
+        aria-hidden="true"></canvas>
+      <img
+        {...hook("photo")}
+        alt=""
+        class="is-hidden"
+        loading="lazy"
+        decoding="async"
+      />
+    </div>
+    <p class="u-label specimen-status" {...hook("badge")}></p>
+    <div class="specimen-names">
+      <h3 id={nameId} {...hook("name")}></h3>
+      <p class="specimen-sci" {...hook("sci")}></p>
+    </div>
+    <p class="specimen-fact" {...hook("fact")}></p>
+    <p class="specimen-credit is-hidden" {...hook("credit")}></p>
+    <div class="specimen-act">
+      <button type="button" class="btn" {...hook("close")}>{closeLabel}</button>
+    </div>
+  </div>
+</div>
+
+<style>
+  .specimen-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: color-mix(in srgb, var(--paper) 72%, transparent);
+  }
+  .specimen-scrim.is-open {
+    display: flex;
+  }
+  .specimen {
+    display: grid;
+    grid-template-columns: 132px minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+    column-gap: 18px;
+    width: 100%;
+    max-width: 440px;
+    padding: 18px;
+    border: 1px solid var(--ink);
+    background: var(--paper);
+    color: var(--ink);
+  }
+  .specimen-pic {
+    position: relative;
+    grid-row: span 2;
+    width: 132px;
+    height: 132px;
+    background: var(--band);
+  }
+  .specimen-pic canvas,
+  .specimen-pic img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+  .specimen-pic img {
+    object-fit: cover;
+  }
+  .specimen-status {
+    margin: 0 0 6px;
+  }
+  .specimen-status.is-warn {
+    color: var(--ink);
+  }
+  .specimen-names h3 {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 400;
+    line-height: 1.25;
+  }
+  .specimen-sci {
+    margin: 2px 0 0;
+    font-size: 13px;
+    font-style: italic;
+    color: var(--ink-3);
+  }
+  .specimen-fact {
+    grid-column: 1 / -1;
+    margin: 14px 0 0;
+    font-size: 14px;
+    line-height: 1.55;
+  }
+  .specimen-credit {
+    grid-column: 1 / -1;
+    margin: 8px 0 0;
+    font-size: 11px;
+    color: var(--ink-2);
+  }
+  .specimen-act {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 16px;
+  }
+  .specimen-act .btn {
+    min-height: 44px;
+    padding-inline: 18px;
+    border-color: var(--ink);
+  }
+  .is-hidden {
+    display: none;
+  }
+
+  @media (max-width: 400px) {
+    .specimen {
+      grid-template-columns: 104px minmax(0, 1fr);
+      column-gap: 14px;
+      padding: 16px;
+    }
+    .specimen-pic {
+      width: 104px;
+      height: 104px;
+    }
+  }
+</style>

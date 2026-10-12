@@ -252,14 +252,14 @@ export function initBirding(root: HTMLElement): void {
     if (tagsEl) {
       const nameSpan = document.createElement('span');
       nameSpan.className =
-        'rounded-full bg-neutral-900 px-2.5 py-1 text-xs font-medium text-white dark:bg-white dark:text-neutral-900';
+        'basis-full text-center text-[15px] text-ink';
       nameSpan.textContent = style.name;
       tagsEl.replaceChildren(
         nameSpan,
         ...describeFeatures(last.features).map((t) => {
           const span = document.createElement('span');
           span.className =
-            'rounded-full bg-neutral-100 px-2.5 py-1 text-xs text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300';
+            'u-label';
           span.textContent = t;
           return span;
         }),

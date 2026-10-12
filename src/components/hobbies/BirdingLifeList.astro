@@ -37,62 +37,41 @@ const {
   data-life-iconic={iconicTaxa}
   data-life-featured={featured}
 >
-  <div
-    class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"
-  >
-    <div class="min-w-0">
-      <div class="flex flex-wrap items-center gap-2">
-        <h2 class="text-lg font-medium">{heading}</h2>
-        <span
-          data-life-count
-          class="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"
-        ></span>
-      </div>
-      {
-        blurb && (
-          <p class="mt-1 max-w-prose text-sm text-neutral-600 dark:text-neutral-400">
-            {blurb}
-          </p>
-        )
-      }
+  <div class="mb-6">
+    <div class="shead">
+      <h2>{heading}</h2>
+      <span data-life-count class="u-label tabular-nums"></span>
     </div>
+    {blurb && <p class="shead-blurb">{blurb}</p>}
     <a
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      class="shrink-0 self-start rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium no-underline hover:bg-neutral-100 sm:self-auto dark:border-neutral-700 dark:hover:bg-neutral-800"
-      >View all on iNaturalist →</a
+      class="shead-link mt-2 inline-block"
+      ><span class="draw">View all on iNaturalist</span> →</a
     >
   </div>
 
-  <h3
-    class="mb-3 text-sm font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400"
-  >
-    Most unique sightings
-  </h3>
+  <h3 class="u-label mb-3">Most unique sightings</h3>
   <div
     data-life-featured
     class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
   >
     {
       Array.from({ length: featured }).map(() => (
-        <div class="overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-800">
-          <div class="aspect-[4/3] animate-pulse bg-neutral-200 dark:bg-neutral-800" />
+        <div class="overflow-hidden border border-rule">
+          <div class="aspect-[4/3] animate-pulse bg-rule-soft" />
           <div class="space-y-2 p-4">
-            <div class="h-4 w-2/3 animate-pulse rounded bg-neutral-200 dark:bg-neutral-800" />
-            <div class="h-3 w-full animate-pulse rounded bg-neutral-200 dark:bg-neutral-800" />
-            <div class="h-3 w-5/6 animate-pulse rounded bg-neutral-200 dark:bg-neutral-800" />
+            <div class="h-4 w-2/3 animate-pulse bg-rule-soft" />
+            <div class="h-3 w-full animate-pulse bg-rule-soft" />
+            <div class="h-3 w-5/6 animate-pulse bg-rule-soft" />
           </div>
         </div>
       ))
     }
   </div>
 
-  <h3
-    class="mb-3 mt-8 text-sm font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400"
-  >
-    The full list
-  </h3>
+  <h3 class="u-label mb-3 mt-10">The full list</h3>
 
   <div
     data-life-controls
@@ -106,17 +85,12 @@ const {
         type="search"
         placeholder="Search by name…"
         autocomplete="off"
-        class="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm placeholder:text-neutral-400 focus:border-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:placeholder:text-neutral-500"
+        class="life-input w-full"
       />
     </label>
-    <label
-      class="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400"
-    >
+    <label class="flex items-center gap-2 text-sm text-ink-3">
       <span class="shrink-0">Sort</span>
-      <select
-        data-life-sort
-        class="rounded-lg border border-neutral-300 bg-white px-2 py-2 text-sm focus:border-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900"
-      >
+      <select data-life-sort class="life-input">
         <option value="family">By family</option>
         <option value="recent">Recently seen</option>
         <option value="name">Name (A–Z)</option>
@@ -131,14 +105,14 @@ const {
     {
       Array.from({ length: 2 }).map(() => (
         <section class="space-y-2">
-          <div class="h-4 w-40 animate-pulse rounded bg-neutral-200 dark:bg-neutral-800" />
+          <div class="h-4 w-40 animate-pulse bg-rule-soft" />
           <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {Array.from({ length: 3 }).map(() => (
-              <div class="flex items-center gap-3 rounded-lg border border-neutral-200 p-2 dark:border-neutral-800">
-                <div class="h-16 w-16 shrink-0 animate-pulse rounded-md bg-neutral-200 dark:bg-neutral-800" />
+              <div class="flex items-center gap-3 border-b border-rule-soft py-2">
+                <div class="h-16 w-16 shrink-0 animate-pulse bg-rule-soft" />
                 <div class="flex-1 space-y-1.5">
-                  <div class="h-3.5 w-1/2 animate-pulse rounded bg-neutral-200 dark:bg-neutral-800" />
-                  <div class="h-3 w-2/3 animate-pulse rounded bg-neutral-200 dark:bg-neutral-800" />
+                  <div class="h-3.5 w-1/2 animate-pulse bg-rule-soft" />
+                  <div class="h-3 w-2/3 animate-pulse bg-rule-soft" />
                 </div>
               </div>
             ))}
@@ -147,11 +121,7 @@ const {
       ))
     }
   </div>
-  <p
-    data-life-status
-    class="mt-2 text-xs text-neutral-500 dark:text-neutral-500"
-  >
-  </p>
+  <p data-life-status class="mt-2 text-xs text-ink-2"></p>
 </section>
 
 <style>
@@ -163,6 +133,27 @@ const {
    */
   [data-life] [hidden] {
     display: none !important;
+  }
+
+  .life-input {
+    min-height: 36px;
+    padding: 6px 10px;
+    border: 1px solid var(--rule);
+    border-radius: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font: inherit;
+    font-size: 13px;
+  }
+  .life-input::placeholder {
+    color: var(--ink-2);
+  }
+  .life-input:focus-visible {
+    border-color: var(--ink);
+  }
+  .life-input option {
+    background: var(--paper);
+    color: var(--ink);
   }
 </style>
 

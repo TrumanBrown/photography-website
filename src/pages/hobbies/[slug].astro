@@ -14,6 +14,7 @@ import INatHerpMap from "@/components/hobbies/INatHerpMap.astro";
 import DayList from "@/components/hobbies/DayList.astro";
 import Lightbox from "@/components/Lightbox.astro";
 import { hobbySlug } from "@/lib/hobbies";
+import { hobbyFacts } from "@/lib/hobby-facts";
 
 export async function getStaticPaths() {
   const hobbies = await getCollection("hobbies");
@@ -42,24 +43,18 @@ const {
   dayList,
 } = entry.data;
 const galleryItems = media?.gallery ?? [];
+const facts = hobbyFacts(entry);
 ---
 
 <BaseLayout title={title} description={summary} section="hobbies">
   <article class="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-    <header class="mb-6 space-y-2">
-      <a
-        href="/hobbies"
-        class="text-xs text-neutral-600 no-underline hover:underline dark:text-neutral-400"
-        >← All hobbies</a
+    <header class="hobby-head">
+      <a href="/hobbies/" class="hobby-back"
+        >← <span class="draw">Things to try</span></a
       >
-      <h1 class="text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h1>
-      {
-        intro && (
-          <p class="max-w-prose text-sm text-neutral-700 dark:text-neutral-300">
-            {intro}
-          </p>
-        )
-      }
+      <h1>{title}</h1>
+      {facts && <p class="u-label hobby-facts">{facts}</p>}
+      {intro && <p class="hobby-intro">{intro}</p>}
     </header>
 
     {interactive === "aquarium" && <AquariumTank />}
@@ -100,14 +95,16 @@ const galleryItems = media?.gallery ?? [];
     {
       media?.hero && (
         <section class="mt-12" aria-label={mediaTitle ?? "Photos"}>
-          <h2 class="mb-4 text-lg font-medium">{mediaTitle ?? "Photos"}</h2>
+          <div class="shead mb-4">
+            <h2>{mediaTitle ?? "Photos"}</h2>
+          </div>
           <div id="hobby-media">
             <a
               href={media.hero.src}
               data-pswp-width={media.hero.width}
               data-pswp-height={media.hero.height}
               data-pswp-caption={media.hero.caption ?? ""}
-              class="group block overflow-hidden rounded-xl border border-neutral-200 no-underline dark:border-neutral-800"
+              class="group block overflow-hidden border border-rule no-underline"
               aria-label={media.hero.caption ?? "Open full-resolution photo"}
             >
               <img
@@ -116,7 +113,7 @@ const galleryItems = media?.gallery ?? [];
                 width={media.hero.width}
                 height={media.hero.height}
                 loading="lazy"
-                class="block max-h-[70vh] w-full bg-neutral-100 object-cover transition-opacity duration-300 group-hover:opacity-95 dark:bg-neutral-900"
+                class="block max-h-[70vh] w-full bg-band object-cover transition-opacity duration-300 group-hover:opacity-95"
               />
             </a>
 
@@ -129,7 +126,7 @@ const galleryItems = media?.gallery ?? [];
                       data-pswp-width={it.width}
                       data-pswp-height={it.height}
                       data-pswp-caption={it.caption ?? ""}
-                      class="group block overflow-hidden rounded-lg bg-neutral-100 no-underline dark:bg-neutral-900"
+                      class="group block overflow-hidden bg-band no-underline"
                       aria-label={it.caption ?? "Open full-resolution photo"}
                     >
                       <img
@@ -176,3 +173,39 @@ const galleryItems = media?.gallery ?? [];
     }
   </article>
 </BaseLayout>
+
+<style>
+  /* The archive's heading voice: light weight, sentence case, one tracked
+     line of facts. */
+  .hobby-head {
+    margin-bottom: 28px;
+  }
+  .hobby-back {
+    display: inline-block;
+    font-size: 12px;
+    color: var(--ink-2);
+    text-decoration: none;
+  }
+  .hobby-back:hover {
+    color: var(--ink);
+    text-decoration: none;
+  }
+  .hobby-head h1 {
+    margin: 10px 0 0;
+    font-size: clamp(22px, 2.4vw, 27px);
+    font-weight: 300;
+    line-height: 1.12;
+    letter-spacing: -0.012em;
+    color: var(--ink);
+  }
+  .hobby-facts {
+    margin: 6px 0 0;
+  }
+  .hobby-intro {
+    margin: 12px 0 0;
+    max-width: 62ch;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--ink-3);
+  }
+</style>

@@ -88,11 +88,16 @@ rather than only writing it down here.
 - Sentence case everywhere, including buttons and headings. Never Title Case.
 - Name buttons after the world, not the widget: `New beach`, `New road`, `Keep looking`,
   `Keep driving`, `Walk the trail`, `Develop postcard`, `Another selfie`, `Send message`.
-- Dismiss buttons stay in the fiction (`Keep looking`) instead of `Close` / `OK` / `Got it`.
+- Dismiss buttons stay in the fiction (`Keep looking`, `Back to the map`, `Back to the trail`)
+  instead of `Close` / `OK` / `Got it`.
 - Personal-data sections use possessive `My …`: `My spark bird`, `My birding life list`,
   `My tide pooling observations`, `My tank`, `Fish I've caught`.
-- Eyebrow labels are two plain words: `Field journal`, `Trail studio`, `Your postcard`, `Keep exploring`.
+- Labels are two plain words: `Field journal`, `Your postcard`, `Keep exploring`. A label never
+  sits above a headline as a badge.
+- Status words on a card are plain and short: `New to your journal`, `Found again`, `Non-native`.
 - Counters are bare and tabular: `0 / 42 species`, `20 gal`, `5 / 10 moments`, `2,400 × 1,600`.
+- A hobby page's facts line is counts and plain nouns joined by `·`: `40 critters to find`,
+  `37 waters · 2 states`, `Selfie · nothing uploads` (`src/lib/hobby-facts.ts`).
 - `aria-label` describes the scene and the action in one sentence, same voice as visible copy:
   `A pixel beach at low tide. Tap rocks and driftwood logs to find the creatures hiding underneath.`
 
@@ -137,9 +142,9 @@ label on the fact and a short first-person reaction after the first line.
 - Rhetorical openers (`Ever wondered what's under that rock?`).
 - Exclamation marks outside the two established warm cases (`Message sent. Thank you!`,
   `I'll get back to you soon. Thanks for visiting!`).
-- Emoji in prose or errors. Emoji only where already established: the species palette and the
-  two Birding entry buttons (`📷 Take a selfie`, `🖼️ Upload a photo`). Hobby cards use their
-  stipple plates, never emoji.
+- Emoji, anywhere a visitor looks: prose, labels, buttons, errors. Hobby cards use their stipple
+  plates, the aquarium picker shows each fish's own sprite colors, and buttons are plain words
+  (`Take a selfie`, `Upload a photo`, `Shuffle`).
 - Address the reader as "users" or "folks". They are "you".
 
 ## Before finishing a string

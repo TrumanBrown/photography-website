@@ -250,16 +250,10 @@ function renderFeaturedCard(
   userId: string,
   blurb: string,
 ): HTMLElement {
-  const card = el(
-    "div",
-    "flex flex-col overflow-hidden rounded-xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900/40",
-  );
+  const card = el("div", "flex flex-col overflow-hidden border border-rule");
 
   if (s.photo) {
-    const figure = el(
-      "div",
-      "aspect-[4/3] w-full overflow-hidden bg-neutral-100 dark:bg-neutral-900",
-    );
+    const figure = el("div", "aspect-[4/3] w-full overflow-hidden bg-band");
     const img = el("img", "h-full w-full object-cover");
     img.src = s.photo;
     img.alt = s.common;
@@ -272,19 +266,17 @@ function renderFeaturedCard(
   const body = el("div", "flex flex-1 flex-col gap-2 p-4");
   const head = el("div", "flex items-start justify-between gap-2");
   const names = el("div");
-  names.appendChild(el("h3", "text-sm font-semibold leading-tight", s.common));
+  names.appendChild(
+    el("h3", "text-[15px] font-normal leading-tight", s.common),
+  );
   if (s.scientific)
     names.appendChild(
-      el(
-        "p",
-        "text-xs italic text-neutral-500 dark:text-neutral-400",
-        s.scientific,
-      ),
+      el("p", "mt-0.5 text-xs italic text-ink-3", s.scientific),
     );
   head.appendChild(names);
   const badge = el(
     "span",
-    "shrink-0 rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-medium text-sky-800 dark:bg-sky-900/50 dark:text-sky-200",
+    "shrink-0 text-[11px] tabular-nums text-ink-2",
     s.mine === 1 ? "Seen once" : `Seen ${s.mine}×`,
   );
   head.appendChild(badge);
@@ -293,26 +285,16 @@ function renderFeaturedCard(
   body.appendChild(
     el(
       "p",
-      "text-[11px] font-medium uppercase tracking-wide text-amber-700 dark:text-amber-400",
+      "text-[11px] leading-snug text-ink-2",
       `Globally uncommon · ~${s.globalCount.toLocaleString()} records on iNaturalist`,
     ),
   );
 
   if (blurb)
-    body.appendChild(
-      el(
-        "p",
-        "text-xs leading-relaxed text-neutral-600 dark:text-neutral-300",
-        blurb,
-      ),
-    );
+    body.appendChild(el("p", "text-xs leading-relaxed text-ink-3", blurb));
 
   const links = el("div", "mt-auto flex flex-wrap gap-3 pt-1 text-xs");
-  const obs = el(
-    "a",
-    "font-medium text-sky-700 no-underline hover:underline dark:text-sky-400",
-    "My sighting →",
-  );
+  const obs = el("a", "draw self-start text-ink", "My sighting →");
   obs.href = observationsUrl(userId, s.id);
   obs.target = "_blank";
   obs.rel = "noopener noreferrer";
@@ -320,7 +302,7 @@ function renderFeaturedCard(
   if (s.wikipediaUrl) {
     const wiki = el(
       "a",
-      "text-neutral-500 no-underline hover:underline dark:text-neutral-400",
+      "draw self-start text-ink-2 hover:text-ink",
       "Wikipedia",
     );
     wiki.href = s.wikipediaUrl;
@@ -337,17 +319,14 @@ function renderFeaturedCard(
 function renderListRow(s: Species, userId: string): HTMLElement {
   const a = el(
     "a",
-    "group flex items-center gap-3 rounded-lg border border-neutral-200 bg-white p-2 no-underline transition-colors hover:border-neutral-300 hover:bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900/40 dark:hover:border-neutral-700 dark:hover:bg-neutral-800/60",
+    "group flex items-center gap-3 border-b border-rule-soft py-2 pr-2 no-underline transition-colors hover:bg-hover hover:no-underline",
   );
   a.href = observationsUrl(userId, s.id);
   a.target = "_blank";
   a.rel = "noopener noreferrer";
   a.setAttribute("role", "listitem");
 
-  const thumb = el(
-    "div",
-    "h-16 w-16 shrink-0 overflow-hidden rounded-md bg-neutral-100 dark:bg-neutral-900",
-  );
+  const thumb = el("div", "h-16 w-16 shrink-0 overflow-hidden bg-band");
   if (s.photo) {
     const img = el("img", "h-full w-full object-cover");
     img.src = s.photo;
@@ -359,14 +338,10 @@ function renderListRow(s: Species, userId: string): HTMLElement {
   a.appendChild(thumb);
 
   const text = el("div", "min-w-0 flex-1");
-  text.appendChild(el("p", "truncate text-sm font-medium", s.common));
+  text.appendChild(el("p", "truncate text-sm text-ink", s.common));
   if (s.scientific)
     text.appendChild(
-      el(
-        "p",
-        "truncate text-xs italic text-neutral-500 dark:text-neutral-400",
-        s.scientific,
-      ),
+      el("p", "truncate text-xs italic text-ink-3", s.scientific),
     );
   a.appendChild(text);
 
@@ -374,15 +349,12 @@ function renderListRow(s: Species, userId: string): HTMLElement {
   meta.appendChild(
     el(
       "span",
-      "text-xs text-neutral-400 dark:text-neutral-500",
+      "text-xs tabular-nums text-ink-2",
       s.mine === 1 ? "×1" : `×${s.mine}`,
     ),
   );
   const seen = formatSeen(s.lastObservedOn);
-  if (seen)
-    meta.appendChild(
-      el("span", "text-[11px] text-neutral-400 dark:text-neutral-500", seen),
-    );
+  if (seen) meta.appendChild(el("span", "text-[11px] text-ink-2", seen));
   a.appendChild(meta);
   return a;
 }
@@ -433,19 +405,13 @@ function renderFamilyGroup(group: FamilyGroup, userId: string): HTMLElement {
   const section = el("section", "space-y-2");
 
   const header = el("div", "flex items-baseline gap-2");
-  header.appendChild(el("h4", "text-sm font-semibold", group.common));
+  header.appendChild(el("h4", "text-sm font-normal text-ink", group.common));
   if (group.sci)
-    header.appendChild(
-      el(
-        "span",
-        "text-xs italic text-neutral-500 dark:text-neutral-400",
-        group.sci,
-      ),
-    );
+    header.appendChild(el("span", "text-xs italic text-ink-3", group.sci));
   header.appendChild(
     el(
       "span",
-      "ml-auto text-xs text-neutral-400 dark:text-neutral-500",
+      "ml-auto text-xs tabular-nums text-ink-2",
       group.members.length === 1
         ? "1 species"
         : `${group.members.length} species`,

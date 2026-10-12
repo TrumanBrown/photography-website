@@ -32,27 +32,22 @@ const {
   data-spark-user={userId}
   data-spark-taxon={taxonId}
 >
-  <h2 class="mb-4 text-lg font-medium">{heading}</h2>
+  <div class="shead mb-4"><h2>{heading}</h2></div>
   <div
     class="grid grid-cols-1 gap-6 sm:grid-cols-[minmax(0,18rem)_1fr] sm:items-start"
   >
-    <div data-spark-media class="overflow-hidden rounded-xl">
-      <div
-        class="aspect-square w-full animate-pulse rounded-xl bg-neutral-200 dark:bg-neutral-800"
-      >
-      </div>
+    <div data-spark-media class="overflow-hidden">
+      <div class="aspect-square w-full animate-pulse bg-rule-soft"></div>
     </div>
     <div>
-      <h3 class="text-base font-semibold leading-tight">{species}</h3>
+      <h3 class="text-[17px] font-normal leading-tight">{species}</h3>
       {
         scientificName && (
-          <p class="text-sm italic text-neutral-500 dark:text-neutral-400">
-            {scientificName}
-          </p>
+          <p class="mt-0.5 text-[13px] italic text-ink-3">{scientificName}</p>
         )
       }
       <div
-        class="mt-3 space-y-3 text-sm leading-relaxed text-neutral-700 dark:text-neutral-300"
+        class="mt-3 max-w-[62ch] space-y-3 text-sm leading-relaxed text-ink-3"
       >
         {story.map((paragraph) => <p>{paragraph}</p>)}
       </div>

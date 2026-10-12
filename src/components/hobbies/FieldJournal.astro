@@ -1,0 +1,80 @@
+---
+/**
+ * The field journal row shared by the tide pool and herping toys: a label, a
+ * tabular count that rolls when you log something new (Cult UI
+ * "rolling-number"), the last find in words, and a 1px progress rule whose
+ * label changes with it (Watermelon UI "labeled-progress-indicator"). The
+ * toy's engine fills it through the data-<prefix>-* hooks.
+ */
+interface Props {
+  /** Hook prefix the engine queries: "tp" for tide pooling, "hp" for herping. */
+  prefix: "tp" | "hp";
+  /** How many species there are to find. */
+  total: number;
+  /** The reset button, named after the world ("New beach"). */
+  resetLabel: string;
+}
+
+const { prefix, total, resetLabel } = Astro.props;
+const hook = (name: string) => ({ [`data-${prefix}-${name}`]: "" });
+---
+
+<div class="journal">
+  <div class="j-row">
+    <span class="j-label">Field journal</span>
+    <span class="j-count"
+      ><span class="j-n" {...hook("count")}>0</span><span class="j-of">
+        / {total} species</span
+      ></span
+    >
+    <span class="j-last" aria-live="polite" {...hook("last")}></span>
+    <button type="button" class="linkbtn draw" {...hook("reset")}
+      ><span>{resetLabel}</span></button
+    >
+  </div>
+  <div class="hair" aria-hidden="true"><i {...hook("bar")}></i></div>
+</div>
+
+<style>
+  .journal {
+    display: grid;
+    gap: 4px;
+    margin-bottom: 14px;
+  }
+  .j-row {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0 14px;
+    font-size: 13px;
+  }
+  .j-label {
+    color: var(--ink);
+  }
+  .j-count {
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+  .j-n {
+    display: inline-block;
+  }
+  .j-of {
+    color: var(--ink-2);
+  }
+  .j-last {
+    flex: 1;
+    min-width: 12ch;
+    color: var(--ink-3);
+  }
+  .j-row > .linkbtn {
+    margin-left: auto;
+  }
+  /* On a phone the reset stays on the first line, at the right, and the last
+     find gets its own line under it. */
+  @media (max-width: 639px) {
+    .j-last {
+      order: 1;
+      flex-basis: 100%;
+    }
+  }
+</style>

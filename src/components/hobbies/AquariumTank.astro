@@ -2,16 +2,30 @@
 /**
  * Interactive planted-aquarium stocking sandbox.
  *
- * Markup is intentionally static and data-free — the species palette and
- * stocking list are built at runtime by the engine in @/lib/hobbies/aquarium.
- * The engine binds to the [data-aquarium-*] hooks below. The mounting script is an
- * Astro-processed module (served from /_astro/), so it satisfies the strict
+ * The species picker is rendered here at build time from SPECIES (a pure data
+ * module), grouped by where each fish lives. The stocking list is built at
+ * runtime by the engine in @/lib/hobbies/aquarium, which binds to the
+ * [data-aquarium-*] hooks below. The mounting script is an Astro-processed
+ * module (served from /_astro/), so it satisfies the strict
  * `script-src 'self'` CSP without any inline-hash bookkeeping.
  */
+import { SPECIES, type Zone } from "@/lib/hobbies/aquarium-species";
+
+const ZONES: ReadonlyArray<{ zone: Zone; label: string }> = [
+  { zone: "top", label: "Top" },
+  { zone: "mid", label: "Middle" },
+  { zone: "bottom", label: "Bottom" },
+];
+
+const groups = ZONES.map(({ zone, label }) => ({
+  zone,
+  label,
+  species: SPECIES.filter((s) => s.zone === zone),
+}));
 ---
 
 <section data-aquarium aria-label="Interactive planted aquarium" class="not-prose">
-  <div class="overflow-hidden rounded-xl border border-neutral-200 bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-900">
+  <div class="aq-frame">
     <canvas
       data-aquarium-canvas
       class="block w-full touch-manipulation"
@@ -20,62 +34,302 @@
       aria-label="A planted freshwater tank. Add fish using the controls below."></canvas>
   </div>
 
-  <div class="mt-4 grid gap-4 lg:grid-cols-[1fr_18rem]">
-    <div>
-      <h2 class="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
-        Add a species
-      </h2>
-      <div data-aquarium-palette class="flex max-h-44 flex-wrap gap-2 overflow-y-auto pr-1"></div>
-      <p class="mt-3 text-xs text-neutral-500 dark:text-neutral-500">
-        Tap a species to add one, then tap in the tank to drop more. The bioload meter is just for fun,
-        not necessarily entirely accurate.
+  <div class="aq">
+    <div class="aq-tank">
+      <div class="aq-row">
+        <label for="aquarium-gallons">Tank size</label>
+        <span data-aquarium-gallons-label class="aq-val">20 gal</span>
+      </div>
+      <input
+        id="aquarium-gallons"
+        data-aquarium-gallons
+        type="range"
+        min="5"
+        max="75"
+        step="5"
+        value="20"
+        class="aq-range"
+      />
+
+      <div class="aq-row aq-meter">
+        <span>Bioload</span>
+        <span class="aq-val"
+          ><span data-aquarium-bioload-pct class="aq-roll">0</span>% · <span
+            data-aquarium-bioload-word>Empty</span
+          ></span
+        >
+      </div>
+      <div class="hair" aria-hidden="true">
+        <i data-aquarium-bioload-bar></i>
+      </div>
+
+      <div class="aq-stock-head">
+        <h2 class="u-label">In the tank</h2>
+        <button type="button" class="linkbtn draw" data-aquarium-reset
+          ><span>Start over</span></button
+        >
+      </div>
+      <ul data-aquarium-stock class="aq-stock"></ul>
+      <p data-aquarium-empty class="aq-empty" hidden>
+        Empty tank. Add a species to get started.
       </p>
+      <p data-aquarium-warn class="aq-warn" hidden></p>
     </div>
 
-    <div class="space-y-4 rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
-      <div>
-        <div class="flex items-center justify-between text-sm">
-          <label for="aquarium-gallons" class="font-medium">Tank size</label>
-          <span data-aquarium-gallons-label class="tabular-nums text-neutral-600 dark:text-neutral-400">20 gal</span>
-        </div>
-        <input
-          id="aquarium-gallons"
-          data-aquarium-gallons
-          type="range"
-          min="5"
-          max="75"
-          step="5"
-          value="20"
-          class="mt-2 w-full accent-sky-500"
-        />
+    <div class="aq-pick">
+      <h2 class="sr-only">Add a species</h2>
+      <div class="aq-zones">
+        {
+          groups.map(({ zone, label, species }) => (
+            <div class="aq-zone" data-zone={zone}>
+              <h3 class="u-label">{label}</h3>
+              <ul>
+                {species.map((s) => (
+                  <li>
+                    <button type="button" data-aquarium-add={s.id}>
+                      <span
+                        class="aq-sw"
+                        style={`--c1:${s.color};--c2:${s.accent}`}
+                        aria-hidden="true"
+                      />
+                      <span class="aq-name">
+                        <span class="sr-only">Add </span>
+                        {s.name}
+                      </span>
+                      <span class="aq-gal">{s.minGallons} gal</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))
+        }
       </div>
-
-      <div>
-        <div class="flex items-center justify-between text-sm">
-          <span class="font-medium">Bioload</span>
-          <span data-aquarium-bioload-label class="tabular-nums text-neutral-600 dark:text-neutral-400">0%</span>
-        </div>
-        <div class="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800">
-          <div data-aquarium-bioload-bar class="h-full w-0 rounded-full transition-all duration-300" style="background-color:#10b981"></div>
-        </div>
-      </div>
-
-      <div>
-        <div class="mb-1 flex items-center justify-between text-sm">
-          <span class="font-medium">In the tank</span>
-          <button
-            type="button"
-            data-aquarium-reset
-            class="rounded px-2 py-0.5 text-xs text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
-          >Reset</button>
-        </div>
-        <ul data-aquarium-stock class="space-y-1 text-sm text-neutral-700 dark:text-neutral-300"></ul>
-        <p data-aquarium-empty class="text-xs text-neutral-500" hidden>Empty tank. Add a species to get started.</p>
-        <p data-aquarium-warn class="mt-1 text-xs text-amber-600 dark:text-amber-500" hidden></p>
-      </div>
+      <p class="aq-hint">
+        Tap a species to add one, then tap in the tank to drop more. The bioload
+        meter is just for fun, not necessarily entirely accurate.
+      </p>
     </div>
   </div>
 </section>
+
+<style>
+  /* Preflight's [hidden] rule loses to any author display value, so make sure
+     the empty and warning notes stay hidden until the engine shows them. */
+  [data-aquarium] [hidden] {
+    display: none !important;
+  }
+
+  .aq-frame {
+    overflow: hidden;
+    border: 1px solid var(--rule);
+    background: var(--band);
+  }
+
+  /* Phones and tablets stack the tank panel first, right under the canvas, so
+     the bioload stays next to the tank. Desktop puts the list on the left. */
+  .aq {
+    display: grid;
+    gap: 28px;
+    margin-top: 18px;
+  }
+  @media (min-width: 1024px) {
+    .aq {
+      grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+      gap: 26px;
+      align-items: start;
+    }
+    .aq-pick {
+      grid-column: 1;
+      grid-row: 1;
+    }
+    .aq-tank {
+      grid-column: 2;
+      grid-row: 1;
+      /* Puts "Tank size" on the same baseline as the Top and Bottom labels. */
+      padding-top: 11px;
+    }
+  }
+
+  /* ---- species picker ---- */
+  .aq-zones {
+    columns: 3 13rem;
+    column-gap: 18px;
+  }
+  /* Only the long middle group flows across columns; the short ones stay
+     whole, so a column never starts with a stray row from the group before. */
+  .aq-zone[data-zone="top"],
+  .aq-zone[data-zone="bottom"] {
+    break-inside: avoid;
+  }
+  /* A heading and its 1px rule take one 32px row, the same as a species, so
+     the rules line up across columns, including a column that carries on a
+     group without its heading. */
+  .aq-zone h3 {
+    display: flex;
+    align-items: flex-end;
+    height: 31px;
+    margin: 0;
+    padding-bottom: 6px;
+    line-height: 1;
+    break-after: avoid;
+  }
+  .aq-zone ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--rule);
+  }
+  .aq-zone li {
+    break-inside: avoid;
+  }
+  .aq-zone button {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    min-height: 32px;
+    margin: 0;
+    padding: 5px 2px;
+    border: 0;
+    border-bottom: 1px solid var(--rule-soft);
+    background: none;
+    color: var(--ink);
+    font: inherit;
+    font-size: 13px;
+    line-height: 1.35;
+    text-align: left;
+    cursor: pointer;
+  }
+  .aq-zone button:hover {
+    background: var(--hover);
+  }
+  .aq-sw {
+    flex: none;
+    width: 14px;
+    height: 8px;
+    background: linear-gradient(90deg, var(--c1) 0 60%, var(--c2) 60% 100%);
+    image-rendering: pixelated;
+    /* A hairline so pale fish on paper (and dark ones in dark mode) still
+       read as a swatch. */
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--ink) 18%, transparent);
+  }
+  .aq-name {
+    min-width: 0;
+  }
+  .aq-gal {
+    flex: none;
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .aq-hint {
+    margin: 14px 0 0;
+    font-size: 12px;
+    color: var(--ink-2);
+  }
+
+  /* ---- tank panel ---- */
+  .aq-tank {
+    font-size: 13px;
+    color: var(--ink);
+  }
+  .aq-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 2px 12px;
+  }
+  .aq-val {
+    color: var(--ink-3);
+    font-variant-numeric: tabular-nums;
+  }
+  .aq-roll {
+    display: inline-block;
+  }
+  /* 32px tall so the whole strip is a comfortable target; the track stays
+     centered in it. */
+  .aq-range {
+    display: block;
+    width: 100%;
+    height: 32px;
+    margin: 0;
+    accent-color: var(--ink);
+  }
+  .aq-meter {
+    margin-top: 8px;
+  }
+  .aq-tank .hair {
+    margin-top: 6px;
+  }
+  .aq-stock-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 22px;
+  }
+  .aq-stock {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--rule);
+  }
+
+  /* The engine builds these rows at runtime, so they don't carry this
+     component's scope attribute. */
+  .aq-stock :global(li) {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .aq-stock :global(li + li) {
+    border-top: 1px solid var(--rule-soft);
+  }
+  .aq-stock :global(.aq-stock-name) {
+    flex: 1;
+    min-width: 0;
+    color: var(--ink);
+  }
+  .aq-stock :global(.aq-stock-n) {
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+  }
+  .aq-stock :global(.aq-stock-rm) {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--ink-2);
+    font: inherit;
+    font-size: 15px;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .aq-stock :global(.aq-stock-rm:hover) {
+    background: var(--hover);
+    color: var(--ink);
+  }
+
+  .aq-empty {
+    margin: 8px 0 0;
+    color: var(--ink-2);
+  }
+  .aq-warn {
+    margin: 8px 0 0;
+    font-size: 12px;
+    color: var(--ink-3);
+  }
+</style>
 
 <script>
   import { initAquarium } from '@/lib/hobbies/aquarium';

@@ -84,7 +84,7 @@ export function initBirdingSpark(root: HTMLElement): void {
       link.target = "_blank";
       link.rel = "noopener noreferrer";
       link.className =
-        "group block overflow-hidden rounded-xl border border-neutral-200 no-underline dark:border-neutral-800";
+        "group block overflow-hidden border border-rule no-underline";
 
       const img = document.createElement("img");
       img.src = photo;
@@ -92,12 +92,12 @@ export function initBirdingSpark(root: HTMLElement): void {
       img.loading = "lazy";
       img.decoding = "async";
       img.className =
-        "block aspect-square w-full bg-neutral-100 object-cover transition-opacity duration-300 group-hover:opacity-95 dark:bg-neutral-900";
+        "block aspect-square w-full bg-band object-cover transition-opacity duration-300 group-hover:opacity-95";
       link.appendChild(img);
 
       const caption = document.createElement("span");
       caption.className =
-        "block bg-neutral-50 px-3 py-2 text-xs text-neutral-500 dark:bg-neutral-900/60 dark:text-neutral-400";
+        "block border-t border-rule px-3 py-2 text-xs text-ink-2";
       const where = coarsePlace(obs.place_guess);
       const when = formatObservedOn(obs.observed_on);
       caption.textContent =

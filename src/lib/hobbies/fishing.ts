@@ -47,23 +47,25 @@ export function initFishing(root: HTMLElement): void {
     row.className = 'flex items-start gap-3';
     const cv = document.createElement('canvas');
     cv.width = 64; cv.height = 38;
-    cv.className = 'shrink-0 rounded bg-sky-50 dark:bg-neutral-800';
+    cv.className = 'shrink-0 bg-band';
     cv.style.width = '64px'; cv.style.height = '38px'; cv.style.imageRendering = 'pixelated';
     const c = cv.getContext('2d');
     if (c) { c.imageSmoothingEnabled = false; drawFish(c, f.category, 32, 20, 2.3, f.color, f.accent, -1); }
     const txt = document.createElement('div');
     txt.className = 'min-w-0';
     const nm = document.createElement('div');
-    nm.className = 'text-sm font-medium leading-tight';
+    nm.className = 'text-sm leading-tight text-ink';
     nm.textContent = f.common;
     const nt = document.createElement('div');
-    nt.className = 'text-xs text-neutral-500 dark:text-neutral-400';
+    nt.className = 'mt-0.5 text-xs text-ink-3';
     nt.textContent = f.note;
     txt.append(nm, nt);
     row.append(cv, txt);
     return row;
   }
 
+  // The panel is a modal: Escape or the scrim closes it and focus goes back.
+  let returnFocus: HTMLElement | null = null;
   function openPanel(waterId: string): void {
     const w = WATERS[waterId];
     if (!w || !panel || !pTitle || !pKind || !pList) return;
@@ -74,10 +76,21 @@ export function initFishing(root: HTMLElement): void {
       const f = FISH_BY_ID[id];
       if (f) pList.appendChild(speciesRow(f));
     }
+    if (!panel.classList.contains('is-open')) {
+      returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    }
     panel.classList.add('is-open');
+    pClose?.focus({ preventScroll: true });
   }
-  pClose?.addEventListener('click', () => panel?.classList.remove('is-open'));
-  panel?.addEventListener('click', (e) => { if (e.target === panel) panel.classList.remove('is-open'); });
+  function closePanel(): void {
+    if (!panel?.classList.contains('is-open')) return;
+    panel.classList.remove('is-open');
+    returnFocus?.focus({ preventScroll: true });
+    returnFocus = null;
+  }
+  pClose?.addEventListener('click', closePanel);
+  panel?.addEventListener('click', (e) => { if (e.target === panel) closePanel(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePanel(); });
 
   // map views
   const views: Array<{ frame: (now: number) => void }> = [];
@@ -92,9 +105,7 @@ export function initFishing(root: HTMLElement): void {
       const key = btn.dataset.fishTab;
       root.querySelectorAll<HTMLElement>('[data-fish-map]').forEach((m) => m.classList.toggle('is-active', m.dataset.fishMap === key));
       root.querySelectorAll<HTMLElement>('[data-fish-tab]').forEach((b) => {
-        const on = b === btn;
-        b.classList.toggle('bg-white', on); b.classList.toggle('dark:bg-neutral-700', on);
-        b.classList.toggle('shadow-sm', on); b.classList.toggle('text-neutral-500', !on);
+        b.setAttribute('aria-checked', String(b === btn));
       });
     });
   });
@@ -154,7 +165,7 @@ function makeView(key: string, canvas: HTMLCanvasElement, onPick: (id: string) =
     .filter((m): m is NonNullable<typeof m> => !!m && !!m.sp);
 
   let hover: (typeof marks)[number] | null = null;
-  const toBmp = (e: PointerEvent) => {
+  const toBmp = (e: MouseEvent) => {
     const r = canvas.getBoundingClientRect();
     return { x: (e.clientX - r.left) * (canvas.width / r.width), y: (e.clientY - r.top) * (canvas.height / r.height) };
   };
@@ -173,7 +184,13 @@ function makeView(key: string, canvas: HTMLCanvasElement, onPick: (id: string) =
     canvas.style.cursor = hover ? 'pointer' : 'default';
   });
   canvas.addEventListener('pointerleave', () => { hover = null; });
-  canvas.addEventListener('pointerdown', (e) => { const hit = pick(toBmp(e)); if (hit) onPick(hit.id); });
+  // Open on click, not pointerdown. The panel opens over the map, so a tap's
+  // click would land on its scrim and close it again, and the mousedown that
+  // follows a pointerdown would pull focus off the panel's button.
+  canvas.addEventListener('click', (e) => {
+    const hit = pick(toBmp(e));
+    if (hit) onPick(hit.id);
+  });
 
   function labelAt(text: string, cx: number, cy: number): void {
     ctx.font = 'bold 10px system-ui, sans-serif';

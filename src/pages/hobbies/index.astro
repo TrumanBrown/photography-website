@@ -17,7 +17,7 @@ const hobbies = sortHobbies(await getCollection("hobbies"));
       <h1 class="text-2xl font-light tracking-tight sm:text-[30px]">
         Things to try
       </h1>
-      <p class="max-w-prose text-sm text-neutral-600 dark:text-neutral-400">
+      <p class="max-w-prose text-sm text-ink-3">
         Some of my hobbies and silly little virtual experiences I built around
         them. Maybe they will inspire you to give them a shot IRL
       </p>
@@ -25,7 +25,7 @@ const hobbies = sortHobbies(await getCollection("hobbies"));
 
     {
       hobbies.length === 0 ? (
-        <div class="rounded-lg border border-dashed border-neutral-300 p-10 text-center text-sm text-neutral-600 dark:border-neutral-700 dark:text-neutral-400">
+        <div class="border border-dashed border-rule p-10 text-center text-sm text-ink-2">
           Nothing here yet.
         </div>
       ) : (

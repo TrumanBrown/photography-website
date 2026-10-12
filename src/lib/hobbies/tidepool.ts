@@ -15,6 +15,7 @@
  */
 import { SPECIES, type TidepoolSpecies, type TidepoolCategory } from './tidepool-species';
 import photoData from './tidepool-photos.json';
+import { rollTo, setHair } from '@/lib/motion';
 
 /** Optional real photos per species id (CC-licensed). See tidepool-photos.json. */
 const PHOTOS = (photoData.species ?? {}) as Record<string, { photo?: string; credit?: string }>;
@@ -353,13 +354,14 @@ export function initTidepool(root: HTMLElement): void {
   const factEl = root.querySelector<HTMLElement>('[data-tp-fact]');
   const badgeEl = root.querySelector<HTMLElement>('[data-tp-badge]');
   const closeBtn = root.querySelector<HTMLButtonElement>('[data-tp-close]');
-  const progressEl = root.querySelector<HTMLElement>('[data-tp-progress]');
+  const countEl = root.querySelector<HTMLElement>('[data-tp-count]');
+  const lastEl = root.querySelector<HTMLElement>('[data-tp-last]');
   const barEl = root.querySelector<HTMLElement>('[data-tp-bar]');
   const resetBtn = root.querySelector<HTMLButtonElement>('[data-tp-reset]');
   const photoEl = root.querySelector<HTMLImageElement>('[data-tp-photo]');
   const creditEl = root.querySelector<HTMLElement>('[data-tp-credit]');
 
-  if (!canvas || !card || !revealCanvas || !nameEl || !sciEl || !factEl || !badgeEl || !closeBtn || !progressEl || !barEl) {
+  if (!canvas || !card || !revealCanvas || !nameEl || !sciEl || !factEl || !badgeEl || !closeBtn || !countEl || !barEl) {
     return;
   }
   const ctx = canvas.getContext('2d');
@@ -677,7 +679,7 @@ export function initTidepool(root: HTMLElement): void {
   function flip(s: Stone): void {
     if (s.open) {
       s.open = false;
-      card!.classList.remove('tp-open');
+      closeCard();
       return;
     }
     s.open = true;
@@ -689,12 +691,13 @@ export function initTidepool(root: HTMLElement): void {
       saveDiscovered(discovered);
       updateJournal();
     }
+    showLastFind(sp);
     showCard(sp, isNew);
   }
 
   function paintRevealSprite(sp: TidepoolSpecies): void {
-    if (photoEl) photoEl.classList.add('tp-hidden');
-    revealCanvas!.classList.remove('tp-hidden');
+    if (photoEl) photoEl.classList.add('is-hidden');
+    revealCanvas!.classList.remove('is-hidden');
     const size = 120;
     revealCanvas!.width = size * dpr;
     revealCanvas!.height = size * dpr;
@@ -714,34 +717,54 @@ export function initTidepool(root: HTMLElement): void {
     const credit = sp.photoCredit ?? override?.credit ?? '';
     if (photo && photoEl) {
       // real photo when we have one; fall back to the sprite if it fails to load
-      photoEl.classList.remove('tp-hidden');
-      revealCanvas!.classList.add('tp-hidden');
+      photoEl.classList.remove('is-hidden');
+      revealCanvas!.classList.add('is-hidden');
       photoEl.onerror = () => {
         paintRevealSprite(sp);
-        if (creditEl) creditEl.classList.add('tp-hidden');
+        if (creditEl) creditEl.classList.add('is-hidden');
       };
       photoEl.alt = sp.common;
       photoEl.src = photo;
       if (creditEl) {
         creditEl.textContent = credit;
-        creditEl.classList.toggle('tp-hidden', !credit);
+        creditEl.classList.toggle('is-hidden', !credit);
       }
     } else {
       paintRevealSprite(sp);
-      if (creditEl) creditEl.classList.add('tp-hidden');
+      if (creditEl) creditEl.classList.add('is-hidden');
     }
 
     nameEl!.textContent = sp.common;
     sciEl!.textContent = sp.scientific;
     factEl!.textContent = sp.facts[Math.floor(Math.random() * sp.facts.length)];
-    badgeEl!.textContent = isNew ? 'New find!' : 'Found again';
-    badgeEl!.classList.toggle('tp-badge-new', isNew);
-    card!.classList.add('tp-open');
+    badgeEl!.textContent = isNew ? 'New to your journal' : 'Found again';
+    openCard();
+  }
+
+  // The card is a modal: focus moves to its button, Escape or the scrim
+  // closes it, and focus goes back where it was.
+  let returnFocus: HTMLElement | null = null;
+  function openCard(): void {
+    if (!card!.classList.contains('is-open')) {
+      returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    }
+    card!.classList.add('is-open');
+    closeBtn!.focus({ preventScroll: true });
+  }
+  function closeCard(): void {
+    if (!card!.classList.contains('is-open')) return;
+    card!.classList.remove('is-open');
+    returnFocus?.focus({ preventScroll: true });
+    returnFocus = null;
+  }
+
+  function showLastFind(sp: TidepoolSpecies): void {
+    if (lastEl) lastEl.textContent = `Last find: ${sp.common}`;
   }
 
   function updateJournal(): void {
-    progressEl!.textContent = `${discovered.size} / ${total} species`;
-    barEl!.style.width = `${(discovered.size / total) * 100}%`;
+    rollTo(countEl!, discovered.size);
+    setHair(barEl!, discovered.size / total);
   }
 
   function hitTest(px: number, py: number): Stone | null {
@@ -753,11 +776,12 @@ export function initTidepool(root: HTMLElement): void {
   }
 
   // -------------------------------------------------------------- wiring
-  canvas.addEventListener('pointerdown', (e: PointerEvent) => {
+  // Flip on click, not pointerdown. The card opens over the beach, so a tap's
+  // click would land on its scrim and close it again, and the mousedown that
+  // follows a pointerdown would pull focus off the card's button.
+  canvas.addEventListener('click', (e: MouseEvent) => {
     const rect2 = canvas.getBoundingClientRect();
-    const px = e.clientX - rect2.left;
-    const py = e.clientY - rect2.top;
-    const s = hitTest(px, py);
+    const s = hitTest(e.clientX - rect2.left, e.clientY - rect2.top);
     if (s) flip(s);
   });
   canvas.addEventListener('pointermove', (e: PointerEvent) => {
@@ -772,11 +796,19 @@ export function initTidepool(root: HTMLElement): void {
     hand.show = false;
   });
 
-  closeBtn.addEventListener('click', () => {
-    card.classList.remove('tp-open');
-  });
+  closeBtn.addEventListener('click', closeCard);
   card.addEventListener('click', (e) => {
-    if (e.target === card) card.classList.remove('tp-open');
+    if (e.target === card) closeCard();
+  });
+  card.addEventListener('keydown', (e) => {
+    // One control in the card, so Tab stays on it.
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      closeBtn.focus();
+    }
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeCard();
   });
   resetBtn?.addEventListener('click', () => {
     for (const s of stones) {
@@ -811,6 +843,11 @@ export function initTidepool(root: HTMLElement): void {
   // --------------------------------------------------------------- init
   fit();
   updateJournal();
+  // The journal saves in the order things were found, so its last entry is
+  // the most recent new find.
+  const lastId = [...discovered].pop();
+  const lastSpecies = SPECIES.find((s) => s.id === lastId);
+  if (lastSpecies) showLastFind(lastSpecies);
   render(performance.now());
   start();
 }

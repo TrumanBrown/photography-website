@@ -760,7 +760,7 @@ export function initHerpMap(root: HTMLElement): void {
       return;
     }
     const head = document.createElement("h3");
-    head.className = "mb-3 text-sm font-semibold";
+    head.className = "mb-3 text-sm font-normal text-ink";
     head.textContent = `${detail.title}${detail.items.length} observation${detail.items.length === 1 ? "" : "s"}`;
 
     const grid = document.createElement("div");
@@ -772,7 +772,7 @@ export function initHerpMap(root: HTMLElement): void {
       a.target = "_blank";
       a.rel = "noopener noreferrer";
       a.className =
-        "group flex gap-3 rounded-lg border border-neutral-200 p-2 no-underline transition-colors hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900";
+        "group flex gap-3 border-b border-rule-soft py-2 pr-2 no-underline transition-colors hover:bg-hover hover:no-underline";
       a.setAttribute("role", "listitem");
 
       const img = document.createElement("img");
@@ -782,28 +782,24 @@ export function initHerpMap(root: HTMLElement): void {
       img.decoding = "async";
       img.width = 64;
       img.height = 64;
-      img.className = "h-16 w-16 shrink-0 rounded-md object-cover";
+      img.className = "h-16 w-16 shrink-0 bg-band object-cover";
       a.appendChild(img);
 
       const meta = document.createElement("div");
       meta.className = "min-w-0 flex-1";
       const nm = document.createElement("p");
-      nm.className =
-        "truncate text-sm font-medium text-neutral-900 dark:text-neutral-100";
+      nm.className = "truncate text-sm text-ink";
       nm.textContent = o.name;
       const sci = document.createElement("p");
-      sci.className =
-        "truncate text-xs italic text-neutral-500 dark:text-neutral-400";
+      sci.className = "truncate text-xs italic text-ink-3";
       sci.textContent = o.sci;
       const sub = document.createElement("p");
-      sub.className =
-        "mt-1 truncate text-xs text-neutral-500 dark:text-neutral-500";
+      sub.className = "mt-1 truncate text-xs text-ink-2";
       const bits = [fmtDate(o.date), o.place].filter(Boolean);
       sub.textContent = bits.join(" · ");
       if (o.obscured) {
         const tag = document.createElement("span");
-        tag.className =
-          "ml-1 whitespace-nowrap rounded bg-neutral-200 px-1 text-[10px] text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400";
+        tag.className = "ml-1 whitespace-nowrap text-[10px] text-ink-2";
         tag.textContent = "approx.";
         sub.appendChild(tag);
       }
@@ -1120,11 +1116,7 @@ export function initHerpMap(root: HTMLElement): void {
     btn.addEventListener("click", () => {
       active = (btn.dataset.herpmapCls as Cls | "all") ?? "all";
       for (const b of toggleEls) {
-        const on = b === btn;
-        b.setAttribute("aria-pressed", String(on));
-        b.classList.toggle("bg-lime-600", on);
-        b.classList.toggle("text-white", on);
-        b.classList.toggle("border-lime-600", on);
+        b.setAttribute("aria-checked", String(b === btn));
       }
       // if the current detail region lost all data under the new filter, back out
       if (

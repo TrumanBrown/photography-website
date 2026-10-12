@@ -29,63 +29,53 @@ const {
   data-herpmap-user={userId}
   data-herpmap-limit={limit}
 >
-  <div class="mb-4 flex items-end justify-between gap-3">
-    <div>
-      <h2 class="text-lg font-medium">{heading}</h2>
-      {
-        blurb && (
-          <p class="mt-1 max-w-prose text-sm text-neutral-600 dark:text-neutral-400">
-            {blurb}
-          </p>
-        )
-      }
+  <div class="mb-4">
+    <div class="shead">
+      <h2>{heading}</h2>
+      <a href={url} target="_blank" rel="noopener noreferrer" class="shead-link"
+        ><span class="draw">View all on iNaturalist</span> →</a
+      >
     </div>
-    <a
-      href={url}
-      target="_blank"
-      rel="noopener noreferrer"
-      class="shrink-0 rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium no-underline hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
-      >View all on iNaturalist →</a
-    >
+    {blurb && <p class="shead-blurb">{blurb}</p>}
   </div>
 
-  <div class="mb-4 flex items-center justify-between gap-2">
+  <div class="mb-4 flex items-end justify-between gap-4">
     <div
-      class="inline-flex gap-1 rounded-lg border border-neutral-300 p-1 text-xs dark:border-neutral-700"
+      class="utabs"
+      role="radiogroup"
+      aria-label="Show"
+      data-utabs
+      data-herpmap-tabs
     >
       <button
         type="button"
+        role="radio"
+        aria-checked="true"
         data-herpmap-cls="all"
-        aria-pressed="true"
-        class="rounded-md border border-lime-600 bg-lime-600 px-3 py-1 font-medium text-white"
-        >All</button
+        data-value="all">All</button
       >
       <button
         type="button"
+        role="radio"
+        aria-checked="false"
         data-herpmap-cls="reptiles"
-        aria-pressed="false"
-        class="rounded-md border border-transparent px-3 py-1 font-medium hover:bg-neutral-100 dark:hover:bg-neutral-800"
-        >Reptiles</button
+        data-value="reptiles">Reptiles</button
       >
       <button
         type="button"
+        role="radio"
+        aria-checked="false"
         data-herpmap-cls="amphibians"
-        aria-pressed="false"
-        class="rounded-md border border-transparent px-3 py-1 font-medium hover:bg-neutral-100 dark:hover:bg-neutral-800"
-        >Amphibians</button
+        data-value="amphibians">Amphibians</button
       >
+      <span class="utabs-bar" aria-hidden="true"></span>
     </div>
-    <button
-      type="button"
-      data-herpmap-back
-      class="hidden rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
-      >← Back</button
+    <button type="button" data-herpmap-back class="linkbtn draw hidden"
+      ><span>← Back</span></button
     >
   </div>
 
-  <div
-    class="relative overflow-hidden rounded-xl border border-neutral-200 bg-[#0b1220] dark:border-neutral-800"
-  >
+  <div class="relative overflow-hidden border border-rule bg-[#0b1220]">
     <canvas
       data-herpmap-canvas
       class="block w-full"
@@ -95,7 +85,7 @@ const {
     ></canvas>
     <div
       data-herpmap-tip
-      class="pointer-events-none absolute hidden -translate-x-1/2 -translate-y-full rounded bg-neutral-900/95 px-2 py-1 text-[11px] text-white shadow-lg"
+      class="pointer-events-none absolute hidden -translate-x-1/2 -translate-y-full bg-[#0b1220] px-2 py-1 text-[11px] text-white ring-1 ring-white/20"
     >
     </div>
     <div class="absolute right-2 top-2 flex flex-col gap-1">
@@ -103,32 +93,28 @@ const {
         type="button"
         data-herpmap-zoom="in"
         aria-label="Zoom in"
-        class="flex h-8 w-8 items-center justify-center rounded-md border border-white/20 bg-neutral-900/70 text-lg leading-none text-white backdrop-blur hover:bg-neutral-900/90"
+        class="flex h-8 w-8 items-center justify-center border border-white/20 bg-[#0b1220]/80 text-lg leading-none text-white hover:bg-[#0b1220]"
         >+</button
       >
       <button
         type="button"
         data-herpmap-zoom="out"
         aria-label="Zoom out"
-        class="flex h-8 w-8 items-center justify-center rounded-md border border-white/20 bg-neutral-900/70 text-lg leading-none text-white backdrop-blur hover:bg-neutral-900/90"
+        class="flex h-8 w-8 items-center justify-center border border-white/20 bg-[#0b1220]/80 text-lg leading-none text-white hover:bg-[#0b1220]"
         >−</button
       >
       <button
         type="button"
         data-herpmap-zoom="reset"
         aria-label="Reset zoom"
-        class="flex h-8 w-8 items-center justify-center rounded-md border border-white/20 bg-neutral-900/70 text-xs leading-none text-white backdrop-blur hover:bg-neutral-900/90"
+        class="flex h-8 w-8 items-center justify-center border border-white/20 bg-[#0b1220]/80 text-xs leading-none text-white hover:bg-[#0b1220]"
         >⤢</button
       >
     </div>
   </div>
 
-  <p
-    data-herpmap-status
-    class="mt-2 text-xs text-neutral-500 dark:text-neutral-500"
-  >
-  </p>
-  <p class="mt-1 text-[11px] text-neutral-400 dark:text-neutral-600">
+  <p data-herpmap-status class="mt-2 text-xs text-ink-2"></p>
+  <p class="mt-1 text-[11px] text-ink-2">
     Pinch or scroll to zoom, drag to pan, or use the + / − buttons.
   </p>
   <div data-herpmap-detail class="mt-4"></div>
@@ -136,6 +122,9 @@ const {
 
 <script>
   import { initHerpMap } from "@/lib/hobbies/inat-herp-map";
+  import { initAllUnderlineTabs } from "@/lib/motion";
+
+  initAllUnderlineTabs();
 
   document
     .querySelectorAll<HTMLElement>("[data-herpmap]")

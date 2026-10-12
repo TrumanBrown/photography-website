@@ -20,6 +20,11 @@ export default {
         paper: "var(--paper)",
         band: "var(--band)",
         ink: "var(--ink)",
+        "ink-2": "var(--ink-2)",
+        "ink-3": "var(--ink-3)",
+        rule: "var(--rule)",
+        "rule-soft": "var(--rule-soft)",
+        hover: "var(--hover)",
       },
       maxWidth: {
         prose: "65ch",
