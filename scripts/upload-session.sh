@@ -4,8 +4,8 @@
 # Blob Storage. Optionally trigger a build afterward.
 #
 # Usage:
-#   ./scripts/upload-session.sh <session>... [--build] [--yes]
-#   ./scripts/upload-session.sh --all [--build] [--yes]
+#   ./scripts/upload-session.sh <session>... [--build] [--yes] [--keep-names]
+#   ./scripts/upload-session.sh --all [--build] [--yes] [--keep-names]
 #
 # A <session> is either a folder or a .zip under staging/ (give the name with or
 # without the .zip). Examples:
@@ -24,6 +24,10 @@
 # name still supplies the location + date. Zips are unpacked to a scratch folder
 # first; extraction is lossless and the original bytes are what get uploaded.
 # Videos and other unsupported files are counted, reported, and left alone.
+#
+# The session name becomes the session's web address, so a misspelled state,
+# country or island in it ("crater-lake-oreogn") stops the upload with the
+# name it should be. --keep-names uploads it as it is.
 
 set -euo pipefail
 
@@ -232,11 +236,13 @@ sessions=()
 trigger_build=false
 auto_yes=false
 upload_all=false
+keep_names=false
 for arg in "$@"; do
   case "$arg" in
     --all) upload_all=true ;;
     --build) trigger_build=true ;;
     --yes|-y) auto_yes=true ;;
+    --keep-names) keep_names=true ;;
     --help|-h)
       usage
       exit 0
@@ -300,6 +306,15 @@ for i in "${!sessions[@]}"; do
     exit 1
   fi
 done
+
+# A folder name becomes the session's web address, so a misspelled state or
+# country ("oreogn") would go public. Stop before anything is uploaded.
+if [ "$keep_names" != true ] && command -v node >/dev/null 2>&1; then
+  if ! node "$ROOT/scripts/photos/check-names.mjs" "${sessions[@]}"; then
+    echo "Rename it in staging/ and run this again, or add --keep-names to upload it as it is." >&2
+    exit 1
+  fi
+fi
 
 # Sanity-check Azure auth before doing anything destructive.
 if ! az account show >/dev/null 2>&1; then

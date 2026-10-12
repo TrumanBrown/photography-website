@@ -14,6 +14,7 @@
  * caption all at once, so it stays short, literal and free of hashtags.
  */
 import { idLevel } from "./analyse.mjs";
+import { fixPlaceWord } from "./placenames.mjs";
 import {
   displayName,
   lint,
@@ -61,13 +62,17 @@ export function hasRealTitle(session) {
   return Boolean(title) && title !== humanize(session.slug);
 }
 
-/** "mt-baker-fall-2026" -> "Mount Baker": the place words in a folder name you chose. */
+/** "mt-baker-fall-2026" -> "Mount Baker": the place words in a folder name you chose, with swapped-letter typos in a state or country fixed ("oreogn" -> "Oregon"). */
 export function slugPlace(slug) {
   const words = String(slug ?? "")
     .split(/[-_\s]+/)
     .filter((w) => w && !SLUG_NOISE.test(w))
     .map((w) =>
-      /^mt$/i.test(w) ? "mount" : /^mtn$/i.test(w) ? "mountain" : w,
+      /^mt$/i.test(w)
+        ? "mount"
+        : /^mtn$/i.test(w)
+          ? "mountain"
+          : (fixPlaceWord(w) ?? w),
     );
   return words.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
 }

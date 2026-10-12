@@ -9,6 +9,11 @@ name becomes the session prefix in Blob and must not contain `/` or `\`. Names
 must produce unique public slugs of at most 200 characters; prebuild rejects
 collisions such as `Hiking 2025` and `Hiking-2025`.
 
+The name is also the session's web address, and captions read place names from
+it, so `upload-session.sh` stops on a misspelled state, country or island
+(`crater-lake-oreogn-sep-2025`) and says what to rename it to. `--keep-names`
+uploads it as it is.
+
 ```
 staging/
 ├── 2026-mexico/

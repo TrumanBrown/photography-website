@@ -87,6 +87,8 @@ It answers with neutral facts, never finished copy:
 
 It may say "Mount Baker" only because the folder name does. If it had named Mount Shuksan, which you never wrote anywhere, the name would be thrown out and the caption would fall back to "Snow-covered peak". To have a peak named in captions, put it in the session's title, location or folder name.
 
+Folder names are the one place name nobody proofreads. A state, country or island with two letters swapped ("crater-lake-oreogn") is read as the right name ("Crater Lake Oregon"), and every run's log warns about the folder with the name to rename it to; the web address keeps the typo until it's renamed. `upload-session.sh` checks names before uploading, so this is only a safety net ([placenames.mjs](../scripts/photos/placenames.mjs)).
+
 ## Identifications come from iNaturalist
 
 Your iNaturalist observations are the source of truth for what an organism is. The model never identifies anything; it only describes.

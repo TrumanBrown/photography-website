@@ -94,6 +94,7 @@ import {
   pickFact,
 } from "./facts.mjs";
 import { wikiClient } from "./wiki.mjs";
+import { fixSlug, slugTypos } from "./placenames.mjs";
 import {
   assembleCaption,
   placeLine,
@@ -199,6 +200,13 @@ async function main() {
     ? await loadSessionsLocal(ROOT)
     : await loadSessionsFromIndex(remote);
   const sessionsBySlug = new Map(sessions.map((s) => [s.slug, s]));
+  // Captions spell a misspelled state or country right (slugPlace), but the
+  // web address keeps the typo until the folder is renamed.
+  for (const s of sessions)
+    for (const t of slugTypos(s.slug))
+      warn(
+        `The folder ${s.slug} looks misspelled: "${t.word}" is read as "${t.fix}". Rename it to ${fixSlug(s.slug)} to fix its web address.`,
+      );
   const only = new Set(args.only);
   const inScope = (slug) => !only.size || only.has(slug);
   const photos = sessions.flatMap((s) => s.photos);

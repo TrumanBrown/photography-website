@@ -155,6 +155,11 @@ container, and optionally triggers the build. See [staging/README.md](staging/RE
 The argument must name one direct child of `staging/`; every session folder must
 map to a unique public slug and contain at least one image.
 
+The folder name becomes the session's web address, and captions read place
+names from it. So the script stops on a misspelled state, country or island
+(`crater-lake-oreogn-sep-2025`) and says what to rename it to. Add
+`--keep-names` to upload it as it is.
+
 ### Setting session metadata
 
 Two options:
