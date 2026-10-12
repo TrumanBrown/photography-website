@@ -97,6 +97,25 @@ describe("Wikipedia lookups", () => {
     expect(art).toMatchObject({ title: "Reduviidae", about: "family" });
   });
 
+  it("matches a place whose article spells it with accents or spaces", async () => {
+    const fetchImpl = fakeFetch({
+      "srsearch=Napali%20Coast%20national%20park": found(
+        "Nā Pali Coast State Wilderness Park",
+      ),
+      "srsearch=Napali%20Coast": found("Nā Pali Coast State Wilderness Park"),
+      "titles=N%C4%81%20Pali%20Coast%20State%20Wilderness%20Park": page(
+        "Nā Pali Coast State Wilderness Park",
+        long("The Nā Pali Coast is on Kauai, Hawaii."),
+      ),
+    });
+    const art = await wikiClient({ fetchImpl, spacingMs: 0 }).placeArticle({
+      place: "Napali Coast",
+      names: ["Napali Coast", "Kauai", "Hawaii"],
+      context: ["Kauai", "Hawaii"],
+    });
+    expect(art.title).toBe("Nā Pali Coast State Wilderness Park");
+  });
+
   it("picks the park over the town, and never a theme park", async () => {
     const fetchImpl = fakeFetch({
       "srsearch=Zhangjiajie%20national%20park": found(

@@ -163,6 +163,9 @@ export function wikiClient({
       .split(/\s+/)
       .filter((w) => w.length > 3)
       .slice(0, 2);
+    // "Napali Coast" is "Nā Pali Coast" to Wikipedia: compare without
+    // accents, spaces or punctuation.
+    const squash = (s) => fold(s).replace(/[^a-z0-9]+/g, "");
     const queries = [
       `${place} national park`,
       place,
@@ -177,11 +180,13 @@ export function wikiClient({
       if (!title || seen.has(title)) continue;
       seen.add(title);
       const tl = title.toLowerCase();
+      const ts = squash(title);
       let score;
-      if (tl === lower) score = 7;
-      else if (main.length && main.every((w) => tl.includes(w))) score = 6;
-      else if (main.some((w) => tl.includes(w))) score = 3;
-      else if (names.some((n) => tl === n.toLowerCase())) score = 1;
+      if (ts === squash(lower)) score = 7;
+      else if (main.length && main.every((w) => ts.includes(squash(w))))
+        score = 6;
+      else if (main.some((w) => ts.includes(squash(w)))) score = 3;
+      else if (names.some((n) => ts === squash(n))) score = 1;
       else continue;
       if (/national park|forest park|reserve|national monument/.test(tl))
         score += 3;
