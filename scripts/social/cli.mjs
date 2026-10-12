@@ -231,7 +231,7 @@ async function main() {
       unskip:
         "Unskipped it. The next Photo captions run puts it back in the plan.",
       redraft:
-        "The next Photo captions run writes it a new first line (the website's caption too) and gives its post a different fact.",
+        "The next Photo captions run writes it a new first line and reaction (the website's caption changes too) and gives its post a different fact.",
     }[command];
     console.log(`${pick}: ${done}`);
     return;

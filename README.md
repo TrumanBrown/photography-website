@@ -260,10 +260,14 @@ or place. Each post is:
   Frames Instagram can't take as they are get plain borders.
 - **a caption written from the photo's own record**: the species from your
   iNaturalist identification of that exact photo with its scientific name and
-  what it's doing, the place, one fact about the species or the place taken
-  from Wikipedia and checked against the article, the camera and lens, five
-  hashtags built from data, alt text, and a last line sending people to the
-  full-resolution photo on your site through the link in your bio.
+  the most interesting thing about it, the place, a one-line reaction in your
+  voice, a fun fact about the species or the place taken from Wikipedia and
+  checked against the article, the camera and lens, five hashtags built from
+  data, alt text, and a last line sending people to the full-resolution photo
+  on your site through the link in your bio. How it sounds comes from your own
+  rewrites, kept in the
+  [caption-voice skill](.github/skills/caption-voice/SKILL.md); edit that file
+  to change it.
 
 **What happens when you upload a session**, with nothing else to do:
 

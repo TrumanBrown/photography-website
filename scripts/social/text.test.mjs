@@ -163,11 +163,12 @@ describe("caption text", () => {
     expect(lint("Orange hands and a barred yellow side")).toEqual([]);
   });
 
-  it("puts a post together: first line, fact, IUCN line, gear and link, hashtags", () => {
+  it("puts a post together: first line and reaction, fun fact, IUCN line, gear and link, hashtags", () => {
     const caption = assembleCaption({
       headline:
-        "Agami heron (Agamia agami) with its neck extended, Tortuguero canals, Limón Province, Costa Rica",
-      body: "It's the only member of the genus Agamia.",
+        "Agami heron (Agamia agami) with its neck stretched out, Tortuguero canals, Limón Province, Costa Rica",
+      comment: "Those colours look painted on.",
+      body: "Its bill is longer than its head.",
       iucn: "Near Threatened",
       gear: gearLine(a6700macro),
       pointer:
@@ -175,15 +176,15 @@ describe("caption text", () => {
       hashtags: ["#agamiheron", "#birdsofinstagram"],
     });
     const parts = caption.split("\n\n");
-    expect(parts[0]).toMatch(
-      /^Agami heron \(Agamia agami\) with its neck extended/,
+    expect(parts[0]).toBe(
+      "Agami heron (Agamia agami) with its neck stretched out, Tortuguero canals, Limón Province, Costa Rica. Those colours look painted on.",
     );
     expect(parts[1]).toBe(
-      "It's the only member of the genus Agamia. Listed as Near Threatened on the IUCN Red List.",
+      "Fun fact: Its bill is longer than its head. Listed as Near Threatened on the IUCN Red List.",
     );
     expect(parts[2]).toMatch(/^Sony a6700 .*\nFull resolution/);
     expect(parts[3]).toBe("#agamiheron #birdsofinstagram");
-    // No fact to tell: the post simply skips that paragraph.
+    // No reaction and no fact: the post simply skips them.
     expect(
       assembleCaption({
         headline: "Hanging moss",
@@ -239,6 +240,12 @@ describe("caption text", () => {
         "Yellow Aster Butte",
       ),
     ).toBe("Yellow Aster Butte, North Cascades, Washington");
+    expect(placeLine({ location: "Portland area, Oregon" }, "Portland")).toBe(
+      "Portland, Oregon",
+    );
+    expect(
+      placeLine({ location: "Cascade Range, Washington" }, "Cascades"),
+    ).toBe("Cascades, Washington");
   });
 
   it("keeps demonyms capitalised mid-sentence", () => {

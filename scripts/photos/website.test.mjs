@@ -414,6 +414,13 @@ describe("website captions", () => {
         location: "Eastern Washington",
       }),
     ).toBe("shrub-steppe");
+    expect(
+      placeLabel({
+        slug: "portland-and-nearby-oct-2025",
+        title: "Portland and Nearby, Oregon, November 2025",
+        location: "Portland area, Oregon",
+      }),
+    ).toBe("Portland");
   });
 });
 

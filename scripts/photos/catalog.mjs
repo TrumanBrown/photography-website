@@ -85,6 +85,14 @@ import {
   normaliseLine,
 } from "./lines.mjs";
 import {
+  HIS_REACTIONS,
+  VOICE_VERSION,
+  loadVoiceGuide,
+  mockVoice,
+  normaliseVoice,
+  voicePrompt,
+} from "./voice.mjs";
+import {
   FACTS_VERSION,
   checkFacts,
   factKey,
@@ -110,7 +118,7 @@ import { info, redact, warn } from "./redact.mjs";
 const DESCRIPTION_VERSION = 2;
 
 /** Bump when the way posts are put together changes, so planned posts are rebuilt. */
-const POST_VERSION = 3;
+const POST_VERSION = 4;
 
 function parseArgs(argv) {
   const out = {
@@ -527,6 +535,26 @@ async function main() {
     (s.line?.v !== LINE_VERSION ||
       s.line?.at !== s.analysis.at ||
       redrafting(s, s.line?.written));
+  // The name the model writes after, for an identified organism; "" otherwise.
+  const namedFor = (s) => {
+    const taxon = taxonOf(s);
+    const level = levelOf(s);
+    if (level === "species")
+      return (s.analysis.count ?? 1) > 1
+        ? speciesSubject(taxon, s.analysis.count)
+        : displayName(taxon.common) || taxon.name;
+    if (level === "group") return `${s.analysis.subject} (${taxon.name})`;
+    return "";
+  };
+  const notesFor = (s) => ({
+    named: namedFor(s),
+    subject: s.analysis.subject,
+    scene: s.analysis.scene,
+    conditions: s.analysis.conditions,
+    landmark: s.analysis.landmark,
+    description: s.analysis.description,
+    place: allowedNames(sessionOf(s.session)).join(", "),
+  });
   const lineQueue = Object.values(shots).filter(
     (s) => inScope(s.session) && needsLine(s),
   );
@@ -552,28 +580,10 @@ async function main() {
         batches.push(list.slice(i, i + 40));
     }
     await pool(batches, 2, async (batch) => {
-      const items = batch.map((s, i) => {
-        const taxon = taxonOf(s);
-        const level = levelOf(s);
-        const session = sessionOf(s.session);
-        return {
-          id: String(i + 1),
-          named:
-            level === "species"
-              ? (s.analysis.count ?? 1) > 1
-                ? speciesSubject(taxon, s.analysis.count)
-                : displayName(taxon.common) || taxon.name
-              : level === "group"
-                ? `${s.analysis.subject} (${taxon.name})`
-                : "",
-          subject: s.analysis.subject,
-          scene: s.analysis.scene,
-          conditions: s.analysis.conditions,
-          landmark: s.analysis.landmark,
-          description: s.analysis.description,
-          place: allowedNames(session).join(", "),
-        };
-      });
+      const items = batch.map((s, i) => ({
+        id: String(i + 1),
+        ...notesFor(s),
+      }));
       try {
         const reply = await askJson({
           provider,
@@ -843,7 +853,7 @@ async function main() {
   await store.writeJson("taxa.json", taxa);
 
   // 6. instagram
-  const ig = { rendered: 0, facts: 0, review: 0, planned: 0 };
+  const ig = { rendered: 0, voiced: 0, facts: 0, review: 0, planned: 0 };
   if (args.instagram && process.env.SOCIAL_ENABLED === "true") {
     try {
       await instagramStage();
@@ -915,21 +925,30 @@ async function main() {
         ? `Full resolution and the rest of this session are on ${settings.domain}, link in bio`
         : "");
 
-    // Everything in a post besides its fact; all of it decided by code.
+    // Everything in a post besides its fact; all of it decided by code, from
+    // the first line and reaction written in Truman's voice (voice.mjs) when
+    // they pass the caption checks, else from the website's plain first line.
     const partsFor = (s) => {
       const file = catalog.files[s.pick];
       const session = sessionOf(s.session);
       const taxon = taxonOf(s);
       const level = levelOf(s);
-      const headline = captionFor({
+      const base = {
         analysis: s.analysis,
         taxon,
         session,
         lexicon,
         place: placeLine(session, placeLabel(session)),
         max: 220,
-        line: s.line,
-      });
+      };
+      const voiced = s.voice?.action
+        ? { action: s.voice.action }
+        : s.voice?.text
+          ? { text: s.voice.text }
+          : null;
+      const headline =
+        (voiced && captionFor({ ...base, line: voiced, strict: true })) ||
+        captionFor({ ...base, line: s.line });
       const hashtags = buildHashtags({
         taxon,
         speciesOk: level === "species",
@@ -945,6 +964,7 @@ async function main() {
         taxon,
         level,
         headline,
+        comment: s.voice?.comment ?? "",
         hashtags,
         gear: gearLine(file.facts),
         iucn: level === "species" ? (taxon.iucn ?? null) : null,
@@ -1143,16 +1163,14 @@ async function main() {
       await store.writeJson("facts.json", { items: factStore });
     }
 
-    // Write each planned post, or bring it up to date. A post keeps its fact
-    // while that fact still exists; a new post takes the fact used least by
-    // any post so far.
+    // Each planned post's fact: a post keeps its fact while that fact still
+    // exists; a new post takes the fact used least by any post so far.
     const used = [];
     for (const s of Object.values(shots))
       if (s.post?.fact && s.post.factKey) used.push(s.post.fact);
     const planned = new Set(items);
-    for (const key of items) {
+    const drafts = items.map((key) => {
       const s = shots[key];
-      const parts = partsFor(s);
       const factKeyUsed = keysFor(s).find((k) => usable(k)) ?? null;
       const facts = factKeyUsed ? usable(factKeyUsed) : [];
       const redraft = redrafting(s, s.post?.draftedAt);
@@ -1168,9 +1186,105 @@ async function main() {
           ? facts.filter((f) => f !== s.post?.fact)
           : facts;
       const fact = keep || pickFact(choices, used);
+      if (!keep && fact && factKeyUsed) used.push(fact);
+      return { key, s, fact, factKeyUsed };
+    });
+
+    // The first line and reaction in Truman's voice (voice.mjs), written once
+    // per planned post, ten to a call, and again on a redraft.
+    const needsVoice = (s) =>
+      s.voice?.v !== VOICE_VERSION ||
+      s.voice?.at !== s.analysis.at ||
+      redrafting(s, s.voice?.written);
+    const voiceQueue = drafts.filter((d) => needsVoice(d.s));
+    if (provider && voiceQueue.length) {
+      const guide = loadVoiceGuide();
+      const queued = new Set(voiceQueue.map((d) => d.s));
+      // Reactions staying put, and his own examples, so new ones don't echo them.
+      const usedComments = [
+        ...HIS_REACTIONS,
+        ...Object.values(shots)
+          .filter((s) => !queued.has(s))
+          .map((s) => s.voice?.comment ?? s.post?.comment)
+          .filter(Boolean),
+      ];
+      // One batch at a time, each seeing the reactions the last ones chose.
+      // A post whose reactions all failed their checks gets one more go, and
+      // keeps the first line it already has.
+      const writeVoices = async (list, second) => {
+        const batches = [];
+        for (let i = 0; i < list.length; i += 10)
+          batches.push(list.slice(i, i + 10));
+        await pool(batches, 1, async (batch) => {
+          const notes = batch.map((d, i) => ({
+            id: String(i + 1),
+            ...notesFor(d.s),
+            fact: d.fact,
+          }));
+          try {
+            const reply = await askJson({
+              provider,
+              model,
+              prompt: voicePrompt(notes, guide, {
+                recent: usedComments.slice(-25),
+              }),
+              mock: () => mockVoice(notes),
+            });
+            const byId = new Map(
+              (reply.items ?? []).map((x) => [String(x.id), x]),
+            );
+            batch.forEach((d, i) => {
+              const taxon = levelOf(d.s) ? taxonOf(d.s) : null;
+              const got = normaliseVoice(byId.get(String(i + 1)), {
+                named: Boolean(notes[i].named),
+                plural: (d.s.analysis.count ?? 1) > 1,
+                fact: d.fact,
+                lexicon,
+                allowed: allowedNames(sessionOf(d.s.session)).join(" "),
+                taxonText: taxon
+                  ? `${taxon.name} ${taxon.common ?? ""} ${notes[i].named}`
+                  : "",
+                avoid: usedComments,
+              });
+              d.s.voice = second
+                ? {
+                    ...d.s.voice,
+                    ...(got.comment ? { comment: got.comment } : {}),
+                  }
+                : {
+                    v: VOICE_VERSION,
+                    at: d.s.analysis.at,
+                    written: new Date().toISOString(),
+                    ...got,
+                  };
+              if (got.comment) {
+                usedComments.push(got.comment);
+                ig.voiced++;
+              }
+            });
+          } catch (e) {
+            warn(
+              `A batch of post openings failed and will be retried next run. ${redact(e)}`,
+            );
+          }
+        });
+      };
+      await writeVoices(voiceQueue, false);
+      await writeVoices(
+        voiceQueue.filter(
+          (d) => d.s.voice?.v === VOICE_VERSION && !d.s.voice.comment,
+        ),
+        true,
+      );
+    }
+
+    // Put each planned post together, or bring it up to date.
+    for (const { s, fact, factKeyUsed } of drafts) {
+      const parts = partsFor(s);
       const basis = sha({
         v: POST_VERSION,
         headline: parts.headline,
+        comment: parts.comment,
         hashtags: parts.hashtags,
         gear: parts.gear,
         pointer,
@@ -1180,23 +1294,28 @@ async function main() {
       if (s.post?.basis === basis) continue;
       const caption = assembleCaption({
         headline: parts.headline,
+        comment: parts.comment,
         body: fact,
         iucn: parts.iucn,
         gear: parts.gear,
         pointer,
         hashtags: parts.hashtags,
       });
-      if (lint(caption).length) {
+      // The written parts are checked, not the "Fun fact:" label code adds.
+      const problems = lint(
+        [parts.headline, parts.comment, fact, pointer].join("\n"),
+      );
+      if (problems.length) {
         s.status = "needs_review";
-        s.problem = lint(caption).join(", ");
+        s.problem = problems.join(", ");
         ig.review++;
         continue;
       }
-      if (!keep && fact && factKeyUsed) used.push(fact);
       s.post = {
         caption,
         alt: tidy(s.analysis.description).slice(0, 1000),
         headline: parts.headline,
+        comment: parts.comment,
         fact,
         factKey: factKeyUsed,
         v: POST_VERSION,
@@ -1242,7 +1361,7 @@ async function main() {
       `iNaturalist matches: ${count((s) => s.inat?.via === "frame")} exact frame, ${count((s) => s.inat?.via === "moment")} same moment; ${count((s) => s.analysis?.idCheck === "conflict")} flagged as not matching.`,
       `Website: ${site.captions} captions (${linesWritten} first lines written), ${site.described} descriptions written${site.describeFailed ? `, ${site.describeFailed} failed checks` : ""}, ${site.waiting} sessions still being analysed, ${site.written} session files updated${site.kept ? `, ${site.kept} of your edits left alone` : ""}${sidecars ? "" : " (not written: dry run)"}.`,
       process.env.SOCIAL_ENABLED === "true" && args.instagram
-        ? `Instagram: ${ig.rendered} posts written, facts for ${ig.facts} new species or places, ${ig.review} need review, ${ig.planned} planned.`
+        ? `Instagram: ${ig.rendered} posts written (${ig.voiced} new reactions), facts for ${ig.facts} new species or places, ${ig.review} need review, ${ig.planned} planned.`
         : "",
     ]
       .filter(Boolean)

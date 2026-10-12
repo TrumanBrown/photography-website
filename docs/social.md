@@ -349,24 +349,35 @@ Wikipedia is read through its public API, one request at a time, with a user age
 ### 5. The caption
 
 ```
-Red-eyed tree frog (Agalychnis callidryas) clinging to the side of a stem, Tapir Valley, Bijagua, Costa Rica
+Groove-billed ani (Crotophaga sulcirostris) munching on an insect on a mossy post, Bijagua, Alajuela Province, Costa Rica. Such an interesting, unique beak on it.
 
-Their embryos can hatch early when predators approach, dropping into the water below to escape.
+Fun fact: Groove-billed anis lay their eggs in one communal nest, and all group members incubate the eggs and care for the young.
 
-Sony a6700 · FE 90mm F2.8 Macro G OSS · f/2.8 · 1/160s · ISO 1250
+Sony a6700 · E 70-350mm F4.5-6.3 G OSS at 350mm · f/6.3 · 1/500s · ISO 320
 Full resolution and the rest of this session are on example.com, link in bio
 
-#redeyedtreefrog #frogsofinstagram #tapirvalley #macrophotography #sonya6700
+#groovebilledani #birdsofinstagram #bijagua #birdphotography #sonya6700
 ```
 
-- **First line:** the photo's first line from the website ([docs/photos.md](photos.md#captions)), with the fuller place. What it is and what it's doing, never the background. Keywords first, because Instagram search and Google read it. Identified species get their scientific name too.
-- **Fact:** one of the species' or place's facts, as above.
+- **First line and reaction**, in your voice: what it is and the most interesting thing about it, said the way a person would ("munching on an insect", not "holding an insect"), then the fuller place, then one short reaction of yours. See below.
+- **Fact:** one of the species' or place's facts, as above, after `Fun fact: `.
 - **Red List line:** added when the global IUCN status is Near Threatened or worse.
 - **Gear line:** from the photo's EXIF data.
 - **Link line:** captions can't hold clickable links, so it sends people to the link in your profile, for the full-resolution photo and the rest of the session. Put the site's address in your bio for it to work. Change the wording with `linkLine` in the [private settings file](#private-settings-file); posts already written are updated with it on the next run.
 - **Alt text:** the record's plain description of the frame, sent with every post. Instagram and Google both read it.
 
-A post is only written once its photo is planned for the coming two weeks, and it's put together by code from the parts above, so rewording any part never means rewriting the whole archive. A written post keeps its fact while that fact still exists.
+**The voice.** The first paragraph follows the [caption-voice skill](../.github/skills/caption-voice/SKILL.md): your own rewrites of posts that sounded like AI, and the rules drawn from them, with the [humanizer](../.github/skills/humanizer/SKILL.md) skill (blader/humanizer, MIT) for anything they don't settle. [voice.mjs](../scripts/photos/voice.mjs) puts that file into one text-only call per ten planned posts, which writes each one's first line and three candidate reactions. A reaction is kept only if it:
+
+- reads as a reaction, not a description of the photo (first person or an opinion word)
+- tells no story the notes can't back up (no waiting, "finally", companions), adds no numbers, and names nothing the record doesn't
+- doesn't repeat its first line or fun fact, and shares no phrase with another post's reaction or with your own examples
+- avoids stock phrases ("stands out against") and the words the voice rules ban, and uses the same praise word ("impressive") on two posts at most
+
+A post whose reactions all fail gets one more try in the same run; if that fails too, it goes out without one. A first line that fails the caption checks falls back to the website's plain one. To change how posts sound, edit the skill; to rewrite the posts already planned, bump `VOICE_VERSION` in voice.mjs. To redo one post, `npm run social -- redraft <photo>` gives it a new first line, reaction and fact.
+
+A post is only written once its photo is planned for the coming two weeks, so rewording any part never means rewriting the whole archive. A written post keeps its fact while that fact still exists.
+
+Published posts can't be changed from here: Instagram's API can only turn comments on or off, or delete a post. Edit a published caption in the Instagram app.
 
 **Hashtags:** exactly five, because Instagram allows no more since December 2025. They're built from data by [hashtags.mjs](../scripts/social/hashtags.mjs), never made up by the model:
 

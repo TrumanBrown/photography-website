@@ -111,6 +111,10 @@ rather than only writing it down here.
 
 ## Species facts and data blurbs
 
+Instagram posts are the exception to this section and to first-person-only-where-it-fits: they
+follow the [caption-voice skill](../skills/caption-voice/SKILL.md), which wants a `Fun fact: `
+label on the fact and a short first-person reaction after the first line.
+
 - Two or three facts per species, one picked at random. Give one ID/field-mark tip and one
   behavior or story fact.
 - One sentence each, roughly 12–25 words, leading with the hook.

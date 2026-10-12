@@ -26,7 +26,7 @@ Each photograph is looked at **once** by a vision model. What it sees is stored 
 |---|---|---|
 | **Photo caption** (alt text, lightbox caption, image search) | Code, from the record, opening with a first line written once per photo (text only) | `Turquoise-browed motmot (Eumomota superciliosa) perched on a branch, Playa Flamingo` |
 | **Session description** (top of the session page, search snippet) | One text-only model call per session, from every photo's caption | `Jagged gray peaks and forested valleys fill most of these, with patches of snow on the rocky slopes...` |
-| **Instagram posts** (optional, [docs/social.md](social.md)) | Code, plus a few facts per species or place, written once from Wikipedia | The same first line with the fuller place, one fact, gear, five hashtags |
+| **Instagram posts** (optional, [docs/social.md](social.md)) | Code, plus a few facts per species or place written once from Wikipedia, and one text-only call per ten posts for the first line and reaction in your voice | A livelier first line with the fuller place, your one-line reaction, a fun fact, gear, five hashtags |
 
 Because the photo is only ever looked at once, changing how captions or descriptions are worded never means paying to analyse the archive again.
 
@@ -87,7 +87,7 @@ It answers with neutral facts, never finished copy:
 
 It may say "Mount Baker" only because the folder name does. If it had named Mount Shuksan, which you never wrote anywhere, the name would be thrown out and the caption would fall back to "Snow-covered peak". To have a peak named in captions, put it in the session's title, location or folder name.
 
-Folder names are the one place name nobody proofreads. A state, country or island with two letters swapped ("crater-lake-oreogn") is read as the right name ("Crater Lake Oregon"), and every run's log warns about the folder with the name to rename it to; the web address keeps the typo until it's renamed. `upload-session.sh` checks names before uploading, so this is only a safety net ([placenames.mjs](../scripts/photos/placenames.mjs)).
+Folder names are the one place name nobody proofreads. A state, country or island with two letters swapped ("crater-lake-oreogn") is read as the right name ("Crater Lake Oregon"), and every run's log warns about the folder with the name to rename it to; the web address keeps the typo until it's renamed. `upload-session.sh` checks names before uploading, so this is only a safety net ([placenames.mjs](../scripts/photos/placenames.mjs)). A state code at the end and filler words are left out too: `napali-coast-hi` is "Napali Coast", `fort-worden-and-nearby-wa` is "Fort Worden", `northern-kauai-pics` is "Northern Kauai".
 
 ## Identifications come from iNaturalist
 
@@ -140,7 +140,7 @@ To rewrite every first line (after changing the prompt, say), bump `LINE_VERSION
 
 **The place** is the first part of the session title ("Yellow Aster Butte"):
 
-- without what you did there: "Tortuguero night walk" gives "Tortuguero"
+- without what you did there: "Tortuguero night walk" gives "Tortuguero", "Portland and Nearby" gives "Portland"
 - lowercase when it's a habitat rather than a name: "shrub-steppe"
 - left off when the line already names it ("Mount Baker from Yellow Aster Butte"). Sharing a word isn't naming it: "Tibetan gazelle" still gets "Tibetan plateau"
 
@@ -261,3 +261,4 @@ On this site's deployment (`gpt-6.1-sol`, 50K tokens a minute); times are measur
 | A new session of 30 photos | 2 to 3 minutes | a few cents |
 | A description rewrite | seconds | under a cent |
 | Instagram facts for a new species or place | seconds | under a cent |
+| Instagram first lines and reactions, two weeks of posts | about a minute | a few cents |

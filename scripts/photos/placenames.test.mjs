@@ -45,4 +45,14 @@ describe("place names in folder names", () => {
     ).toContain("Crater Lake Oregon");
     expect(slugPlace("mt-baker-fall-2026")).toBe("Mount Baker");
   });
+
+  it("leaves state codes and folder words out of the place", () => {
+    expect(slugPlace("napali-coast-hi-oct-2025")).toBe("Napali Coast");
+    expect(slugPlace("lake-valhalla-wa-nov-2025")).toBe("Lake Valhalla");
+    expect(slugPlace("fort-worden-and-nearby-wa-aug-2025")).toBe("Fort Worden");
+    expect(slugPlace("northern-kauai-pics-oct-2025")).toBe("Northern Kauai");
+    expect(slugPlace("nisqually-and-point-defiance-wildlife-nov-2025")).toBe(
+      "Nisqually and Point Defiance Wildlife",
+    );
+  });
 });

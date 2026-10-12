@@ -291,5 +291,18 @@ describe("first lines", () => {
     expect(
       normaliseLine({ action: "flying with its tail fanned" }, { named: true }),
     ).toEqual({ action: "flying with its tail fanned" });
+    // A body part inside a "with" phrase already has its "with".
+    for (const action of [
+      "preening with its long curved bill tucked into its feathers",
+      "resting on a gray rock with its orange and black wings spread",
+      "standing with its front legs spread",
+    ])
+      expect(normaliseLine({ action }, { named: true })).toEqual({ action });
+    expect(
+      normaliseLine(
+        { action: "hanging head down in its web with its legs spread" },
+        { named: true },
+      ),
+    ).toEqual({ action: "hanging head down in its web with its legs spread" });
   });
 });

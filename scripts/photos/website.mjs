@@ -47,7 +47,10 @@ const MONTH_TAIL = new RegExp(
 );
 export const TITLE_SHAPE = new RegExp(`, (?:${MONTHS.join("|")}) \\d{4}$`);
 const SLUG_NOISE =
-  /^(?:\d+|jan|feb|mar|apr|may|jun|june|jul|july|aug|august|sep|sept|september|oct|october|nov|november|dec|december|january|february|march|april|spring|summer|fall|autumn|winter|trip|day|days|part|pt)$/i;
+  /^(?:\d+|jan|feb|mar|apr|may|jun|june|jul|july|aug|august|sep|sept|september|oct|october|nov|november|dec|december|january|february|march|april|spring|summer|fall|autumn|winter|trip|day|days|part|pt|pics|photos|pictures|nearby)$/i;
+// US state codes, dropped from the end of a folder name: "napali-coast-hi" is "Napali Coast".
+const STATE_CODE =
+  /^(?:al|ak|az|ar|ca|co|ct|de|fl|ga|hi|id|il|ia|ks|ky|la|me|md|ma|mi|mn|ms|mo|ne|nv|nh|nj|nm|ny|nc|nd|oh|ok|or|pa|ri|sc|sd|tn|tx|ut|vt|va|wa|wv|wi|wy)$/i;
 
 /** What the build shows when nobody has titled a session: the folder name, tidied. */
 export function humanize(slug) {
@@ -74,7 +77,19 @@ export function slugPlace(slug) {
           ? "mountain"
           : (fixPlaceWord(w) ?? w),
     );
-  return words.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+  // "fort-worden-and-nearby-wa": no state code or dangling "and" at the end.
+  while (
+    words.length > 1 &&
+    (STATE_CODE.test(words.at(-1)) || /^(?:and|&)$/i.test(words.at(-1)))
+  )
+    words.pop();
+  return words
+    .map((w, i) =>
+      i > 0 && /^and$/i.test(w)
+        ? "and"
+        : w.charAt(0).toUpperCase() + w.slice(1),
+    )
+    .join(" ");
 }
 
 /** The place and landmark names a caption may use: only ones you've written somewhere. */
@@ -101,7 +116,7 @@ export function allowedNames(session) {
 // What a session title says you did there rather than where: "Tortuguero
 // night walk", "Eastern Washington macro".
 const ACTIVITY_TAIL =
-  /\s+(?:night walks?|walks?|macro|camping|hikes?|hiking|birding|wildlife|adventures?|weekend|trip)$/i;
+  /\s+(?:night walks?|walks?|macro|camping|hikes?|hiking|birding|wildlife|adventures?|weekend|trip|and nearby|and around)$/i;
 // A habitat rather than a named place reads lowercase mid-sentence: "…, shrub-steppe, Eastern Washington".
 const HABITAT =
   /^(?:shrub-steppe|sagebrush steppe|steppe|desert|rainforest|cloud forest|tide ?pools?|wetlands?|grasslands?|old-growth forest)$/i;
@@ -336,6 +351,8 @@ export function placeAfter(phrase, place, subject = "") {
  * @param max      longest the line may be
  * @param line     the written first line (lines.mjs), used when it passes
  *                 the same checks; otherwise the line is built from the notes
+ * @param strict   return "" instead of building from the notes when `line`
+ *                 fails (Instagram then falls back to the plain line)
  */
 export function captionFor({
   analysis,
@@ -345,6 +362,7 @@ export function captionFor({
   place = placeLabel(session),
   max = CAPTION_MAX,
   line = null,
+  strict = false,
 }) {
   const a = analysis ?? {};
   const level = a.idCheck === "conflict" ? null : idLevel(taxon);
@@ -400,6 +418,7 @@ export function captionFor({
     if (full.length <= max) return full;
     if (tidy(phrase).length <= max) return tidy(phrase);
   }
+  if (strict) return "";
 
   const scene = clean(a.scene, ctx) ? a.scene : "";
   const conditions =
@@ -439,7 +458,7 @@ export function captionFor({
  * direct flash".
  */
 const BACKDROP_WORDS =
-  /\b(?:backgrounds?|backdrops?|blurred|blurry|foreground|bokeh|out of focus)\b|\bagainst the dark\b|\b(?:behind|beyond) (?:it|them)\b|\b(?:faces|facing|turned|turning|pointing|extending|looking|leaning|angled|falling)\s+(?:to(?:ward)?s?\s+the\s+)?(?:left|right)\b|\bto the (?:left|right)\b|\b(?:under|in|with)\s+(?:the\s+|a\s+)?(?:direct\s+|bright\s+)?flash\b/i;
+  /\b(?:backgrounds?|backdrops?|blurred|blurry|foreground|bokeh|out of focus)\b|\bagainst the dark\b|\b(?:behind|beyond) (?:it|them)\b|\b(?:faces|facing|turned|turning|pointing|extending|looking|leaning|angled|falling|stretched|stretching|curved|curving|curled|curling|coiled|bent|bending|tilted|tilting)\s+(?:to(?:ward)?s?\s+the\s+)?(?:left|right)\b|\bto the (?:left|right)\b|\b(?:under|in|with)\s+(?:the\s+|a\s+)?(?:direct\s+|bright\s+)?flash\b/i;
 
 /** The first phrase in `text` that describes the photo rather than the moment, or null. */
 export function backdropIn(text) {

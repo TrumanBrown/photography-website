@@ -69,12 +69,15 @@ export function normaliseLine(raw, { named = false, plural = false } = {}) {
   let text = tidy(pick ?? "")
     .replace(/[.]+$/, "")
     .replace(BACKDROP, "")
-    .replace(
-      BARE_BODY_PART,
-      (m, lead, part, how) =>
-        `${lead}with ${plural ? "their" : "its"} ${part} ${how}`,
-    )
     .trim();
+  // Only a body part that starts its own phrase in a line with no "with" yet:
+  // "with its long curved bill tucked" and "head down with its legs spread"
+  // read fine as they are.
+  text = text.replace(BARE_BODY_PART, (m, lead, part, how) =>
+    /\bwith\b/i.test(text)
+      ? m
+      : `${lead}with ${plural ? "their" : "its"} ${part} ${how}`,
+  );
   if (!text || text.length > 70 || NEVER.test(text)) return null;
   if (named) text = text.replace(/^\p{Lu}(?!\p{Lu})/u, (c) => c.toLowerCase());
   else text = text.charAt(0).toUpperCase() + text.slice(1);
