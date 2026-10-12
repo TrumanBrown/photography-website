@@ -4,8 +4,9 @@
  * author fishes. Both maps render side-by-side on desktop; on mobile a segmented
  * toggle switches between them. Tap a fish (a named water) to open its species
  * panel. The bottom "fish I've caught" gallery pairs each fish's map sprite with
- * a placeholder photo. All behaviour lives in @/lib/hobbies/fishing, bound via
- * [data-fish-*] hooks; the mounting script is an Astro module so it satisfies the CSP.
+ * the real catch photo, which the lightbox shows at full size. All behaviour
+ * lives in @/lib/hobbies/fishing, bound via [data-fish-*] hooks; the mounting
+ * script is an Astro module so it satisfies the CSP.
  */
 import catchesJson from '@/lib/hobbies/fishing-catches.json';
 import { FISH_BY_ID } from '@/lib/hobbies/fishing-species';
@@ -13,10 +14,21 @@ import { getImage } from 'astro:assets';
 import type { ImageMetadata } from 'astro';
 import Lightbox from '@/components/Lightbox.astro';
 
-const catches = catchesJson.catches;
+interface Catch {
+  fishId: string;
+  state: string;
+  where: string;
+  photo: string;
+  /** The full-size original in Blob Storage (scripts/upload-fishing-catches.mjs). */
+  full?: { src: string; width: number; height: number };
+}
 
-// Real catch photos live in src/assets and go through Astro's image pipeline,
-// so the responsive variants get offloaded to Blob by sync-variants.mjs in CI.
+const catches: Catch[] = catchesJson.catches;
+
+// A small copy of each catch photo lives in src/assets and goes through Astro's
+// image pipeline for the thumbnail and the lightbox's quick preview; the
+// responsive variants get offloaded to Blob by sync-variants.mjs in CI. The
+// lightbox then ends on the full-size original, like the photography pages.
 const photoModules = import.meta.glob<{ default: ImageMetadata }>(
   '../../assets/hobbies/fishing/*.jpg',
   { eager: true },
@@ -30,23 +42,25 @@ for (const [path, mod] of Object.entries(photoModules)) {
   photoBy[base] = mod.default;
 }
 
-async function buildCard(c: (typeof catches)[number]) {
+async function buildCard(c: Catch) {
   const f = FISH_BY_ID[c.fishId];
   const meta = photoBy[c.photo];
-  const fullW = Math.min(1600, meta.width);
-  const fullH = Math.round((fullW * meta.height) / meta.width);
-  const [thumb, full] = await Promise.all([
+  const viewW = Math.min(1600, meta.width);
+  const viewH = Math.round((viewW * meta.height) / meta.width);
+  const [thumb, view] = await Promise.all([
     getImage({ src: meta, width: 700 }),
-    getImage({ src: meta, width: fullW }),
+    getImage({ src: meta, width: viewW }),
   ]);
   return {
     fishId: c.fishId,
     name: f?.common ?? c.fishId,
     where: c.where,
     thumb: thumb.src,
-    full: full.src,
-    w: fullW,
-    h: fullH,
+    view: view.src,
+    full: c.full?.src,
+    // The lightbox is sized to the full original, so zooming isn't capped.
+    w: c.full?.width ?? viewW,
+    h: c.full?.height ?? viewH,
   };
 }
 
@@ -152,7 +166,8 @@ const groups = [
                     />
                   </div>
                   <a
-                    href={card.full}
+                    href={card.view}
+                    data-pswp-full={card.full}
                     data-pswp-width={card.w}
                     data-pswp-height={card.h}
                     data-pswp-caption={`${card.name} · ${card.where}`}
