@@ -7,6 +7,7 @@ import LeadPhoto from "@/components/LeadPhoto.astro";
 import HobbyBand from "@/components/HobbyBand.astro";
 import { sortSessions, sessionSlug, splitSessionTitle } from "@/lib/sessions";
 import { buildLeadFrames, coverFileOf, type LeadItem } from "@/lib/archive";
+import { jsonForScript } from "@/lib/html";
 import { siteConfig } from "../../site.config";
 
 // Eagerly resolve every image under src/content/sessions/ so we can look up
@@ -82,7 +83,7 @@ const personSchema = {
 >
   <script
     type="application/ld+json"
-    set:html={JSON.stringify(personSchema)}
+    set:html={jsonForScript(personSchema)}
     is:inline
   />
 

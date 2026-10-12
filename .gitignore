@@ -16,6 +16,13 @@ src/content/sessions/*
 .env
 .env.*
 !.env.example
+# Azure Functions' local settings would hold the storage connection string.
+**/local.settings.json
+*.pem
+*.key
+*.pfx
+*.p12
+*.publishsettings
 
 # Domain registration contact info (contains your real name/address/phone).
 # Used once by `az appservice domain create`.

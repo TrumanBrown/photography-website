@@ -12,6 +12,7 @@ import {
   copyrightLine,
   splitSessionTitle,
 } from "@/lib/sessions";
+import { jsonForScript } from "@/lib/html";
 import { siteConfig } from "../../../site.config";
 
 type SessionLink = {
@@ -227,7 +228,7 @@ const structuredData = {
 >
   <script
     type="application/ld+json"
-    set:html={JSON.stringify(structuredData)}
+    set:html={jsonForScript(structuredData)}
     is:inline
   />
 

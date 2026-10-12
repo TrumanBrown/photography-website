@@ -7,7 +7,7 @@
  * in GitHub Actions secrets.
  */
 export const siteConfig = {
-  /** Your full name as it should appear in the footer, <meta author>, and EXIF. */
+  /** Your full name as it should appear in the footer, <meta author>, and structured data. */
   ownerName: "Truman Brown",
 
   /** First year the site went live. Footer renders e.g. "© 2026–2028 <Owner>". */
@@ -46,8 +46,10 @@ export const siteConfig = {
 
   /**
    * Public Blob Storage account hostname. Used to build full-res image URLs
-   * for the lightbox and to allowlist in CSP. The actual value is plugged in
-   * by the IaC deploy; for local dev it can stay as the placeholder.
+   * for the lightbox. Set it by hand after the first infra deploy, and name
+   * the same host in the Content-Security-Policy in staticwebapp.config.json:
+   * `npm run check:csp` fails until they match. For local dev it can stay as
+   * the placeholder.
    *
    * Format: '<storage-account>.blob.core.windows.net'
    */

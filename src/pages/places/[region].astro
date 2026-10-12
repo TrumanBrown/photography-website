@@ -5,6 +5,7 @@ import BaseLayout from "@/layouts/BaseLayout.astro";
 import SessionCard from "@/components/SessionCard.astro";
 import { sortSessions, sessionSlug } from "@/lib/sessions";
 import { groupByRegion, countLine, type RegionGroup } from "@/lib/places";
+import { jsonForScript } from "@/lib/html";
 import { siteConfig } from "../../../site.config";
 
 const images = import.meta.glob<{ default: ImageMetadata }>(
@@ -85,7 +86,7 @@ const breadcrumb = {
 >
   <script
     type="application/ld+json"
-    set:html={JSON.stringify(breadcrumb)}
+    set:html={jsonForScript(breadcrumb)}
     is:inline
   />
 

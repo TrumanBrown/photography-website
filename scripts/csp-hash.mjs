@@ -50,11 +50,28 @@ const configured = [...policy.matchAll(/'sha256-[A-Za-z0-9+/=]+'/g)].map((match)
 const missing = expected.filter((token) => !configured.includes(token));
 const stale = configured.filter((token) => !expected.includes(token));
 
-if (missing.length || stale.length) {
+// Photos and downloads come from this site's storage account only, not from
+// any account on blob.core.windows.net, so the policy has to name the same
+// host as site.config.ts.
+const blobHost = read('site.config.ts').match(/blobHost:\s*["']([^"']+)["']/)?.[1];
+const blobSources = [...policy.matchAll(/https:\/\/[^\s;]*\.blob\.core\.windows\.net/g)].map((match) => match[0]);
+const strayBlob = blobSources.filter((source) => source !== `https://${blobHost}`);
+const blobProblem = !blobHost
+  ? 'site.config.ts has no blobHost.'
+  : blobSources.length === 0
+    ? `Content-Security-Policy doesn't allow https://${blobHost}, where the photos are.`
+    : strayBlob.length
+      ? `Content-Security-Policy allows ${strayBlob.join(' ')}; it should name only https://${blobHost} (blobHost in site.config.ts).`
+      : '';
+
+if (missing.length || stale.length || blobProblem) {
   if (missing.length) console.error('Missing CSP token(s):', missing.join(' '));
   if (stale.length) console.error('Stale CSP token(s):', stale.join(' '));
-  console.error('Update script-src in staticwebapp.config.json with the tokens above.');
+  if (missing.length || stale.length) {
+    console.error('Update script-src in staticwebapp.config.json with the tokens above.');
+  }
+  if (blobProblem) console.error(blobProblem);
   process.exitCode = 1;
 } else {
-  console.log(`CSP hashes match ${expected.length} inline scripts.`);
+  console.log(`CSP hashes match ${expected.length} inline scripts; photos load only from ${blobHost}.`);
 }
