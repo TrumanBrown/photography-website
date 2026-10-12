@@ -1,5 +1,6 @@
 ---
 import type { CollectionEntry } from "astro:content";
+import PlateArt from "@/components/PlateArt.astro";
 import { hobbySlug } from "@/lib/hobbies";
 
 interface Props {
@@ -8,80 +9,53 @@ interface Props {
 
 const { entry } = Astro.props;
 const slug = hobbySlug(entry);
-const { title, summary, emoji, iconSrc, interactive, dayList } = entry.data;
-const cta = interactive || dayList ? "Play it" : "Explore";
+const { title, summary, plateNote } = entry.data;
 ---
 
 <a href={`/hobbies/${slug}/`} class="hcard">
-  <span class="mark" aria-hidden="true">
-    {
-      iconSrc ? (
-        <img src={iconSrc} alt="" width="52" height="52" loading="lazy" />
-      ) : (
-        <span class="emoji">{emoji}</span>
-      )
-    }
-  </span>
-  <span class="body">
-    <h2>{title}</h2>
-    <p>{summary}</p>
-    <span class="cta u-label">{cta} →</span>
-  </span>
+  <PlateArt slug={slug} size="card" />
+  <h2 class="t">{title}</h2>
+  {plateNote && <span class="m">{plateNote}</span>}
+  <p class="d">{summary}</p>
 </a>
 
 <style>
-  /* Deliberately not a card: a rule, a mark and some type. The tinted icon
-     tile and accent-coloured call to action this replaced were the most
-     generic-looking thing on the site. */
+  /* The same anatomy as a session card (a picture, a title, one tracked
+     line), so the two halves of the site read as one. The picture is a
+     stipple plate drawn from one of my photos. */
   .hcard {
-    display: flex;
-    gap: 16px;
-    align-items: flex-start;
-    height: 100%;
-    padding: 18px 10px 20px 0;
-    border-top: 1px solid var(--rule);
+    display: block;
     color: inherit;
     text-decoration: none;
   }
   .hcard:hover {
     text-decoration: none;
   }
-  .hcard:hover h2 {
+  .hcard:hover .t {
     text-decoration: underline;
     text-underline-offset: 3px;
   }
 
-  .mark {
-    flex: none;
-    width: 52px;
-    height: 52px;
-    display: block;
-  }
-  .mark .emoji {
-    font-size: 34px;
-    line-height: 52px;
-    display: block;
-    text-align: center;
-  }
-
-  .body {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-  }
-  h2 {
-    font-size: 17px;
+  .t {
+    margin: 11px 0 0;
+    font-size: 15px;
     font-weight: 400;
-    margin: 0;
-    line-height: 1.25;
+    line-height: 1.3;
+    color: var(--ink);
   }
-  p {
-    margin: 4px 0 0;
-    font-size: 14px;
-    line-height: 1.5;
+  .m {
+    display: block;
+    margin-top: 2px;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-2);
+  }
+  .d {
+    margin: 6px 0 0;
+    max-width: 44ch;
+    font-size: 13px;
+    line-height: 1.45;
     color: var(--ink-3);
-  }
-  .cta {
-    margin-top: 10px;
   }
 </style>

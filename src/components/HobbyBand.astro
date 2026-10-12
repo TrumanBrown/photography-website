@@ -1,5 +1,6 @@
 ---
 import { getCollection } from "astro:content";
+import PlateArt from "@/components/PlateArt.astro";
 import { sortHobbies, hobbySlug } from "@/lib/hobbies";
 
 const hobbies = sortHobbies(await getCollection("hobbies"));
@@ -21,35 +22,19 @@ const VERBS: Record<string, string> = {
       <div class="in">
         <div class="bhead">
           <h2 id="things-to-try">Things to try</h2>
-          <span class="u-label">
-            Six hobbies I actually do · nothing uploads anywhere
-          </span>
+          <span class="u-label">Six hobbies I actually do</span>
         </div>
         <div class="toyrow">
-          {hobbies.map((entry) => (
-            <a class="tcard" href={`/hobbies/${hobbySlug(entry)}/`}>
-              {entry.data.iconSrc ? (
-                <img
-                  src={entry.data.iconSrc}
-                  alt=""
-                  width="42"
-                  height="42"
-                  loading="lazy"
-                />
-              ) : (
-                <span class="emoji" aria-hidden="true">
-                  {entry.data.emoji}
-                </span>
-              )}
-              <span>
+          {hobbies.map((entry) => {
+            const slug = hobbySlug(entry);
+            return (
+              <a class="tcard" href={`/hobbies/${slug}/`}>
+                <PlateArt slug={slug} size="mini" />
                 <span class="tn">{entry.data.title}</span>
-                <span class="td">{entry.data.summary}</span>
-                <span class="tv">
-                  {VERBS[hobbySlug(entry)] ?? "Have a go"} →
-                </span>
-              </span>
-            </a>
-          ))}
+                <span class="tv">{VERBS[slug] ?? "Have a go"} →</span>
+              </a>
+            );
+          })}
         </div>
       </div>
     </section>
@@ -58,7 +43,9 @@ const VERBS: Record<string, string> = {
 
 <style>
   /* A band at the foot of the overview, so the toys are findable without
-     hunting for a nav link. */
+     hunting for a nav link. One small plate per hobby, like a drawer of
+     specimens; the plates stay at least about 125px wide so the drawings
+     don't turn into grey smudges. */
   .band {
     border-top: 1px solid var(--rule);
     background: var(--band);
@@ -81,15 +68,11 @@ const VERBS: Record<string, string> = {
   }
   .toyrow {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0 26px;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 26px 16px;
   }
   .tcard {
-    display: flex;
-    gap: 13px;
-    align-items: flex-start;
-    padding: 14px 10px 14px 0;
-    border-top: 1px solid var(--rule);
+    display: block;
     color: inherit;
     text-decoration: none;
   }
@@ -100,47 +83,36 @@ const VERBS: Record<string, string> = {
     text-decoration: underline;
     text-underline-offset: 3px;
   }
-  .tcard img,
-  .tcard .emoji {
-    width: 42px;
-    height: 42px;
-    flex: none;
-    font-size: 30px;
-    line-height: 1.2;
-    text-align: center;
-  }
   .tn {
     display: block;
-    font-size: 15px;
+    margin-top: 8px;
+    font-size: 14px;
+    line-height: 1.3;
     color: var(--ink);
-  }
-  .td {
-    display: block;
-    font-size: 13px;
-    line-height: 1.45;
-    color: var(--ink-3);
-    margin-top: 2px;
   }
   .tv {
     display: block;
-    margin-top: 6px;
+    margin-top: 3px;
     font-size: 10px;
     letter-spacing: 0.14em;
     text-transform: uppercase;
     color: var(--ink-2);
   }
 
-  @media (max-width: 1099px) {
+  @media (max-width: 1299px) {
     .toyrow {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: repeat(4, minmax(0, 1fr));
     }
   }
   @media (max-width: 899px) {
-    .toyrow {
-      grid-template-columns: 1fr;
-    }
     .in {
       padding-block: 26px 32px;
+    }
+  }
+  @media (max-width: 599px) {
+    .toyrow {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 22px 14px;
     }
   }
 </style>

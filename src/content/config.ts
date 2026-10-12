@@ -117,10 +117,12 @@ const hobbies = defineCollection({
     summary: z.string(),
     /** A sentence or two shown on the hobby page above the interactive. */
     intro: z.string().default(""),
-    /** Emoji used as the card icon (keeps the grid asset-free). */
-    emoji: z.string().default("•"),
-    /** Optional icon image (e.g. an SVG under public/); overrides the emoji on the card. */
-    iconSrc: z.string().optional(),
+    /**
+     * Caption under the hobby's stipple plate: what's drawn, where and when
+     * ("Red rock crab · Puget Sound, May 2026"). The plates themselves are
+     * src/assets/plates/<slug>-*.webp, drawn by the stipple-plates skill.
+     */
+    plateNote: z.string().optional(),
     /** Optional hex accent (e.g. '#0ea5e9') tinting the card icon tile. */
     accent: z.string().optional(),
     /** Explicit ordering on the hobbies landing page (ascending). */

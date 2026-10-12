@@ -133,8 +133,9 @@ rather than only writing it down here.
 - Rhetorical openers (`Ever wondered what's under that rock?`).
 - Exclamation marks outside the two established warm cases (`Message sent. Thank you!`,
   `I'll get back to you soon. Thanks for visiting!`).
-- Emoji in prose or errors. Emoji only where already established: hobby `emoji` fields, the species
-  palette, and the two Birding entry buttons (`📷 Take a selfie`, `🖼️ Upload a photo`).
+- Emoji in prose or errors. Emoji only where already established: the species palette and the
+  two Birding entry buttons (`📷 Take a selfie`, `🖼️ Upload a photo`). Hobby cards use their
+  stipple plates, never emoji.
 - Address the reader as "users" or "folks". They are "you".
 
 ## Before finishing a string

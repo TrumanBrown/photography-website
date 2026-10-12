@@ -1,0 +1,128 @@
+---
+import { plateFor, type PlateSize } from "@/lib/plates";
+
+interface Props {
+  slug: string;
+  size: PlateSize;
+}
+
+const { slug, size } = Astro.props;
+const plate = plateFor(slug, size);
+---
+
+{
+  plate && (
+    <span class="plate" data-plate>
+      <img
+        data-ink="light"
+        data-frames={JSON.stringify(plate.light)}
+        src={plate.light[0]}
+        alt=""
+        width={plate.width}
+        height={plate.height}
+        loading="lazy"
+        decoding="async"
+      />
+      <img
+        data-ink="dark"
+        data-frames={JSON.stringify(plate.dark)}
+        src={plate.dark[0]}
+        alt=""
+        width={plate.width}
+        height={plate.height}
+        loading="lazy"
+        decoding="async"
+      />
+    </span>
+  )
+}
+
+<style>
+  .plate {
+    position: relative;
+    display: block;
+    aspect-ratio: 4 / 3;
+  }
+  .plate img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+  /* Only the current theme's drawing is displayed, and lazy images that
+     aren't displayed are never fetched. */
+  .plate img[data-ink="dark"],
+  :global(html.dark) .plate img[data-ink="light"] {
+    display: none;
+  }
+  :global(html.dark) .plate img[data-ink="dark"] {
+    display: block;
+  }
+</style>
+
+<script>
+  // Hover "boil": while a card is pointed at or focused, its plate cycles
+  // through three inkings of the same drawing every 125 ms, like hand-drawn
+  // animation. Never on touch, and not under reduced motion.
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
+  const stops: Array<() => void> = [];
+
+  const framesOf = (img: HTMLImageElement): string[] =>
+    JSON.parse(img.dataset.frames ?? "[]");
+
+  for (const plate of document.querySelectorAll<HTMLElement>("[data-plate]")) {
+    const host = plate.closest<HTMLElement>("a") ?? plate;
+    let running: HTMLImageElement | null = null;
+    let timer: number | undefined;
+
+    const stop = () => {
+      window.clearInterval(timer);
+      timer = undefined;
+      const first = running && framesOf(running)[0];
+      if (running && first && running.getAttribute("src") !== first) {
+        running.src = first;
+      }
+      running = null;
+    };
+
+    const start = async () => {
+      if (reduce.matches || running) return;
+      const ink = document.documentElement.classList.contains("dark")
+        ? "dark"
+        : "light";
+      const img = plate.querySelector<HTMLImageElement>(
+        `img[data-ink="${ink}"]`,
+      );
+      if (!img) return;
+      running = img;
+      const frames = framesOf(img);
+      // Decode the other inkings before the first swap, so the plate never
+      // blinks empty while one loads.
+      await Promise.all(
+        frames.slice(1).map(async (src) => {
+          const next = new Image();
+          next.src = src;
+          await next.decode().catch(() => undefined);
+        }),
+      );
+      if (running !== img) return;
+      let i = 0;
+      timer = window.setInterval(() => {
+        i = (i + 1) % frames.length;
+        img.src = frames[i];
+      }, 125);
+    };
+
+    host.addEventListener("pointerenter", (event) => {
+      if (event.pointerType !== "touch") void start();
+    });
+    host.addEventListener("pointerleave", stop);
+    host.addEventListener("focusin", () => void start());
+    host.addEventListener("focusout", stop);
+    stops.push(stop);
+  }
+
+  // A page restored from the back/forward cache starts with nothing hovered.
+  window.addEventListener("pagehide", () => stops.forEach((stop) => stop()));
+</script>

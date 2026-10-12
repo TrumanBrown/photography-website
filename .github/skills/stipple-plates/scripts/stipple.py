@@ -45,7 +45,8 @@ def _repo_root() -> Path:
 
 REPO = _repo_root()
 SESSIONS = REPO / "src" / "content" / "sessions"
-DEFAULT_OUT = REPO / "mocks" / "things-to-try" / "assets" / "plates"
+# Straight into the site: src/lib/plates.ts picks these up by file name.
+DEFAULT_OUT = REPO / "src" / "assets" / "plates"
 MAX_DOWNLOAD = 80 * 1024 * 1024
 
 # name: (width, height, dot radius). Plates are shown at about half these
@@ -922,7 +923,7 @@ def main(argv=None):
     ap.add_argument("names", nargs="*", help="subjects to render (default: all)")
     ap.add_argument("--subjects", default=str(SKILL / "subjects.json"))
     ap.add_argument("--out", default=str(DEFAULT_OUT))
-    ap.add_argument("--sizes", default="card", help="comma list of: " + ", ".join(SIZES))
+    ap.add_argument("--sizes", default="card,mini", help="comma list of: " + ", ".join(SIZES))
     ap.add_argument("--themes", default="light,dark")
     ap.add_argument("--frames", type=int, default=3, help="drawings per plate, for the hover boil")
     ap.add_argument("--list", action="store_true", help="list subjects and exit")

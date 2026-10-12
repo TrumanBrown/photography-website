@@ -8,10 +8,13 @@ argument-hint: 'Subject name and photo URL, e.g. "herping https://..."'
 
 Pen-and-ink stipple drawings made from Truman's own photographs: about ten
 thousand evenly spaced dots, one pen for the whole set, ink on paper in light
-mode and scratchboard in dark mode. The first set (the seven Things to try
-hobbies) is in `mocks/things-to-try/assets/plates/` and
-`mocks/things-to-try/plates-preview.html`. `mocks/` is gitignored, so those
-exist on Truman's machine only; re-render from `subjects.json` anywhere else.
+mode and scratchboard in dark mode. They're the pictures on the Things to try
+cards: `card` plates on /hobbies/ and `mini` plates in the band at the foot of
+the home page. The files live in `src/assets/plates/`, and
+`src/components/PlateArt.astro` shows them. Each subject in `subjects.json`
+is named after its hobby's slug, and the caption under a card is `plateNote`
+in `src/content/hobbies/<slug>.json` (keep it in step with the subject's
+`note`).
 
 Read [lessons](./references/lessons.md) before choosing photos or touching the
 pipeline. It records which photos worked, which failed and why.
@@ -63,16 +66,21 @@ downloads the isnet-general-use model (about 170 MB). Afterwards use
    off the grid on the right-hand (cropped) pane. For precise polygons and
    graft points, `review.py zoom <name> --box x0,y0,x1,y1` gives a close-up
    with the cutout outline and a 0.05 grid (`--raw` shows it before retouching).
-3. **Render one theme first:** `$PY .github/skills/stipple-plates/scripts/stipple.py <name> --themes light`.
-4. **Judge it at display size:** `$PY .github/skills/stipple-plates/scripts/review.py plates <name>`.
-   Tune `weight`, `tone`, `despecular` or `features`, then render both themes
-   (the default).
-5. **Show Truman** the plate in context (e.g. reload
-   `mocks/things-to-try/plates-preview.html`).
+3. **Render one theme first, somewhere else:** `$PY .github/skills/stipple-plates/scripts/stipple.py <name> --themes light --out /tmp/plates`.
+   Without `--out`, renders go straight into `src/assets/plates/`, replacing
+   the live plate (`git checkout src/assets/plates` undoes that).
+4. **Judge it at display size:** `$PY .github/skills/stipple-plates/scripts/review.py plates <name> --dir /tmp/plates`.
+   Tune `weight`, `tone`, `despecular` or `features`.
+5. **Render the keeper into the site:** `$PY .github/skills/stipple-plates/scripts/stipple.py <name>`
+   (both themes and both sizes, the defaults).
+6. **Show Truman** the plate in context: `npm run dev`, then /hobbies/ and
+   the band at the foot of the home page. `npm test` checks every hobby has
+   all twelve files.
 
 Each render writes `<name>-<size>[-dark].webp` plus two re-inked frames,
-`-b1` and `-b2`, for the hover "boil". Cycle the three frames every 125 ms
-while the card is pointed at or focused, and not under reduced motion.
+`-b1` and `-b2`, for the hover "boil". `PlateArt.astro` cycles the three
+frames every 125 ms while a card is pointed at or focused, never on touch and
+not under reduced motion.
 
 ## subjects.json fields
 
@@ -126,11 +134,11 @@ polygon around any debris as well.
 
 ## Sizes
 
-| Size   | Render  | Shown at             | Use                                      |
-| ------ | ------- | -------------------- | ---------------------------------------- |
-| `card` | 880x660 | about 440x330 CSS px | cards, the default                       |
-| `mini` | 360x270 | about 180x135        | home page band                           |
-| `icon` | 120x90  | 60x45                | too small for most subjects; see lessons |
+| Size   | Render  | Shown at                    | Use                                      |
+| ------ | ------- | --------------------------- | ---------------------------------------- |
+| `card` | 880x660 | about 350x260 CSS px        | /hobbies/ cards                          |
+| `mini` | 360x270 | about 125-260 CSS px across | home page band                           |
+| `icon` | 120x90  | 60x45                       | too small for most subjects; see lessons |
 
 ## Choosing a photo
 

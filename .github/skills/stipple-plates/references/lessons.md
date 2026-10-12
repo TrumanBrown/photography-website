@@ -150,3 +150,22 @@ What failed, and why:
 - **Read polygons off the right-hand pane.** `exclude` and `skin_out` use
   0-1 coordinates of the cropped (and flipped) image, which is the cutout
   pane in the mask sheet, not the full photo.
+
+## On the site
+
+- **One image per theme, both lazy.** The theme is a class on `<html>`, which
+  a `<picture>` media query can't see, so each plate has an ink-on-paper and a
+  scratchboard `<img>` and CSS hides one. A lazy image that isn't displayed is
+  never fetched: a visitor downloads their theme's seven plates, plus a card's
+  two boil frames once they point at it (checked on a production build).
+- **Check downloads on a production build.** Under `npm run dev`, Astro's dev
+  toolbar fetches every image on the page to audit it, so the hidden theme
+  looks like it downloads when it doesn't.
+- **Decode the boil frames before swapping.** Swapping `src` to a frame that
+  hasn't loaded shows an empty plate for a moment; `PlateArt.astro` decodes
+  the two re-inkings first.
+- **Imported, not in `public/`.** Astro gives imported files hashed `/_astro/`
+  URLs with a year-long immutable cache, so a re-rendered plate can't go
+  stale in someone's browser.
+- **Minis for the home band.** A card plate's ten thousand dots are too many
+  to stay separate at 150px wide; `mini` plates carry about 1,000-2,500.

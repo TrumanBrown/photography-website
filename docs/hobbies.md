@@ -39,15 +39,14 @@ The `sections.hobbies` flag only controls the **header nav link** (discoverabili
      "title": "Hiking",
      "summary": "Short blurb shown on the hobby card.",
      "intro": "A sentence or two shown on the hobby page above the interactive.",
-     "emoji": "🥾",
-     "accent": "#16a34a",
+     "plateNote": "Liberty Bell · Washington Pass, July 2026",
      "order": 3,
      "interactive": "pixel-hike"
    }
    ```
 
    - `slug` comes from the filename (`hiking.json` → `/hobbies/hiking`).
-   - `emoji` + optional `accent` (hex) render the card icon tile, which keeps the grid asset-free.
+   - The card's picture is a stipple plate drawn from one of your photos: add a subject named after the slug to the [stipple-plates skill](../.github/skills/stipple-plates/SKILL.md) and render it into `src/assets/plates/`. `plateNote` is the caption under it. `npm test` fails while a hobby is missing any of its plates.
    - `order` sorts the landing grid (ascending); entries without `order` fall to the end, alphabetical.
    - `interactive` is one of the enum values in the schema, or omit it for a static page.
 
