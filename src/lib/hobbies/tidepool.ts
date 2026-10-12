@@ -16,6 +16,7 @@
 import { SPECIES, type TidepoolSpecies, type TidepoolCategory } from './tidepool-species';
 import photoData from './tidepool-photos.json';
 import { rollTo, setHair } from '@/lib/motion';
+import { revealFromPixels, stopPixelReveal } from './pixel-reveal';
 
 /** Optional real photos per species id (CC-licensed). See tidepool-photos.json. */
 const PHOTOS = (photoData.species ?? {}) as Record<string, { photo?: string; credit?: string }>;
@@ -715,21 +716,31 @@ export function initTidepool(root: HTMLElement): void {
     const override = PHOTOS[sp.id];
     const photo = sp.photo ?? override?.photo;
     const credit = sp.photoCredit ?? override?.credit ?? '';
+    stopPixelReveal(revealCanvas!);
     if (photo && photoEl) {
-      // real photo when we have one; fall back to the sprite if it fails to load
-      photoEl.classList.remove('is-hidden');
+      // real photo when we have one; fall back to the sprite if it fails to load.
+      // The square stays empty until the photo has loaded, then the photo
+      // resolves out of pixels, like the beach it came from.
+      photoEl.classList.add('is-hidden');
       revealCanvas!.classList.add('is-hidden');
       photoEl.onerror = () => {
         paintRevealSprite(sp);
         if (creditEl) creditEl.classList.add('is-hidden');
       };
+      photoEl.onload = () => revealFromPixels(revealCanvas!, photoEl);
       photoEl.alt = sp.common;
-      photoEl.src = photo;
+      if (photoEl.getAttribute('src') === photo && photoEl.complete && photoEl.naturalWidth) {
+        revealFromPixels(revealCanvas!, photoEl);
+      } else {
+        photoEl.src = photo;
+      }
       if (creditEl) {
         creditEl.textContent = credit;
         creditEl.classList.toggle('is-hidden', !credit);
       }
     } else {
+      // A photo still loading for an earlier critter mustn't land on this one.
+      if (photoEl) photoEl.onload = null;
       paintRevealSprite(sp);
       if (creditEl) creditEl.classList.add('is-hidden');
     }

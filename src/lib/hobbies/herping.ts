@@ -24,6 +24,7 @@ import {
 } from "./herping-species";
 import photoData from "./herping-photos.json";
 import { rollTo, setHair } from "@/lib/motion";
+import { revealFromPixels, stopPixelReveal } from "./pixel-reveal";
 
 /** Optional real photos per species id (CC-licensed). See herping-photos.json. */
 const PHOTOS = (photoData.species ?? {}) as Record<
@@ -830,20 +831,34 @@ export function initHerping(root: HTMLElement): void {
     const override = PHOTOS[sp.id];
     const photo = sp.photo ?? override?.photo;
     const credit = sp.photoCredit ?? override?.credit ?? "";
+    stopPixelReveal(revealCanvas!);
     if (photo && photoEl) {
-      photoEl.classList.remove("is-hidden");
+      // The square stays empty until the photo has loaded (usually at once,
+      // they're preloaded), then the photo resolves out of pixels.
+      photoEl.classList.add("is-hidden");
       revealCanvas!.classList.add("is-hidden");
       photoEl.onerror = () => {
         paintRevealSprite(sp);
         if (creditEl) creditEl.classList.add("is-hidden");
       };
+      photoEl.onload = () => revealFromPixels(revealCanvas!, photoEl);
       photoEl.alt = sp.common;
-      photoEl.src = photo;
+      if (
+        photoEl.getAttribute("src") === photo &&
+        photoEl.complete &&
+        photoEl.naturalWidth
+      ) {
+        revealFromPixels(revealCanvas!, photoEl);
+      } else {
+        photoEl.src = photo;
+      }
       if (creditEl) {
         creditEl.textContent = credit;
         creditEl.classList.toggle("is-hidden", !credit);
       }
     } else {
+      // A photo still loading for an earlier animal mustn't land on this one.
+      if (photoEl) photoEl.onload = null;
       paintRevealSprite(sp);
       if (creditEl) creditEl.classList.add("is-hidden");
     }

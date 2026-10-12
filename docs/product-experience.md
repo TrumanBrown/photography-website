@@ -9,7 +9,7 @@ The site is a photography archive first and a collection of interactive hobbies 
 - Put real photographs in the first viewport; avoid a marketing hero or decorative art.
 - Keep navigation predictable while making the photographer and archive scale clear.
 - Treat captions and session descriptions as editorial content, not ornamental metadata.
-- Spend JavaScript only on interactions that need it: navigation drawers, PhotoSwipe, Admin, analytics, and the Hobbies experiences.
+- Spend JavaScript only on interactions that need it: navigation drawers, PhotoSwipe, small hover previews, Admin, analytics, and the Hobbies experiences.
 - Prefer build-time relationships and metadata over new runtime services.
 
 ## Measured baseline (July 2026)
@@ -61,6 +61,18 @@ Admin can now edit an optional caption for every image. Caption edits preserve g
 
 Admin tabs now expose the tab/tablist/tabpanel relationship and support Arrow, Home, and End keys. The edit surface is a labelled modal dialog with focus containment, Escape handling, scroll locking, and focus restoration. The theme toggle now announces the action it will perform and exposes the active dark-mode state with `aria-pressed`.
 
+Every page starts with a "Skip to content" link that appears when Tab reaches it, so keyboard visitors don't have to walk the whole session rail to reach a photograph. Below 900px the page keeps 60px of scroll padding at the top, so a focused element never ends up under the sticky bar. The footer link uses `--ink-2`, which clears 4.5:1 in both themes (it was 2.4:1).
+
+### Motion that answers what you do
+
+A later pass borrowed mechanics from four React component libraries (Cult UI, Watermelon UI, Skiper UI, Magic UI) and rules from Vercel's web interface guidelines, UI/UX Pro Max and Bencium's motion spec. The site has no React, so each one is rewritten in plain CSS or TypeScript in the archive's ink and paper. Things move only in answer to the visitor; the lead photo is the one thing that changes on its own, and it now has a pause. Under `prefers-reduced-motion` all of it settles instantly.
+
+- **The lightbox opens from the photo you clicked.** PhotoSwipe zooms out of the grid thumbnail (300ms open, 250ms close) and back into it on close. Each photo has its own address (`#photo-4`, kept current with `replaceState`, so it adds no history entries), and loading that address opens the lightbox on that photo. The toolbar's Copy link button copies it; on touch screens it's Share, through the device share sheet. (From Watermelon UI `copy-confirm`, and Vercel's and Pro Max's "deep-link everything".)
+- **Home cards skim.** With a mouse, moving across a session card steps through its first eight photos, 480px WebP fetched on the first hover. The card's header and cover are unchanged, and a click still opens the session. Touch screens don't skim. (Watermelon UI `scrub-slider`, Cult UI `hover-video-player`.)
+- **The rail peeks.** On desktop, pointing at a session in the archive rail, or tabbing to it, shows its cover beside the rail. It hides when the pointer leaves or the list scrolls. (Watermelon UI `preview-link-card`.)
+- **The lead photo has a timer and a pause.** A 1px rule over the caption fills while each photo is up, and a Pause button stops the rotation: anything that moves on its own for more than five seconds needs a way to stop it (WCAG 2.2.2). It also waits while the tab is hidden, the photo is scrolled away, or the caption is hovered or focused.
+- **The theme switch is on every page.** It sits in the rail and the phone bar as well as the hobby header, and crossfades between themes with a View Transition. `theme-color` and `color-scheme` follow the site's theme rather than the system's, so the phone's address bar, scrollbars and form controls match the page. (Magic UI `animated-theme-toggler`, Skiper UI `skiper26`; both also wipe a circle out from the switch, which was left out as louder than anything else on the site.)
+
 ## What remains intentionally unchanged
 
 - Static Astro rendering and Blob-hosted variants remain the right architecture.
@@ -75,7 +87,6 @@ Admin tabs now expose the tab/tablist/tabpanel relationship and support Arrow, H
 | Opportunity                                               | Visitor/owner value                                                 |         Effort | Confidence | Recommendation                                                              |
 | --------------------------------------------------------- | ------------------------------------------------------------------- | -------------: | ---------: | --------------------------------------------------------------------------- |
 | Write session descriptions and captions for featured work | Stronger storytelling, SEO, and non-visual access                   | Content effort |       High | Start now in Admin; prioritize covers and the first 5–10 photos per session |
-| Deep-link and share a specific lightbox photo             | Makes individual photographs shareable without a new backend        |         Medium |       High | Near term                                                                   |
 | Add optional `featured` editorial ordering                | Lets the owner lead with strongest work rather than only chronology |         Medium |     Medium | Near term after enough curated captions exist                               |
 | Add related sessions from explicit tags/collections       | Better discovery than date adjacency when the archive grows         |         Medium |     Medium | Add only with an owner-maintained taxonomy                                  |
 | Draft/preview publication status                          | Safer metadata review before public builds                          |         Medium |     Medium | Useful when publishing becomes frequent                                     |

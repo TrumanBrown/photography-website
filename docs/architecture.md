@@ -335,6 +335,8 @@ Full image-pipeline mechanics: [image-pipeline.md](image-pipeline.md).
 
 **How it is wired:** each slide moves through three tiers — the already-cached grid thumbnail, a size-capped WebP bridge, then the full-size original (image data exactly as uploaded), which is fetched only for the photograph actually on screen. That keeps full resolution without making the first paint wait on a 20 MB file. Details, measurements and tradeoffs: [image-pipeline.md](image-pipeline.md#viewing-full-resolution-without-the-wait).
 
+**Opening and sharing:** the lightbox zooms out of the thumbnail you clicked and back into it on close (an instant fade under `prefers-reduced-motion`). The photo on screen is kept in the address as `#photo-N` with `history.replaceState`, so paging through photos adds no history entries, and a page loaded with that hash opens straight to the photo. A toolbar button copies the link, or opens the device share sheet on touch screens. All of it lives in [Lightbox.astro](../src/components/Lightbox.astro).
+
 ### Azure Blob Storage: the photo album
 
 **What it is:** Azure's cloud file storage. Think of it as a hard drive in the cloud you access by URL. You upload files, you get back a URL per file.

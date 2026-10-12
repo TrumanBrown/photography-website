@@ -1,13 +1,19 @@
 ---
-// Pure-client theme toggle. No framework, no hydration cost.
+// Pure-client theme toggle. No framework, no hydration cost. A page can hold
+// several (the rail, the phone bar, the hobby header); they share one state.
+interface Props {
+  class?: string;
+}
+
+const { class: className } = Astro.props;
 ---
 
 <button
-  id="theme-toggle"
   type="button"
+  data-theme-toggle
   aria-label="Toggle color theme"
   aria-pressed="false"
-  class="rounded border border-neutral-300 px-2 py-1 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-900"
+  class:list={["theme-toggle", className]}
 >
   <span class="hidden dark:inline">Light</span>
   <span class="inline dark:hidden">Dark</span>
@@ -15,22 +21,62 @@
 
 <script is:inline>
   (function () {
-    var btn = document.getElementById('theme-toggle');
-    if (!btn) return;
+    if (window.__themeToggle) return;
+    window.__themeToggle = true;
     var root = document.documentElement;
-    function syncState() {
+    function sync() {
       var isDark = root.classList.contains('dark');
-      btn.setAttribute('aria-label', isDark ? 'Use light theme' : 'Use dark theme');
-      btn.setAttribute('aria-pressed', String(isDark));
+      document.querySelectorAll('[data-theme-toggle]').forEach(function (btn) {
+        btn.setAttribute('aria-label', isDark ? 'Use light theme' : 'Use dark theme');
+        btn.setAttribute('aria-pressed', String(isDark));
+      });
+      var meta = document.querySelector('meta[name="theme-color"]');
+      var paper = getComputedStyle(root).getPropertyValue('--paper').trim();
+      if (meta && paper) meta.setAttribute('content', paper);
     }
-    syncState();
-    btn.addEventListener('click', function () {
-      var nextDark = !root.classList.contains('dark');
+    function apply(nextDark) {
       root.classList.toggle('dark', nextDark);
       try {
         localStorage.setItem('theme', nextDark ? 'dark' : 'light');
       } catch {}
-      syncState();
+      sync();
+    }
+    document.addEventListener('click', function (event) {
+      var btn = event.target.closest && event.target.closest('[data-theme-toggle]');
+      if (!btn) return;
+      var nextDark = !root.classList.contains('dark');
+      var still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      // The page dims into the other theme instead of snapping.
+      if (document.startViewTransition && !still) {
+        document.startViewTransition(function () {
+          apply(nextDark);
+        });
+      } else {
+        apply(nextDark);
+      }
     });
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', sync);
+    } else {
+      sync();
+    }
   })();
 </script>
+
+<style>
+  /* A quiet word, like the rail's links, not a widget. */
+  .theme-toggle {
+    font: inherit;
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-2);
+    background: none;
+    border: 0;
+    padding: 4px 0;
+    cursor: pointer;
+  }
+  .theme-toggle:hover {
+    color: var(--ink);
+  }
+</style>

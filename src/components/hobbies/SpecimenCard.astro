@@ -33,13 +33,12 @@ const nameId = `${prefix}-specimen-name`;
         height="120"
         style="image-rendering: pixelated"
         aria-hidden="true"></canvas>
-      <img
-        {...hook("photo")}
-        alt=""
-        class="is-hidden"
-        loading="lazy"
-        decoding="async"
-      />
+      {
+        /* Not lazy: it has no src until a card opens, and it stays hidden
+          until the photo loads (the pixel reveal). Chrome never fetches a
+          lazy image that isn't displayed. */
+      }
+      <img {...hook("photo")} alt="" class="is-hidden" decoding="async" />
     </div>
     <p class="u-label specimen-status" {...hook("badge")}></p>
     <div class="specimen-names">

@@ -1,8 +1,16 @@
 ---
-import { Picture } from "astro:assets";
+import { Picture, getImage } from "astro:assets";
 import type { CollectionEntry } from "astro:content";
 import type { ImageMetadata } from "astro";
 import { sessionSlug, splitSessionTitle } from "@/lib/sessions";
+
+const sessionImages = import.meta.glob<{ default: ImageMetadata }>(
+  "/src/content/sessions/**/images/*.{jpg,jpeg,png,webp,avif,JPG,JPEG,PNG,WEBP,AVIF}",
+  { eager: true },
+);
+
+/** How many photographs you can thumb through on a card. */
+const SKIM = 8;
 
 interface Props {
   entry: CollectionEntry<"sessions">;
@@ -19,6 +27,25 @@ const count = images.length;
 /* The card shows the place and moves the period into the line underneath, so
    neither is printed twice. */
 const { label, period } = splitSessionTitle(title);
+
+/* The session's first photographs, in the order the session page shows them,
+   small: pointing across the card thumbs through them. Nothing loads until
+   someone points. */
+const skim = (
+  await Promise.all(
+    images.slice(0, SKIM).map(async (image) => {
+      const mod =
+        sessionImages[`/src/content/sessions/${slug}/images/${image.file}`];
+      if (!mod) return null;
+      const small = await getImage({
+        src: mod.default,
+        width: 480,
+        format: "webp",
+      });
+      return small.src;
+    }),
+  )
+).filter((src): src is string => Boolean(src));
 ---
 
 <a
@@ -27,6 +54,7 @@ const { label, period } = splitSessionTitle(title);
   data-session-card
   data-location={location ?? ""}
   data-note={`${count} photograph${count === 1 ? "" : "s"}`}
+  data-skim={skim.length > 1 ? JSON.stringify(skim) : undefined}
 >
   <span class="shotwrap">
     <i class="s1" aria-hidden="true"></i>
@@ -43,6 +71,16 @@ const { label, period } = splitSessionTitle(title);
         fetchpriority={priority ? "high" : "auto"}
         class="shot-img"
       />
+      {
+        skim.length > 1 && (
+          <>
+            <img class="skim-frame" alt="" decoding="async" hidden />
+            <span class="skim" aria-hidden="true">
+              <b />
+            </span>
+          </>
+        )
+      }
       <span class="n">{count}</span>
     </span>
   </span>
@@ -105,6 +143,33 @@ const { label, period } = splitSessionTitle(title);
     background: var(--band);
     display: block;
   }
+  /* While you thumb through a session, its photographs sit over the cover and
+     a 2px rule along the bottom shows how far into the stack you are. */
+  .skim-frame {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .skim-frame[hidden] {
+    display: none;
+  }
+  .skim {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 2px;
+    pointer-events: none;
+  }
+  .skim b {
+    position: absolute;
+    inset: 0;
+    background: var(--paper);
+    transform: scaleX(0);
+    transform-origin: left;
+  }
   .n {
     position: absolute;
     right: 0;
@@ -151,3 +216,65 @@ const { label, period } = splitSessionTitle(title);
     }
   }
 </style>
+
+<script>
+  /* Thumb through a session from its card: pointing across the cover shows
+     its first photographs in order, like flicking through a stack of prints.
+     Mouse only; a tap or a click opens the session as before. */
+  const finePointer = window.matchMedia("(hover: hover) and (pointer: fine)");
+
+  document
+    .querySelectorAll<HTMLAnchorElement>("[data-skim]")
+    .forEach((card) => {
+      const shot = card.querySelector<HTMLElement>(".shot");
+      const frame = shot?.querySelector<HTMLImageElement>(".skim-frame");
+      const fill = shot?.querySelector<HTMLElement>(".skim > b");
+      let frames: string[] = [];
+      try {
+        frames = JSON.parse(card.dataset.skim ?? "[]");
+      } catch {
+        frames = [];
+      }
+      if (!shot || !frame || !fill || frames.length < 2) return;
+
+      let warmed = false;
+      let at = -1;
+      const isMouse = (event: PointerEvent) =>
+        event.pointerType === "mouse" && finePointer.matches;
+
+      shot.addEventListener("pointerenter", (event) => {
+        if (!isMouse(event) || warmed) return;
+        warmed = true;
+        for (const src of frames) {
+          const preload = new Image();
+          preload.decoding = "async";
+          preload.src = src;
+        }
+      });
+
+      shot.addEventListener("pointermove", (event) => {
+        if (!isMouse(event)) return;
+        const box = shot.getBoundingClientRect();
+        const index = Math.min(
+          frames.length - 1,
+          Math.max(
+            0,
+            Math.floor(
+              ((event.clientX - box.left) / box.width) * frames.length,
+            ),
+          ),
+        );
+        if (index === at) return;
+        at = index;
+        frame.src = frames[index];
+        frame.hidden = false;
+        fill.style.transform = `scaleX(${(index + 1) / frames.length})`;
+      });
+
+      shot.addEventListener("pointerleave", () => {
+        at = -1;
+        frame.hidden = true;
+        fill.style.transform = "scaleX(0)";
+      });
+    });
+</script>

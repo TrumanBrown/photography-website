@@ -701,13 +701,31 @@ export function initHikeBuilder(root: HTMLElement): void {
     walkLabel.textContent = "Walking...";
   });
 
+  // The print the postcard develops in (PixelHike.astro). Optional, so the
+  // builder still works without it.
+  const print = root.querySelector<HTMLElement>("[data-hike-print]");
+
   function createPostcard(): void {
-    exportStatus.textContent = "Developing at 2,400 × 1,600...";
+    const developing = "Developing at 2,400 × 1,600...";
+    exportStatus.textContent = developing;
     dialogTitle.textContent = state.routeName;
     if (!dialog.open) dialog.showModal();
     requestAnimationFrame(() => {
       renderHikePostcard(postcard, state);
-      exportStatus.textContent = "Rendered on your device at 2,400 × 1,600.";
+      const done = () => {
+        // Download or Share may have updated the status mid-develop.
+        if (exportStatus.textContent !== developing) return;
+        exportStatus.textContent = "Rendered on your device at 2,400 × 1,600.";
+      };
+      if (!print || reduceMotion) {
+        done();
+        return;
+      }
+      // Restart the develop even when the dialog is already open.
+      print.classList.remove("developing");
+      void print.offsetWidth;
+      print.classList.add("developing");
+      postcard.addEventListener("animationend", done, { once: true });
     });
   }
 

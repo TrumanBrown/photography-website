@@ -6,6 +6,7 @@ import Header from "@/components/Header.astro";
 import Footer from "@/components/Footer.astro";
 import ArchiveRail from "@/components/ArchiveRail.astro";
 import ContactForm from "@/components/ContactForm.astro";
+import ThemeToggle from "@/components/ThemeToggle.astro";
 
 interface Props {
   title?: string;
@@ -61,6 +62,8 @@ const ogImageAbsolute = ogImage
     {noindex && <meta name="robots" content="noindex, nofollow" />}
     <link rel="canonical" href={canonical} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2" />
+    {/* The theme toggle keeps this in step with the paper colour. */}
+    <meta name="theme-color" content="#fbfaf8" />
     <link rel="preconnect" href={blobOrigin} />
 
     <meta property="og:type" content="website" />
@@ -95,6 +98,7 @@ const ogImageAbsolute = ogImage
     <script is:inline set:html={themeBootstrap} />
   </head>
   <body class="min-h-screen">
+    <a class="skip-link" href="#main">Skip to content</a>
     {
       section === "photography" ? (
         <div id="page-shell" class="archive-shell">
@@ -112,6 +116,7 @@ const ogImageAbsolute = ogImage
                 {siteConfig.ownerName}
               </a>
               <span class="bar-acts">
+                <ThemeToggle class="bar-theme" />
                 {siteConfig.sections.hobbies && (
                   <a class="bar-link" href="/hobbies">
                     Things to try
@@ -122,7 +127,7 @@ const ogImageAbsolute = ogImage
                 </button>
               </span>
             </div>
-            <main class="flex-1">
+            <main id="main" tabindex="-1" class="flex-1">
               <slot />
             </main>
             <Footer />
@@ -135,7 +140,7 @@ const ogImageAbsolute = ogImage
             class="flex min-h-screen min-w-0 flex-1 flex-col"
           >
             <Header section={section} />
-            <main class="flex-1">
+            <main id="main" tabindex="-1" class="flex-1">
               <slot />
             </main>
             <Footer />
@@ -148,6 +153,28 @@ const ogImageAbsolute = ogImage
   </body>
 
   <style is:global>
+    /* Hidden until a keyboard reaches it, then the first thing on the page. */
+    .skip-link {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      z-index: 100;
+      padding: 7px 11px;
+      border: 1px solid var(--ink);
+      background: var(--paper);
+      color: var(--ink);
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      text-decoration: none;
+      transform: translateY(-160%);
+    }
+    .skip-link:focus-visible {
+      transform: none;
+    }
+    #main:focus {
+      outline: none;
+    }
     .archive-shell {
       display: flex;
       align-items: flex-start;
@@ -181,6 +208,10 @@ const ogImageAbsolute = ogImage
     }
 
     @media (max-width: 899px) {
+      /* Keep anything you tab to clear of the sticky bar. */
+      html {
+        scroll-padding-top: 60px;
+      }
       .archive-bar {
         display: flex;
         align-items: center;

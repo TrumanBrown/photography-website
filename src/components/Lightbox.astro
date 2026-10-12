@@ -32,12 +32,30 @@ const { gallerySelector = "#gallery" } = Astro.props;
   // Read the per-page selector from the marker element below.
   const marker = document.querySelector<HTMLElement>("[data-lightbox-marker]");
   const selector = marker?.dataset.gallery ?? "#gallery";
+  const reduceMotion = window.matchMedia(
+    "(prefers-reduced-motion: reduce)",
+  ).matches;
+
+  /* A photograph grows out of its own spot in the grid and shrinks back into
+     it on close, so you can see where it came from. Thumbnails cropped by
+     object-fit (the fishing catches) are marked, so PhotoSwipe animates the
+     crop instead of a squashed box. Reduced motion keeps an instant fade. */
+  document
+    .querySelectorAll<HTMLAnchorElement>(`${selector} a`)
+    .forEach((anchor) => {
+      const thumb = anchor.querySelector("img");
+      if (thumb && getComputedStyle(thumb).objectFit === "cover") {
+        anchor.dataset.cropped = "true";
+      }
+    });
 
   const lightbox = new PhotoSwipeLightbox({
     gallery: selector,
     children: "a",
     pswpModule: () => import("photoswipe"),
-    showHideAnimationType: "fade",
+    showHideAnimationType: reduceMotion ? "fade" : "zoom",
+    showAnimationDuration: reduceMotion ? 0 : 300,
+    hideAnimationDuration: reduceMotion ? 0 : 250,
     bgOpacity: 0.95,
     // Fetch a couple of neighbours ahead so moving through a session doesn't
     // wait on the network at every step. These are the size-capped copies, not
@@ -54,6 +72,65 @@ const { gallerySelector = "#gallery" } = Astro.props;
   });
 
   lightbox.on("uiRegister", function () {
+    /* Each photograph has its own address (#photo-12), so the link copied
+       here opens straight onto it. On a phone with a share sheet this is
+       "Share"; elsewhere it copies the link. */
+    const canShare =
+      typeof navigator.share === "function" &&
+      window.matchMedia("(pointer: coarse)").matches;
+    // Screen readers don't reliably read a focused button's new text, so the
+    // result is also spoken through this hidden status line.
+    let linkStatus: HTMLElement | null = null;
+    lightbox.pswp?.ui?.registerElement({
+      name: "link-status",
+      order: 7,
+      tagName: "span",
+      onInit: (el) => {
+        el.setAttribute("role", "status");
+        linkStatus = el;
+      },
+    });
+    lightbox.pswp?.ui?.registerElement({
+      name: "link-button",
+      order: 7,
+      isButton: true,
+      tagName: "button",
+      html: canShare ? "Share" : "Copy link",
+      onInit: (el) => {
+        el.setAttribute(
+          "title",
+          canShare ? "Share this photograph" : "Copy a link to this photograph",
+        );
+        let reset: number | undefined;
+        const say = (text: string) => {
+          el.textContent = text;
+          if (linkStatus) linkStatus.textContent = text;
+          window.clearTimeout(reset);
+          reset = window.setTimeout(() => {
+            el.textContent = canShare ? "Share" : "Copy link";
+            if (linkStatus) linkStatus.textContent = "";
+          }, 1600);
+        };
+        el.addEventListener("click", async () => {
+          const url = window.location.href;
+          if (canShare) {
+            try {
+              await navigator.share({ url, title: document.title });
+            } catch {
+              // Closing the share sheet isn't an error worth reporting.
+            }
+            return;
+          }
+          try {
+            await navigator.clipboard.writeText(url);
+            say("Link copied");
+          } catch {
+            say("Couldn't copy");
+          }
+        });
+      },
+    });
+
     // Download full-resolution button in the top toolbar.
     lightbox.pswp?.ui?.registerElement({
       name: "download-button",
@@ -185,7 +262,33 @@ const { gallerySelector = "#gallery" } = Astro.props;
     pswp.on("change", run);
   });
 
+  /* The address follows the photograph on screen. replaceState, not
+     pushState, so Back leaves the page instead of stepping through photos. */
+  const PHOTO_HASH = /^#photo-(\d+)$/;
+  lightbox.on("change", () => {
+    const index = lightbox.pswp?.currIndex;
+    if (typeof index !== "number") return;
+    history.replaceState(history.state, "", `#photo-${index + 1}`);
+  });
+  lightbox.on("close", () => {
+    if (PHOTO_HASH.test(window.location.hash)) {
+      history.replaceState(
+        history.state,
+        "",
+        window.location.pathname + window.location.search,
+      );
+    }
+  });
+
   lightbox.init();
+
+  // A link to one photograph opens the page with it already up.
+  const linked = PHOTO_HASH.exec(window.location.hash);
+  if (linked) {
+    const count = document.querySelectorAll(`${selector} a`).length;
+    const index = Number(linked[1]) - 1;
+    if (index >= 0 && index < count) lightbox.loadAndOpen(index);
+  }
 </script>
 
 <span data-lightbox-marker data-gallery={gallerySelector} hidden></span>
@@ -204,10 +307,32 @@ const { gallerySelector = "#gallery" } = Astro.props;
     font-size: 0.875rem;
     padding: 0.3rem 0.75rem;
     background: rgba(0, 0, 0, 0.55);
-    border-radius: 0.25rem;
     max-width: 90vw;
     text-align: center;
     pointer-events: none;
+  }
+
+  /* A word, not an icon, in the toolbar's own colour and size. */
+  .pswp__button--link-button {
+    width: auto;
+    padding: 0 12px;
+    font: inherit;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--pswp-icon-color);
+  }
+  .pswp__button--link-button:hover {
+    color: #fff;
+  }
+  .pswp__link-status {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   .pswp__caption:empty {

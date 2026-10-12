@@ -1,8 +1,16 @@
 ---
 import { getCollection } from "astro:content";
+import { getImage } from "astro:assets";
+import type { ImageMetadata } from "astro";
 import { sortSessions, sessionSlug, splitSessionTitle } from "@/lib/sessions";
-import { buildPlaces } from "@/lib/archive";
+import { buildPlaces, coverFileOf } from "@/lib/archive";
 import { siteConfig } from "../../site.config";
+import ThemeToggle from "./ThemeToggle.astro";
+
+const sessionImages = import.meta.glob<{ default: ImageMetadata }>(
+  "/src/content/sessions/**/images/*.{jpg,jpeg,png,webp,avif,JPG,JPEG,PNG,WEBP,AVIF}",
+  { eager: true },
+);
 
 interface Props {
   /** Slug of the session being shown, for the highlight. */
@@ -63,6 +71,22 @@ for (const entry of sessions) {
 function railLabel(entry: (typeof sessions)[number]): string {
   return splitSessionTitle(entry.data.title).label;
 }
+
+/* Each session's cover, small, for the print that slides out of the rail
+   when you point at a session. */
+const peekCovers = new Map<string, string>();
+await Promise.all(
+  sessions.map(async (entry) => {
+    const slug = sessionSlug(entry);
+    const mod =
+      sessionImages[
+        `/src/content/sessions/${slug}/images/${coverFileOf(entry)}`
+      ];
+    if (!mod) return;
+    const small = await getImage({ src: mod.default, width: 320, format: "webp" });
+    peekCovers.set(slug, small.src);
+  }),
+);
 ---
 
 <aside id="archive-rail" class="rail" aria-label="Sessions">
@@ -88,6 +112,7 @@ function railLabel(entry: (typeof sessions)[number]): string {
     <button id="rail-close" class="rail-close u-label" type="button"
       >Close</button
     >
+    <span class="rail-theme"><ThemeToggle /></span>
   </div>
 
   {
@@ -124,6 +149,7 @@ function railLabel(entry: (typeof sessions)[number]): string {
               ]}
               href={`/sessions/${sessionSlug(row.entry)}/`}
               data-rail-item
+              data-peek={peekCovers.get(sessionSlug(row.entry))}
               data-search={`${row.entry.data.title} ${row.entry.data.location ?? ""} ${row.entry.data.date}`.toLowerCase()}
             >
               <span class="t">{railLabel(row.entry)}</span>
@@ -136,6 +162,12 @@ function railLabel(entry: (typeof sessions)[number]): string {
       )
     }
     <p class="rail-empty" id="rail-none" hidden>No sessions match.</p>
+  </div>
+
+  <div class="peek" id="rail-peek" aria-hidden="true">
+    <span class="peek-print"
+      ><i class="p1"></i><i class="p2"></i><img alt="" decoding="async" /></span
+    >
   </div>
 
   {
@@ -198,6 +230,13 @@ function railLabel(entry: (typeof sessions)[number]): string {
   }
   .rail-link.here {
     color: var(--ink);
+  }
+  /* The theme word sits in the rail's top corner. The phone drawer has its
+     Close button there instead; the phone bar carries its own switch. */
+  .rail-theme {
+    position: absolute;
+    top: 14px;
+    right: 14px;
   }
   .rail-close {
     display: none;
@@ -340,13 +379,67 @@ function railLabel(entry: (typeof sessions)[number]): string {
     .rail-close {
       display: block;
     }
+    .rail-theme {
+      display: none;
+    }
     .orb canvas {
       max-width: 210px;
     }
   }
 
+  /* A session's cover slides out from under the rail's edge while you point
+     at it or tab to it (the preview-link card from Watermelon UI, kept as a
+     print). Desktop only; on touch a tap just opens the session. */
+  .peek {
+    display: none;
+  }
+  @media (min-width: 900px) {
+    .peek {
+      display: block;
+      position: absolute;
+      top: 0;
+      left: 100%;
+      width: 220px;
+      pointer-events: none;
+      opacity: 0;
+      transform: translate(-12px, var(--peek-y, 0px));
+      transition:
+        opacity 140ms ease-out,
+        transform 180ms cubic-bezier(0.2, 0, 0, 1);
+    }
+    .peek.on {
+      opacity: 1;
+      transform: translate(14px, var(--peek-y, 0px));
+    }
+  }
+  .peek-print {
+    position: relative;
+    display: block;
+  }
+  .peek-print i {
+    position: absolute;
+    inset: 0;
+  }
+  .peek-print .p1 {
+    background: var(--stack-1);
+    transform: translate(6px, 6px);
+  }
+  .peek-print .p2 {
+    background: var(--stack-2);
+    transform: translate(3px, 3px);
+  }
+  .peek-print img {
+    position: relative;
+    display: block;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+    background: var(--band);
+  }
+
   @media (prefers-reduced-motion: reduce) {
-    .rail {
+    .rail,
+    .peek {
       transition: none;
     }
   }
@@ -387,6 +480,42 @@ function railLabel(entry: (typeof sessions)[number]): string {
     if (none) none.hidden = shown > 0;
   }
   search?.addEventListener("input", applyFilter);
+
+  /* Point at a session (or tab to it) and its cover slides out beside the
+     rail. Only where the rail is a column, not the phone drawer. */
+  const peek = document.getElementById("rail-peek");
+  const peekImg = peek?.querySelector<HTMLImageElement>("img");
+  const railEl = document.getElementById("archive-rail");
+  const wideRail = window.matchMedia("(min-width: 900px)");
+  if (list && peek && peekImg && railEl) {
+    const show = (item: HTMLElement) => {
+      const src = item.dataset.peek;
+      if (!src || !wideRail.matches) return;
+      const railBox = railEl.getBoundingClientRect();
+      const row = item.getBoundingClientRect();
+      // Centre the print on the row, but keep it on screen.
+      const y = Math.max(
+        12,
+        Math.min(row.top - railBox.top - 60, window.innerHeight - 220),
+      );
+      peek.style.setProperty("--peek-y", `${y}px`);
+      if (peekImg.getAttribute("src") !== src) peekImg.src = src;
+      peek.classList.add("on");
+    };
+    const hide = () => peek.classList.remove("on");
+    list.querySelectorAll<HTMLElement>("[data-rail-item]").forEach((item) => {
+      item.addEventListener("pointerenter", (event) => {
+        if ((event as PointerEvent).pointerType === "mouse") show(item);
+      });
+      item.addEventListener("focus", () => show(item));
+    });
+    list.addEventListener("pointerleave", hide);
+    list.addEventListener("focusout", (event) => {
+      const next = (event as FocusEvent).relatedTarget as Node | null;
+      if (!next || !list.contains(next)) hide();
+    });
+    list.addEventListener("scroll", hide, { passive: true });
+  }
 
   /* Keep the highlighted session in view without scrolling the page. */
   const current = list?.querySelector<HTMLElement>(".rail-item.on");

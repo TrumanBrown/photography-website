@@ -18,7 +18,9 @@
 
 @layer base {
   :root {
-    color-scheme: light dark;
+    /* Follows the site's own theme (html.dark), not the system's, so
+       scrollbars and form controls match the page you're looking at. */
+    color-scheme: light;
 
     /* One palette for the whole archive. Components read these rather than
        hard-coding neutrals, so the theme toggle keeps working. */
@@ -47,6 +49,7 @@
   }
 
   html.dark {
+    color-scheme: dark;
     --paper: #121211;
     --band: #181816;
     --ink: #ece9e1;

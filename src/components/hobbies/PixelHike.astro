@@ -283,13 +283,16 @@ const hikerColors = ["#d5523f", "#e1a13a", "#247d72", "#355f9b", "#7d4f8f"];
       >
     </div>
     <div class="hike-well">
-      <canvas
-        data-hike-postcard
-        width="2400"
-        height="1600"
-        class="hike-postcard"
-        role="img"
-        aria-label="Your generated hiking postcard"></canvas>
+      <div class="hike-print" data-hike-print>
+        <canvas
+          data-hike-postcard
+          width="2400"
+          height="1600"
+          class="hike-postcard"
+          role="img"
+          aria-label="Your generated hiking postcard"></canvas>
+        <span class="hike-grain" aria-hidden="true"></span>
+      </div>
     </div>
     <div class="hike-dialog-foot">
       <p data-hike-export-status class="hike-export" aria-live="polite">
@@ -701,6 +704,64 @@ const hikerColors = ["#d5523f", "#e1a13a", "#247d72", "#355f9b", "#7d4f8f"];
     display: block;
     width: 100%;
     aspect-ratio: 3 / 2;
+  }
+
+  /* "Develop postcard" develops: the print comes up pale and grainy and the
+     contrast and colour come in, like a print in the tray. The grain is an
+     ordered-dither screen (the Bayer idea behind Cult UI's dither-image). The
+     download is the canvas itself, so none of this touches the PNG. */
+  .hike-print {
+    position: relative;
+  }
+  .hike-grain {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    pointer-events: none;
+    background-image:
+      radial-gradient(
+        circle at 25% 25%,
+        rgb(20 18 12 / 0.55) 0 0.9px,
+        transparent 1.1px
+      ),
+      radial-gradient(
+        circle at 75% 75%,
+        rgb(20 18 12 / 0.35) 0 0.9px,
+        transparent 1.1px
+      );
+    background-size: 4px 4px;
+    mix-blend-mode: multiply;
+  }
+  .hike-print.developing .hike-postcard {
+    animation: hike-develop 1700ms cubic-bezier(0.25, 0.1, 0.25, 1) both;
+  }
+  .hike-print.developing .hike-grain {
+    animation: hike-undither 1400ms cubic-bezier(0.25, 0.1, 0.25, 1) both;
+  }
+  @keyframes hike-develop {
+    0% {
+      filter: contrast(0.25) brightness(1.55) sepia(0.6) blur(1.2px);
+    }
+    55% {
+      filter: contrast(0.75) brightness(1.15) sepia(0.25) blur(0.3px);
+    }
+    100% {
+      filter: none;
+    }
+  }
+  @keyframes hike-undither {
+    0% {
+      opacity: 0.9;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .hike-print.developing .hike-postcard,
+    .hike-print.developing .hike-grain {
+      animation: none;
+    }
   }
 
   .hike-dialog-foot {

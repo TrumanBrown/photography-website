@@ -78,6 +78,11 @@ const first = resolved[0];
         </a>
       </div>
       <div class="cap">
+        {resolved.length > 1 && (
+          <span class="cap-timer" aria-hidden="true">
+            <i id="lead-timer" />
+          </span>
+        )}
         <a class="t" id="lead-title" href={`/sessions/${first.slug}/`}>
           {first.label}
         </a>
@@ -87,6 +92,9 @@ const first = resolved[0];
           </span>
           {resolved.length > 1 && (
             <>
+              <button type="button" id="lead-pause" class="lead-pause">
+                Pause
+              </button>
               <button
                 type="button"
                 id="lead-prev"
@@ -189,6 +197,7 @@ const first = resolved[0];
   }
 
   .cap {
+    position: relative;
     display: flex;
     align-items: baseline;
     justify-content: space-between;
@@ -227,6 +236,27 @@ const first = resolved[0];
   .steps button:hover {
     color: var(--ink);
   }
+  /* The caption's top rule doubles as the clock: an ink line fills it toward
+     the next photograph and stops when you pause. */
+  .cap-timer {
+    position: absolute;
+    top: -1px;
+    left: 0;
+    right: 0;
+    height: 1px;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .cap-timer i {
+    position: absolute;
+    inset: 0;
+    background: var(--ink);
+    transform: scaleX(0);
+    transform-origin: left;
+  }
+  .steps .lead-pause {
+    font-size: 12px;
+  }
 
   @media (max-width: 899px) {
     .plate {
@@ -248,6 +278,11 @@ const first = resolved[0];
   @media (prefers-reduced-motion: reduce) {
     .plate img {
       transition: none;
+    }
+    /* Nothing rotates under reduced motion, so there is nothing to pause. */
+    .cap-timer,
+    .steps .lead-pause {
+      display: none;
     }
   }
 </style>
@@ -294,7 +329,6 @@ const first = resolved[0];
       Number.isInteger(chosen) && chosen >= 0 && chosen < frames.length
         ? chosen
         : 0;
-    let timer: number | undefined;
     let paused = false;
 
     /* If the inline chooser never ran, the plate is still empty. Paint the
@@ -347,19 +381,61 @@ const first = resolved[0];
     }
 
     const seconds = Number(root!.dataset.interval ?? 6) * 1000;
+    const timerFill = document.getElementById("lead-timer");
+    const pauseButton = document.getElementById("lead-pause");
+
+    /* A clock rather than an interval, so the rule under the photograph can
+       show how long is left and freeze while paused. Hovering the caption,
+       focus inside the box, the Pause button, a hidden tab and the box
+       scrolled out of view all stop it. */
+    let held = false;
+    let onscreen = true;
+    let elapsed = 0;
+    let last = 0;
+    let raf = 0;
+
+    function tick(now: number) {
+      // Capped, so coming back to the tab doesn't skip a photograph.
+      const dt = last ? Math.min(now - last, 100) : 0;
+      last = now;
+      if (!paused && !held && !document.hidden) {
+        elapsed += dt;
+        if (elapsed >= seconds) {
+          elapsed = 0;
+          show(index + 1);
+        }
+      }
+      if (timerFill) {
+        timerFill.style.transform = `scaleX(${Math.min(1, elapsed / seconds)})`;
+      }
+      raf = onscreen ? requestAnimationFrame(tick) : 0;
+    }
 
     function start() {
-      if (reduced || frames.length < 2 || timer) return;
-      timer = window.setInterval(() => {
-        if (!paused && !document.hidden) show(index + 1);
-      }, seconds);
+      if (reduced || frames.length < 2 || raf) return;
+      last = 0;
+      raf = requestAnimationFrame(tick);
     }
 
     /** Restart the clock after a manual move, so it doesn't jump straight on. */
     function restart() {
-      if (timer) window.clearInterval(timer);
-      timer = undefined;
+      elapsed = 0;
       start();
+    }
+
+    pauseButton?.addEventListener("click", () => {
+      held = !held;
+      // Play means play, even though the pointer or focus is still on the
+      // caption (either would otherwise keep it paused).
+      if (!held) paused = false;
+      pauseButton.textContent = held ? "Play" : "Pause";
+    });
+
+    if ("IntersectionObserver" in window) {
+      new IntersectionObserver((entries) => {
+        onscreen = entries.some((entry) => entry.isIntersecting);
+        if (onscreen) start();
+      }).observe(root);
     }
 
     function step(by: number) {
