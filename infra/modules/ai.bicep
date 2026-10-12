@@ -4,10 +4,10 @@ param name string
 @description('Region.')
 param location string
 
-@description('Principal ID of the Bicep deploy identity (id-photography-deploy-<env>). It gets inference-only access.')
+@description('Principal ID of the build identity (id-photography-deploy-<env>), which the build, photo and posting workflows sign in as through AZURE_DEPLOY_CLIENT_ID. It gets inference-only access.')
 param principalId string
 
-@description('The identity GitHub Actions actually signs in as, through the AZURE_CLIENT_ID secret. scripts/setup-federated-credential.sh creates it under these names. It gets inference-only access too.')
+@description('The subscription-wide bootstrap identity from scripts/setup-federated-credential.sh. Workflows fall back to it (AZURE_CLIENT_ID) until AZURE_DEPLOY_CLIENT_ID is set, so it gets inference-only access too.')
 param ciIdentityName string = 'id-photography-bootstrap'
 
 @description('Resource group of the GitHub Actions identity.')
@@ -81,8 +81,8 @@ resource ciIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31
   scope: resourceGroup(ciIdentityResourceGroup)
 }
 
-// The build's prebuild step runs as this identity, so this is the grant that
-// lets new sessions get a drafted description.
+// The fallback identity's grant, for workflows that haven't switched to the
+// build identity yet (docs/cicd.md).
 resource ciRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(account.id, ciIdentity.id, openAiUserRoleId)
   scope: account

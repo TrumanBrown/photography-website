@@ -97,18 +97,22 @@ jobs:
           echo "::add-mask::$TOKEN"
           echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
 
-      - name: Write SWA token into repo secret
+      - name: Write deploy secrets into the repository
         env:
           GH_TOKEN: ${{ secrets.GH_PAT_FOR_SECRETS }}
+          SWA_TOKEN: ${{ steps.swa-token.outputs.token }}
+          STORAGE_ACCOUNT: ${{ steps.deploy.outputs.storageAccountName }}
+          # The build identity: Blob access on this storage account only. The
+          # build, photo and posting workflows sign in as it once it's set.
+          DEPLOY_CLIENT_ID: ${{ steps.deploy.outputs.managedIdentityClientId }}
+          RESOURCE_GROUP: ${{ steps.deploy.outputs.resourceGroupName }}
+          SWA_NAME: ${{ steps.deploy.outputs.swaName }}
         run: |
           if [ -z "${GH_TOKEN:-}" ]; then
-            echo "::warning::GH_PAT_FOR_SECRETS not set; cannot auto-update AZURE_STATIC_WEB_APPS_API_TOKEN."
-            echo "Run ./scripts/bootstrap-swa-token.sh '${{ steps.deploy.outputs.resourceGroupName }}' '${{ steps.deploy.outputs.swaName }}' '${{ github.repository }}' from an authenticated machine."
+            echo "::warning::GH_PAT_FOR_SECRETS not set; cannot auto-update AZURE_STATIC_WEB_APPS_API_TOKEN, AZURE_STORAGE_ACCOUNT or AZURE_DEPLOY_CLIENT_ID."
+            echo "Run ./scripts/bootstrap-swa-token.sh '$RESOURCE_GROUP' '$SWA_NAME' '$GITHUB_REPOSITORY' from an authenticated machine."
             exit 0
           fi
-          gh secret set AZURE_STATIC_WEB_APPS_API_TOKEN \
-            --repo "${{ github.repository }}" \
-            --body "${{ steps.swa-token.outputs.token }}"
-          gh secret set AZURE_STORAGE_ACCOUNT \
-            --repo "${{ github.repository }}" \
-            --body "${{ steps.deploy.outputs.storageAccountName }}"
+          gh secret set AZURE_STATIC_WEB_APPS_API_TOKEN --repo "$GITHUB_REPOSITORY" --body "$SWA_TOKEN"
+          gh secret set AZURE_STORAGE_ACCOUNT --repo "$GITHUB_REPOSITORY" --body "$STORAGE_ACCOUNT"
+          gh secret set AZURE_DEPLOY_CLIENT_ID --repo "$GITHUB_REPOSITORY" --body "$DEPLOY_CLIENT_ID"

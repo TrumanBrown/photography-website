@@ -54,7 +54,10 @@ resource sa 'Microsoft.Storage/storageAccounts@2024-01-01' existing = {
   name: storageAccountName
 }
 
-// Storage Blob Data Contributor — read originals, write derivatives.
+// Storage Blob Data Contributor: read originals, write derivatives, variants
+// and the private metadata container. The build, photo and posting workflows
+// need nothing else from the storage account; contact messages and analytics
+// in Table Storage stay out of their reach.
 var blobDataContributorRoleId = 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
 
 resource roleAssignmentBlob 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
@@ -67,20 +70,7 @@ resource roleAssignmentBlob 'Microsoft.Authorization/roleAssignments@2022-04-01'
   }
 }
 
-// Storage Table Data Contributor — write contact form submissions.
-var tableDataContributorRoleId = '0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3'
-
-resource roleAssignmentTable 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(sa.id, mi.id, tableDataContributorRoleId)
-  scope: sa
-  properties: {
-    principalId: mi.properties.principalId
-    principalType: 'ServicePrincipal'
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', tableDataContributorRoleId)
-  }
-}
-
-// Reader on the resource group — lets the deploy step look up resource props.
+// Reader on the resource group, so the OIDC sign-in finds the subscription.
 var readerRoleId = 'acdd72a7-3385-48ef-bd42-f606fba81ae7'
 
 resource roleAssignmentReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = {

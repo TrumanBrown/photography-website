@@ -60,10 +60,11 @@ jobs:
       - name: Install npm deps
         run: npm ci
 
+      # The build identity (AZURE_DEPLOY_CLIENT_ID) when it's set; docs/cicd.md.
       - name: Azure login (OIDC)
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          client-id: ${{ secrets.AZURE_DEPLOY_CLIENT_ID || secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
@@ -83,10 +84,13 @@ jobs:
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL }}
+          PHOTOS_MODEL: ${{ vars.PHOTOS_MODEL }}
+          PHOTOS_PROVIDER: ${{ vars.PHOTOS_PROVIDER }}
           INATURALIST_USER: ${{ vars.INATURALIST_USER }}
           # Instagram (stage 6), only with SOCIAL_ENABLED=true.
           SOCIAL_ENABLED: ${{ vars.SOCIAL_ENABLED }}
           SOCIAL_POSTS_PER_DAY: ${{ vars.SOCIAL_POSTS_PER_DAY }}
+          SOCIAL_LANDSCAPE_EVERY: ${{ vars.SOCIAL_LANDSCAPE_EVERY }}
           SOCIAL_TALL_IMAGES: ${{ vars.SOCIAL_TALL_IMAGES }}
           SOCIAL_MIN_WIDTH: ${{ vars.SOCIAL_MIN_WIDTH }}
           IG_LOGIN_MODE: ${{ vars.IG_LOGIN_MODE }}
