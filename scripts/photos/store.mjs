@@ -173,11 +173,26 @@ export async function blobStore({
     },
     /** Read any blob in the account (used for the prebuild's admin index). */
     async readOther(containerName, blobName) {
+      return (await this.readOtherBytes(containerName, blobName)).toString(
+        "utf8",
+      );
+    },
+    /** The bytes of any blob in the account (a photo's original, say). */
+    async readOtherBytes(containerName, blobName) {
       const res = await service
         .getContainerClient(containerName)
         .getBlobClient(blobName)
         .download();
-      return (await streamToBuffer(res.readableStreamBody)).toString("utf8");
+      return streamToBuffer(res.readableStreamBody);
+    },
+    /** Names of the blobs in another container, optionally under `prefix`. */
+    async listOther(containerName, prefix = "") {
+      const names = [];
+      for await (const b of service
+        .getContainerClient(containerName)
+        .listBlobsFlat({ prefix }))
+        names.push(b.name);
+      return names;
     },
   };
 }

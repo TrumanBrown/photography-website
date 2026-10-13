@@ -1,6 +1,8 @@
 import {
   burstGroups,
+  cameraFacts,
   chooseVersion,
+  originalFor,
   padFraction,
   shotKey,
 } from "../photos/shots.mjs";
@@ -13,6 +15,8 @@ import {
   pickObservation,
   speciesUsable,
   timeCandidates,
+  unseenCandidates,
+  zoneSlip,
 } from "../photos/inat.mjs";
 import { hamming } from "../photos/hash.mjs";
 import { loadSettings } from "./settings.mjs";
@@ -26,6 +30,41 @@ describe("shots", () => {
       ),
     ).toBe("ILCE-6700|2026-09-04T17:22:40|12");
     expect(shotKey({ clock: null }, "abcd")).toBe("hash:abcd");
+  });
+
+  it("reads a converted photo's camera facts from its original, keeping its key", () => {
+    const heic = {
+      facts: { clock: null, model: "", subsec: "" },
+      hash: "ab",
+      capture: {
+        clock: "2025-10-22T17:12:53",
+        model: "iPhone 16 Pro",
+        subsec: "123",
+      },
+    };
+    expect(cameraFacts(heic)).toMatchObject({
+      clock: "2025-10-22T17:12:53",
+      model: "iPhone 16 Pro",
+    });
+    expect(shotKey(heic.facts, heic.hash)).toBe("hash:ab");
+    expect(
+      cameraFacts({ facts: { clock: "own" }, capture: { clock: "original" } })
+        .clock,
+    ).toBe("own");
+    const names = [
+      "koloa-forest-reserve-hi-oct-2025/IMG_6955.HEIC",
+      "koloa-forest-reserve-hi-oct-2025/IMG_6983.JPEG",
+      "Shanghai-city-and-birds-Spring-2026/IMG_1.heic",
+    ];
+    expect(
+      originalFor("koloa-forest-reserve-hi-oct-2025", "IMG_6955.jpg", names),
+    ).toBe(names[0]);
+    expect(
+      originalFor("koloa-forest-reserve-hi-oct-2025", "IMG_6983.JPEG", names),
+    ).toBeNull();
+    expect(
+      originalFor("Shanghai-city-and-birds-Spring-2026", "IMG_1.jpg", names),
+    ).toBe(names[2]);
   });
 
   it("posts the version that needs no border, then the biggest", () => {
@@ -346,6 +385,67 @@ describe("iNaturalist matching", () => {
   it("offers only research-grade observations from the same moment", () => {
     const c = timeCandidates("2026-09-04T17:21:00", index, 120, 5);
     expect(c.map((x) => x.obsId)).toEqual(["2", "1"]);
+  });
+
+  it("takes a looser copy when the clocks agree across a time-zone slip", () => {
+    // 16 bits from the frame: too far on looks alone.
+    const copy = flip(frame, 4);
+    const slipped = hashMatcher({
+      observations: {
+        7: {
+          taxon: 70,
+          quality: "research",
+          clock: "2025-10-23T21:25:28",
+          photos: { 700: "u" },
+        },
+        8: {
+          taxon: 80,
+          quality: "research",
+          clock: "2025-10-23T02:04:00",
+          photos: { 800: "u" },
+        },
+      },
+      hashes: { 700: copy, 800: copy },
+    });
+    // Ten hours apart to the second, as when iNaturalist read the phone's
+    // time in the wrong zone.
+    expect(
+      slipped([frame], "2025-10-23T11:25:28").map((h) => [h.obsId, h.slipped]),
+    ).toEqual([["7", true]]);
+    // An observation timed only to the minute gets a minute's grace.
+    expect(slipped([frame], "2025-10-22T16:04:17").map((h) => h.obsId)).toEqual(
+      ["8"],
+    );
+    // Minutes apart, or the fingerprints too far apart: not the same photo.
+    expect(slipped([frame], "2025-10-23T11:20:00")).toEqual([]);
+    expect(
+      hashMatcher({
+        observations: {
+          7: { taxon: 70, clock: "2025-10-23T21:25:28", photos: { 700: "u" } },
+        },
+        hashes: { 700: flip(frame, 7) },
+      })([frame], "2025-10-23T11:25:28"),
+    ).toEqual([]);
+    expect(zoneSlip("2025-10-23T11:25:28", "2025-10-23T11:25:28")).toBe(false);
+    expect(zoneSlip("2025-10-23T11:25:28", "2025-10-24T07:25:28")).toBe(false);
+  });
+
+  it("looks again only for observations a photo's last look can't have seen", () => {
+    const candidates = [
+      { obsId: "1", obs: { created: "2025-10-22T19:44:42-10:00" } },
+      { obsId: "2", obs: { created: "2026-10-12T08:00:00-07:00" } },
+      { obsId: "3", obs: {} },
+    ];
+    const analysedAt = "2026-10-11T01:28:46.519Z";
+    expect(
+      unseenCandidates(candidates, { analysedAt, hadClock: true }).map(
+        (c) => c.obsId,
+      ),
+    ).toEqual(["2"]);
+    // Without a capture time then, nothing was compared at all.
+    expect(
+      unseenCandidates(candidates, { analysedAt, hadClock: false }),
+    ).toHaveLength(3);
   });
 
   it("lends a species name only from research-grade, species-level IDs", () => {

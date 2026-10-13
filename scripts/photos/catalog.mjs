@@ -40,7 +40,14 @@ import {
 } from "./sessions.mjs";
 import { gearLine, orientedSize, readFacts } from "./exif.mjs";
 import { dhash, hamming } from "./hash.mjs";
-import { burstGroups, chooseVersion, padFraction, shotKey } from "./shots.mjs";
+import {
+  burstGroups,
+  cameraFacts,
+  chooseVersion,
+  originalFor,
+  padFraction,
+  shotKey,
+} from "./shots.mjs";
 import {
   fetchTaxon,
   hashMatcher,
@@ -48,6 +55,7 @@ import {
   pickObservation,
   refreshIndex,
   timeCandidates,
+  unseenCandidates,
 } from "./inat.mjs";
 import { askJson, encodeForModel, modelFor, providerFor } from "./model.mjs";
 import {
@@ -109,7 +117,7 @@ import {
   sessionNames,
 } from "../social/compose.mjs";
 import { buildHashtags } from "../social/hashtags.mjs";
-import { planQueue } from "../social/plan.mjs";
+import { SCENES, planQueue } from "../social/plan.mjs";
 import { resolveToken } from "../social/token.mjs";
 import { createClient } from "../social/instagram.mjs";
 import { info, redact, warn } from "./redact.mjs";
@@ -119,6 +127,9 @@ const DESCRIPTION_VERSION = 2;
 
 /** Bump when the way posts are put together changes, so planned posts are rebuilt. */
 const POST_VERSION = 4;
+
+/** Bump to read converted photos' capture facts from their originals again. */
+const CAPTURE_VERSION = 1;
 
 function parseArgs(argv) {
   const out = {
@@ -257,7 +268,47 @@ async function main() {
     if (p?.url) f.url = p.url;
   }
 
-  // 2. group into shots
+  // 1b. A HEIC, TIFF or RAW photo is shown from a JPEG the build makes, which
+  // carries no camera data, so its capture time, camera and lens are read
+  // from the original instead, once. Without a capture time a photo can't be
+  // matched to the iNaturalist observation of the same moment, or even to its
+  // own copy there unless the fingerprints are nearly identical. Where it was
+  // taken is never kept.
+  const noCapture = Object.values(catalog.files).filter(
+    (f) =>
+      !f.facts?.clock &&
+      f.captureV !== CAPTURE_VERSION &&
+      /\/derivatives\//.test(f.url ?? ""),
+  );
+  let captured = 0;
+  if (noCapture.length && remote?.listOther) {
+    try {
+      const originals = await remote.listOther("originals");
+      await pool(noCapture, 4, async (f) => {
+        const prefix = sessionsBySlug.get(f.session)?.prefix ?? f.session;
+        const name = originalFor(prefix, f.file, originals);
+        try {
+          const facts = name
+            ? await readFacts(await remote.readOtherBytes("originals", name))
+            : null;
+          const camera = { ...(facts ?? {}) };
+          delete camera.lat;
+          delete camera.lon;
+          f.capture = camera.clock || camera.model ? camera : null;
+          f.captureV = CAPTURE_VERSION;
+          if (f.capture) captured++;
+        } catch {
+          // Unreadable for now; tried again next run.
+        }
+      });
+    } catch (e) {
+      warn(
+        `Couldn't read the originals of converted photos; tried again next run. ${redact(e)}`,
+      );
+    }
+  }
+
+  // 2. group into shots (by the file's own facts; see cameraFacts in shots.mjs)
   const groups = new Map();
   for (const [id, f] of Object.entries(catalog.files)) {
     const key = shotKey(f.facts, f.hash);
@@ -273,7 +324,7 @@ async function main() {
       pick: pick.id,
       session: pick.session,
       location: sessionsBySlug.get(pick.session)?.location ?? null,
-      clock: pick.facts?.clock ?? null,
+      clock: cameraFacts(pick)?.clock ?? null,
       sessionDate: sessionsBySlug.get(pick.session)?.date ?? null,
     };
   }
@@ -338,8 +389,10 @@ async function main() {
         taxon: best.obs.taxon,
         quality: best.obs.quality,
         via: "frame",
+        ...(best.slipped ? { slipped: true } : {}),
       };
-      if (s.clock && best.obs.clock) {
+      // A time-zone slip says nothing about this camera's clock.
+      if (s.clock && best.obs.clock && !best.slipped) {
         if (!offsetPairs.has(s.session)) offsetPairs.set(s.session, []);
         offsetPairs
           .get(s.session)
@@ -380,12 +433,32 @@ async function main() {
   const gaveUp = (s) =>
     (s.unreadable || (s.failures ?? 0) >= 3) &&
     !(s.redo && s.redo > (s.failedAt ?? ""));
+  // The same-moment check (tier 2) only happens while a photo is analysed, so
+  // an organism photo without an identification gets another look when an
+  // observation of the same moment appears that its last look can't have
+  // seen: put on iNaturalist since, or the photo had no capture time then.
+  const momentDue = (s) => {
+    if (s.inat || !s.clock || !s.analysis || !index) return false;
+    if (SCENES.has(s.analysis.group) || s.analysis.group === "people")
+      return false;
+    const hadClock =
+      "clock" in s.analysis
+        ? Boolean(s.analysis.clock)
+        : Boolean(catalog.files[s.pick]?.facts?.clock);
+    return (
+      unseenCandidates(
+        timeCandidates(s.clock, index, catalog.offsets[s.session] ?? 0),
+        { analysedAt: s.analysis.at, hadClock },
+      ).length > 0
+    );
+  };
   const needsAnalysis = (s) =>
     !gaveUp(s) &&
     (!s.analysis ||
       s.analysis.v !== ANALYSIS_VERSION ||
       (s.analysis.taxon ?? null) !== (s.inat?.taxon ?? null) ||
-      (s.redo && s.redo > (s.analysis.at ?? "")));
+      (s.redo && s.redo > (s.analysis.at ?? "")) ||
+      momentDue(s));
   const pending = Object.values(shots)
     .filter((s) => inScope(s.session) && needsAnalysis(s))
     .sort(
@@ -517,6 +590,9 @@ async function main() {
       v: ANALYSIS_VERSION,
       ...analysis,
       taxon: s.inat?.taxon ?? null,
+      // What the same-moment check could go on, so a later run can tell
+      // whether an observation is new to this photo.
+      clock: s.clock ?? null,
       model,
       at: new Date().toISOString(),
       ...(problems.length ? { problems } : {}),
@@ -953,7 +1029,7 @@ async function main() {
         taxon,
         speciesOk: level === "species",
         group: s.analysis.group,
-        facts: file.facts,
+        facts: cameraFacts(file),
         session: { ...session, description: sessionNames(session) },
         proposedPlace: s.analysis.placeTag,
         landmark: s.analysis.landmark,
@@ -966,7 +1042,7 @@ async function main() {
         headline,
         comment: s.voice?.comment ?? "",
         hashtags,
-        gear: gearLine(file.facts),
+        gear: gearLine(cameraFacts(file)),
         iucn: level === "species" ? (taxon.iucn ?? null) : null,
       };
     };
@@ -1356,7 +1432,7 @@ async function main() {
   const count = (fn) => all.filter(fn).length;
   info(
     [
-      `Photos: ${photos.length} (${scanned} newly scanned${scanFailed ? `, ${scanFailed} unreadable` : ""}).`,
+      `Photos: ${photos.length} (${scanned} newly scanned${scanFailed ? `, ${scanFailed} unreadable` : ""}${captured ? `, ${captured} capture times read from originals` : ""}).`,
       `Shots: ${all.length}, analysed: ${count((s) => s.analysis)} (${analysed} this run${analyseFailed ? `, ${analyseFailed} failed` : ""}).`,
       `iNaturalist matches: ${count((s) => s.inat?.via === "frame")} exact frame, ${count((s) => s.inat?.via === "moment")} same moment; ${count((s) => s.analysis?.idCheck === "conflict")} flagged as not matching.`,
       `Website: ${site.captions} captions (${linesWritten} first lines written), ${site.described} descriptions written${site.describeFailed ? `, ${site.describeFailed} failed checks` : ""}, ${site.waiting} sessions still being analysed, ${site.written} session files updated${site.kept ? `, ${site.kept} of your edits left alone` : ""}${sidecars ? "" : " (not written: dry run)"}.`,

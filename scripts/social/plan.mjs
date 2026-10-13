@@ -18,7 +18,7 @@
  */
 const DAY_MS = 24 * 3600 * 1000;
 
-const SCENES = new Set([
+export const SCENES = new Set([
   "mountain",
   "forest",
   "waterfall",

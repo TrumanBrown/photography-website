@@ -17,6 +17,38 @@ export function shotKey(facts, hash) {
   return `hash:${hash}`;
 }
 
+/** Formats the site shows as a JPEG the build makes, which carries no camera data. */
+export const CONVERTED =
+  /\.(?:heic|heif|tiff?|dng|arw|nef|cr2|cr3|raf|orf|rw2)$/i;
+
+/**
+ * A file's camera facts: its own, or for a photo the site shows converted
+ * (HEIC, TIFF, RAW), the ones read from its original (`file.capture`).
+ * Shot keys deliberately keep using the file's own facts, so a shot that
+ * gains a capture time this way keeps its key, and with it its record and
+ * its place in the posting history.
+ */
+export function cameraFacts(file) {
+  if (!file) return null;
+  if (file.facts?.clock || !file.capture) return file.facts ?? null;
+  return { ...file.facts, ...file.capture };
+}
+
+/**
+ * The original a converted photo was made from: same session folder and
+ * name, any converted format. `names` lists the originals container.
+ */
+export function originalFor(prefix, file, names) {
+  const stem =
+    `${prefix}/${String(file).replace(/\.[^.]+$/, "")}`.toLowerCase();
+  return (
+    names.find(
+      (n) =>
+        CONVERTED.test(n) && n.replace(/\.[^.]+$/, "").toLowerCase() === stem,
+    ) ?? null
+  );
+}
+
 /** How much of the Instagram frame would be border (0 when the photo fits as-is). */
 export function padFraction(width, height) {
   const r = width / height;

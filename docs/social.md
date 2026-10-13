@@ -51,7 +51,7 @@ Nothing needs doing when you add photos. After `./scripts/upload-session.sh <fol
 2. **Photo captions** analyses the new photos, matches them to your iNaturalist observations, writes their website captions and the session description, redeploys the site, and adds them to the Instagram plan.
 3. They're posted as their turn comes. Sessions photographed in the last 45 days get a small head start; the plan never posts one session twice in a day, the same species or landmark within about five days, or frames from the same burst within about ten.
 
-Adding iNaturalist observations later is fine: the next Photo captions run matches them, and the website captions and any post not yet published pick up the species.
+Adding iNaturalist observations later is fine: the next Photo captions run matches them, whether the observation uses the same photo or another one from the same moment, and the website captions and any post not yet published pick up the species. iPhone HEIC photos are matched by the capture time in their originals.
 
 ## What stays private
 

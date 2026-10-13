@@ -95,8 +95,10 @@ Your iNaturalist observations are the source of truth for what an organism is. T
 
 A photo is matched to an observation in one of two ways ([inat.mjs](../scripts/photos/inat.mjs)):
 
-- **Same photo.** Every photo on your observations is fingerprinted. A site photo matches when the fingerprints are within 14 bits and the observation is dated within a day of capture (within 6 bits when there's no date). Measured on this archive, different shots never came closer than 9 bits.
-- **Same moment.** With no fingerprint match, research-grade observations made within five minutes of the capture are shown to the model next to the photo. One is only used if the model is confident it's the same organism. Each session's camera-clock error is learned from its fingerprint matches first.
+- **Same photo.** Every photo on your observations is fingerprinted. A site photo matches when the fingerprints are within 14 bits and the observation is dated within a day of capture (within 6 bits when there's no date). Measured on this archive, different shots never came closer than 9 bits. Up to 24 bits also counts when the two times agree to the second (or to the minute, for a time typed in by hand) but sit whole hours apart: the same photo, with iNaturalist reading its time in another time zone. Unrelated photos sit around 64 bits apart.
+- **Same moment.** With no fingerprint match, research-grade observations made within five minutes of the capture are shown to the model next to the photo. One is only used if the model is confident it's the same organism. Each session's camera-clock error is learned from its fingerprint matches first. This check happens while a photo is looked at, so a photo of an organism without an identification gets another look when an observation from the same moment turns up that it couldn't have been compared with: one added to iNaturalist since, or any at all if the photo had no capture time then.
+
+Both need the photo's capture time. **HEIC, TIFF and RAW photos** are shown on the site as a JPEG the build makes, which carries no camera data, so their capture time, camera and lens are read once from the original in the `originals` container. Without that, an iPhone photo could only match an observation photo that was a near-identical copy. Location is never read from the original.
 
 The match is used **at whatever rank and grade it has**, because even an identification still waiting for confirmation is yours and beats a model's guess:
 
@@ -246,6 +248,7 @@ Workflow options (Run workflow): `limit` (photos to analyse, default 300), `over
 - **A caption is wrong.** Edit it in `/admin`; it stays. Or run `npm run photos -- redo <photo>` for a fresh look.
 - **A photo has no caption.** The model's content filter can refuse a harmless photo (one of a person bent over on a slope was refused here). It isn't retried, and `npm run photos -- status` lists it. A photo with an iNaturalist identification still gets a caption from that alone. Write one in `/admin`, or `redo` it to try again. Other failures are retried for three runs.
 - **A species is wrong.** Fix the identification on iNaturalist. The next run follows it.
+- **A species isn't named, though it's on iNaturalist.** The match needs the photo's capture time, or a near-identical copy of the photo on the observation. Check the photo still has its camera data (HEIC originals are read automatically), and that the observation's time is right; an observation whose time is off by whole hours still matches when the photos are close. `npm run photos -- redo <photo>` looks again.
 - **A peak or lake isn't named.** Add it to the session's title, location or folder name, then `npm run photos -- redo --session <slug>`.
 - **A description didn't change.** It's left alone once edited in `/admin`. `npm run photos -- status` lists any that failed their checks.
 - **Trying it without Azure:** `node scripts/photos/catalog.mjs --local --provider mock` runs every stage against the sessions prebuild downloaded, with state in `.cache/photos/state`.

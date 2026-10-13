@@ -4,12 +4,17 @@
  * Tier 1, exact frame: every photo on your observations is fingerprinted once
  * (dHash of iNat's 240 px copy). A site photo whose fingerprint is within a few
  * bits of one of them IS that observation's photo, whatever the camera clock
- * said. This was checked by eye on real pairs before relying on it.
+ * said. This was checked by eye on real pairs before relying on it. A looser
+ * fingerprint counts too when the clocks agree to the second across a
+ * time-zone slip (whole hours apart), the usual sign of the same photo
+ * uploaded with the wrong zone.
  *
  * Tier 2, same moment: observations made within a few minutes of the capture
  * (after correcting the session's camera-clock offset, learned from Tier 1
  * matches in that session). These are only candidates; the vision model has
- * to confirm the same animal is in both photos before one is used.
+ * to confirm the same animal is in both photos before one is used. A photo
+ * gets another look when such an observation appears that its last look
+ * can't have seen.
  *
  * Species names are only ever taken from research-grade observations at
  * species rank or finer. Everything else stays at group level.
@@ -62,6 +67,9 @@ function slimObservation(o) {
     rank: o.taxon?.rank ?? null,
     quality: o.quality_grade ?? null,
     clock: obsClock(o),
+    // When it was put on iNaturalist, to tell which observations a photo's
+    // last look could have been compared with.
+    created: o.created_at ?? null,
     obscured: Boolean(
       o.obscured ||
       o.geoprivacy === "obscured" ||
@@ -147,12 +155,33 @@ export async function refreshIndex(
  * true iNat copies sat at 0-16 bits, 288 of 290 within a day of capture. */
 export const MATCH_DATED = 14;
 export const MATCH_UNDATED = 6;
+/** With clocks that agree to the second across a time-zone slip, a looser
+ * fingerprint is enough: unrelated photos sit around 64 bits apart. */
+export const MATCH_SLIPPED = 24;
+
+/**
+ * True when two clock readings are the same moment recorded in different
+ * time zones (a phone and iNaturalist disagreeing about where you were):
+ * whole hours apart, to the second, or to the minute when the observation's
+ * time was only entered to the minute.
+ */
+export function zoneSlip(shotClock, obsClock) {
+  const a = clockMs(shotClock);
+  const b = clockMs(obsClock);
+  if (a == null || b == null) return false;
+  const hours = Math.round((b - a) / 3600000);
+  if (hours === 0 || Math.abs(hours) > 14) return false;
+  const residual = Math.abs(b - a - hours * 3600000) / 1000;
+  const seconds = /T\d{2}:\d{2}:(\d{2})/.exec(obsClock)?.[1];
+  return !seconds || seconds === "00" ? residual < 60 : residual <= 2;
+}
 
 /**
  * Build a lookup over the index once per run. The returned function lists the
  * observation photos that plausibly ARE this shot: within MATCH_DATED bits and
  * observed within a day of the capture date, or within MATCH_UNDATED bits when
- * either date is unknown. Closest first.
+ * either date is unknown, or within MATCH_SLIPPED bits when the clocks agree
+ * across a time-zone slip (`slipped: true`). Closest first.
  */
 export function hashMatcher(index) {
   const entries = [];
@@ -164,6 +193,7 @@ export function hashMatcher(index) {
           obsId,
           photoId,
           hash,
+          clock: o.clock ?? null,
           day: o.clock?.slice(0, 10) ?? null,
         });
     }
@@ -174,13 +204,22 @@ export function hashMatcher(index) {
     for (const e of entries) {
       for (const fileHash of fileHashes) {
         const distance = hamming(fileHash, e.hash);
-        if (distance > MATCH_DATED) continue;
+        if (distance > MATCH_SLIPPED) continue;
         const dated = shotDay && e.day;
         const sameDay =
           dated && Math.abs(Date.parse(shotDay) - Date.parse(e.day)) <= 864e5;
-        if (dated ? sameDay : distance <= MATCH_UNDATED) {
+        if (
+          distance <= MATCH_DATED &&
+          (dated ? sameDay : distance <= MATCH_UNDATED)
+        )
           hits.push({ obsId: e.obsId, photoId: e.photoId, distance });
-        }
+        else if (zoneSlip(shotClock, e.clock))
+          hits.push({
+            obsId: e.obsId,
+            photoId: e.photoId,
+            distance,
+            slipped: true,
+          });
       }
     }
     return hits.sort((a, b) => a.distance - b.distance);
@@ -281,6 +320,22 @@ export function timeCandidates(
     .filter((c) => c.gap <= windowMinutes)
     .sort((a, b) => a.gap - b.gap)
     .slice(0, 4);
+}
+
+/**
+ * The same-moment candidates a photo's last look can't have been compared
+ * with: every one when the photo had no capture time then, otherwise those
+ * put on iNaturalist after it. An observation of the same moment added later
+ * means the photo gets another look.
+ */
+export function unseenCandidates(candidates, { analysedAt, hadClock }) {
+  if (!hadClock) return candidates;
+  // iNat's times carry their own offset ("-10:00"); compare instants.
+  const seen = Date.parse(analysedAt ?? "");
+  return candidates.filter((c) => {
+    const made = Date.parse(c.obs?.created ?? "");
+    return Number.isFinite(made) && Number.isFinite(seen) && made > seen;
+  });
 }
 
 const IUCN = {
