@@ -4,7 +4,7 @@ A second, **optional** top-level section beside Photography. Photography is unch
 
 This doc covers how the section is wired, how to add a hobby, the conventions every interactive follows, and the aquarium island as the original reference implementation. It is written so a future session (or you) can pick the work back up cold.
 
-> Status: shell + six islands + one daily puzzle are live: **Aquarium keeping**, **Tide pooling**, **Fishing**, **Birding** (selfie to bird), **Herping** (night-drive road cruising), **Hiking** (trail builder + postcard studio), and **Day list** (a daily where-and-when puzzle, mounted by its `dayList` content rather than an `interactive` island). More are planned (travel map and repo explorer) and meant to be built **one at a time**.
+> Status: shell + six islands + one daily puzzle are live: **Aquarium keeping**, **Tide pooling**, **Fishing**, **Birding** (selfie to bird), **Herping** (night-drive road cruising), **Hiking** (trail builder + postcard studio), and **Narrow nature** (a daily where-and-when puzzle, called Day list in the code and mounted by its `dayList` content rather than an `interactive` island). More are planned (travel map and repo explorer) and meant to be built **one at a time**.
 
 ---
 
@@ -325,7 +325,7 @@ A **road-cruising game**: a dark, wet Pacific Northwest back road scrolls toward
 
 Like the other islands, everything is **drawn in code**, the loop pauses offscreen and when the tab is hidden, and it honors `prefers-reduced-motion` — which **parks the car** (the road stops moving) and degrades to a stationary headlamp-sweep so there's no vestibular motion.
 
-## Reference implementation: Day list (daily puzzle)
+## Reference implementation: Narrow nature (daily puzzle)
 
 A daily puzzle that asks you to read a **community** rather than a single organism. Six species were
 all recorded at one real place in one month; they are revealed most-widely-recorded first, so the
@@ -364,9 +364,12 @@ There are two modes on one board. **Today's list** is the same round for everyon
   the busiest month and the size of the boundary. Run it by hand when adding a location (`--extra`
   for More lists candidates).
 
-**Where it lives.** Day list is its own hobby at `/hobbies/day-list/`, with its own card on the
-hobbies index. The block is still opt-in per hobby, so it can be dropped onto any other hobby page
-by adding:
+**Where it lives.** Narrow nature is its own hobby at `/hobbies/day-list/`, with its own card on
+the hobbies index. It started out as Day list, and the code still uses that name: the slug and
+URL, the files, the `dayList` block, the `data-daylist-*` hooks and the saved-progress keys, so
+bookmarks and saved rounds carry over. Only the title and the share text say Narrow nature.
+`order: 0` puts it first in Things to try, since it's the one people come back to every day. The
+block is still opt-in per hobby, so it can be dropped onto any other hobby page by adding:
 
 ```json
 "dayList": { "heading": "Today's list" }

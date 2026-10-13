@@ -36,7 +36,7 @@ The project started as a photography portfolio and has grown into a small person
 ## Tech at a glance
 
 - **Frontend:** Astro 5 + Tailwind v3 (static build, near-zero JS), see [docs/architecture.md](docs/architecture.md)
-- **Interactive hobbies:** hand-drawn canvas islands (aquarium, tide pooling, fishing, birding selfie-to-bird, herping night drive, hiking trail studio) plus the Day list daily puzzle, each card illustrated with a stipple plate drawn from one of the photos, see [docs/hobbies.md](docs/hobbies.md)
+- **Interactive hobbies:** hand-drawn canvas islands (aquarium, tide pooling, fishing, birding selfie-to-bird, herping night drive, hiking trail studio) plus the Narrow nature daily puzzle, each card illustrated with a stipple plate drawn from one of the photos, see [docs/hobbies.md](docs/hobbies.md)
 - **Dynamic API:** three Azure Functions bundled with SWA (contact form, admin session manager, analytics beacon), see [docs/architecture.md](docs/architecture.md)
 - **Admin + analytics:** browser `/admin` panel gated by GitHub sign-in, cookieless traffic metrics, see [docs/admin.md](docs/admin.md) and [docs/analytics.md](docs/analytics.md)
 - **Hosting:** Azure Static Web Apps (Free tier), see [docs/azure.md](docs/azure.md)

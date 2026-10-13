@@ -1,10 +1,10 @@
 {
-  "title": "Day list",
+  "title": "Narrow nature",
   "summary": "Six species, all seen at the same place in the same month. Guess where and when.",
   "intro": "Six species were all seen at the same place in the same month. Guess where and when.",
   "plateNote": "The globe · new list every day",
   "accent": "#6b6250",
-  "order": 7,
+  "order": 0,
   "dayList": {
     "heading": "Today's list"
   }

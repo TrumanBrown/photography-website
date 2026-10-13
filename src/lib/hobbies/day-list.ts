@@ -882,7 +882,7 @@ export function initDayList(root: HTMLElement): void {
     const where =
       km === 0 ? "inside the boundary" : `${count(Math.round(km))} km off`;
     return (
-      `Day list, ${DATE_SHORT.format(new Date())}\n${read}\n${distance}${season}\n` +
+      `Narrow nature, ${DATE_SHORT.format(new Date())}\n${read}\n${distance}${season}\n` +
       `${where} \u00b7 ${used}/${round.clues.length} species \u00b7 ${count(score)}`
     );
   }
