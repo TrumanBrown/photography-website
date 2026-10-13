@@ -3,9 +3,9 @@
  * Private helper for the social auto-poster, run on your own machine.
  *
  *   npm run social -- status              counts, and roughly when the archive runs out
- *   npm run social -- preview [count]     open the upcoming posts as a page in your browser
+ *   npm run social -- preview [count]     open the next story and the upcoming posts as a page in your browser
  *                                         (.cache/social/preview.html; --no-open just writes it)
- *   npm run social -- skip <photo> [why]  never post this shot
+ *   npm run social -- skip <photo> [why]  never post this shot, as a post or a story
  *   npm run social -- unskip <photo>
  *   npm run social -- redraft <photo>     new first line and a different fact on the next Photo captions run
  *   npm run social -- approve <photo>     only matters with SOCIAL_REQUIRE_APPROVAL=true
@@ -25,6 +25,8 @@ import { ROOT, loadSettings } from "./settings.mjs";
 import { blobStore, localStore, updateJson } from "../photos/store.mjs";
 import { isPostable } from "./plan.mjs";
 import { canvasFor } from "./render.mjs";
+import { STORY_LEDGER, pickStory, storyCandidates } from "./story.mjs";
+import { localParts } from "./schedule.mjs";
 import { showPage } from "../photos/open.mjs";
 
 const args = process.argv
@@ -149,6 +151,17 @@ async function status({ social, photos }) {
   console.log(
     `At ${settings.postsPerDay} a day, the archive lasts about ${days} more days (around ${end}).`,
   );
+  const stories = (await social.readJson(STORY_LEDGER))?.data ?? {};
+  const forStories = storyCandidates({
+    catalog,
+    storyLedger: stories,
+    feedLedger: ledger,
+    queue: (await social.readJson("queue.json"))?.data?.items ?? [],
+  });
+  const vertical = forStories.filter((c) => c.vertical).length;
+  console.log(
+    `Stories posted: ${Object.keys(stories.posted ?? {}).length}. Photos left for stories: ${vertical} vertical, ${forStories.length - vertical} others (one a day, vertical first).`,
+  );
 }
 
 async function preview({ social, photos }, count) {
@@ -180,10 +193,33 @@ async function preview({ social, photos }, count) {
     (k) => catalog.shots[k].status === "needs_review",
   );
   const shown = queue.slice(0, count);
+  // The photo the next story would use, shown in the story's 9:16 frame.
+  const storyLedger = (await social.readJson(STORY_LEDGER))?.data ?? {};
+  const story = pickStory({
+    catalog,
+    storyLedger,
+    feedLedger: (await social.readJson("ledger.json"))?.data ?? {},
+    queue,
+    recent: Object.entries(storyLedger.posted ?? {})
+      .sort((a, b) => String(a[1].at).localeCompare(String(b[1].at)))
+      .map(([k]) => k),
+    day: localParts(new Date(), settings.timezone).day,
+  });
+  const storySrc = story
+    ? local
+      ? `file://${join(ROOT, "src/content/sessions", story.file.session, "images", story.file.file)}`
+      : story.file.url
+    : "";
+  const storyCard = story
+    ? `<h1>Next story</h1><article><div class="frame" style="aspect-ratio:9/16"><img src="${escape(storySrc)}" loading="lazy" alt=""></div><div>
+<p class="meta">${escape(story.shot.pick)} · ${story.vertical ? "vertical" : "not vertical: no vertical photos are left"}</p>
+<p class="lede">One a day, at a different time each day. The photo alone: where it isn't 9:16, a blurred copy of it fills the rest of the frame.</p></div></article>`
+    : "";
   const html = `<!doctype html><meta charset="utf-8"><title>Upcoming posts</title>
 <style>body{font:15px system-ui;margin:2rem;max-width:1100px}article{display:grid;grid-template-columns:340px 1fr;gap:1.4rem;margin:0 0 2.2rem}
 .frame{width:340px;background:#1b1b1b;display:flex}.frame img{width:100%;height:100%;object-fit:contain}
 pre{white-space:pre-wrap;font:15px system-ui;margin:.4rem 0}.meta{color:#666;font-size:13px;margin:0}.alt{color:#444;font-size:13px}.lede{color:#444;max-width:70ch}</style>
+${storyCard}
 <h1>Next ${shown.length} posts</h1>
 <p class="lede">In the order they'll go out, ${settings.postsPerDay} a day. Each photo is shown in the frame Instagram will use: never cropped, with plain borders where it doesn't fit (black or white, matched to the photo when it's posted).</p>
 ${shown.map((key, i) => card(key, i)).join("\n")}
@@ -227,7 +263,7 @@ async function main() {
     });
     const done = {
       approve: "Approved it.",
-      skip: "Skipped it. It won't be posted.",
+      skip: "Skipped it. It won't be posted, as a post or a story.",
       unskip:
         "Unskipped it. The next Photo captions run puts it back in the plan.",
       redraft:
@@ -244,21 +280,22 @@ async function main() {
     };
     const key = rest[0] === "--all" ? null : findShot(catalog, rest[0])[0];
     let cleared = 0;
-    await updateJson(
-      stores.social,
-      "ledger.json",
-      (l) => {
-        l.failed = l.failed ?? {};
-        for (const k of Object.keys(l.failed)) {
-          if (key === null || k === key) {
-            delete l.failed[k];
-            cleared++;
+    for (const file of ["ledger.json", STORY_LEDGER])
+      await updateJson(
+        stores.social,
+        file,
+        (l) => {
+          l.failed = l.failed ?? {};
+          for (const k of Object.keys(l.failed)) {
+            if (key === null || k === key) {
+              delete l.failed[k];
+              cleared++;
+            }
           }
-        }
-        return l;
-      },
-      { fallback: { posted: {}, failed: {} } },
-    );
+          return l;
+        },
+        { fallback: { posted: {}, failed: {} } },
+      );
     console.log(
       `Cleared ${cleared} failed ${cleared === 1 ? "attempt" : "attempts"}. They can be posted again.`,
     );

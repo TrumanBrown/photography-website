@@ -84,9 +84,9 @@ The prebuild cache cleanup is a disk-capacity requirement, not a cache miss. A p
 
 ### [`social-post.yml`](../.github/workflows/social-post.yml): Instagram posting
 
-**When it runs:** every 30 minutes through the posting day, started by the timer below; on its own half-hourly schedule as a backup; or by hand (tick **force** to post now). Only with `SOCIAL_ENABLED=true`, and it only publishes with `SOCIAL_LIVE=true`.
+**When it runs:** every 30 minutes through the posting day, started by the timer below; on its own half-hourly schedule as a backup; or by hand (tick **force** to post now, or **story** to post today's story now). Only with `SOCIAL_ENABLED=true`, and it only publishes with `SOCIAL_LIVE=true`.
 
-**What it does:** a dependency-free check decides in seconds whether one of the day's slots is due. If it is, it renders the next planned photo, hands it to Instagram and publishes it, exactly once per slot. Full walkthrough: [docs/social.md](social.md).
+**What it does:** a dependency-free check decides in seconds whether one of the day's slots, or the day's story, is due. If a slot is, it renders the next planned photo, hands it to Instagram and publishes it, exactly once per slot. With `SOCIAL_STORIES=true` it then does the same for one story a day. Full walkthrough: [docs/social.md](social.md).
 
 ### The timer: a Logic App that starts workflows
 

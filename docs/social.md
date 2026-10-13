@@ -11,6 +11,7 @@
 - [Setting it up again](#setting-it-up-again)
 - [Settings](#settings)
 - [How each post is made](#how-each-post-is-made)
+- [Stories](#stories)
 - [Reliability and failures](#reliability-and-failures)
 - [Troubleshooting](#troubleshooting)
 - [Optional extras](#optional-extras)
@@ -24,6 +25,7 @@
 - Posts the **whole frame at Instagram's full resolution** (1440 px wide). It never crops. Frames too tall or too wide for Instagram get plain borders instead.
 - **Writes each caption from the photo's record**: the same one-time analysis that writes the website's captions ([docs/photos.md](photos.md)). Each post gets what the photo is of and what it's doing, where it is, **one true fact about the species or the place** taken from Wikipedia, the camera and lens, alt text, and five hashtags. For animals and plants it uses **your own iNaturalist identification of that exact photo**.
 - **Mixes the feed**: one post in every three is a landscape or place, the rest wildlife.
+- Posts **one story a day**, at a different time each day: a photo from the archive, vertical ones first, with nothing added ([Stories](#stories)).
 - **Picks up new sessions on its own**, the night after they appear on the site.
 - Runs entirely in **GitHub Actions**. Nothing has to run on your computer.
 
@@ -33,7 +35,7 @@
 |---|---|---|
 | Every 30 minutes from 7 am to 10:30 pm Pacific, and at 3 am | **The timer**, a Logic App in your Azure resource group ([infra/modules/scheduler.bicep](../infra/modules/scheduler.bicep)) | Starts Social post on GitHub at :02 and :32, and Photo captions at 3:02 am. GitHub's own scheduler is best effort: on this repository an hourly schedule ran about once every five hours, and the new half-hourly one didn't run at all for its first hours, so the timer is what keeps posts on time. The schedules inside the workflow files stay as a backup |
 | Once a day (the timer), twice a day (GitHub's schedule, when it runs), and after new photos appear | **Photo captions** workflow ([docs/photos.md](photos.md)) | Analyses photos new to the site once, for the website and Instagram alike. With `SOCIAL_ENABLED=true` it also checks what's already on the Instagram account, plans the next two weeks of posts and writes them, so posting carries on for two weeks even if nothing starts this workflow |
-| Each time the timer starts it | **Social post** workflow | Checks whether one of today's posting slots is due. If it is, publishes the next planned photo. Most runs find nothing due and finish in seconds |
+| Each time the timer starts it | **Social post** workflow | Checks whether one of today's posting slots is due. If it is, publishes the next planned photo. Then the same for the day's story, when stories are on. Most runs find nothing due and finish in seconds |
 | Once a week | inside Social post | Renews the Instagram access token, so it never reaches its 60-day expiry |
 | The morning after a day with no post | inside Social post | Fails one run on purpose, so GitHub emails you |
 | After 45 days without a commit | inside Social post | Makes an empty commit. GitHub switches off scheduled workflows in public repositories after 60 days without one |
@@ -60,7 +62,7 @@ Adding iNaturalist observations later is fine: the next Photo captions run match
 | Which account, and its access token | GitHub secrets, plus an encrypted copy in the private `metadata` storage container | No |
 | Each photo's record (what's in it, its identification, its written post) | `metadata/photos/` in the private container | No |
 | The facts posts draw on, and which Wikipedia article each came from | `metadata/photos/facts.json` in the private container | No |
-| The posting plan, posting history | `metadata/social/` in the private container | No |
+| The posting plan, posting history, story history | `metadata/social/` in the private container | No |
 | The images sent to Instagram | Uploaded to the private container, given to Instagram as a link that expires after two hours, deleted after posting | No |
 | Workflow logs | Public, like every Actions log in a public repository | Yes, but they only contain counts and generic messages. Errors pass through [redact.mjs](../scripts/photos/redact.mjs), which strips tokens, account and media ids, signed links and provider ids |
 | This code and these docs | The repository | Yes, by design |
@@ -230,9 +232,9 @@ When you want to steer it, these run on your computer (signed in with `az login`
 
 | Command | What it does |
 |---|---|
-| `npm run social -- status` | Counts, and roughly when the archive runs out |
-| `npm run social -- preview` | Opens the next week of posts in your browser (`--no-open` just writes the page) |
-| `npm run social -- skip DSC01234 [why]` | Never post this shot |
+| `npm run social -- status` | Counts, roughly when the archive runs out, and how many photos are left for stories |
+| `npm run social -- preview` | Opens the next story and the next week of posts in your browser (`--no-open` just writes the page) |
+| `npm run social -- skip DSC01234 [why]` | Never post this shot, as a post or a story |
 | `npm run social -- unskip DSC01234` | Undo a skip |
 | `npm run social -- redraft DSC01234` | On the next Photo captions run, write the photo a new first line (its website caption changes too) and give its post a different fact |
 | `npm run social -- approve DSC01234` | Approve this exact caption (only matters with `SOCIAL_REQUIRE_APPROVAL=true`) |
@@ -240,7 +242,7 @@ When you want to steer it, these run on your computer (signed in with `az login`
 
 `DSC01234` can be any unique part of a filename, or a full `session/file` id.
 
-To pause posting, set `SOCIAL_LIVE` to anything other than `true`. To stop everything, set `SOCIAL_ENABLED` to `false`.
+To pause posting, set `SOCIAL_LIVE` to anything other than `true`. To stop stories only, set `SOCIAL_STORIES` to anything other than `true`. To stop everything, set `SOCIAL_ENABLED` to `false`.
 
 ## Setting it up again
 
@@ -280,9 +282,11 @@ Set these as **secrets** (masked in logs) or **variables** under Settings → Se
 | `SOCIAL_TALL_IMAGES` | variable | `pad` | `skip` leaves out frames that would need borders |
 | `SOCIAL_PAD_COLOR` | variable | `auto` | Border colour. `auto` picks black or white from the photo's edges |
 | `SOCIAL_REQUIRE_APPROVAL` | variable | off | `true` posts only captions you've approved |
+| `SOCIAL_STORIES` | variable | off | `true` posts one story a day (only while `SOCIAL_LIVE` is `true`); `rehearse` does everything but publish |
+| `SOCIAL_STORY_WINDOW` | variable | `10:00-21:00` | The day's story goes out at a time picked within this window, different each day |
 | `IG_LOGIN_MODE`, `IG_USER_ID` | variable, secret | `instagram` | Only for the [Facebook Login setup](#location-tags-and-tagging-accounts) |
 
-The timer's own settings are parameters of [scheduler.bicep](../infra/modules/scheduler.bicep): `timeZone` (a Windows time zone name, `Pacific Standard Time` by default; keep it the same as `SOCIAL_TIMEZONE`), `postingHours` (7 to 22, which covers the default slots and the 11 pm cutoff) and `pipelineHour` (3). Change them there and run the Infra workflow.
+The timer's own settings are parameters of [scheduler.bicep](../infra/modules/scheduler.bicep): `timeZone` (a Windows time zone name, `Pacific Standard Time` by default; keep it the same as `SOCIAL_TIMEZONE`), `postingHours` (7 to 22, which covers the default slots, the story window and the 11 pm cutoff) and `pipelineHour` (3). Change them there and run the Infra workflow.
 
 ---
 
@@ -396,6 +400,27 @@ When there's no subject tag (most landscapes), the broad region takes the slot (
 - **Fixed automatically:** em dashes, emoji, exclamation marks, and stray `#` or `@`.
 - **Already checked on the way in:** the first line and the fact each pass their own checks before they're stored (banned words, names nobody wrote down, species the photo isn't identified as, facts that can't be traced to their article).
 - **Held back:** a caption that still fails the copy checks is marked "needs review" and is never posted unprompted.
+
+---
+
+## Stories
+
+With `SOCIAL_STORIES=true` (and `SOCIAL_LIVE=true`), the Social post workflow also posts **one story a day** ([story.mjs](../scripts/social/story.mjs)).
+
+**When.** At a time picked within `SOCIAL_STORY_WINDOW` (10:00 to 21:00 Pacific by default), different each day, so stories don't appear like clockwork. It goes out on the first timer run after that time; a missed run only delays it, until the day ends at 11 pm.
+
+**Which photo.**
+
+- **Vertical photos first**, while any are left, so the 9:16 frame needs as little fill as possible. Among similar ratings, the shape closest to 9:16 wins. Other shapes only once the vertical ones run out (`npm run social -- status` says how many are left).
+- **Never twice**: never a photo already used for a story, one planned for the feed in the next two weeks, or one the feed posted in the last month.
+- **Never one the photo checks leave out** (blurry, an identifiable person, under 1080 px, an identification that doesn't match) or one you skipped.
+- **Outings rotate**: not the same outing as either of the last two stories, nor a frame from the same burst as one of the last ten.
+
+**What it looks like.** The photo alone, whole and never cropped, in a 1080×1920 frame. Where it isn't 9:16, a blurred, dimmed copy of the same photo fills the rest: about 150 px above and below a 2:3 vertical. No text, stickers or music. Instagram's API can't add a location, a link, a poll or music to a story anyway; those only exist in the app. Camera data and location are stripped, as for posts.
+
+**Switches.** `SOCIAL_STORIES=rehearse` does everything except publish: it picks the photo, renders it and hands it to Instagram as a story, then stops, once a day. Any other value turns stories off. To post today's story now instead of at its time, run **Actions → Social post → Run workflow** with **story** ticked; it never posts a second story the same day.
+
+**Reliability.** Exactly-once and failures work as for posts (below), with their own day records (`metadata/social/story-days/`) and history (`metadata/social/stories.json`). A photo Instagram rejects gets one more try another day; another photo takes its place that day. `npm run social -- retry` clears story strikes too.
 
 ---
 

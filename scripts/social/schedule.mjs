@@ -76,3 +76,37 @@ export function decide({ now, settings, day }) {
   }
   return { due: true, slot: used };
 }
+
+/**
+ * The minute the day's story goes out: somewhere in the story window, the
+ * same all day and different from one day to the next, so stories don't
+ * appear like clockwork.
+ */
+export function storyMinute(day, window) {
+  let h = 2166136261;
+  for (const ch of String(day)) {
+    h ^= ch.charCodeAt(0);
+    h = Math.imul(h, 16777619);
+  }
+  return window.start + ((h >>> 0) % Math.max(1, window.end - window.start));
+}
+
+/**
+ * Is the day's story due? One a day, from its minute until the posting day
+ * ends, so a dropped run only delays it. `day` is the stories' own day record.
+ */
+export function decideStory({ now, settings, day }) {
+  if (settings.stories === "off")
+    return { due: false, reason: "stories are off" };
+  if (day?.pausedUntil && now < new Date(day.pausedUntil))
+    return { due: false, reason: "stories are paused after a failed attempt" };
+  const publishing = settings.live && settings.stories === "on";
+  if ((day?.attempts ?? []).some((a) => countsToward(a, publishing)))
+    return { due: false, reason: "today's story is done" };
+  const { day: today, minutes } = localParts(now, settings.timezone);
+  if (minutes < storyMinute(today, settings.storyWindow))
+    return { due: false, reason: "today's story is later today" };
+  if (minutes >= settings.dayEnd)
+    return { due: false, reason: "the posting day is over" };
+  return { due: true };
+}

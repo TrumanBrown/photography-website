@@ -38,19 +38,20 @@ import { renderForInstagram } from "./render.mjs";
 import { info, redact, registerSecret } from "../photos/redact.mjs";
 
 const dayFile = (day) => `days/${day}.json`;
-const STALE_CLAIM_MS = 20 * 60 * 1000;
-const PAUSE_MS = 2 * 3600 * 1000;
+export const STALE_CLAIM_MS = 20 * 60 * 1000;
+export const PAUSE_MS = 2 * 3600 * 1000;
 
-class NotDue extends Error {}
+export class NotDue extends Error {}
 
 const emptyLedger = () => ({ posted: {}, failed: {} });
 
-async function recordPosted(store, key, entry) {
+/** Record a published shot in a ledger (the feed's, or the stories' with `file`). */
+export async function recordPosted(store, key, entry, file = "ledger.json") {
   // Runs re-confirm recent posts every time; only write when something's new.
-  if ((await store.readJson("ledger.json"))?.data?.posted?.[key]) return;
+  if ((await store.readJson(file))?.data?.posted?.[key]) return;
   await updateJson(
     store,
-    "ledger.json",
+    file,
     (l) => {
       l.posted = l.posted ?? {};
       if (!l.posted[key]) l.posted[key] = entry;
@@ -61,10 +62,10 @@ async function recordPosted(store, key, entry) {
 }
 
 /** A strike against the photo itself. Two and it's left out until retried. */
-async function recordStrike(store, key, reason) {
+export async function recordStrike(store, key, reason, file = "ledger.json") {
   await updateJson(
     store,
-    "ledger.json",
+    file,
     (l) => {
       l.failed = l.failed ?? {};
       const prev = l.failed[key];
@@ -80,7 +81,7 @@ async function recordStrike(store, key, reason) {
 }
 
 /** Shots posted or still in flight in these day records. */
-function busyShots(records) {
+export function busyShots(records) {
   const busy = new Set();
   for (const rec of records) {
     for (const a of rec?.attempts ?? []) {
@@ -143,9 +144,20 @@ async function nextShot(store, photos, settings, busy) {
   };
 }
 
-/** Finish, or write off, anything an earlier run left half done. */
-async function reconcile({ store, client, day, today, now }) {
-  const rec = (await store.readJson(dayFile(day)))?.data;
+/**
+ * Finish, or write off, anything an earlier run left half done. Stories use
+ * it with their own day records (`dayPath`) and ledger.
+ */
+export async function reconcile({
+  store,
+  client,
+  day,
+  today,
+  now,
+  dayPath = dayFile,
+  ledger = "ledger.json",
+}) {
+  const rec = (await store.readJson(dayPath(day)))?.data;
   for (const a of rec?.attempts ?? []) {
     let patch = null;
     let strike = null;
@@ -187,19 +199,24 @@ async function reconcile({ store, client, day, today, now }) {
       // flight and keeps the slot blocked. Writing it off could post it twice.
     }
     if (patch) {
-      await updateJson(store, dayFile(day), (d) => {
+      await updateJson(store, dayPath(day), (d) => {
         Object.assign(d.attempts[a.n], patch);
         return d;
       });
       if (a.media) await store.remove(a.media).catch(() => {});
-      if (strike) await recordStrike(store, a.shot, strike);
+      if (strike) await recordStrike(store, a.shot, strike, ledger);
     }
     if ((patch?.state ?? a.state) === "published") {
-      await recordPosted(store, a.shot, {
-        at: patch?.publishedAt ?? a.publishedAt,
-        day,
-        mediaId: patch?.mediaId ?? a.mediaId ?? null,
-      });
+      await recordPosted(
+        store,
+        a.shot,
+        {
+          at: patch?.publishedAt ?? a.publishedAt,
+          day,
+          mediaId: patch?.mediaId ?? a.mediaId ?? null,
+        },
+        ledger,
+      );
     }
   }
 }
@@ -462,9 +479,8 @@ export async function runPost({
   }
 }
 
-async function main() {
-  const local = process.argv.includes("--local");
-  const force = process.argv.includes("--force");
+/** Settings, stores, the Instagram client and the photo reader, shared with stories (story.mjs). */
+export async function openPoster({ local = false } = {}) {
   const settings = loadSettings();
   const store = local
     ? localStore(join(ROOT, ".cache/social/state"))
@@ -494,6 +510,15 @@ async function main() {
       throw new Error(`Could not download the photo (${res.status}).`);
     return Buffer.from(await res.arrayBuffer());
   };
+  return { settings, store, photos, makeClient, readImage };
+}
+
+async function main() {
+  const local = process.argv.includes("--local");
+  const force = process.argv.includes("--force");
+  const { settings, store, photos, makeClient, readImage } = await openPoster({
+    local,
+  });
   const result = await runPost({
     settings,
     store,

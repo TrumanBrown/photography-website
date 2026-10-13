@@ -107,3 +107,49 @@ export async function renderForInstagram(
   }
   throw new Error("Rendered image is still over Instagram's 8 MB limit.");
 }
+
+export const STORY_WIDTH = 1080;
+export const STORY_HEIGHT = 1920;
+
+/**
+ * A story frame: 1080×1920 with nothing added, no text, no stickers. The
+ * photo sits whole in the middle, never cropped; where it isn't 9:16, the
+ * space around it is a blurred, dimmed copy of the same photo. A 2:3 vertical
+ * leaves a band about 150 px deep above and below. sRGB, camera metadata
+ * (and location) stripped.
+ */
+export async function renderStory(input) {
+  const source = () =>
+    sharp(input, { failOn: "none" })
+      .rotate()
+      .flatten({ background: "#000000" })
+      .toColourspace("srgb");
+  const photo = await source()
+    .resize(STORY_WIDTH, STORY_HEIGHT, { fit: "inside", kernel: "lanczos3" })
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const fill = await source()
+    .resize(STORY_WIDTH, STORY_HEIGHT, { fit: "cover" })
+    .blur(40)
+    .modulate({ brightness: 0.6 })
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const left = Math.round((STORY_WIDTH - photo.info.width) / 2);
+  const top = Math.round((STORY_HEIGHT - photo.info.height) / 2);
+  for (const quality of [92, 88, 84, 80]) {
+    const data = await sharp(fill.data, { raw: fill.info })
+      .composite([{ input: photo.data, raw: photo.info, left, top }])
+      .withIccProfile("srgb")
+      .jpeg({ quality, chromaSubsampling: "4:4:4", mozjpeg: true })
+      .toBuffer();
+    if (data.length <= IG_MAX_BYTES)
+      return {
+        buffer: data,
+        width: STORY_WIDTH,
+        height: STORY_HEIGHT,
+        photo: { width: photo.info.width, height: photo.info.height },
+        quality,
+      };
+  }
+  throw new Error("Rendered story is still over Instagram's 8 MB limit.");
+}

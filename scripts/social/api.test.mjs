@@ -74,6 +74,27 @@ describe("Instagram client", () => {
     expect(create.body.user_tags).toBeUndefined();
   });
 
+  it("posts a story as the image alone", async () => {
+    const { calls, fetchImpl } = fakeGraph({
+      "POST /17841400000000001/media": () => [200, { id: "story1" }],
+    });
+    const client = createClient({
+      token: TOKEN,
+      userId: "17841400000000001",
+      fetchImpl,
+    });
+    expect(
+      await client.createStoryContainer({ imageUrl: "https://x.test/s.jpg" }),
+    ).toBe("story1");
+    const { body } = calls.find((c) => c.path.endsWith("/media"));
+    expect(body).toMatchObject({
+      image_url: "https://x.test/s.jpg",
+      media_type: "STORIES",
+    });
+    expect(body.caption).toBeUndefined();
+    expect(body.alt_text).toBeUndefined();
+  });
+
   it("sends location and user tags with Facebook Login", async () => {
     const { calls, fetchImpl } = fakeGraph({
       "POST /99999999999/media": () => [200, { id: "1" }],

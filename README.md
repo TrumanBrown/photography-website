@@ -293,6 +293,10 @@ or place. Each post is:
   [caption-voice skill](.github/skills/caption-voice/SKILL.md); edit that file
   to change it.
 
+It can also post **one story a day**, at a different time each day: a photo
+from the archive, vertical ones first, with nothing added
+(`SOCIAL_STORIES=true`).
+
 **What happens when you upload a session**, with nothing else to do:
 
 1. `./scripts/upload-session.sh <folder> --build` uploads the photos and starts

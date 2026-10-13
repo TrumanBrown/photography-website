@@ -131,6 +131,19 @@ export function createClient({
       return String(json.id);
     },
 
+    /**
+     * A story: just the image. Instagram's API can't add stickers (location,
+     * link, poll) or music to a story, and stories take no caption or alt text.
+     */
+    async createStoryContainer({ imageUrl }) {
+      const id = await this.userId();
+      const json = await call("POST", `/${id}/media`, {
+        image_url: imageUrl,
+        media_type: "STORIES",
+      });
+      return String(json.id);
+    },
+
     async containerStatus(containerId) {
       const json = await call("GET", `/${containerId}`, {
         fields: "status_code",

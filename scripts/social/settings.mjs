@@ -59,11 +59,35 @@ function spread(count) {
   });
 }
 
+const DEFAULT_STORY_WINDOW = { start: 10 * 60, end: 21 * 60 };
+
+/** "10:00-21:00" -> { start, end } in minutes past midnight; 10:00 to 21:00 when unset or malformed. */
+export function parseWindow(raw) {
+  const [a, b] = String(raw ?? "")
+    .split("-")
+    .map((s) => clockMinutes(s));
+  return a != null && b != null && b > a
+    ? { start: a, end: b }
+    : { ...DEFAULT_STORY_WINDOW };
+}
+
 export function loadSettings(env = process.env) {
   const postsPerDay = int(env.SOCIAL_POSTS_PER_DAY, 3, 1, 6);
   return {
     /** Publishing only happens when this is exactly "true". Everything else is a dry run. */
     live: env.SOCIAL_LIVE === "true",
+    /**
+     * One story a day: "on" publishes it (only when live), "rehearse" does
+     * everything but publish, anything else leaves stories off.
+     */
+    stories:
+      env.SOCIAL_STORIES === "true"
+        ? "on"
+        : env.SOCIAL_STORIES === "rehearse"
+          ? "rehearse"
+          : "off",
+    /** The day's story goes out at a time picked within this window, different each day. */
+    storyWindow: parseWindow(env.SOCIAL_STORY_WINDOW),
     /** Strict mode: only post entries approved with `npm run social -- approve`. */
     requireApproval: env.SOCIAL_REQUIRE_APPROVAL === "true",
     /** "instagram" = Instagram Login (no Facebook Page); "facebook" = Facebook Login (Page-linked). */

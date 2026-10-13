@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Is a post due right now?
+ * Is a post (or the day's story) due right now?
  *
  * The posting workflow fires every half hour because GitHub drops scheduled
  * runs. This check uses no npm packages, so it runs before `npm ci` and the
@@ -14,12 +14,18 @@ import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { loadSettings } from "./settings.mjs";
-import { IN_FLIGHT, decide, localParts, previousDay } from "./schedule.mjs";
+import {
+  IN_FLIGHT,
+  decide,
+  decideStory,
+  localParts,
+  previousDay,
+} from "./schedule.mjs";
 
 const settings = loadSettings();
 const today = localParts(new Date(), settings.timezone).day;
 
-function readDay(day) {
+function readDay(day, folder = "days") {
   if (!settings.storageAccount) return null;
   const dir = mkdtempSync(join(tmpdir(), "social-"));
   const file = join(dir, "day.json");
@@ -35,7 +41,7 @@ function readDay(day) {
         "--container-name",
         "metadata",
         "--name",
-        `social/days/${day}.json`,
+        `social/${folder}/${day}.json`,
         "--file",
         file,
         "--auth-mode",
@@ -56,12 +62,28 @@ function readDay(day) {
 }
 
 const day = readDay(today);
-// An unsettled post from today or yesterday needs a full run to settle it.
-const inFlight = [day, readDay(previousDay(today))].some((rec) =>
+const days = [day, readDay(previousDay(today))];
+// The day's story, when stories are on.
+const stories = settings.stories !== "off";
+const storyDay = stories ? readDay(today, "story-days") : null;
+if (stories) days.push(storyDay, readDay(previousDay(today), "story-days"));
+// An unsettled post or story from today or yesterday needs a full run to settle it.
+const inFlight = days.some((rec) =>
   (rec?.attempts ?? []).some((a) => IN_FLIGHT.has(a.state)),
 );
-const { due, reason } = decide({ now: new Date(), settings, day });
-const result = due || inFlight;
-console.log(result ? "A post is due." : `Nothing due: ${reason}.`);
+const feed = decide({ now: new Date(), settings, day });
+const story = stories
+  ? decideStory({ now: new Date(), settings, day: storyDay })
+  : { due: false };
+const result = feed.due || story.due || inFlight;
+console.log(
+  feed.due
+    ? "A post is due."
+    : story.due
+      ? "Today's story is due."
+      : inFlight
+        ? "Something from earlier needs settling."
+        : `Nothing due: ${feed.reason}.`,
+);
 if (process.env.GITHUB_OUTPUT)
   appendFileSync(process.env.GITHUB_OUTPUT, `due=${result}\n`);

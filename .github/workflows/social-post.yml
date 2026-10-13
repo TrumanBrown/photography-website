@@ -1,6 +1,7 @@
 name: Social post
 
-# Publishes the next planned photo when one of the day's slots is due.
+# Publishes the next planned photo when one of the day's slots is due, and the
+# day's story when stories are on (SOCIAL_STORIES).
 # GitHub drops a lot of scheduled runs (this repo's hourly build fires about a
 # fifth of the time), so this fires every half hour at off-peak minutes across
 # the posting day, in both daylight and standard time, and the dependency-free
@@ -16,6 +17,10 @@ on:
     inputs:
       force:
         description: "Post now, ignoring the time slots"
+        type: boolean
+        default: false
+      story:
+        description: "Post today's story now, if it hasn't gone out yet"
         type: boolean
         default: false
 
@@ -42,6 +47,8 @@ jobs:
       SOCIAL_SLOTS: ${{ vars.SOCIAL_SLOTS }}
       SOCIAL_MIN_GAP_MINUTES: ${{ vars.SOCIAL_MIN_GAP_MINUTES }}
       SOCIAL_DAY_END: ${{ vars.SOCIAL_DAY_END }}
+      SOCIAL_STORIES: ${{ vars.SOCIAL_STORIES }}
+      SOCIAL_STORY_WINDOW: ${{ vars.SOCIAL_STORY_WINDOW }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -61,20 +68,20 @@ jobs:
 
       - name: Is a post due?
         id: due
-        if: ${{ !inputs.force }}
+        if: ${{ !inputs.force && !inputs.story }}
         run: node scripts/social/due.mjs
 
       # Package install scripts never run while signed in to anything.
       - name: Sign out before installing packages
-        if: inputs.force || steps.due.outputs.due == 'true'
+        if: inputs.force || inputs.story || steps.due.outputs.due == 'true'
         run: az logout
 
       - name: Install npm deps
-        if: inputs.force || steps.due.outputs.due == 'true'
+        if: inputs.force || inputs.story || steps.due.outputs.due == 'true'
         run: npm ci
 
       - name: Azure login (OIDC)
-        if: inputs.force || steps.due.outputs.due == 'true'
+        if: inputs.force || inputs.story || steps.due.outputs.due == 'true'
         uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_DEPLOY_CLIENT_ID || secrets.AZURE_CLIENT_ID }}
@@ -96,6 +103,19 @@ jobs:
         run: |
           node scripts/social/post.mjs $FORCE
           echo "ran=true" >> "$GITHUB_OUTPUT"
+
+      # The day's story. Runs even when the post step failed (a missed-day
+      # alert, say), and decides for itself whether one is due.
+      - name: Story
+        if: ${{ !cancelled() && (inputs.story || steps.due.outputs.due == 'true') }}
+        env:
+          STORY_FORCE: ${{ inputs.story && '--force' || '' }}
+          IG_LOGIN_MODE: ${{ vars.IG_LOGIN_MODE }}
+          IG_API_VERSION: ${{ vars.IG_API_VERSION }}
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          SOCIAL_SECRET_KEY: ${{ secrets.SOCIAL_SECRET_KEY }}
+        run: node scripts/social/story.mjs $STORY_FORCE
 
   # Public repos lose their schedules after 60 days without a commit. An empty
   # commit every 45 quiet days keeps this and the site build running. Its own
