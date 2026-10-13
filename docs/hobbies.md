@@ -349,13 +349,16 @@ There are two modes on one board. **Today's list** is the same round for everyon
   scoring, the reveal on the map, the result receipt, share string and the full list.
 - [src/lib/hobbies/day-list-map.ts](../src/lib/hobbies/day-list-map.ts), the map: zoom and pan,
   gestures, the terrain tiles and their palette, the graticule, and the camera moves the reveal uses.
+- [src/lib/hobbies/day-list-borders.ts](../src/lib/hobbies/day-list-borders.ts), the country and
+  state borders drawn over the map, from the files in `src/lib/hobbies/day-list-borders/`.
 - [src/lib/hobbies/day-list.json](../src/lib/hobbies/day-list.json), the daily set, and
   [day-list-extra.json](../src/lib/hobbies/day-list-extra.json), the More lists set.
 - [public/day-list/relief/](../public/day-list/relief/) and
   [day-list-relief.json](../src/lib/hobbies/day-list-relief.json), the terrain tiles and the list of
   which exist.
-- [scripts/build-day-list.mjs](../scripts/build-day-list.mjs) builds both puzzle sets, and
-  [scripts/build-day-list-relief.mjs](../scripts/build-day-list-relief.mjs) cuts the tiles.
+- [scripts/build-day-list.mjs](../scripts/build-day-list.mjs) builds both puzzle sets,
+  [scripts/build-day-list-relief.mjs](../scripts/build-day-list-relief.mjs) cuts the tiles, and
+  [scripts/build-day-list-borders.mjs](../scripts/build-day-list-borders.mjs) builds the borders.
 - [scripts/resolve-day-list-places.mjs](../scripts/resolve-day-list-places.mjs), a helper that
   resolves candidate locations to iNaturalist place ids and reports how much data each one has,
   the busiest month and the size of the boundary. Run it by hand when adding a location (`--extra`
@@ -417,7 +420,8 @@ a reveal button that shows its cost) and redraws it in the archive's ink on pape
 
 The map is plate carrée, the projection the puzzle boundaries are published in, so a pin, a
 boundary and the terrain line up with no reprojection. It's one canvas, drawn by
-[day-list-map.ts](../src/lib/hobbies/day-list-map.ts).
+[day-list-map.ts](../src/lib/hobbies/day-list-map.ts), with the borders from
+[day-list-borders.ts](../src/lib/hobbies/day-list-borders.ts) over the terrain.
 
 **Zooming.** Zoom runs from the whole world (1x) to 64x, where a pixel is about a kilometre on a
 laptop and the terrain is still sharp. All of these work:
@@ -463,6 +467,34 @@ npm run build:day-list-relief   # downloads ~46 MB to .cache/natural-earth once,
 The free Azure Static Web Apps plan allows 15,000 files per deployment. The tiles are about 2,900
 of them, and the photo variants (12,000+) move to Blob Storage before deploy, so there's room, but
 another zoom level from a finer source would be about 8,000 more files.
+
+**Borders.** Country and state borders are lines drawn over the tiles, from Natural Earth's 1:10m
+boundary lines (v5.1.2, public domain).
+[build-day-list-borders.mjs](../scripts/build-day-list-borders.mjs) joins Natural Earth's 53,000
+fragments into about 8,700 lines and simplifies them into three levels of detail, each to within
+half a pixel at the closest zoom it's drawn at. Level 0 is one file (52 KB gzipped) that loads with
+the map. Levels 1 and 2 are cut into 60° and 30° cells, the largest 45 KB and 74 KB gzipped, and the
+map loads only the cells in view, drawing the coarser level until they arrive. The files (about
+920 KB in all) sit in `src/lib/hobbies/day-list-borders/` and load as Vite chunks, so they get
+hashed names and the immutable caching `/_astro/` already has. A file groups its lines by kind and
+zoom, each group one polyline-encoded string, so the map strokes a group in one go.
+
+Country borders show at every zoom, with disputed and indefinite ones dashed. State lines stay off
+at world view, then fade in country by country once that country's states average about 10 pixels
+across. On a laptop-width map that's about 1.2x for the US, 2x for Mexico, 3.4x for Germany and 16x
+for the UK's councils. Lines between regions, like France's regions as against its departments, go
+by the size of the regions. Natural Earth's own `MIN_ZOOM` favours the big federations, which left
+Mexico blank beside a fully drawn US, so the script works the zoom out from the state polygons
+instead. It also drops the state lines Natural Earth draws across bays and straits, like Chesapeake
+Bay, by testing both sides of each line against those polygons, which stop at the coast.
+
+```bash
+npm run build:day-list-borders   # downloads ~62 MB to .cache/natural-earth once, then ~10 seconds
+```
+
+The script overwrites its files and deletes only the ones it no longer makes. Deleting the whole
+folder loses the dev server's watch on it, and the dev server keeps serving the old lines until it
+restarts.
 
 ### More lists
 

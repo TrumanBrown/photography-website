@@ -9,3 +9,6 @@ src/content/sessions
 
 # Generated coastline data for the globe — one long line on purpose.
 src/lib/geo-land.json
+
+# Generated Day list borders, polyline-encoded on purpose.
+src/lib/hobbies/day-list-borders

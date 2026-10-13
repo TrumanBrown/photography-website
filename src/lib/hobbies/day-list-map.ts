@@ -15,10 +15,14 @@
  * page at world view (touch-action: pan-y) and pans once you're zoomed in
  * (touch-action: none), the same deal as the herp map.
  *
+ * Country and state borders are vector lines from ./day-list-borders, drawn
+ * over the terrain at whatever detail the zoom needs.
+ *
  * The game draws its pin, line and boundary on top through `drawOverlay`.
  */
 import { LAND } from "../geo";
 import { prefersReducedMotion } from "../motion";
+import { createBorders } from "./day-list-borders";
 import relief from "./day-list-relief.json";
 
 export interface LonLat {
@@ -53,6 +57,8 @@ export interface Palette {
   grid: string;
   coast: string;
   lut: Uint8ClampedArray;
+  /** Light ink on a dark page. */
+  dark: boolean;
 }
 
 export const MAX_ZOOM = 64;
@@ -289,6 +295,7 @@ export function createWorldMap(options: WorldMapOptions): WorldMap | null {
   let palette = readPalette();
   const tiles = new Map<string, Tile>();
   const widths = RELIEF.levels.map((l) => l.w);
+  const borders = createBorders(() => redraw());
 
   let scratch: CanvasRenderingContext2D | null = null;
 
@@ -310,6 +317,9 @@ export function createWorldMap(options: WorldMapOptions): WorldMap | null {
       grid: v("--globe-grid", "#eeebe3"),
       coast: v("--globe-coast", "#bab4a6"),
       lut: buildLut(paper, ink, sea),
+      dark:
+        lum(parseColour(paper, [251, 250, 248])) <
+        lum(parseColour(ink, [22, 21, 15])),
     };
   }
 
@@ -528,6 +538,11 @@ export function createWorldMap(options: WorldMapOptions): WorldMap | null {
       drawLevel(level, level >= target - 1);
     }
     drawGraticule();
+    borders.draw(
+      ctx!,
+      { width, height, k: view.k, cu: view.cu, cv: view.cv },
+      { ink: palette.ink, dark: palette.dark },
+    );
     options.drawOverlay?.(ctx!, map);
     evict();
   }

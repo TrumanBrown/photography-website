@@ -21,6 +21,7 @@
     "build:herp-geo": "node scripts/build-herp-geo.mjs",
     "build:day-list": "node scripts/build-day-list.mjs",
     "build:day-list-relief": "node scripts/build-day-list-relief.mjs",
+    "build:day-list-borders": "node scripts/build-day-list-borders.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint .",

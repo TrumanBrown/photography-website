@@ -40,6 +40,7 @@ npm ci            # exact dependency install from package-lock.json
 | `npm run fetch:tidepool-photos`, `npm run fetch:herping-photos` | Refresh the CC-licensed reveal-card photos ([hobbies.md](hobbies.md))                                                                                          |
 | `npm run build:herp-geo`, `npm run build:day-list`              | Regenerate the committed herping map geometry and Day list puzzle data (`-- --extra` for More lists, `-- --retag` to refresh native/introduced labels only)    |
 | `npm run build:day-list-relief`                                 | Re-cut the Day list map's terrain tiles from Natural Earth ([hobbies.md](hobbies.md#the-map))                                                                  |
+| `npm run build:day-list-borders`                                | Rebuild the Day list map's country and state borders from Natural Earth ([hobbies.md](hobbies.md#the-map))                                                     |
 | `npm run format`                                                | Prettier write                                                                                                                                                 |
 | `npm run format:check`                                          | Prettier check (currently advisory in CI)                                                                                                                      |
 
