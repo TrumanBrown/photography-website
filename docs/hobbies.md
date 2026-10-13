@@ -389,9 +389,13 @@ with the rules and uses one set of words throughout:
   numbered steps in the largest body text on the page. They use the same words as the controls
   ("show the next one", "tap the map", "Lock it in") and say that there's only one guess.
 - **The six species are the board.** Six squares sit in a row under a "Most common → Rarest" rule.
-  A shown species gets its photo, name, Latin name, worldwide sighting count and photo credit. The
+  A shown species gets its photo, name, Latin name and worldwide sighting count. The
   next square is the button and says what it costs ("−600 points"), and the rest wait with their
   number. Three to a row below 1024px.
+- **Photo credits are a closed footnote.** A photographer's name can give the place away, so
+  credits aren't under the photos. They sit in a "Photo credits" `<details>` at the foot of the
+  page, which lists only the photos on the board (`photoCredits`) and closes again whenever a new
+  round loads. CC BY and CC BY-NC are still met, since the credit is on the same page as the photo.
 - **The stakes stay on screen.** The guess panel opens with "Up to 6,000 points", the most a perfect
   guess can still score (`bestPossible`). It rolls down with each species you ask for (`rollTo`).
 - **The result is a receipt.** "Lock it in" swaps the panel for the verdict, the place and where the

@@ -179,8 +179,14 @@ const MONTHS = [
     looking as much as where the animal lives. The full list flags introduced
     and endemic species, because a kookaburra in Tasmania is a very different
     clue once you know it was put there. Data from iNaturalist, terrain and
-    borders from Natural Earth, photos credited to whoever took them.
+    borders from Natural Earth. Photo credits are tucked away below, since a
+    photographer's name can give the place away.
   </p>
+
+  <details class="dl-credits" data-daylist-credits>
+    <summary>Photo credits</summary>
+    <ol class="dl-credits__list" role="list" data-daylist-credit-list></ol>
+  </details>
 </div>
 
 <script>
@@ -372,16 +378,6 @@ const MONTHS = [
     font-size: 12px;
     color: var(--ink-3);
     font-variant-numeric: tabular-nums;
-  }
-  /* CC BY and CC BY-NC both require the photographer to be named, so the
-     credit rides with the photo rather than living in a footnote. */
-  .dl-slot__credit {
-    display: block;
-    margin-top: 3px;
-    font-size: 10px;
-    line-height: 1.35;
-    color: var(--ink-2);
-    overflow-wrap: anywhere;
   }
   .dl-slot.is-new .dl-slot__body {
     animation: dl-rise 320ms var(--ease) var(--dl-delay, 0ms) both;
@@ -917,6 +913,45 @@ const MONTHS = [
     font-size: 12px;
     line-height: 1.6;
     color: var(--ink-2);
+  }
+
+  /* CC BY and CC BY-NC both require the photographer to be named, but a name
+     can give the place away. So the credits wait here, closed, rather than
+     under each photo, and list only the photos on the board. */
+  .dl-credits {
+    margin: 10px 0 0;
+    max-width: 72ch;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--ink-2);
+  }
+  .dl-credits > summary {
+    width: fit-content;
+    padding: 4px 0;
+    color: var(--ink-3);
+    cursor: pointer;
+  }
+  .dl-credits > summary::marker {
+    color: var(--ink-2);
+  }
+  .dl-credits > summary::-webkit-details-marker {
+    color: var(--ink-2);
+  }
+  .dl-credits__list {
+    counter-reset: dl-credit;
+    list-style: none;
+    margin: 4px 0 0;
+    padding: 0;
+  }
+  .dl-credits__list > li {
+    counter-increment: dl-credit;
+    overflow-wrap: anywhere;
+  }
+  .dl-credits__list > li::before {
+    content: counter(dl-credit);
+    display: inline-block;
+    min-width: 1.4em;
+    font-variant-numeric: tabular-nums;
   }
 
   @media (max-width: 639px) {

@@ -3,6 +3,7 @@ import { describe, it, expect } from "vitest";
 import {
   EXTRA_PER_DAY,
   bestPossible,
+  photoCredits,
   pickExtra,
   readDaily,
   readExtra,
@@ -130,6 +131,27 @@ describe("pickExtra", () => {
 
   it("goes back to the one started longest ago once all are seen", () => {
     expect(pickExtra([1, 2, 3], [2, 3, 1])).toBe(2);
+  });
+});
+
+describe("photoCredits", () => {
+  const clues = daily[0].clues.map((clue, i) => ({
+    ...clue,
+    by: `Photographer ${i + 1}`,
+  }));
+
+  it("credits only the photos on the board, since a name can give the place away", () => {
+    const two = photoCredits(clues, 2);
+    expect(two.match(/<li>/g)).toHaveLength(2);
+    expect(two).toContain("Photographer 2");
+    expect(two).not.toContain("Photographer 3");
+    expect(photoCredits(clues, 6).match(/<li>/g)).toHaveLength(6);
+  });
+
+  it("escapes the photographer's name", () => {
+    const html = photoCredits([{ ...clues[0], by: "<b>A&B</b>" }], 1);
+    expect(html).toContain("&lt;b&gt;A&amp;B&lt;/b&gt;");
+    expect(html).not.toContain("<b>");
   });
 });
 

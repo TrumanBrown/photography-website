@@ -368,6 +368,23 @@ function escapeHtml(value: string): string {
   );
 }
 
+/**
+ * The lines of the photo credits footnote, in board order. Only photos already
+ * on the board are listed, because a photographer's name can give the place
+ * away.
+ */
+export function photoCredits(clues: Round["clues"], shown: number): string {
+  return clues
+    .slice(0, Math.max(0, shown))
+    .map(
+      (clue) =>
+        `<li>${escapeHtml(displayName(clue.name))} &middot; &copy; ${escapeHtml(
+          clue.by,
+        )} &middot; <span class="dl-nowrap">${escapeHtml(clue.licence)}</span></li>`,
+    )
+    .join("");
+}
+
 const isMac = () =>
   /Mac|iPhone|iPad/.test(
     (navigator as Navigator & { userAgentData?: { platform?: string } })
@@ -411,6 +428,8 @@ export function initDayList(root: HTMLElement): void {
   const viewBtn = q<HTMLButtonElement>("[data-daylist-view]");
   const scaleEl = q<HTMLElement>("[data-daylist-scale]");
   const wheelHint = q<HTMLElement>("[data-daylist-wheelhint]");
+  const credits = q<HTMLDetailsElement>("[data-daylist-credits]");
+  const creditList = q<HTMLElement>("[data-daylist-credit-list]");
 
   const day = todayNumber();
   const daily = ROUNDS[day % ROUNDS.length];
@@ -672,9 +691,6 @@ export function initDayList(root: HTMLElement): void {
             <span class="dl-slot__name">${escapeHtml(displayName(clue.name))}</span>
             <span class="dl-slot__sci">${escapeHtml(clue.sci)}</span>
             <span class="dl-slot__count">${count(clue.global)} sightings worldwide</span>
-            <span class="dl-slot__credit">&copy; ${escapeHtml(clue.by)} &middot; <span class="dl-nowrap">${escapeHtml(
-              clue.licence,
-            )}</span></span>
           </figcaption>
         </figure>`;
       const img = li.querySelector("img");
@@ -707,6 +723,10 @@ export function initDayList(root: HTMLElement): void {
 
   function syncWorth(): void {
     if (worthEl) rollTo(worthEl, bestPossible(lines));
+  }
+
+  function paintCredits(): void {
+    if (creditList) creditList.innerHTML = photoCredits(round.clues, shown);
   }
 
   /** Fetch the next photo while the visitor thinks, so the reveal is instant. */
@@ -746,6 +766,7 @@ export function initDayList(root: HTMLElement): void {
     shown = lines;
     paintSlot(lines - 1, true);
     if (lines < round.clues.length) paintSlot(lines);
+    paintCredits();
     syncWorth();
     preloadNext();
     persist();
@@ -1005,6 +1026,7 @@ export function initDayList(root: HTMLElement): void {
       for (let i = from; i < round.clues.length; i++) {
         paintSlot(i, animate, (i - from) * FILL_STAGGER_MS);
       }
+      paintCredits();
     };
     if (motion) {
       for (const clue of round.clues.slice(used)) {
@@ -1187,10 +1209,13 @@ export function initDayList(root: HTMLElement): void {
     resultSlot!.hidden = true;
     resultSlot!.innerHTML = "";
     if (rollSlot) rollSlot.innerHTML = "";
+    // Left open, the footnote would show the next round's names as they come.
+    if (credits) credits.open = false;
     if (announce) announce.textContent = "";
     // A new round's ceiling is set, not counted down from the last one's.
     if (worthEl) delete worthEl.dataset.value;
     for (let i = 0; i < slots.length; i++) paintSlot(i);
+    paintCredits();
     describeGuess();
     syncLock();
     syncWorth();
