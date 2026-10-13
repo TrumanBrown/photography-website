@@ -56,7 +56,7 @@ infra/modules/scheduler.bicep  # optional: Azure timer that starts photos.yml an
 - `workflow_dispatch` → manual button for impatience
 - `repository_dispatch: blob-changed` → reserved for future Event Grid → webhook hookup; harmless to leave wired
 
-A `concurrency` block cancels older runs on the same branch when a new one arrives, useful when you push three commits in quick succession.
+A `concurrency` block cancels older runs on the same branch when a new one arrives, useful when you push three commits in quick succession. Pull request runs are grouped by the PR's branch rather than `github.ref`: when a PR is merged, GitHub gives the `closed` run main's ref, so the preview teardown used to cancel the production deploy of the merge commit.
 
 **Steps in order (with explanations):**
 

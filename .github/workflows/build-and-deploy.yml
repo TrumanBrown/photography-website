@@ -24,9 +24,12 @@ on:
   repository_dispatch:
     types: [blob-changed]
 
-# Cancel older runs on the same ref when a new one arrives.
+# Cancel older runs on the same ref when a new one arrives. Pull request runs
+# group by their branch instead: when a PR is merged, GitHub gives the `closed`
+# run main's ref, so grouping by github.ref let the preview teardown cancel the
+# production deploy of the merge commit.
 concurrency:
-  group: build-and-deploy-${{ github.ref }}
+  group: build-and-deploy-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
 permissions:
