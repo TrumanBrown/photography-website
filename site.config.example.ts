@@ -14,6 +14,7 @@ export const siteConfig = {
   sections: {
     hobbies: true,
   },
+  prints: true,
   blobHost: 'stphotographyprodxyz.blob.core.windows.net',
 } as const;
 

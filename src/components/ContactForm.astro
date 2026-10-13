@@ -187,6 +187,29 @@
   closeBtn.addEventListener('click', closeDrawer);
   backdrop.addEventListener('click', closeDrawer);
 
+  /* Other parts of the page can open the form with a message already started:
+     the lightbox's Prints button names the photo, and buttons on /prints carry
+     data-contact-open. A prefill never replaces something the visitor typed. */
+  let lastPrefill = '';
+  function openWithMessage(message?: string) {
+    const current = messageField.value.trim();
+    if (message && (current === '' || current === lastPrefill.trim())) {
+      messageField.value = message;
+      lastPrefill = message;
+      charCount.textContent = String(messageField.value.length);
+    }
+    openDrawer();
+  }
+  window.addEventListener('contact:open', (event) => {
+    openWithMessage((event as CustomEvent<{ message?: string }>).detail?.message);
+  });
+  document.addEventListener('click', (event) => {
+    const trigger = (event.target as Element | null)?.closest<HTMLElement>('[data-contact-open]');
+    if (!trigger) return;
+    event.preventDefault();
+    openWithMessage(trigger.dataset.contactMessage);
+  });
+
   // Close on Escape
   document.addEventListener('keydown', (e) => {
     if (!isOpen) return;

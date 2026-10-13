@@ -1,0 +1,74 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { copyrightLine } from "@/lib/sessions";
+import { LICENSING_ID } from "@/lib/prints";
+---
+
+<BaseLayout
+  title="Prints"
+  description="Ask about a print of one of my photos, or about using one somewhere else."
+>
+  <section class="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+    <header class="mb-6">
+      <h1 class="text-2xl font-light tracking-tight sm:text-[30px]">Prints</h1>
+    </header>
+
+    <div class="copy">
+      <p>
+        Most of the photos here can be printed. Open one and tap Prints: the
+        contact form opens with that photo's link already in the message. Tell
+        me roughly what size you have in mind and I'll get back to you with
+        options and a price.
+      </p>
+      <p>
+        Not every photo holds up at poster size. If yours won't, I'll tell you
+        before you pay for anything.
+      </p>
+      <button
+        type="button"
+        class="linkbtn draw"
+        data-contact-open
+        data-contact-message="I'd like to ask about a print."
+      >
+        <span>Ask about a print</span>
+      </button>
+
+      <h2 id={LICENSING_ID} class="text-xl font-light tracking-tight">
+        Using a photo
+      </h2>
+      <p>Every photo on this site is mine. {copyrightLine()}</p>
+      <p>
+        If you'd like to use one in a magazine or on a website, ask first
+        through the contact form and tell me where it'll appear.
+      </p>
+      <button
+        type="button"
+        class="linkbtn draw"
+        data-contact-open
+        data-contact-message="I'd like to ask about using one of your photos."
+      >
+        <span>Ask about using a photo</span>
+      </button>
+    </div>
+
+    <p class="mt-12">
+      <a class="u-label" href="/">← All sessions</a>
+    </p>
+  </section>
+</BaseLayout>
+
+<style>
+  .copy {
+    max-width: 65ch;
+  }
+  .copy p {
+    margin: 0 0 14px;
+    color: var(--ink-3);
+    font-size: 15px;
+    line-height: 1.6;
+  }
+  .copy h2 {
+    margin: 44px 0 12px;
+    scroll-margin-top: 96px;
+  }
+</style>

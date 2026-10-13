@@ -45,6 +45,16 @@ export const siteConfig = {
   },
 
   /**
+   * Prints and licensing inquiries. When true, session photos get a "Prints"
+   * button in the lightbox that opens the contact form with the photo's link
+   * already in the message, the footer links to /prints, and each photo's
+   * structured data points Google Images at /prints for licensing (the
+   * "Licensable" badge). Inquiries arrive through the existing contact form;
+   * there is no shop or checkout. The /prints page still builds when false.
+   */
+  prints: true,
+
+  /**
    * Public Blob Storage account hostname. Used to build full-res image URLs
    * for the lightbox. Set it by hand after the first infra deploy, and name
    * the same host in the Content-Security-Policy in staticwebapp.config.json:

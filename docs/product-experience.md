@@ -73,6 +73,16 @@ A later pass borrowed mechanics from four React component libraries (Cult UI, Wa
 - **The lead photo has a timer and a pause.** A 1px rule over the caption fills while each photo is up, and a Pause button stops the rotation: anything that moves on its own for more than five seconds needs a way to stop it (WCAG 2.2.2). It also waits while the tab is hidden, the photo is scrolled away, or the caption is hovered or focused.
 - **The theme switch is on every page.** It sits in the rail and the phone bar as well as the hobby header, and crossfades between themes with a View Transition. `theme-color` and `color-scheme` follow the site's theme rather than the system's, so the phone's address bar, scrollbars and form controls match the page. (Magic UI `animated-theme-toggler`, Skiper UI `skiper26`; both also wipe a circle out from the switch, which was left out as louder than anything else on the site.)
 
+### Prints and licensing inquiries
+
+Before this, nothing on the site said a photo could be printed or licensed, so interest from visitors (including the ones arriving from social media) had nowhere to go. With `prints: true` in [site.config.ts](../site.config.ts):
+
+- **A Prints button in the session lightbox.** It sits beside Share as a word in the toolbar. Tapping it closes the lightbox and opens the existing contact form with the photo's own address (`/sessions/<slug>/#photo-12`) already in the message, so an inquiry always names the exact photo. The form opens only after PhotoSwipe's `destroy`, because PhotoSwipe hands focus back to the grid thumbnail as it closes. A prefill never replaces something the visitor already typed. Fishing catches and hobby galleries use the same lightbox without the button (`<Lightbox prints>` is opt-in).
+- **A plain `/prints` page**, linked from the footer, that says what to expect (rough size in, options and a price back) and holds the licensing terms under `#licensing`. Its buttons open the same form through a `data-contact-open` / `data-contact-message` hook in `ContactForm.astro`, which any page can use.
+- **The "Licensable" badge in Google Images.** Each session photo's `ImageObject` gains `license` and `acquireLicensePage`, both pointing at `/prints/#licensing` (`src/lib/prints.ts`). Google shows the badge and a link to that page beside the image, so someone who finds a photo through image search can ask about it.
+
+It's inquiry-only on purpose: no shop, checkout, prices or new cloud service. Messages land in the same `contactmessages` table as any other contact. A print-on-demand store can come later if the inquiries show demand.
+
 ## What remains intentionally unchanged
 
 - Static Astro rendering and Blob-hosted variants remain the right architecture.
