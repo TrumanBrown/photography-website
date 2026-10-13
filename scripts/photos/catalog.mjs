@@ -128,8 +128,8 @@ const DESCRIPTION_VERSION = 2;
 /** Bump when the way posts are put together changes, so planned posts are rebuilt. */
 const POST_VERSION = 4;
 
-/** Bump to read converted photos' capture facts from their originals again. */
-const CAPTURE_VERSION = 1;
+/** Bump to read converted photos' originals again (those still without a capture time). */
+const CAPTURE_VERSION = 2;
 
 function parseArgs(argv) {
   const out = {
@@ -277,6 +277,7 @@ async function main() {
   const noCapture = Object.values(catalog.files).filter(
     (f) =>
       !f.facts?.clock &&
+      !f.capture?.clock &&
       f.captureV !== CAPTURE_VERSION &&
       /\/derivatives\//.test(f.url ?? ""),
   );

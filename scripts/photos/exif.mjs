@@ -16,7 +16,7 @@ function clockFrom(raw) {
   return m ? `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}` : null;
 }
 
-export async function readFacts(buffer) {
+async function parseTags(buffer) {
   let tags = {};
   let raw = {};
   try {
@@ -37,6 +37,34 @@ export async function readFacts(buffer) {
       })) ?? {};
   } catch {
     // Stripped or synthetic files simply have no facts.
+  }
+  return { tags, raw };
+}
+
+const EXIF_MARK = Buffer.from("Exif\0\0", "latin1");
+
+/**
+ * Where a HEIC/HEIF file keeps its EXIF as a plain TIFF block, or -1. Some
+ * iPhone HEICs come out of metadata tools in a shape exifr doesn't recognise
+ * as HEIC at all, though the block is untouched: it follows "Exif\0\0".
+ */
+export function heifTiffOffset(buffer) {
+  if (buffer.length < 16 || buffer.toString("latin1", 4, 8) !== "ftyp")
+    return -1;
+  for (let at = buffer.indexOf(EXIF_MARK); at !== -1; ) {
+    const tiff = at + EXIF_MARK.length;
+    const sig = buffer.toString("hex", tiff, tiff + 4);
+    if (sig === "4d4d002a" || sig === "49492a00") return tiff;
+    at = buffer.indexOf(EXIF_MARK, at + 1);
+  }
+  return -1;
+}
+
+export async function readFacts(buffer) {
+  let { tags, raw } = await parseTags(buffer);
+  if (!raw.DateTimeOriginal && !raw.CreateDate && !tags.Model) {
+    const at = heifTiffOffset(buffer);
+    if (at !== -1) ({ tags, raw } = await parseTags(buffer.subarray(at)));
   }
   const clock = clockFrom(raw.DateTimeOriginal) ?? clockFrom(raw.CreateDate);
   return {
