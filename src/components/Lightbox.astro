@@ -15,23 +15,30 @@
  * The width/height above must then describe the original. The capped copy is
  * only a first paint: the lightbox swaps the original in as soon as it has
  * loaded, and the download button always uses data-pswp-full.
+ *
+ * With `prints`, the toolbar also gets a Prints button that closes the
+ * lightbox and opens the contact form with this photo's link in the message.
  */
 interface Props {
   /** CSS selector for the gallery container. Defaults to `#gallery`. */
   gallerySelector?: string;
+  /** Show the Prints button. Only for galleries of photographs for sale. */
+  prints?: boolean;
 }
 
-const { gallerySelector = "#gallery" } = Astro.props;
+const { gallerySelector = "#gallery", prints = false } = Astro.props;
 ---
 
 <script>
   // @ts-ignore - photoswipe ships its own types under subpaths
   import PhotoSwipeLightbox from "photoswipe/lightbox";
   import "photoswipe/style.css";
+  import { printInquiry } from "@/lib/prints";
 
   // Read the per-page selector from the marker element below.
   const marker = document.querySelector<HTMLElement>("[data-lightbox-marker]");
   const selector = marker?.dataset.gallery ?? "#gallery";
+  const showPrints = marker?.dataset.prints === "true";
   const reduceMotion = window.matchMedia(
     "(prefers-reduced-motion: reduce)",
   ).matches;
@@ -130,6 +137,33 @@ const { gallerySelector = "#gallery" } = Astro.props;
         });
       },
     });
+
+    // Prints button: a word in the toolbar, like Share.
+    if (showPrints) {
+      lightbox.pswp?.ui?.registerElement({
+        name: "print-button",
+        order: 7,
+        isButton: true,
+        tagName: "button",
+        html: "Prints",
+        onInit: (el, instance) => {
+          el.setAttribute("title", "Ask about a print of this photograph");
+          el.addEventListener("click", () => {
+            // The address already names the photograph on screen (#photo-12);
+            // closing the lightbox clears it, so read it first.
+            const message = printInquiry(window.location.href);
+            // PhotoSwipe hands focus back to the thumbnail on destroy, which
+            // would pull it out of the form, so open the form after that.
+            instance.on("destroy", () => {
+              window.dispatchEvent(
+                new CustomEvent("contact:open", { detail: { message } }),
+              );
+            });
+            instance.close();
+          });
+        },
+      });
+    }
 
     // Download full-resolution button in the top toolbar.
     lightbox.pswp?.ui?.registerElement({
@@ -291,7 +325,11 @@ const { gallerySelector = "#gallery" } = Astro.props;
   }
 </script>
 
-<span data-lightbox-marker data-gallery={gallerySelector} hidden></span>
+<span
+  data-lightbox-marker
+  data-gallery={gallerySelector}
+  data-prints={prints ? "true" : undefined}
+  hidden></span>
 
 <style is:global>
   .pswp__caption {
@@ -313,7 +351,8 @@ const { gallerySelector = "#gallery" } = Astro.props;
   }
 
   /* A word, not an icon, in the toolbar's own colour and size. */
-  .pswp__button--link-button {
+  .pswp__button--link-button,
+  .pswp__button--print-button {
     width: auto;
     padding: 0 12px;
     font: inherit;
@@ -323,8 +362,26 @@ const { gallerySelector = "#gallery" } = Astro.props;
     white-space: nowrap;
     color: var(--pswp-icon-color);
   }
-  .pswp__button--link-button:hover {
+  .pswp__button--link-button:hover,
+  .pswp__button--print-button:hover {
     color: #fff;
+  }
+
+  /* Two word buttons and three icons don't fit a phone's toolbar. Pinching,
+     double-tapping or clicking the photo already zooms, so the zoom icon is
+     the one to go, and the words sit a little tighter. */
+  @media (max-width: 480px) {
+    .pswp.pswp--zoom-allowed .pswp__button--zoom {
+      display: none;
+    }
+    .pswp__button--link-button,
+    .pswp__button--print-button {
+      padding: 0 8px;
+      letter-spacing: 0.1em;
+    }
+    .pswp__counter {
+      white-space: nowrap;
+    }
   }
   .pswp__link-status {
     position: absolute;

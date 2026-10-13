@@ -1,15 +1,26 @@
 ---
 import { copyrightLine } from '@/lib/sessions';
+import { PRINTS_PATH } from '@/lib/prints';
+import { siteConfig } from '../../site.config';
 ---
 
 <footer class="mt-16 border-t border-rule py-8 text-sm text-ink-2">
   <div class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 sm:px-6">
     <p>{copyrightLine()}</p>
-    <a
-      href="https://github.com/TrumanBrown/photography-website"
-      target="_blank"
-      rel="noopener noreferrer"
-      class="draw text-ink-2 no-underline hover:text-ink"
-    >How this site is built</a>
+    <div class="flex flex-wrap gap-x-5 gap-y-2">
+      {
+        siteConfig.prints && (
+          <a href={PRINTS_PATH} class="draw text-ink-2 no-underline hover:text-ink">
+            Prints
+          </a>
+        )
+      }
+      <a
+        href="https://github.com/TrumanBrown/photography-website"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="draw text-ink-2 no-underline hover:text-ink"
+      >How this site is built</a>
+    </div>
   </div>
 </footer>

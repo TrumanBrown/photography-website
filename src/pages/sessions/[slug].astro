@@ -13,6 +13,7 @@ import {
   splitSessionTitle,
 } from "@/lib/sessions";
 import { jsonForScript } from "@/lib/html";
+import { licenseFields } from "@/lib/prints";
 import { siteConfig } from "../../../site.config";
 
 type SessionLink = {
@@ -201,7 +202,8 @@ const structuredData = {
     },
     // Image metadata is the one image-related markup Google documents support
     // for. contentUrl points at the full-resolution original so Google Images
-    // has a discovery path to it beyond the single og:image cover.
+    // has a discovery path to it beyond the single og:image cover. With prints
+    // on, license + acquireLicensePage add the "Licensable" badge.
     ...resolved
       .filter((img) => img.fullUrl.startsWith("http"))
       .map((img) => ({
@@ -214,6 +216,7 @@ const structuredData = {
         creator: { "@type": "Person", name: siteConfig.ownerName },
         creditText: siteConfig.ownerName,
         copyrightNotice: copyrightLine(),
+        ...licenseFields(siteOrigin),
       })),
   ],
 };
@@ -322,7 +325,7 @@ const structuredData = {
       }
     </ul>
 
-    <Lightbox gallerySelector="#gallery" />
+    <Lightbox gallerySelector="#gallery" prints={siteConfig.prints} />
 
     {
       (previousSession || nextSession) && (
