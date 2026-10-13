@@ -385,6 +385,31 @@ export function photoCredits(clues: Round["clues"], shown: number): string {
     .join("");
 }
 
+/**
+ * The squares are up to 360px across, more than iNaturalist's medium size
+ * holds on a sharp screen, so the browser can swap in large. The widths given
+ * are each size's short side for a 4:3 photo, since the square crops to it.
+ */
+const PHOTO_SIZES =
+  "(min-width: 1152px) 360px, (min-width: 640px) calc((100vw - 72px) / 3), calc((100vw - 48px) / 3)";
+
+export function photoSrcset(photo: string): string {
+  if (!photo.includes("/medium.")) return "";
+  return `${photo} 375w, ${photo.replace("/medium.", "/large.")} 768w`;
+}
+
+/** Fetch a photo at the size its square will ask for, so it shows at once. */
+function preloadPhoto(photo: string): void {
+  const image = new Image();
+  image.decoding = "async";
+  const srcset = photoSrcset(photo);
+  if (srcset) {
+    image.sizes = PHOTO_SIZES;
+    image.srcset = srcset;
+  }
+  image.src = photo;
+}
+
 const isMac = () =>
   /Mac|iPhone|iPad/.test(
     (navigator as Navigator & { userAgentData?: { platform?: string } })
@@ -682,11 +707,14 @@ export function initDayList(root: HTMLElement): void {
     else li.style.removeProperty("--dl-delay");
     if (i < shown) {
       const clue = round.clues[i];
+      const srcset = photoSrcset(clue.photo);
       li.className = fresh ? "dl-slot is-new" : "dl-slot";
       li.innerHTML = `<figure class="dl-slot__fig">
-          <div class="dl-slot__pic"><img src="${escapeHtml(
-            clue.photo,
-          )}" alt="" width="500" height="500" decoding="async"></div>
+          <div class="dl-slot__pic"><img src="${escapeHtml(clue.photo)}"${
+            srcset
+              ? ` srcset="${escapeHtml(srcset)}" sizes="${PHOTO_SIZES}"`
+              : ""
+          } alt="" width="500" height="500" decoding="async"></div>
           <figcaption class="dl-slot__body">
             <span class="dl-slot__name">${escapeHtml(displayName(clue.name))}</span>
             <span class="dl-slot__sci">${escapeHtml(clue.sci)}</span>
@@ -733,11 +761,7 @@ export function initDayList(root: HTMLElement): void {
   function preloadNext(): void {
     const next = round.clues[lines];
     if (!next || done) return;
-    const fetchPhoto = () => {
-      const image = new Image();
-      image.decoding = "async";
-      image.src = next.photo;
-    };
+    const fetchPhoto = () => preloadPhoto(next.photo);
     if (typeof window.requestIdleCallback === "function") {
       window.requestIdleCallback(fetchPhoto, { timeout: 2000 });
     } else {
@@ -1029,11 +1053,7 @@ export function initDayList(root: HTMLElement): void {
       paintCredits();
     };
     if (motion) {
-      for (const clue of round.clues.slice(used)) {
-        const image = new Image();
-        image.decoding = "async";
-        image.src = clue.photo;
-      }
+      for (const clue of round.clues.slice(used)) preloadPhoto(clue.photo);
     }
 
     surface!.classList.add("is-done");

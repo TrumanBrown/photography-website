@@ -388,10 +388,13 @@ with the rules and uses one set of words throughout:
   at the same place in the same month. Guess where and when."). Under it, "How to play" is four
   numbered steps in the largest body text on the page. They use the same words as the controls
   ("show the next one", "tap the map", "Lock it in") and say that there's only one guess.
-- **The six species are the board.** Six squares sit in a row under a "Most common → Rarest" rule.
-  A shown species gets its photo, name, Latin name and worldwide sighting count. The
-  next square is the button and says what it costs ("−600 points"), and the rest wait with their
-  number. Three to a row below 1024px.
+- **The six species are the board.** Six squares, three to a row at every width, sit under a
+  "Most common → Rarest" rule. A shown species gets its photo, name, Latin name and worldwide
+  sighting count. The next square is the button and says what it costs ("−600 points"), and the
+  rest wait with their number. The photos are up to 360px across, so on a laptop the map sits below
+  them. That's more than iNaturalist's 500px medium size holds on a sharp screen, so each photo
+  also offers the 1024px large size (`photoSrcset`) and the browser picks whichever the screen
+  needs. Preloads ask for the same size, so a reveal is still instant.
 - **Photo credits are a closed footnote.** A photographer's name can give the place away, so
   credits aren't under the photos. They sit in a "Photo credits" `<details>` at the foot of the
   page, which lists only the photos on the board (`photoCredits`) and closes again whenever a new

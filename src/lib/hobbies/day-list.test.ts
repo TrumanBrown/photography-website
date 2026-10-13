@@ -4,6 +4,7 @@ import {
   EXTRA_PER_DAY,
   bestPossible,
   photoCredits,
+  photoSrcset,
   pickExtra,
   readDaily,
   readExtra,
@@ -152,6 +153,28 @@ describe("photoCredits", () => {
     const html = photoCredits([{ ...clues[0], by: "<b>A&B</b>" }], 1);
     expect(html).toContain("&lt;b&gt;A&amp;B&lt;/b&gt;");
     expect(html).not.toContain("<b>");
+  });
+});
+
+describe("photoSrcset", () => {
+  it("offers iNaturalist's large size beside medium", () => {
+    expect(photoSrcset("https://x/photos/1/medium.jpeg")).toBe(
+      "https://x/photos/1/medium.jpeg 375w, https://x/photos/1/large.jpeg 768w",
+    );
+    expect(photoSrcset("https://x/photos/2/medium.")).toContain(
+      "/photos/2/large. 768w",
+    );
+  });
+
+  it("leaves a photo that isn't the medium size alone", () => {
+    expect(photoSrcset("https://x/photos/3/square.jpg")).toBe("");
+  });
+
+  it("covers every photo in both puzzle sets", () => {
+    const photos = [...daily, ...extra].flatMap((r) =>
+      r.clues.map((c) => c.photo),
+    );
+    expect(photos.filter((p) => !photoSrcset(p))).toEqual([]);
   });
 });
 

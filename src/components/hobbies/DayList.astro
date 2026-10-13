@@ -315,6 +315,8 @@ const MONTHS = [
   }
 
   /* ---------------- the six species ---------------- */
+  /* Three to a row at every width, so the photos are big enough to read
+     (up to 360px across). On a laptop that puts the map below them. */
   .dl-tray {
     list-style: none;
     margin: 0;
@@ -322,11 +324,6 @@ const MONTHS = [
     display: grid;
     gap: 16px 12px;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-  @media (min-width: 1024px) {
-    .dl-tray {
-      grid-template-columns: repeat(6, minmax(0, 1fr));
-    }
   }
   .dl-slot {
     min-width: 0;
