@@ -336,20 +336,30 @@ few species they needed.
 This is the inverse of a "what is this organism" quiz. One species gives you a range; an assemblage
 gives you a point, which is how field ecologists actually read a habitat (indicator species).
 
+There are two modes on one board. **Today's list** is the same round for everyone, picked by date.
+**More lists** deals up to ten more a day per browser, from a separate set of places.
+
 **Files**
 
 - [src/components/hobbies/DayList.astro](../src/components/hobbies/DayList.astro), the markup:
-  the how-to-play steps, the board (species tray, map and guess panel), the month radios, and
-  the styles.
-- [src/lib/hobbies/day-list.ts](../src/lib/hobbies/day-list.ts), the engine: daily round selection,
-  the species tray and its reveal, the points ceiling, equirectangular map, pin and keyboard
-  guessing, scoring, the result receipt, share string, the full list, and `localStorage`
-  persistence so a finished day stays finished.
-- [src/lib/hobbies/day-list.json](../src/lib/hobbies/day-list.json), the puzzle set.
-- [scripts/build-day-list.mjs](../scripts/build-day-list.mjs), the builder.
+  the how-to-play steps, the board (mode tabs, species tray, map and its controls, guess panel), the
+  month radios, and the styles.
+- [src/lib/hobbies/day-list.ts](../src/lib/hobbies/day-list.ts), the engine: both modes and their
+  saved state, the species tray and its reveal, the points ceiling, pin and keyboard guessing,
+  scoring, the reveal on the map, the result receipt, share string and the full list.
+- [src/lib/hobbies/day-list-map.ts](../src/lib/hobbies/day-list-map.ts), the map: zoom and pan,
+  gestures, the terrain tiles and their palette, the graticule, and the camera moves the reveal uses.
+- [src/lib/hobbies/day-list.json](../src/lib/hobbies/day-list.json), the daily set, and
+  [day-list-extra.json](../src/lib/hobbies/day-list-extra.json), the More lists set.
+- [public/day-list/relief/](../public/day-list/relief/) and
+  [day-list-relief.json](../src/lib/hobbies/day-list-relief.json), the terrain tiles and the list of
+  which exist.
+- [scripts/build-day-list.mjs](../scripts/build-day-list.mjs) builds both puzzle sets, and
+  [scripts/build-day-list-relief.mjs](../scripts/build-day-list-relief.mjs) cuts the tiles.
 - [scripts/resolve-day-list-places.mjs](../scripts/resolve-day-list-places.mjs), a helper that
-  resolves candidate locations to iNaturalist place ids and reports how much data each one has.
-  Run it by hand when adding a location.
+  resolves candidate locations to iNaturalist place ids and reports how much data each one has,
+  the busiest month and the size of the boundary. Run it by hand when adding a location (`--extra`
+  for More lists candidates).
 
 **Where it lives.** Day list is its own hobby at `/hobbies/day-list/`, with its own card on the
 hobbies index. The block is still opt-in per hobby, so it can be dropped onto any other hobby page
@@ -382,23 +392,101 @@ with the rules and uses one set of words throughout:
   points came from: Place (distance, and how many species were showing), Month, Total. The full list
   with facts follows under the board. Wikipedia's bracketed Latin name and IPA pronunciation are
   trimmed from the facts at render time (`tidyFact`), so the JSON keeps the source text.
-- **The answer lands in one beat.** On the map, a dashed line runs from the pin to the nearest edge
-  of the place over 600ms (`LINE_MS`), the same point the distance is measured to, while the "km
-  off" figure counts up beside it with `rollTo`. The line goes the short way round, so a pin in
-  Hawaii reaches Japan off one side of the map and back in the other. Then the boundary strokes in
-  (`BOX_MS`, 300ms) as the total lands, the place name appears, and the species still hidden fill
-  in 70ms apart. Under `prefers-reduced-motion`, and for a finished day restored on load,
-  everything is drawn at once. After locking in, the map scrolls into view if it's off screen, so
-  on a phone the line can be watched with the result right under it.
+- **The answer lands in one beat.** The map glides to frame the pin and the place together
+  (`CAMERA_MS`, 650ms, no closer than 48x), then a dashed line runs from the pin to the nearest edge
+  of the place over 600ms (`LINE_MS`), the same point the distance is measured to. The "km off"
+  figure and the total start counting with `rollTo` as soon as you lock in, and land as the line
+  arrives and the boundary closes. The line goes the short way round, so a pin in Hawaii reaches
+  Japan off one side of the map and back in the other, and the distance is written on it once it's
+  long enough to carry a label. Then the boundary strokes in (`BOX_MS`, 300ms), the place name
+  appears, and the species still hidden fill in 70ms apart. Under `prefers-reduced-motion`, and for
+  a finished round restored on load, everything is drawn at once. After locking in, the map scrolls
+  into view if it's off screen, so on a phone the line can be watched with the result right under
+  it.
 - **Native controls.** The months are radio inputs, so arrow keys and screen readers work with no
-  extra code. The lock button stays outlined until there's a pin and a month, then turns ink. The
-  pin drops on `click`, not `pointerdown`, so a scroll that starts on the map doesn't drop one.
+  extra code. The lock button stays outlined until there's a pin and a month, then turns ink. A pin
+  drops on a tap that didn't move, so a scroll, pan or pinch that starts on the map never drops one.
 - **Keyboard and screen readers.** Revealing a species from the keyboard moves focus to the next
   square, and a polite live region reads out the new species and the new ceiling. Locking in moves
-  focus to the result. A finished day restored on load doesn't move focus or replay anything.
+  focus to the result. A finished round restored on load doesn't move focus or replay anything.
 
 The layout takes its structure from the daily game Originle (a guess card with the stakes on it, and
 a reveal button that shows its cost) and redraws it in the archive's ink on paper.
+
+### The map
+
+The map is plate carrée, the projection the puzzle boundaries are published in, so a pin, a
+boundary and the terrain line up with no reprojection. It's one canvas, drawn by
+[day-list-map.ts](../src/lib/hobbies/day-list-map.ts).
+
+**Zooming.** Zoom runs from the whole world (1x) to 64x, where a pixel is about a kilometre on a
+laptop and the terrain is still sharp. All of these work:
+
+| Input                      | Does                                                                                                                                           |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pinch (touch)              | Zooms around the fingers, and two fingers pan                                                                                                  |
+| Double-tap or double-click | Zooms in 2x there (and drops the pin there, like any tap)                                                                                      |
+| `+` and `−` buttons        | Zoom 2x, toward the pin if there is one                                                                                                        |
+| Ctrl or ⌘ + scroll         | Zooms around the pointer. A trackpad pinch arrives this way, and Safari's as `gesture*` events                                                 |
+| Plain scroll               | Scrolls the page. If the mouse was just moved onto the map, a "Hold Ctrl and scroll to zoom" hint shows for a moment, the way embedded maps do |
+| Keys                       | `+`, `−` and `0` (whole world). Arrows move the pin, by less the further in you are; after the answer they pan instead                         |
+
+On touch, one finger scrolls the page while the whole world is showing (`touch-action: pan-y`) and
+pans the map once you've zoomed in (`touch-action: none`), the same deal as the herp map. A scale
+bar shows from 1.5x, for the latitude in the middle of the view. "Whole world" zooms back out, and
+after the answer "Back to your guess" reframes the pin and the place. On a phone the map runs edge
+to edge.
+
+**Terrain.** The tiles are Natural Earth's "Gray Earth with Shaded Relief, Hypsography, and Flat
+Water" at 1:10m (21600 × 10800, public domain), cut by
+[build-day-list-relief.mjs](../scripts/build-day-list-relief.mjs) into a six-level pyramid of
+256px WebP tiles: about 2,900 files and 7.6 MB, committed under `public/day-list/relief/v1/`. Tiles
+that would be all sea aren't written; the manifest says which exist and the map paints open water
+itself. A tile is one grey channel: 0 is water and 48-255 is the land's relief and height shading.
+The browser maps that grey through the page palette (`buildLut`), so one set of tiles serves light
+and dark mode and follows the theme toggle. Light mode keeps the archive's tan sea and paper land
+shaded toward ink. Dark mode turns it round, with a sea darker than the page under land lit a few
+steps toward ink, because relief shaded down from near-black has nowhere to go.
+
+The map loads the coarsest level first and keeps it underneath, so a zoom never shows a blank, then
+sharpens with the level the zoom needs (and the one under it, which arrives four times faster).
+Before any tile arrives, the coarse coastline from `src/lib/geo-land.json` stands in. About 100
+decoded tiles are kept and the oldest are dropped. The tiles are same-origin on purpose: the map
+reads their pixels to recolour them, which a tile from another origin would block without CORS.
+`staticwebapp.config.json` serves them as immutable, so **bump `VERSION` in the build script when
+the tiles change**.
+
+```bash
+npm run build:day-list-relief   # downloads ~46 MB to .cache/natural-earth once, then ~40 seconds
+```
+
+The free Azure Static Web Apps plan allows 15,000 files per deployment. The tiles are about 2,900
+of them, and the photo variants (12,000+) move to Blob Storage before deploy, so there's room, but
+another zoom level from a finer source would be about 8,000 more files.
+
+### More lists
+
+**Ten a day, from their own places.** More lists deals from
+[day-list-extra.json](../src/lib/hobbies/day-list-extra.json), 63 places that the daily rotation
+never uses, so playing extras can't spoil a future daily list. The builder refuses to write if the
+two sets share a place, and a test checks it too. The cap is ten a browser a day (`EXTRA_PER_DAY`):
+the pool is finite, so without one a keen player would run through it in an afternoon and start
+seeing repeats. The data is a dynamic import, so the daily page doesn't download it until More
+lists is opened.
+
+**What it remembers.** `localStorage` key `day-list-extra-v1` holds today's played places and
+scores, every place this browser has ever started (`seen`), and the round in progress. A new list
+is a place not yet seen. Once all 63 have been played it goes back to the one started longest ago.
+The count resets at the date change; a list left half-played carries over as the next day's first.
+Today's list (`day-list-v2`) now remembers a round in progress as well, so a reload can't wipe how
+many species you've seen. Older saves from before that, which were only ever written at lock-in,
+still read as finished.
+
+**Where it shows.** The board's title is a pair of underline tabs, "Today's list" and "More lists"
+(`initUnderlineTabs`, the Cult UI direction-aware-tabs port). The daily result offers "Play more
+lists", and each extra result offers "Next list" until the tenth, which shows the day's total
+instead. Extras have no share button, because the share string is about the daily list. A link to
+`/hobbies/day-list/#more-lists` opens straight onto More lists.
 
 ### Accuracy rules
 
@@ -418,7 +506,14 @@ The puzzle is aimed at people who know the species, so the builder is strict abo
   place away.
 - **Species are labelled native, introduced or endemic for that place**, from iNaturalist's own
   establishment means. This matters: the Laughing Kookaburra on the Cradle Mountain list is
-  introduced to Tasmania, and presenting it as a native indicator would be wrong.
+  introduced to Tasmania, and presenting it as a native indicator would be wrong. iNaturalist flags
+  each record against every place that contains it, so one stray listing can mislabel a species: a
+  user-made place called Mallards introduced, which tagged them introduced in the Danube Delta,
+  Iceland and four other rounds. So the label goes with the majority of the place's own flagged
+  records (175 native Mallard records in the Danube Delta against 3 introduced). An endemic label
+  also has to hold worldwide: at least half the species' records anywhere must be flagged endemic.
+  That drops island listings of a local subspecies, like Grey Wagtail on Madeira (2% worldwide),
+  and keeps real endemics, which run from 66% (Red-necked Wallaby, introduced abroad) to 100%.
 - **Facts come from the taxon's Wikipedia summary** and ship with the article link so they can be
   checked. iNaturalist returns those URLs with raw spaces in the title, which do not resolve, so the
   builder normalises them.
@@ -435,18 +530,22 @@ The puzzle is aimed at people who know the species, so the builder is strict abo
 **Rebuilding the puzzles.**
 
 ```bash
-npm run build:day-list
+npm run build:day-list                       # daily set
+npm run build:day-list -- --extra            # More lists set
+npm run build:day-list -- --retag [--extra]  # refresh the labels only, same species
 ```
 
-Takes around an hour for the full set of locations: the script throttles to one request a second,
-and it tries up to eight candidates per abundance band so a species without a usable photo costs a
-request rather than a whole round. Failed calls retry with a widening pause, because a build is well
-over a thousand requests and a dropped socket is a matter of when rather than if. It refuses to write
-a set with fewer than ten rounds.
+A full build takes around an hour per set: the script throttles to one request a second, and it
+tries up to eight candidates per abundance band so a species without a usable photo costs a request
+rather than a whole round. Failed calls retry with a widening pause, because a build is well over a
+thousand requests and a dropped socket is a matter of when rather than if. It refuses to write a set
+with fewer than ten rounds. Rebuilding the daily set changes the rounds people are partway through,
+so do it near midnight. `--retag` keeps every round's species and only relabels native, introduced
+and endemic, so it's safe to run any time (about ten minutes for both sets).
 
-**No runtime API calls.** Puzzle data ships as JSON and photos load straight from the iNaturalist
-CDNs already allow-listed in `img-src`, so the island costs nothing per play and keeps working if the
-API is down.
+**No runtime API calls.** Puzzle data ships as JSON, the terrain ships as same-origin tiles, and
+photos load straight from the iNaturalist CDNs already allow-listed in `img-src`, so the island costs
+nothing per play and keeps working if the API is down.
 
 **One gotcha worth remembering.** The species squares, the result receipt and the full list are all
 built by the script at runtime, so Astro's scoped styles never reach them. The component uses

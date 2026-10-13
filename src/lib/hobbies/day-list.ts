@@ -9,14 +9,30 @@
  * can score, and the board shows both that ceiling ("Up to 5,400 points") and
  * what the next species costs, so the trade is visible before you make it.
  *
+ * Two modes share the board. Today's list is the same round for everyone,
+ * picked by date from day-list.json. More lists deals up to ten a day per
+ * browser from day-list-extra.json, a separate set of places, so an extra list
+ * can never spoil a future daily one. Both modes remember a round in progress,
+ * so reloading can't reset how many species you've seen.
+ *
  * Puzzle data is built at release time by scripts/build-day-list.mjs. Photos
  * come from the iNaturalist CDNs already allow-listed in the site's CSP, so the
- * island makes no runtime API calls.
+ * island makes no runtime API calls. The map (zoom, terrain, gestures) is
+ * ./day-list-map.
  *
  * Mounted by src/components/hobbies/DayList.astro via [data-daylist] hooks.
  */
-import { LAND } from "../geo";
-import { prefersReducedMotion, rollTo } from "../motion";
+import { initUnderlineTabs, prefersReducedMotion, rollTo } from "../motion";
+import {
+  MAX_ZOOM,
+  answerView,
+  createWorldMap,
+  scaleBar,
+  type Box,
+  type LonLat,
+  type Point,
+  type WorldMap,
+} from "./day-list-map";
 import puzzles from "./day-list.json";
 
 interface Clue {
@@ -28,7 +44,7 @@ interface Clue {
   global: number;
   /** Observations at this place in this month. */
   local: number;
-  /** Standing at this place, from iNaturalist's establishment means. */
+  /** Standing at this place, by majority of the place's flagged records. */
   standing: "native" | "introduced" | "endemic";
   fact: string;
   wiki: string;
@@ -40,15 +56,36 @@ interface Clue {
   photoSource: string;
 }
 
-interface Round {
+export interface Round {
   placeId: number;
   name: string;
   region: string;
   official: string;
   month: number;
   /** Published place boundary. A pin inside it is exactly right. */
-  bbox: { w: number; e: number; s: number; n: number };
+  bbox: Box;
   clues: Clue[];
+}
+
+type Mode = "daily" | "extra";
+
+/** Where a round stands: species shown, the guess so far, locked in or not. */
+export interface Progress {
+  lines: number;
+  lat?: number;
+  lon?: number;
+  month?: number;
+  done: boolean;
+}
+
+/** More lists, per browser. `played` and `scores` are today's. */
+export interface ExtraState {
+  day: number;
+  played: number[];
+  scores: Record<string, number>;
+  /** Every extra place this browser has started, oldest first. */
+  seen: number[];
+  current: (Progress & { placeId: number }) | null;
 }
 
 const DATA = puzzles as { built: string; source: string; rounds: Round[] };
@@ -74,16 +111,24 @@ const CLUE_MULTIPLIER = [1, 0.88, 0.76, 0.65, 0.55, 0.46];
 const MAX_PLACE_POINTS = 5000;
 const MAX_MONTH_POINTS = 1000;
 
-const STORE_KEY = "day-list-v2";
+const DAILY_KEY = "day-list-v2";
+const EXTRA_KEY = "day-list-extra-v1";
+/** Extra lists a browser can start in a day. The pool is finite, so pace it. */
+export const EXTRA_PER_DAY = 10;
 
 /**
- * After "Lock it in" the answer lands in one beat: the line runs from the pin
- * to the place while the distance counts up beside it, then the boundary
- * strokes in, then the species still hidden fill in one after another.
+ * After "Lock it in" the answer lands in one beat: the map glides to frame the
+ * pin and the place, the line runs from one to the other while the distance
+ * counts up beside it, the boundary strokes in as the total lands, then the
+ * species still hidden fill in one after another.
  */
+const CAMERA_MS = 650;
 const LINE_MS = 600;
 const BOX_MS = 300;
 const FILL_STAGGER_MS = 70;
+
+const MAP_LABEL =
+  "World map. Tap where you think the six species were seen. Arrow keys move the pin, plus and minus zoom.";
 
 // The page is in English, so dates and numbers are too.
 const DATE_LONG = new Intl.DateTimeFormat("en-US", {
@@ -96,14 +141,8 @@ const DATE_SHORT = new Intl.DateTimeFormat("en-US", {
   day: "numeric",
 });
 const count = (value: number): string => value.toLocaleString("en-US");
-
-interface Saved {
-  day: number;
-  lines: number;
-  lat: number;
-  lon: number;
-  month: number;
-}
+const clamp = (v: number, lo: number, hi: number) =>
+  Math.min(hi, Math.max(lo, v));
 
 function todayNumber(): number {
   const now = new Date();
@@ -112,29 +151,97 @@ function todayNumber(): number {
   );
 }
 
-function load(day: number): Saved | null {
+function readStore(key: string): unknown {
   try {
-    const raw = localStorage.getItem(STORE_KEY);
-    if (!raw) return null;
-    const saved = JSON.parse(raw) as Saved;
-    return saved && saved.day === day ? saved : null;
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
   }
 }
 
-function save(state: Saved): void {
+function writeStore(key: string, value: unknown): void {
   try {
-    localStorage.setItem(STORE_KEY, JSON.stringify(state));
+    localStorage.setItem(key, JSON.stringify(value));
   } catch {
-    /* private browsing; the puzzle still plays, it just will not persist */
+    /* private browsing; the puzzle still plays, it just won't persist */
   }
 }
 
-function haversineKm(
-  a: { lat: number; lon: number },
-  b: { lat: number; lon: number },
+const isNum = (v: unknown): v is number =>
+  typeof v === "number" && Number.isFinite(v);
+
+/**
+ * Today's daily round from storage. Saves from before rounds were remembered in
+ * progress have no `done`, but they were only ever written at lock-in.
+ */
+export function readDaily(raw: unknown, day: number): Progress | null {
+  if (!raw || typeof raw !== "object") return null;
+  const s = raw as Partial<Progress> & { day?: number };
+  if (s.day !== day) return null;
+  const guessed = isNum(s.lat) && isNum(s.lon) && isNum(s.month);
+  return {
+    lines: isNum(s.lines) ? s.lines : 1,
+    lat: isNum(s.lat) ? s.lat : undefined,
+    lon: isNum(s.lon) ? s.lon : undefined,
+    month: isNum(s.month) ? s.month : undefined,
+    done: guessed && (typeof s.done === "boolean" ? s.done : true),
+  };
+}
+
+/** More lists from storage, with today's count reset when the day turns. */
+export function readExtra(raw: unknown, day: number): ExtraState {
+  const fresh: ExtraState = {
+    day,
+    played: [],
+    scores: {},
+    seen: [],
+    current: null,
+  };
+  if (!raw || typeof raw !== "object") return fresh;
+  const s = raw as Partial<ExtraState>;
+  const seen = Array.isArray(s.seen) ? s.seen.filter(isNum) : [];
+  const current =
+    s.current && typeof s.current === "object" && isNum(s.current.placeId)
+      ? s.current
+      : null;
+  if (s.day !== day) {
+    // A list left half-played on an earlier day carries over, as today's first.
+    const carry = current && !current.done ? current : null;
+    return {
+      ...fresh,
+      seen,
+      played: carry ? [carry.placeId] : [],
+      current: carry,
+    };
+  }
+  return {
+    day,
+    seen,
+    current,
+    played: Array.isArray(s.played) ? s.played.filter(isNum) : [],
+    scores:
+      s.scores && typeof s.scores === "object"
+        ? (s.scores as Record<string, number>)
+        : {},
+  };
+}
+
+/**
+ * The next extra place: one this browser hasn't started, or once they've all
+ * been played, the one started longest ago.
+ */
+export function pickExtra(
+  pool: number[],
+  seen: number[],
+  random: () => number = Math.random,
 ): number {
+  const unseen = pool.filter((id) => !seen.includes(id));
+  if (unseen.length) return unseen[Math.floor(random() * unseen.length)];
+  return seen.find((id) => pool.includes(id)) ?? pool[0];
+}
+
+function haversineKm(a: LonLat, b: LonLat): number {
   const R = 6371;
   const rad = Math.PI / 180;
   const dLat = (b.lat - a.lat) * rad;
@@ -146,13 +253,10 @@ function haversineKm(
 }
 
 /** The point of a place's boundary closest to a pin, or the pin if inside. */
-function nearestPoint(
-  pin: { lat: number; lon: number },
-  bbox: Round["bbox"],
-): { lat: number; lon: number } {
+function nearestPoint(pin: LonLat, bbox: Box): LonLat {
   return {
-    lat: Math.max(bbox.s, Math.min(bbox.n, pin.lat)),
-    lon: Math.max(bbox.w, Math.min(bbox.e, pin.lon)),
+    lat: clamp(pin.lat, bbox.s, bbox.n),
+    lon: clamp(pin.lon, bbox.w, bbox.e),
   };
 }
 
@@ -161,10 +265,7 @@ function nearestPoint(
  * 1,500 km long: a pin on its north coast is a correct answer, and scoring it
  * against a centroid would call that a 700 km miss.
  */
-function distanceToPlace(
-  pin: { lat: number; lon: number },
-  bbox: Round["bbox"],
-): number {
+function distanceToPlace(pin: LonLat, bbox: Box): number {
   const edge = nearestPoint(pin, bbox);
   if (edge.lat === pin.lat && edge.lon === pin.lon) return 0; // inside
   return haversineKm(pin, edge);
@@ -181,6 +282,29 @@ export function bestPossible(lines: number): number {
   return (
     Math.round(MAX_PLACE_POINTS * CLUE_MULTIPLIER[index]) + MAX_MONTH_POINTS
   );
+}
+
+/** Points for a guess. `month` is 0-11; the round's is 1-12. */
+export function scoreGuess(
+  round: Pick<Round, "bbox" | "month">,
+  guess: LonLat & { month: number; lines: number },
+) {
+  const km = distanceToPlace(guess, round.bbox);
+  const used = clamp(Math.round(guess.lines), 1, CLUE_MULTIPLIER.length);
+  const multiplier = CLUE_MULTIPLIER[used - 1];
+  const placePoints = Math.round(
+    MAX_PLACE_POINTS * Math.exp(-km / 1800) * multiplier,
+  );
+  const off = monthsApart(guess.month, round.month - 1);
+  const monthPoints = Math.max(0, Math.round(MAX_MONTH_POINTS * (1 - off / 6)));
+  return {
+    km,
+    off,
+    used,
+    placePoints,
+    monthPoints,
+    score: placePoints + monthPoints,
+  };
 }
 
 const STANDING_LABEL: Record<Clue["standing"], string> = {
@@ -227,18 +351,11 @@ function displayName(name: string): string {
   return name.charAt(0).toUpperCase() + name.slice(1);
 }
 
-function formatPin(pin: { lat: number; lon: number }): string {
+function formatPin(pin: LonLat): string {
   return (
     `${Math.abs(pin.lat).toFixed(1)}\u00b0${pin.lat >= 0 ? "N" : "S"}, ` +
     `${Math.abs(pin.lon).toFixed(1)}\u00b0${pin.lon >= 0 ? "E" : "W"}`
   );
-}
-
-function cssVar(name: string, fallback: string): string {
-  const value = getComputedStyle(document.documentElement)
-    .getPropertyValue(name)
-    .trim();
-  return value || fallback;
 }
 
 function escapeHtml(value: string): string {
@@ -251,19 +368,27 @@ function escapeHtml(value: string): string {
   );
 }
 
+const isMac = () =>
+  /Mac|iPhone|iPad/.test(
+    (navigator as Navigator & { userAgentData?: { platform?: string } })
+      .userAgentData?.platform ?? navigator.userAgent,
+  );
+
 export function initDayList(root: HTMLElement): void {
-  const canvas = root.querySelector<HTMLCanvasElement>("[data-daylist-map]");
-  const mapWrap = root.querySelector<HTMLElement>("[data-daylist-mapwrap]");
-  const tray = root.querySelector<HTMLElement>("[data-daylist-clues]");
-  const lockBtn = root.querySelector<HTMLButtonElement>("[data-daylist-lock]");
-  const guessPanel = root.querySelector<HTMLElement>("[data-daylist-guess]");
-  const resultSlot = root.querySelector<HTMLElement>("[data-daylist-result]");
+  const q = <T extends Element>(selector: string) =>
+    root.querySelector<T>(selector);
+  const canvas = q<HTMLCanvasElement>("[data-daylist-map]");
+  const surface = q<HTMLElement>("[data-daylist-mapwrap]");
+  const tray = q<HTMLElement>("[data-daylist-clues]");
+  const lockBtn = q<HTMLButtonElement>("[data-daylist-lock]");
+  const guessPanel = q<HTMLElement>("[data-daylist-guess]");
+  const resultSlot = q<HTMLElement>("[data-daylist-result]");
   const monthInputs = Array.from(
     root.querySelectorAll<HTMLInputElement>("[data-daylist-month]"),
   );
   if (
     !canvas ||
-    !mapWrap ||
+    !surface ||
     !tray ||
     !lockBtn ||
     !guessPanel ||
@@ -272,133 +397,112 @@ export function initDayList(root: HTMLElement): void {
   )
     return;
 
-  const readout = root.querySelector<HTMLElement>("[data-daylist-readout]");
-  const worthEl = root.querySelector<HTMLElement>("[data-daylist-worth]");
-  const announce = root.querySelector<HTMLElement>("[data-daylist-announce]");
-  const rollSlot = root.querySelector<HTMLElement>("[data-daylist-roll]");
-  const dateEl = root.querySelector<HTMLElement>("[data-daylist-date]");
-
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
+  const readout = q<HTMLElement>("[data-daylist-readout]");
+  const worthEl = q<HTMLElement>("[data-daylist-worth]");
+  const announce = q<HTMLElement>("[data-daylist-announce]");
+  const rollSlot = q<HTMLElement>("[data-daylist-roll]");
+  const metaEl = q<HTMLElement>("[data-daylist-meta]");
+  const titleEl = q<HTMLElement>("[data-daylist-title]");
+  const board = q<HTMLElement>("[data-daylist-board]");
+  const playArea = q<HTMLElement>("[data-daylist-play]");
+  const modes = q<HTMLElement>("[data-daylist-modes]");
+  const zoomInBtn = q<HTMLButtonElement>('[data-daylist-zoom="in"]');
+  const zoomOutBtn = q<HTMLButtonElement>('[data-daylist-zoom="out"]');
+  const viewBtn = q<HTMLButtonElement>("[data-daylist-view]");
+  const scaleEl = q<HTMLElement>("[data-daylist-scale]");
+  const wheelHint = q<HTMLElement>("[data-daylist-wheelhint]");
 
   const day = todayNumber();
-  const round = ROUNDS[day % ROUNDS.length];
-  const total = round.clues.length;
-  const restored = load(day);
+  const daily = ROUNDS[day % ROUNDS.length];
 
-  let lines = restored ? Math.min(Math.max(restored.lines, 1), total) : 1;
-  let pin: { lat: number; lon: number } | null = restored
-    ? { lat: restored.lat, lon: restored.lon }
-    : null;
-  let month: number | null = restored ? restored.month : null;
-  let done = Boolean(restored);
+  let mode: Mode = "daily";
+  let round = daily;
+  let lines = 1;
   // Slots showing a species. It matches `lines` except while the answer is
   // landing, when the species still hidden wait for the boundary.
-  let shown = lines;
-
+  let shown = 1;
+  let pin: LonLat | null = null;
+  let month: number | null = null;
+  let done = false;
   // How much of the answer the map shows, 0 to 1: the line from the pin, then
   // the boundary. Both stay at 1 unless the reveal is playing.
   let lineT = 1;
   let boxT = 1;
-
-  let width = 0;
-  let height = 0;
+  // Bumped whenever a round loads, so a reveal still playing for the last
+  // round stops touching the board.
+  let generation = 0;
+  // True from "Lock it in" until the answer has landed on the map.
+  let revealing = false;
+  let extraPool: Round[] | null = null;
+  let extra = readExtra(readStore(EXTRA_KEY), day);
 
   /* ---------------------------------------------------------------- map */
 
-  const project = (lon: number, lat: number) => ({
-    x: ((lon + 180) / 360) * width,
-    y: ((90 - lat) / 180) * height,
+  const map = createWorldMap({
+    canvas,
+    surface,
+    onTap: placePin,
+    focusPoint: () => pin,
+    drawOverlay: drawGame,
+    onView: syncMapControls,
+    onWheelHint: showWheelHint,
   });
-  const unproject = (x: number, y: number) => ({
-    lon: (x / width) * 360 - 180,
-    lat: 90 - (y / height) * 180,
-  });
+  if (!map) return;
 
-  function drawMap(): void {
-    if (!ctx || !width || !height) return;
-    const ink = cssVar("--ink", "#16150f");
-    const trail = cssVar("--ink-2", "#706c63");
-    const grid = cssVar("--globe-grid", "#eeebe3");
-    // Ocean sits a step darker than paper so coastlines read at this size.
-    const ocean = cssVar("--stack-1", "#d8d2c4");
-    const landFill = cssVar("--paper", "#fbfaf8");
-    const coast = cssVar("--globe-coast", "#bab4a6");
+  /** The pin and the place together, which the reveal frames. */
+  function answerBox(): Box {
+    const b = round.bbox;
+    if (!pin) return b;
+    return {
+      w: Math.min(b.w, pin.lon),
+      e: Math.max(b.e, pin.lon),
+      s: Math.min(b.s, pin.lat),
+      n: Math.max(b.n, pin.lat),
+    };
+  }
 
-    ctx.clearRect(0, 0, width, height);
-    ctx.fillStyle = ocean;
-    ctx.fillRect(0, 0, width, height);
-
-    ctx.strokeStyle = grid;
-    ctx.lineWidth = 1;
-    ctx.globalAlpha = 0.5;
-    for (let lat = -60; lat <= 60; lat += 30) {
-      const { y } = project(0, lat);
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(width, y);
-      ctx.stroke();
-    }
-    for (let lon = -120; lon <= 120; lon += 60) {
-      const { x } = project(lon, 0);
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, height);
-      ctx.stroke();
-    }
-    ctx.globalAlpha = 1;
-
-    ctx.fillStyle = landFill;
-    ctx.strokeStyle = coast;
-    ctx.lineWidth = 0.8;
-    for (const ring of LAND) {
-      ctx.beginPath();
-      ring.forEach(([lon, lat], i) => {
-        const p = project(lon, lat);
-        if (i === 0) ctx.moveTo(p.x, p.y);
-        else ctx.lineTo(p.x, p.y);
-      });
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-    }
-
-    const tl = project(round.bbox.w, round.bbox.n);
-    const br = project(round.bbox.e, round.bbox.s);
+  function drawGame(ctx: CanvasRenderingContext2D, m: WorldMap): void {
+    const { ink, ink2, paper } = m.palette;
+    const tl = m.project(round.bbox.w, round.bbox.n);
+    const br = m.project(round.bbox.e, round.bbox.s);
     const boxW = Math.max(6, br.x - tl.x) + 2;
     const boxH = Math.max(6, br.y - tl.y) + 2;
+    let middle: Point | null = null;
+    let lineLength = 0;
 
     // The line runs to the nearest edge of the place, the point the distance
     // is measured to, and leaves from the rim of the pin rather than its
-    // middle. It goes the short way round, like the distance: a pin in
-    // Hawaii reaches Japan off one side of the map and back in the other.
+    // middle. It goes the short way round, like the distance: a pin in Hawaii
+    // reaches Japan off one side of the map and back in at the other.
     if (done && pin && lineT > 0) {
       const edge = nearestPoint(pin, round.bbox);
       let toLon = edge.lon;
       if (toLon - pin.lon > 180) toLon -= 360;
       else if (pin.lon - toLon > 180) toLon += 360;
-      const from = project(pin.lon, pin.lat);
-      const to = project(toLon, edge.lat);
+      const from = m.project(pin.lon, pin.lat);
+      const to = m.project(toLon, edge.lat);
       const length = Math.hypot(to.x - from.x, to.y - from.y);
       if (length > 8) {
         const ux = (to.x - from.x) / length;
         const uy = (to.y - from.y) / length;
         const reach = 7 + (length - 7) * lineT;
-        const ax = from.x + ux * 7;
-        const bx = from.x + ux * reach;
+        const a = { x: from.x + ux * 7, y: from.y + uy * 7 };
+        const b = { x: from.x + ux * reach, y: from.y + uy * reach };
         const shifts = [0];
-        if (Math.min(ax, bx) < 0) shifts.push(width);
-        if (Math.max(ax, bx) > width) shifts.push(-width);
-        ctx.strokeStyle = trail;
+        if (toLon < -180) shifts.push(m.worldWidth);
+        if (toLon > 180) shifts.push(-m.worldWidth);
+        ctx.strokeStyle = ink2;
         ctx.lineWidth = 1.4;
         ctx.setLineDash([4, 4]);
         ctx.beginPath();
         for (const shift of shifts) {
-          ctx.moveTo(ax + shift, from.y + uy * 7);
-          ctx.lineTo(bx + shift, from.y + uy * reach);
+          ctx.moveTo(a.x + shift, a.y);
+          ctx.lineTo(b.x + shift, b.y);
         }
         ctx.stroke();
         ctx.setLineDash([]);
+        middle = { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 };
+        lineLength = length;
       }
     }
 
@@ -414,7 +518,7 @@ export function initDayList(root: HTMLElement): void {
     }
 
     if (pin) {
-      const p = project(pin.lon, pin.lat);
+      const p = m.project(pin.lon, pin.lat);
       ctx.strokeStyle = ink;
       ctx.lineWidth = 1.6;
       ctx.beginPath();
@@ -432,42 +536,115 @@ export function initDayList(root: HTMLElement): void {
       ctx.stroke();
     }
 
-    // The name goes above the box, to its right, unless that runs off the
-    // map. A rim in the land colour keeps it readable over coastlines.
-    if (done && boxT >= 1) {
-      ctx.font =
-        '500 11px "Libre Franklin", ui-sans-serif, system-ui, sans-serif';
-      ctx.textAlign = "left";
-      const textW = ctx.measureText(round.name).width;
-      let x = tl.x - 1 + boxW + 5;
-      if (x + textW > width - 4) x = tl.x - 6 - textW;
-      x = Math.max(4, Math.min(width - 4 - textW, x));
-      const y = Math.max(13, tl.y - 6);
-      ctx.lineJoin = "round";
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = landFill;
-      ctx.strokeText(round.name, x, y);
+    if (!done || boxT < 1) return;
+
+    // Labels sit on a rim of paper so they read over coastlines and relief.
+    ctx.font =
+      '500 11px "Libre Franklin", ui-sans-serif, system-ui, sans-serif';
+    ctx.textAlign = "left";
+    ctx.lineJoin = "round";
+    ctx.lineWidth = 3;
+    const label = (text: string, x: number, y: number) => {
+      ctx.strokeStyle = paper;
+      ctx.strokeText(text, x, y);
       ctx.fillStyle = ink;
-      ctx.fillText(round.name, x, y);
+      ctx.fillText(text, x, y);
+    };
+
+    // The name goes above the box, to its right, unless that runs off the map.
+    const nameW = ctx.measureText(round.name).width;
+    let nx = tl.x - 1 + boxW + 5;
+    if (nx + nameW > m.width - 4) nx = tl.x - 6 - nameW;
+    nx = clamp(nx, 4, m.width - 4 - nameW);
+    const ny = Math.max(13, tl.y - 6);
+    label(round.name, nx, ny);
+
+    // How far, written on the line itself once it's long enough to carry it.
+    if (pin && middle && lineLength > 110) {
+      const km = distanceToPlace(pin, round.bbox);
+      const text = `${count(Math.round(km))} km`;
+      const tw = ctx.measureText(text).width;
+      const lx = clamp(middle.x - tw / 2, 4, m.width - 4 - tw);
+      const ly = clamp(middle.y - 8, 13, m.height - 6);
+      const clear =
+        Math.abs(ly - ny) > 16 || lx + tw < nx - 8 || lx > nx + nameW + 8;
+      if (km > 0 && clear) label(text, lx, ly);
     }
   }
 
-  function resize(): void {
-    const rect = canvas!.getBoundingClientRect();
-    if (!rect.width) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    width = rect.width;
-    height = rect.height;
-    canvas!.width = Math.round(width * dpr);
-    canvas!.height = Math.round(height * dpr);
-    ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
-    drawMap();
+  function isFramed(m: WorldMap): boolean {
+    if (!done || !pin) return false;
+    const want = answerView(answerBox(), m.width, m.height);
+    const v = m.view;
+    return (
+      Math.abs(Math.log(v.k / want.k)) < 0.08 &&
+      Math.abs(v.cu - want.cu) < 0.05 / v.k &&
+      Math.abs(v.cv - want.cv) < 0.05 / v.k
+    );
+  }
+
+  function syncMapControls(m: WorldMap): void {
+    const k = m.view.k;
+    if (zoomInBtn) zoomInBtn.disabled = k >= MAX_ZOOM - 0.01;
+    if (zoomOutBtn) zoomOutBtn.disabled = k <= 1.001;
+    if (viewBtn) {
+      // Zoomed in: a way back out. After the answer, a way back to it. Not
+      // while the answer is landing, when the view moves by itself.
+      const framed = isFramed(m);
+      if (revealing) {
+        viewBtn.hidden = true;
+      } else if (done && !framed) {
+        viewBtn.hidden = false;
+        viewBtn.textContent = "Back to your guess";
+        viewBtn.dataset.action = "answer";
+      } else if (k > 1.001) {
+        viewBtn.hidden = false;
+        viewBtn.textContent = "Whole world";
+        viewBtn.dataset.action = "world";
+      } else {
+        viewBtn.hidden = true;
+      }
+    }
+    if (scaleEl) {
+      const show = k > 1.5;
+      scaleEl.hidden = !show;
+      if (show) {
+        const { km, px } = scaleBar(m.kmPerPx());
+        const bar = scaleEl.querySelector<HTMLElement>("i");
+        const text = scaleEl.querySelector<HTMLElement>("span");
+        if (bar) bar.style.width = `${Math.round(px)}px`;
+        if (text) text.textContent = `${count(km)} km`;
+      }
+    }
+  }
+
+  zoomInBtn?.addEventListener("click", () => {
+    map.zoomBy(2, pin ? map.project(pin.lon, pin.lat) : undefined);
+  });
+  zoomOutBtn?.addEventListener("click", () => map.zoomBy(0.5));
+  viewBtn?.addEventListener("click", () => {
+    if (viewBtn.dataset.action === "answer") void map.fit(answerBox());
+    else void map.reset();
+  });
+
+  let hintTimer = 0;
+  function showWheelHint(): void {
+    if (!wheelHint) return;
+    wheelHint.textContent = isMac()
+      ? "Hold \u2318 and scroll to zoom"
+      : "Hold Ctrl and scroll to zoom";
+    wheelHint.classList.add("is-on");
+    window.clearTimeout(hintTimer);
+    hintTimer = window.setTimeout(
+      () => wheelHint.classList.remove("is-on"),
+      1200,
+    );
   }
 
   /* -------------------------------------------------------- the species */
 
   tray.textContent = "";
-  const slots = round.clues.map(() => {
+  const slots = Array.from({ length: 6 }, () => {
     const li = document.createElement("li");
     li.className = "dl-slot";
     tray.append(li);
@@ -548,19 +725,35 @@ export function initDayList(root: HTMLElement): void {
     }
   }
 
+  function persist(): void {
+    const progress: Progress = { lines, done };
+    if (pin) {
+      progress.lat = pin.lat;
+      progress.lon = pin.lon;
+    }
+    if (month !== null) progress.month = month;
+    if (mode === "daily") {
+      writeStore(DAILY_KEY, { day, ...progress });
+    } else {
+      extra.current = { placeId: round.placeId, ...progress };
+      writeStore(EXTRA_KEY, extra);
+    }
+  }
+
   function reveal(fromKeyboard: boolean): void {
-    if (done || lines >= total) return;
+    if (done || lines >= round.clues.length) return;
     lines += 1;
     shown = lines;
     paintSlot(lines - 1, true);
-    if (lines < total) paintSlot(lines);
+    if (lines < round.clues.length) paintSlot(lines);
     syncWorth();
     preloadNext();
+    persist();
 
     const clue = round.clues[lines - 1];
     if (announce) {
       announce.textContent =
-        `Species ${lines} of ${total}: ${displayName(clue.name)}, ` +
+        `Species ${lines} of ${round.clues.length}: ${displayName(clue.name)}, ` +
         `${count(clue.global)} sightings worldwide. ` +
         `Up to ${count(bestPossible(lines))} points now.`;
     }
@@ -568,7 +761,7 @@ export function initDayList(root: HTMLElement): void {
     // follows to the next one (or the map once all six are out).
     if (fromKeyboard) {
       const next = tray!.querySelector<HTMLElement>("[data-daylist-more]");
-      (next ?? mapWrap!).focus();
+      (next ?? surface!).focus();
     }
   }
 
@@ -598,39 +791,52 @@ export function initDayList(root: HTMLElement): void {
     lockBtn!.disabled = done || !pin || month === null;
   }
 
-  // Click rather than pointerdown: on a phone, a drag that starts on the map
-  // is a scroll, and only a tap should drop the pin.
-  mapWrap.addEventListener("click", (event) => {
+  function placePin(at: LonLat): void {
     if (done) return;
-    const rect = canvas.getBoundingClientRect();
-    pin = unproject(event.clientX - rect.left, event.clientY - rect.top);
-    mapWrap.classList.add("is-placed");
+    pin = { lat: clamp(at.lat, -85, 85), lon: clamp(at.lon, -180, 180) };
+    surface!.classList.add("is-placed");
     describeGuess();
     syncLock();
-    drawMap();
-  });
+    persist();
+    map!.redraw();
+  }
 
-  // Keyboard guessing: arrows nudge a pin that starts in the middle.
-  mapWrap.addEventListener("keydown", (event) => {
-    if (done) return;
-    const step = event.shiftKey ? 15 : 4;
-    if (!pin) {
-      // Only an arrow or Enter drops the first pin. Anything else, Tab
-      // included, has to pass through or keyboard users get stuck here.
+  // Keyboard guessing: the pin starts in the middle of the view and arrows
+  // nudge it, by less the further in you've zoomed. Once the answer is in,
+  // arrows pan the map instead, so the keyboard can look around it too.
+  surface.addEventListener("keydown", (event) => {
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+    if (done) {
+      const pan: Record<string, [number, number]> = {
+        ArrowUp: [0, -1],
+        ArrowDown: [0, 1],
+        ArrowLeft: [-1, 0],
+        ArrowRight: [1, 0],
+      };
+      const dir = pan[event.key];
+      if (!dir || map.view.k <= 1.001) return;
+      event.preventDefault();
+      const by = (event.shiftKey ? 0.5 : 0.15) * map.width;
+      map.panBy(dir[0] * by, dir[1] * by);
+      return;
+    }
+    const step = Math.max(0.01, (event.shiftKey ? 15 : 4) / map.view.k);
+    let next = pin;
+    if (!next) {
       if (!event.key.startsWith("Arrow") && event.key !== "Enter") return;
-      pin = { lat: 20, lon: 0 };
-      mapWrap.classList.add("is-placed");
-    } else if (event.key === "ArrowUp") pin.lat = Math.min(85, pin.lat + step);
-    else if (event.key === "ArrowDown") pin.lat = Math.max(-85, pin.lat - step);
+      next = map.unproject(map.width / 2, map.height / 2);
+    } else if (event.key === "ArrowUp")
+      next = { ...next, lat: next.lat + step };
+    else if (event.key === "ArrowDown")
+      next = { ...next, lat: next.lat - step };
     else if (event.key === "ArrowLeft")
-      pin.lon = Math.max(-180, pin.lon - step);
+      next = { ...next, lon: next.lon - step };
     else if (event.key === "ArrowRight")
-      pin.lon = Math.min(180, pin.lon + step);
+      next = { ...next, lon: next.lon + step };
     else return;
     event.preventDefault();
-    describeGuess();
-    syncLock();
-    drawMap();
+    placePin(next);
+    if (pin) map.show(pin);
   });
 
   monthInputs.forEach((input) => {
@@ -639,6 +845,7 @@ export function initDayList(root: HTMLElement): void {
       month = Number(input.value);
       describeGuess();
       syncLock();
+      persist();
     });
   });
 
@@ -651,7 +858,7 @@ export function initDayList(root: HTMLElement): void {
     score: number,
   ): string {
     let read = "";
-    for (let i = 0; i < total; i++) {
+    for (let i = 0; i < round.clues.length; i++) {
       read += i < used ? "\u{1F4D6}" : "\u2B1C";
     }
     const distance =
@@ -676,7 +883,7 @@ export function initDayList(root: HTMLElement): void {
       km === 0 ? "inside the boundary" : `${count(Math.round(km))} km off`;
     return (
       `Day list, ${DATE_SHORT.format(new Date())}\n${read}\n${distance}${season}\n` +
-      `${where} \u00b7 ${used}/${total} species \u00b7 ${count(score)}`
+      `${where} \u00b7 ${used}/${round.clues.length} species \u00b7 ${count(score)}`
     );
   }
 
@@ -725,44 +932,46 @@ export function initDayList(root: HTMLElement): void {
    * Play the answer onto the map: the line for `lineMs`, then the boundary
    * for BOX_MS, redrawing every frame. `landed` runs once both are down.
    */
-  function playReveal(lineMs: number, landed: () => void): void {
+  function playReveal(lineMs: number, mine: number, landed: () => void): void {
     lineT = 0;
     boxT = 0;
     const start = performance.now();
-    const clamp = (k: number) => Math.min(1, Math.max(0, k));
-    const easeOut = (k: number) => 1 - Math.pow(1 - clamp(k), 3);
+    const easeOut = (k: number) => 1 - Math.pow(1 - clamp(k, 0, 1), 3);
     const step = (now: number) => {
+      if (mine !== generation) return;
       const elapsed = now - start;
       lineT = lineMs > 0 ? easeOut(elapsed / lineMs) : 1;
       boxT = easeOut((elapsed - lineMs) / BOX_MS);
-      drawMap();
+      map!.redraw();
       if (elapsed < lineMs + BOX_MS) requestAnimationFrame(step);
       else landed();
     };
     requestAnimationFrame(step);
   }
 
+  function extraRow(): string {
+    const played = extra.played.length;
+    const points = Object.values(extra.scores).reduce((a, b) => a + b, 0);
+    return played >= EXTRA_PER_DAY
+      ? `That's all ten for today, ${count(points)} points. Ten more turn up tomorrow`
+      : `${played} of ${EXTRA_PER_DAY} played today &middot; ${count(points)} points`;
+  }
+
   /**
    * Score the guess and swap the guess panel for a receipt. `animate` is
-   * false when a finished day is restored on load, so nothing replays.
+   * false when a finished round is restored, so nothing replays.
    */
-  function finish(animate: boolean): void {
+  async function finish(animate: boolean): Promise<void> {
     if (!pin || month === null) return;
+    const mine = generation;
     done = true;
     const motion = animate && !prefersReducedMotion();
-
-    const km = distanceToPlace(pin, round.bbox);
-    const used = Math.min(lines, total);
-    const multiplier = CLUE_MULTIPLIER[used - 1];
-    const placePoints = Math.round(
-      MAX_PLACE_POINTS * Math.exp(-km / 1800) * multiplier,
+    const { km, off, used, placePoints, monthPoints, score } = scoreGuess(
+      round,
+      { ...pin, month, lines },
     );
-    const off = monthsApart(month, round.month - 1);
-    const monthPoints = Math.max(
-      0,
-      Math.round(MAX_MONTH_POINTS * (1 - off / 6)),
-    );
-    const score = placePoints + monthPoints;
+    if (mode === "extra") extra.scores[String(round.placeId)] = score;
+    persist();
 
     const verdict =
       km === 0
@@ -789,11 +998,11 @@ export function initDayList(root: HTMLElement): void {
 
     // The species still hidden stay numbered squares until the boundary is
     // down, then fill in. Their photos start loading now.
-    for (let i = shown; i < total; i++) paintSlot(i);
+    for (let i = shown; i < round.clues.length; i++) paintSlot(i);
     const fillIn = () => {
       const from = shown;
-      shown = total;
-      for (let i = from; i < total; i++) {
+      shown = round.clues.length;
+      for (let i = from; i < round.clues.length; i++) {
         paintSlot(i, animate, (i - from) * FILL_STAGGER_MS);
       }
     };
@@ -805,13 +1014,21 @@ export function initDayList(root: HTMLElement): void {
       }
     }
 
-    mapWrap!.classList.add("is-done");
-    mapWrap!.setAttribute(
+    surface!.classList.add("is-done");
+    surface!.setAttribute(
       "aria-label",
       `World map showing your pin and ${round.name}.`,
     );
     syncLock();
 
+    const canNext = mode === "extra" && extra.played.length < EXTRA_PER_DAY;
+    const actions =
+      mode === "daily"
+        ? `<button type="button" class="btn btn-ink" data-daylist-to-extra>Play more lists</button>
+           <button type="button" class="btn" data-daylist-copy>Copy result</button>`
+        : canNext
+          ? `<button type="button" class="btn btn-ink" data-daylist-next>Next list</button>`
+          : "";
     guessPanel!.hidden = true;
     resultSlot!.hidden = false;
     resultSlot!.innerHTML = `
@@ -826,7 +1043,7 @@ export function initDayList(root: HTMLElement): void {
         <div>
           <dt>Place</dt>
           <dd class="dl-receipt__pts">${count(placePoints)}</dd>
-          <dd class="dl-receipt__why">${distance}, with ${used} of ${total} species showing</dd>
+          <dd class="dl-receipt__why">${distance}, with ${used} of ${round.clues.length} species showing</dd>
         </div>
         <div>
           <dt>Month</dt>
@@ -841,29 +1058,14 @@ export function initDayList(root: HTMLElement): void {
         </div>
       </dl>
       <div class="dl-actions">
-        <button type="button" class="btn" data-daylist-copy>Copy result</button>
+        ${actions}
         <a class="btn" href="https://www.inaturalist.org/places/${
           round.placeId
         }" target="_blank" rel="noopener noreferrer">See the place</a>
       </div>
-      <p class="dl-next">A new list turns up tomorrow</p>`;
-
-    // The distance counts up as the line runs out to the place, and the total
-    // lands with the boundary.
-    if (motion) {
-      const kmEl = resultSlot!.querySelector<HTMLElement>("[data-daylist-km]");
-      if (kmEl) {
-        kmEl.dataset.value = "0";
-        rollTo(kmEl, kmShown, { ms: lineMs });
-      }
-      const scoreEl = resultSlot!.querySelector<HTMLElement>(
-        "[data-daylist-score]",
-      );
-      if (scoreEl) {
-        scoreEl.dataset.value = "0";
-        rollTo(scoreEl, score, { ms: lineMs + BOX_MS });
-      }
-    }
+      <p class="dl-next">${
+        mode === "daily" ? "A new list turns up tomorrow" : extraRow()
+      }</p>`;
 
     const copy = resultSlot!.querySelector<HTMLButtonElement>(
       "[data-daylist-copy]",
@@ -881,66 +1083,251 @@ export function initDayList(root: HTMLElement): void {
         copy.textContent = "Copy result";
       }, 1800);
     });
+    resultSlot!
+      .querySelector("[data-daylist-to-extra]")
+      ?.addEventListener("click", () => void setMode("extra", true));
+    resultSlot!
+      .querySelector("[data-daylist-next]")
+      ?.addEventListener("click", () => startExtra(true));
 
     renderFullList();
 
     if (animate) {
       // Screen readers hear the place first. The map is kept in view so the
-      // line can be watched; on a phone the result sits right under it.
+      // answer can be watched landing; on a phone the result sits under it.
       resultSlot!
         .querySelector<HTMLElement>("[data-daylist-place]")
         ?.focus({ preventScroll: true });
-      mapWrap!.scrollIntoView({
+      surface!.scrollIntoView({
         block: "nearest",
         behavior: motion ? "smooth" : "auto",
       });
     }
 
-    if (motion) {
-      playReveal(lineMs, fillIn);
-    } else {
+    if (!motion) {
       lineT = 1;
       boxT = 1;
       fillIn();
-      drawMap();
+      await map!.fit(answerBox(), { animate: false });
+      return;
     }
+
+    // The numbers start straight away, so nothing sits at zero. The distance
+    // reaches its value as the line reaches the place, and the total as the
+    // boundary closes.
+    revealing = true;
+    const kmEl = resultSlot!.querySelector<HTMLElement>("[data-daylist-km]");
+    if (kmEl) {
+      kmEl.dataset.value = "0";
+      rollTo(kmEl, kmShown, { ms: CAMERA_MS + lineMs });
+    }
+    const scoreEl = resultSlot!.querySelector<HTMLElement>(
+      "[data-daylist-score]",
+    );
+    if (scoreEl) {
+      scoreEl.dataset.value = "0";
+      rollTo(scoreEl, score, { ms: CAMERA_MS + lineMs + BOX_MS });
+    }
+
+    lineT = 0;
+    boxT = 0;
+    map!.redraw();
+    syncMapControls(map!);
+    await map!.fit(answerBox(), { animate: true, ms: CAMERA_MS });
+    if (mine !== generation) return;
+
+    playReveal(lineMs, mine, () => {
+      revealing = false;
+      fillIn();
+      map!.redraw();
+      syncMapControls(map!);
+    });
   }
 
   lockBtn.addEventListener("click", () => {
     if (done || !pin || month === null) return;
-    save({ day, lines, lat: pin.lat, lon: pin.lon, month });
-    finish(true);
+    void finish(true);
   });
+
+  /* ------------------------------------------------------------ rounds */
+
+  function syncMeta(): void {
+    if (!metaEl) return;
+    if (mode === "daily") {
+      metaEl.textContent = DATE_LONG.format(new Date());
+      return;
+    }
+    const at = Math.max(1, extra.played.indexOf(round.placeId) + 1);
+    metaEl.textContent = `List ${at} of ${EXTRA_PER_DAY} today`;
+  }
+
+  /** Put a round on the board, as far along as `progress` says. */
+  function loadRound(next: Round, progress: Progress | null): void {
+    generation++;
+    revealing = false;
+    round = next;
+    lines = clamp(progress?.lines ?? 1, 1, next.clues.length);
+    shown = lines;
+    pin =
+      progress && isNum(progress.lat) && isNum(progress.lon)
+        ? { lat: progress.lat, lon: progress.lon }
+        : null;
+    month = progress && isNum(progress.month) ? progress.month : null;
+    done = false;
+    lineT = 1;
+    boxT = 1;
+
+    surface!.classList.remove("is-done");
+    surface!.classList.toggle("is-placed", Boolean(pin));
+    surface!.setAttribute("aria-label", MAP_LABEL);
+    monthInputs.forEach((input) => {
+      input.checked = month !== null && Number(input.value) === month;
+    });
+    guessPanel!.hidden = false;
+    resultSlot!.hidden = true;
+    resultSlot!.innerHTML = "";
+    if (rollSlot) rollSlot.innerHTML = "";
+    if (announce) announce.textContent = "";
+    // A new round's ceiling is set, not counted down from the last one's.
+    if (worthEl) delete worthEl.dataset.value;
+    for (let i = 0; i < slots.length; i++) paintSlot(i);
+    describeGuess();
+    syncLock();
+    syncWorth();
+    syncMeta();
+    void map!.reset(false);
+
+    if (progress?.done && pin && month !== null) void finish(false);
+    else preloadNext();
+  }
+
+  /** Deal the next extra list, if today's ten aren't used up. */
+  function startExtra(scroll: boolean): void {
+    if (!extraPool?.length) return;
+    if (extra.played.length >= EXTRA_PER_DAY) return;
+    const id = pickExtra(
+      extraPool.map((r) => r.placeId),
+      extra.seen,
+    );
+    extra.seen = [...extra.seen.filter((x) => x !== id), id];
+    extra.played = [...extra.played, id];
+    extra.current = { placeId: id, lines: 1, done: false };
+    writeStore(EXTRA_KEY, extra);
+    const next = extraPool.find((r) => r.placeId === id);
+    if (!next) return;
+    loadRound(next, extra.current);
+    if (scroll) {
+      board?.scrollIntoView({
+        block: "start",
+        behavior: prefersReducedMotion() ? "auto" : "smooth",
+      });
+    }
+  }
+
+  /** The tabs, the board's title and the URL say which list this is. */
+  function showMode(next: Mode, fromUser: boolean): void {
+    modes
+      ?.querySelectorAll<HTMLElement>('[role="radio"]')
+      .forEach((option) =>
+        option.setAttribute(
+          "aria-checked",
+          String(option.dataset.value === next),
+        ),
+      );
+    if (titleEl) {
+      titleEl.textContent = next === "daily" ? "Today's list" : "More lists";
+    }
+    if (fromUser) {
+      const url = `${location.pathname}${location.search}${
+        next === "extra" ? "#more-lists" : ""
+      }`;
+      history.replaceState(history.state, "", url);
+    }
+  }
+
+  /**
+   * While More lists loads, the board can't be played. The round on it still
+   * belongs to the old mode, so a tap or a lock-in then would be saved to
+   * the wrong list.
+   */
+  function setBusy(busy: boolean): void {
+    tray!.inert = busy;
+    if (playArea) playArea.inert = busy;
+    board?.classList.toggle("is-loading", busy);
+  }
+
+  // The mode asked for last. `mode` changes only once that mode's round is on
+  // the board, so the two differ while More lists loads.
+  let wanted: Mode = "daily";
+  let switching = 0;
+
+  async function setMode(next: Mode, fromUser: boolean): Promise<void> {
+    const ticket = ++switching;
+    wanted = next;
+    showMode(next, fromUser);
+
+    if (next === "daily") {
+      setBusy(false);
+      mode = "daily";
+      loadRound(daily, readDaily(readStore(DAILY_KEY), day));
+      return;
+    }
+
+    if (!extraPool) {
+      setBusy(true);
+      if (metaEl) metaEl.textContent = "Loading more lists...";
+      try {
+        const data = await import("./day-list-extra.json");
+        extraPool = (data.default as { rounds: Round[] }).rounds;
+      } catch {
+        if (ticket !== switching) return;
+        // Back to today's list, which is always there. A list that won't
+        // load is usually a deploy that replaced it, so a reload fixes it.
+        await setMode("daily", fromUser);
+        if (metaEl) {
+          metaEl.textContent =
+            "More lists didn't load. Reload the page to try again.";
+        }
+        return;
+      }
+      if (ticket !== switching) return;
+      setBusy(false);
+    }
+
+    mode = "extra";
+    extra = readExtra(readStore(EXTRA_KEY), day);
+    const current = extra.current
+      ? extraPool.find((r) => r.placeId === extra.current!.placeId)
+      : undefined;
+    if (current && extra.current) {
+      loadRound(current, extra.current);
+    } else if (extra.played.length < EXTRA_PER_DAY) {
+      startExtra(false);
+    } else {
+      // Ten played but none to show, which only a cleared or edited store
+      // can cause. Today's list is still there to play.
+      await setMode("daily", false);
+      if (metaEl) metaEl.textContent = "That's all ten more lists for today";
+      return;
+    }
+    if (fromUser) {
+      board?.scrollIntoView({
+        block: "start",
+        behavior: prefersReducedMotion() ? "auto" : "smooth",
+      });
+    }
+  }
+
+  if (modes) {
+    initUnderlineTabs(modes);
+    modes.addEventListener("utabs:change", (event) => {
+      const value = (event as CustomEvent<string>).detail;
+      const next: Mode = value === "extra" ? "extra" : "daily";
+      if (next !== wanted) void setMode(next, true);
+    });
+  }
 
   /* ---------------------------------------------------------------- boot */
 
-  if (dateEl) dateEl.textContent = DATE_LONG.format(new Date());
-
-  // Browsers can restore a radio's checked state on reload; the engine's
-  // state is the one that counts.
-  monthInputs.forEach((input) => {
-    input.checked = month !== null && Number(input.value) === month;
-  });
-  if (pin) mapWrap.classList.add("is-placed");
-
-  for (let i = 0; i < total; i++) paintSlot(i);
-  describeGuess();
-  syncLock();
-  syncWorth();
-
-  if (typeof ResizeObserver !== "undefined") {
-    new ResizeObserver(resize).observe(mapWrap);
-  } else {
-    window.addEventListener("resize", resize);
-  }
-  resize();
-
-  // Re-draw on theme change so the map follows the palette.
-  new MutationObserver(drawMap).observe(document.documentElement, {
-    attributes: true,
-    attributeFilter: ["class"],
-  });
-
-  if (restored) finish(false);
-  else preloadNext();
+  void setMode(location.hash === "#more-lists" ? "extra" : "daily", false);
 }

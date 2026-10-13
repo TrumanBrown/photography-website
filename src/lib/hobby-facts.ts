@@ -29,6 +29,6 @@ export function hobbyFacts(entry: Hobby): string | undefined {
     case "pixel-hike":
       return "Ends in a postcard";
   }
-  if (dayList) return "New list every day";
+  if (dayList) return "New list every day · 10 more a day";
   return undefined;
 }

@@ -50,12 +50,35 @@ const MONTHS = [
     <ol class="dl-steps" role="list">
       {STEPS.map((step) => <li>{step}</li>)}
     </ol>
+    <p class="dl-how-note">
+      Today's list is the same for everyone and changes each day. More lists
+      gives you ten others a day, from places the daily list never uses.
+    </p>
   </section>
 
-  <section class="dl-board" aria-labelledby="dl-board-title">
-    <div class="shead">
-      <h2 id="dl-board-title">{heading}</h2>
-      <p class="dl-date" data-daylist-date></p>
+  <section class="dl-board" aria-labelledby="dl-board-title" data-daylist-board>
+    <h2 class="dl-sr" id="dl-board-title" data-daylist-title>{heading}</h2>
+    <div class="dl-boardhead">
+      <div
+        class="utabs dl-modes"
+        role="radiogroup"
+        aria-label="Which list"
+        data-daylist-modes
+      >
+        <button
+          type="button"
+          role="radio"
+          aria-checked="true"
+          data-value="daily">{heading}</button
+        >
+        <button
+          type="button"
+          role="radio"
+          aria-checked="false"
+          data-value="extra">More lists</button
+        >
+      </div>
+      <p class="dl-date" data-daylist-meta></p>
     </div>
 
     <div class="dl-axis" aria-hidden="true">
@@ -70,16 +93,36 @@ const MONTHS = [
     </ol>
     <p class="dl-sr" aria-live="polite" data-daylist-announce></p>
 
-    <div class="dl-play">
-      <div
-        class="dl-mapwrap"
-        data-daylist-mapwrap
-        tabindex="0"
-        role="application"
-        aria-label="World map. Tap where you think the six species were seen. Arrow keys move the pin."
-      >
-        <canvas data-daylist-map></canvas>
+    <div class="dl-play" data-daylist-play>
+      <div class="dl-mapbox">
+        <div
+          class="dl-mapwrap"
+          data-daylist-mapwrap
+          tabindex="0"
+          role="application"
+          aria-label="World map. Tap where you think the six species were seen. Arrow keys move the pin, plus and minus zoom."
+        >
+          <canvas data-daylist-map></canvas>
+        </div>
         <p class="dl-maphint" aria-hidden="true">Tap the map to drop a pin</p>
+        <div class="dl-scale" data-daylist-scale aria-hidden="true" hidden>
+          <i></i><span></span>
+        </div>
+        <div class="dl-zoom" role="group" aria-label="Zoom">
+          <button type="button" data-daylist-zoom="in" aria-label="Zoom in"
+            >+</button
+          >
+          <button
+            type="button"
+            data-daylist-zoom="out"
+            aria-label="Zoom out"
+            disabled>&minus;</button
+          >
+        </div>
+        <button type="button" class="dl-mapbtn" data-daylist-view hidden
+          >Whole world</button
+        >
+        <p class="dl-wheelhint" data-daylist-wheelhint aria-hidden="true"></p>
       </div>
 
       <div class="dl-panel">
@@ -135,8 +178,8 @@ const MONTHS = [
     how often something gets logged worldwide, which follows where people go
     looking as much as where the animal lives. The full list flags introduced
     and endemic species, because a kookaburra in Tasmania is a very different
-    clue once you know it was put there. Data from iNaturalist, photos credited
-    to whoever took them.
+    clue once you know it was put there. Data from iNaturalist, terrain from
+    Natural Earth, photos credited to whoever took them.
   </p>
 </div>
 
@@ -199,17 +242,45 @@ const MONTHS = [
     color: var(--ink-2);
     font-variant-numeric: tabular-nums;
   }
+  .dl-how-note {
+    margin: 16px 0 0 2rem;
+    max-width: 60ch;
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--ink-3);
+  }
 
   /* ---------------- board ---------------- */
   .dl-board {
     margin-top: 44px;
     padding-top: 18px;
     border-top: 1px solid var(--rule);
+    scroll-margin-top: 16px;
+  }
+  .dl-boardhead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 6px 16px;
+  }
+  /* The two modes are the board's title: Cult UI direction-aware-tabs at
+     heading size, one ink bar sliding between them (src/lib/motion.ts). */
+  .dl .dl-modes {
+    gap: 26px;
+  }
+  .dl .dl-modes > [role="radio"] {
+    min-height: 40px;
+    padding: 4px 0 8px;
+    font-size: 19px;
+    font-weight: 300;
+    line-height: 1.25;
   }
   .dl-date {
-    margin: 0;
+    margin: 0 0 9px;
     font-size: 12px;
     color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
   }
 
   /* Says why the order matters, right where the order is. */
@@ -375,6 +446,11 @@ const MONTHS = [
   }
 
   /* ---------------- map and guess ---------------- */
+  /* More lists loading: the board can't be played (it's inert), and looks it. */
+  .dl-board.is-loading .dl-tray,
+  .dl-board.is-loading .dl-play {
+    opacity: 0.45;
+  }
   .dl-play {
     margin-top: 28px;
     display: grid;
@@ -388,15 +464,32 @@ const MONTHS = [
     }
   }
 
+  .dl-mapbox {
+    position: relative;
+  }
   .dl-mapwrap {
     position: relative;
     aspect-ratio: 2 / 1;
     border: 1px solid var(--rule);
     cursor: crosshair;
-    touch-action: manipulation;
+    /* The map module sets pan-y at world view and none once zoomed in. */
+    touch-action: pan-y;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .dl-mapwrap.is-zoomed {
+    cursor: grab;
   }
   .dl-mapwrap.is-done {
     cursor: default;
+  }
+  .dl-mapwrap.is-done.is-zoomed {
+    cursor: grab;
+  }
+  .dl-mapwrap.is-panning,
+  .dl-mapwrap.is-done.is-panning {
+    cursor: grabbing;
   }
   .dl-mapwrap canvas {
     display: block;
@@ -416,9 +509,130 @@ const MONTHS = [
     pointer-events: none;
     transition: opacity 250ms var(--ease);
   }
-  .dl-mapwrap.is-placed .dl-maphint,
-  .dl-mapwrap.is-done .dl-maphint {
+  .dl-mapwrap.is-placed ~ .dl-maphint,
+  .dl-mapwrap.is-zoomed ~ .dl-maphint,
+  .dl-mapwrap.is-done ~ .dl-maphint {
     opacity: 0;
+  }
+
+  /* Map controls sit over the map but outside it, so pressing one is never a
+     tap on the map. */
+  .dl-zoom {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: grid;
+  }
+  .dl-zoom button,
+  .dl-mapbtn {
+    border: 1px solid var(--rule);
+    background: color-mix(in srgb, var(--paper) 90%, transparent);
+    color: var(--ink);
+    font: inherit;
+    cursor: pointer;
+    transition:
+      background-color 150ms var(--ease),
+      border-color 150ms var(--ease);
+  }
+  .dl-zoom button {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    font-size: 18px;
+    line-height: 1;
+  }
+  .dl-zoom button + button {
+    border-top: 0;
+  }
+  .dl-zoom button:hover:not(:disabled),
+  .dl-mapbtn:hover {
+    background: var(--hover);
+    border-color: var(--ink-2);
+  }
+  .dl-zoom button:disabled {
+    color: var(--ink-2);
+    cursor: default;
+  }
+  .dl-mapbtn {
+    position: absolute;
+    right: 8px;
+    bottom: 8px;
+    min-height: 32px;
+    padding: 4px 10px;
+    font-size: 12px;
+  }
+  @media (pointer: coarse) {
+    .dl-zoom button {
+      width: 40px;
+      height: 40px;
+    }
+    .dl-mapbtn {
+      min-height: 40px;
+    }
+  }
+  /* A phone's map is only ~195px tall, so the controls go flush to the edge
+     and stay small. 36px is still a comfortable thumb. */
+  @media (max-width: 639px) {
+    .dl-zoom {
+      top: 0;
+      right: 0;
+    }
+    .dl-zoom button {
+      width: 36px;
+      height: 36px;
+    }
+    .dl-mapbtn {
+      right: 0;
+      bottom: 0;
+      min-height: 36px;
+    }
+    .dl-scale,
+    .dl-maphint {
+      left: 6px;
+      bottom: 6px;
+    }
+  }
+
+  /* A scale bar for the latitude in the middle of the view: a hairline with
+     end ticks and a round distance under it. */
+  .dl-scale {
+    position: absolute;
+    left: 8px;
+    bottom: 8px;
+    display: grid;
+    gap: 3px;
+    padding: 4px 6px 3px;
+    background: color-mix(in srgb, var(--paper) 80%, transparent);
+    font-size: 11px;
+    line-height: 1;
+    color: var(--ink-3);
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+  }
+  .dl-scale i {
+    display: block;
+    height: 5px;
+    border: 1px solid var(--ink-2);
+    border-top: 0;
+  }
+
+  .dl-wheelhint {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    margin: 0;
+    background: color-mix(in srgb, var(--paper) 60%, transparent);
+    font-size: 14px;
+    color: var(--ink);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 200ms var(--ease);
+  }
+  .dl-wheelhint.is-on {
+    opacity: 1;
   }
 
   .dl-guess,
@@ -723,13 +937,27 @@ const MONTHS = [
     .dl-slot__cost {
       font-size: 11px;
     }
+    /* Edge to edge on a phone, where every pixel of width is more map. The
+       hobby page pads the article by 16px at this size (px-4). */
+    .dl-mapbox {
+      margin-inline: -16px;
+    }
+    .dl-mapwrap {
+      border-inline: 0;
+    }
+    .dl-how-note {
+      margin-left: 1.6rem;
+    }
   }
 
   @media (prefers-reduced-motion: reduce) {
     .dl-slot__pic img,
     .dl-slot__next,
     .dl-maphint,
-    .dl-month__cell {
+    .dl-month__cell,
+    .dl-zoom button,
+    .dl-mapbtn,
+    .dl-wheelhint {
       transition: none;
     }
     .dl-slot.is-new .dl-slot__body {

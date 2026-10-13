@@ -17,7 +17,10 @@
  *  - Each species is labelled native / introduced / endemic *for that place*,
  *    taken from iNaturalist's own establishment means. This matters: a
  *    Buff-tailed Bumble Bee in Tasmania is introduced, and presenting it as a
- *    native indicator would be wrong.
+ *    native indicator would be wrong. iNaturalist flags each record against
+ *    every place that contains it, and a stray listing somewhere (a user-made
+ *    place that calls Mallards introduced) shouldn't outvote the rest. So the
+ *    label goes with the majority of the place's own flagged records.
  *  - Facts come from the taxon's Wikipedia summary and ship with the article
  *    link so a player can check them.
  *  - Photos are openly licensed only, and the licence and photographer travel
@@ -26,13 +29,29 @@
  *  - Clue ordering uses worldwide iNaturalist observation counts. That is a
  *    measure of how often a species is *recorded*, not how widespread it is,
  *    and the UI says so rather than implying range.
+ *
+ * Two sets come out of this. PLACES is the daily rotation, one list a day for
+ * everyone. EXTRA_PLACES feeds "More lists", up to ten a day per player. They
+ * never share a place, so playing extras can't spoil a future daily list.
+ *
+ *   npm run build:day-list                      daily set -> day-list.json
+ *   npm run build:day-list -- --extra           extras -> day-list-extra.json
+ *   npm run build:day-list -- --retag [--extra] refresh the native/introduced
+ *                                               labels only, same species
  */
-import { writeFileSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const OUT = join(root, "src/lib/hobbies/day-list.json");
+const EXTRA = process.argv.includes("--extra");
+const RETAG = process.argv.includes("--retag");
+const OUT = join(
+  root,
+  EXTRA
+    ? "src/lib/hobbies/day-list-extra.json"
+    : "src/lib/hobbies/day-list.json",
+);
 
 const UA = {
   "User-Agent": "trumanbrown.com day-list builder (+https://trumanbrown.com)",
@@ -229,6 +248,290 @@ const PLACES = [
 ];
 
 /**
+ * The "More lists" pool, resolved with
+ * `node scripts/resolve-day-list-places.mjs --extra`. Same rules as PLACES:
+ * the month is the place's busiest for research-grade records. Places right
+ * next to a daily one (Jasper beside Banff, Hawaii Volcanoes beside Haleakala)
+ * are left out, because their lists would give that daily away.
+ */
+const EXTRA_PLACES = [
+  // North America
+  {
+    id: 49610,
+    month: 7,
+    label: "Acadia National Park",
+    region: "Maine, United States",
+  },
+  {
+    id: 69216,
+    month: 5,
+    label: "Grand Canyon National Park",
+    region: "Arizona, United States",
+  },
+  {
+    id: 50634,
+    month: 5,
+    label: "Zion National Park",
+    region: "Utah, United States",
+  },
+  {
+    id: 49676,
+    month: 7,
+    label: "Rocky Mountain National Park",
+    region: "Colorado, United States",
+  },
+  {
+    id: 68542,
+    month: 6,
+    label: "Yosemite National Park",
+    region: "California, United States",
+  },
+  {
+    id: 3157,
+    month: 4,
+    label: "Channel Islands National Park",
+    region: "California, United States",
+  },
+  {
+    id: 4504,
+    month: 3,
+    label: "Death Valley National Park",
+    region: "California, United States",
+  },
+  {
+    id: 9012,
+    month: 7,
+    label: "Shenandoah National Park",
+    region: "Virginia, United States",
+  },
+  {
+    id: 95121,
+    month: 8,
+    label: "Cape Cod National Seashore",
+    region: "Massachusetts, United States",
+  },
+  {
+    id: 72841,
+    month: 7,
+    label: "Glacier National Park",
+    region: "Montana, United States",
+  },
+  {
+    id: 112932,
+    month: 5,
+    label: "Point Pelee National Park",
+    region: "Ontario, Canada",
+  },
+  {
+    id: 68850,
+    month: 5,
+    label: "Pacific Rim National Park",
+    region: "British Columbia, Canada",
+  },
+  {
+    id: 95245,
+    month: 6,
+    label: "Isle Royale",
+    region: "Michigan, United States",
+  },
+  {
+    id: 119523,
+    month: 3,
+    label: "The Okefenokee Swamp",
+    region: "Georgia, United States",
+  },
+  {
+    id: 119590,
+    month: 11,
+    label: "Santa Ana Wildlife Refuge",
+    region: "Texas, United States",
+  },
+  {
+    id: 95300,
+    month: 5,
+    label: "Padre Island",
+    region: "Texas, United States",
+  },
+
+  // Latin America
+  { id: 118509, month: 7, label: "Monteverde", region: "Costa Rica" },
+  {
+    id: 68640,
+    month: 1,
+    label: "Corcovado National Park",
+    region: "Costa Rica",
+  },
+  { id: 54190, month: 2, label: "Sian Ka'an", region: "Quintana Roo, Mexico" },
+  { id: 68655, month: 1, label: "Tikal", region: "Guatemala" },
+  {
+    id: 68566,
+    month: 10,
+    label: "Iguazú National Park",
+    region: "Misiones, Argentina",
+  },
+  {
+    id: 126436,
+    month: 2,
+    label: "Tijuca National Park",
+    region: "Rio de Janeiro, Brazil",
+  },
+  {
+    id: 233255,
+    month: 10,
+    label: "Itatiaia National Park",
+    region: "Rio de Janeiro, Brazil",
+  },
+  { id: 68650, month: 3, label: "Yasuní National Park", region: "Ecuador" },
+  { id: 64055, month: 8, label: "The Pantanal", region: "Brazil" },
+  {
+    id: 131713,
+    month: 11,
+    label: "Península Valdés",
+    region: "Patagonia, Argentina",
+  },
+
+  // Europe
+  {
+    id: 81743,
+    month: 8,
+    label: "The New Forest",
+    region: "Hampshire, England",
+  },
+  {
+    id: 163159,
+    month: 7,
+    label: "The Lake District",
+    region: "Cumbria, England",
+  },
+  { id: 174739, month: 7, label: "Picos de Europa", region: "Spain" },
+  {
+    id: 108268,
+    month: 3,
+    label: "The western Canary Islands",
+    region: "Spain",
+  },
+  { id: 7291, month: 4, label: "Madeira", region: "Portugal" },
+  {
+    id: 184355,
+    month: 7,
+    label: "The Swiss National Park",
+    region: "Switzerland",
+  },
+  {
+    id: 153340,
+    month: 7,
+    label: "Gran Paradiso",
+    region: "Aosta Valley, Italy",
+  },
+  { id: 68877, month: 9, label: "The Bavarian Forest", region: "Germany" },
+  { id: 119785, month: 5, label: "The Biebrza Marshes", region: "Poland" },
+  { id: 68886, month: 6, label: "Hortobágy", region: "Hungary" },
+  { id: 163585, month: 4, label: "Lesbos", region: "Greece" },
+  { id: 7095, month: 4, label: "Crete", region: "Greece" },
+  { id: 195476, month: 7, label: "Lofoten", region: "Norway" },
+  { id: 69050, month: 7, label: "Abisko", region: "Swedish Lapland" },
+
+  // Africa
+  {
+    id: 69891,
+    month: 7,
+    label: "Bwindi Impenetrable Forest",
+    region: "Uganda",
+  },
+  { id: 68929, month: 8, label: "Amboseli", region: "Kenya" },
+  { id: 219297, month: 8, label: "Lake Nakuru", region: "Kenya" },
+  { id: 69134, month: 7, label: "South Luangwa", region: "Zambia" },
+  { id: 69215, month: 8, label: "Hwange National Park", region: "Zimbabwe" },
+  {
+    id: 71275,
+    month: 7,
+    label: "Hluhluwe-iMfolozi Park",
+    region: "KwaZulu-Natal, South Africa",
+  },
+  {
+    id: 69021,
+    month: 9,
+    label: "Kgalagadi Transfrontier Park",
+    region: "South Africa and Botswana",
+  },
+  { id: 8357, month: 4, label: "Mauritius", region: "Indian Ocean" },
+
+  // Asia
+  { id: 69667, month: 3, label: "Chitwan National Park", region: "Nepal" },
+  { id: 68897, month: 11, label: "Kaziranga", region: "Assam, India" },
+  { id: 69064, month: 1, label: "Khao Yai", region: "Thailand" },
+  { id: 69072, month: 2, label: "Doi Inthanon", region: "Thailand" },
+  { id: 68946, month: 3, label: "Taman Negara", region: "Malaysia" },
+  {
+    id: 131153,
+    month: 8,
+    label: "Bako National Park",
+    region: "Sarawak, Borneo",
+  },
+  { id: 191493, month: 10, label: "Danum Valley", region: "Sabah, Borneo" },
+  { id: 69569, month: 5, label: "Yangmingshan", region: "Taiwan" },
+  { id: 69587, month: 7, label: "Taroko Gorge", region: "Taiwan" },
+  { id: 11003, month: 7, label: "Jeju Island", region: "South Korea" },
+
+  // Australia and the Pacific
+  {
+    id: 68745,
+    month: 9,
+    label: "The Daintree",
+    region: "Queensland, Australia",
+  },
+  {
+    id: 51506,
+    month: 10,
+    label: "Lamington National Park",
+    region: "Queensland, Australia",
+  },
+  { id: 131698, month: 6, label: "K'gari", region: "Queensland, Australia" },
+  {
+    id: 48996,
+    month: 10,
+    label: "The Blue Mountains",
+    region: "New South Wales, Australia",
+  },
+  {
+    id: 196253,
+    month: 1,
+    label: "Kosciuszko National Park",
+    region: "New South Wales, Australia",
+  },
+  { id: 19271, month: 10, label: "Kangaroo Island", region: "South Australia" },
+  {
+    id: 72050,
+    month: 9,
+    label: "Uluru-Kata Tjuta",
+    region: "Northern Territory, Australia",
+  },
+  {
+    id: 18651,
+    month: 2,
+    label: "Lord Howe Island",
+    region: "Tasman Sea, Australia",
+  },
+  {
+    id: 131030,
+    month: 1,
+    label: "Tongariro National Park",
+    region: "New Zealand",
+  },
+  { id: 89730, month: 1, label: "Fiordland", region: "New Zealand" },
+];
+
+{
+  const daily = new Set(PLACES.map((p) => p.id));
+  const shared = EXTRA_PLACES.filter((p) => daily.has(p.id));
+  if (shared.length) {
+    throw new Error(
+      `Daily and extra sets share ${shared.map((p) => p.label).join(", ")}; an extra list would spoil a daily one.`,
+    );
+  }
+}
+
+/**
  * A full build is well over a thousand requests, so a dropped socket or a
  * momentary 503 is a matter of when, not if. Retry with a widening pause rather
  * than throwing away twenty minutes of work.
@@ -340,22 +643,68 @@ function bboxOf(place) {
   };
 }
 
-/** Every taxon id in a place that iNaturalist flags with this status. */
-async function statusSet(placeId, flag) {
-  const ids = new Set();
-  for (let page = 1; page <= 3; page++) {
-    const data = await api("observations/species_counts", {
-      place_id: String(placeId),
-      quality_grade: "research",
-      per_page: "500",
-      page: String(page),
-      [flag]: "true",
-    });
-    for (const row of data.results || []) ids.add(row.taxon.id);
-    await sleep(THROTTLE);
-    if ((data.results || []).length < 500) break;
+/** Research-grade records of these taxa in a place that carry `flag`. */
+async function flaggedCounts(placeId, ids, flag) {
+  const data = await api("observations/species_counts", {
+    place_id: String(placeId),
+    taxon_id: ids.join(","),
+    quality_grade: "research",
+    per_page: String(Math.max(ids.length * 2, 20)),
+    [flag]: "true",
+  });
+  await sleep(THROTTLE);
+  const counts = new Map();
+  for (const row of data.results || []) counts.set(row.taxon.id, row.count);
+  return counts;
+}
+
+/**
+ * Share of a taxon's research-grade records, worldwide, flagged endemic.
+ * A listing on one island can call a widespread species endemic because of a
+ * local subspecies: Grey Wagtail on Madeira, Eurasian Kestrel on the Canaries.
+ * Their worldwide share is 1-2%. Real endemics sit between 66% (Red-necked
+ * Wallaby, which has been introduced abroad) and 100% (Olympic Marmot).
+ */
+async function endemicShare(id) {
+  const all = await api("observations", {
+    taxon_id: String(id),
+    quality_grade: "research",
+    per_page: "0",
+  });
+  await sleep(THROTTLE);
+  const flagged = await api("observations", {
+    taxon_id: String(id),
+    quality_grade: "research",
+    endemic: "true",
+    per_page: "0",
+  });
+  await sleep(THROTTLE);
+  return all.total_results ? flagged.total_results / all.total_results : 0;
+}
+
+/**
+ * Native, introduced or endemic for each taxon, by majority of the place's
+ * own flagged records. 175 native Mallard records in the Danube Delta outvote
+ * the 3 that a stray listing calls introduced; all 11 Kookaburra records at
+ * Cradle Mountain are introduced, because Tasmania lists them that way. An
+ * endemic label also has to hold worldwide (see endemicShare).
+ */
+async function standings(placeId, ids) {
+  const introduced = await flaggedCounts(placeId, ids, "introduced");
+  const native = await flaggedCounts(placeId, ids, "native");
+  const endemic = await flaggedCounts(placeId, ids, "endemic");
+  const out = new Map();
+  for (const id of ids) {
+    const i = introduced.get(id) || 0;
+    const n = native.get(id) || 0;
+    const e = endemic.get(id) || 0;
+    let label = i > n ? "introduced" : "native";
+    if (label === "native" && e > 0 && e * 2 >= n) {
+      label = (await endemicShare(id)) >= 0.5 ? "endemic" : "native";
+    }
+    out.set(id, label);
   }
-  return ids;
+  return out;
 }
 
 /**
@@ -393,11 +742,12 @@ function animalFirst(a, b) {
 }
 
 /**
- * Fetches the fact, citation, credited photo and local standing for a species.
- * Returns null when the species has no openly-licensed photo, so the caller can
- * try the next candidate in the same band.
+ * Fetches the fact, citation and credited photo for a species. Returns null
+ * when the species has no openly-licensed photo, so the caller can try the
+ * next candidate in the same band. Standing is filled in once all six are
+ * picked (see standings()).
  */
-async function enrich(clue, { introduced, endemic }) {
+async function enrich(clue) {
   let taxon;
   try {
     const data = await api(`taxa/${clue.id}`, { locale: "en" });
@@ -418,11 +768,7 @@ async function enrich(clue, { introduced, endemic }) {
     group: clue.group,
     global: clue.global,
     local: clue.local,
-    standing: endemic.has(clue.id)
-      ? "endemic"
-      : introduced.has(clue.id)
-        ? "introduced"
-        : "native",
+    standing: "native",
     fact: firstSentences(taxon.wikipedia_summary),
     wiki: wikiUrl(taxon.wikipedia_url),
     rank: taxon.conservation_status
@@ -440,7 +786,7 @@ async function enrich(clue, { introduced, endemic }) {
  * enrichment inside the pick (rather than picking first and enriching after)
  * means a species with no usable photo costs a request, not a whole round.
  */
-async function buildClues(list, status) {
+async function buildClues(list) {
   const sorted = list.slice().sort((a, b) => b.global - a.global);
   const used = new Set();
   const picked = [];
@@ -460,7 +806,7 @@ async function buildClues(list, status) {
       });
 
     for (const candidate of inBand.slice(0, TRIES_PER_BAND)) {
-      const clue = await enrich(candidate, status);
+      const clue = await enrich(candidate);
       if (clue) {
         used.add(candidate.id);
         picked.push(clue);
@@ -485,7 +831,7 @@ async function buildClues(list, status) {
     if (used.has(candidate.id)) continue;
     if (BOTANICAL.has(candidate.group) && botanical >= MAX_BOTANICAL_PER_ROUND)
       continue;
-    const clue = await enrich(candidate, status);
+    const clue = await enrich(candidate);
     if (clue) {
       used.add(candidate.id);
       picked.push(clue);
@@ -497,10 +843,35 @@ async function buildClues(list, status) {
   return picked.length === 6 ? picked : null;
 }
 
+/**
+ * --retag: keep every round's species, refresh only the native / introduced /
+ * endemic labels. Safe to run on the live set mid-day, because nothing a
+ * player has already guessed against changes.
+ */
+if (RETAG) {
+  const set = JSON.parse(readFileSync(OUT, "utf8"));
+  let changed = 0;
+  for (const round of set.rounds) {
+    const ids = round.clues.map((c) => c.id);
+    const labels = await standings(round.placeId, ids);
+    for (const clue of round.clues) {
+      const next = labels.get(clue.id) || "native";
+      if (next !== clue.standing) {
+        console.log(`${round.name}: ${clue.name} ${clue.standing} -> ${next}`);
+        clue.standing = next;
+        changed++;
+      }
+    }
+  }
+  writeFileSync(OUT, `${JSON.stringify(set, null, 2)}\n`);
+  console.log(`\nRelabelled ${changed} species in ${OUT}.`);
+  process.exit(0);
+}
+
 const rounds = [];
 const problems = [];
 
-for (const entry of PLACES) {
+for (const entry of EXTRA ? EXTRA_PLACES : PLACES) {
   let place;
   try {
     const data = await api(`places/${entry.id}`);
@@ -556,10 +927,7 @@ for (const entry of PLACES) {
   }
   await sleep(THROTTLE);
 
-  const introduced = await statusSet(entry.id, "introduced");
-  const endemic = await statusSet(entry.id, "endemic");
-
-  const enriched = await buildClues(candidates, { introduced, endemic });
+  const enriched = await buildClues(candidates);
   if (enriched && enriched[0].global < 120000) {
     // Without a genuinely cosmopolitan opener the puzzle starts half-solved.
     problems.push(
@@ -573,6 +941,11 @@ for (const entry of PLACES) {
     );
     continue;
   }
+  const labels = await standings(
+    entry.id,
+    enriched.map((c) => c.id),
+  );
+  for (const clue of enriched) clue.standing = labels.get(clue.id) || "native";
 
   rounds.push({
     placeId: entry.id,

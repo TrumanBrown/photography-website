@@ -21,26 +21,27 @@ npm ci            # exact dependency install from package-lock.json
 
 ## Common commands
 
-| Command | What it does |
-|---|---|
-| `npm run dev` | Astro dev server with hot reload on http://localhost:4321 |
-| `npm run build` | Production build into `dist/` (copies the Birding WASM runtime and checks CSP hashes first) |
-| `npm run preview` | Serve `dist/` locally (mimics SWA) |
-| `npm run check` | Verify inline CSP hashes, then type-check Astro + content schemas |
-| `npm run check:csp` | Verify the three inline scripts (two theme scripts, the lead-photo chooser) match `staticwebapp.config.json` |
-| `npm test` | Run the Vitest suite: site helpers, API functions, prebuild validation, session/date logic, Blob/HTML helpers, hobby engines, and the photo + social pipelines |
-| `npm run test:watch` | Same suite in watch mode while developing |
-| `npm run lint` | ESLint over the whole repo (blocking in CI) |
-| `npm run fixtures` | Generate two synthetic sessions in `src/content/sessions/` |
-| `npm run fixtures:many` | Generate ~40 synthetic sessions across 5 years (great for testing the sidebar at scale) |
-| `npm run prebuild:remote` | Sync sessions from real Blob Storage (needs `AZURE_STORAGE_ACCOUNT` env and `az login`) |
-| `npm run prebuild:local` | Run prebuild in local-only mode; auto-seeds fixtures if no sessions exist |
-| `npm run photos -- <command>` | Photo caption pipeline: `status`, `preview`, `redo`, `redescribe` ([photos.md](photos.md#day-to-day)) |
-| `npm run social -- <command>` | Instagram plan: `status`, `preview`, `skip`, `approve`, `retry` ([social.md](social.md#day-to-day)) |
-| `npm run fetch:tidepool-photos`, `npm run fetch:herping-photos` | Refresh the CC-licensed reveal-card photos ([hobbies.md](hobbies.md)) |
-| `npm run build:herp-geo`, `npm run build:day-list` | Regenerate the committed herping map geometry and Day list puzzle data |
-| `npm run format` | Prettier write |
-| `npm run format:check` | Prettier check (currently advisory in CI) |
+| Command                                                         | What it does                                                                                                                                                   |
+| --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run dev`                                                   | Astro dev server with hot reload on http://localhost:4321                                                                                                      |
+| `npm run build`                                                 | Production build into `dist/` (copies the Birding WASM runtime and checks CSP hashes first)                                                                    |
+| `npm run preview`                                               | Serve `dist/` locally (mimics SWA)                                                                                                                             |
+| `npm run check`                                                 | Verify inline CSP hashes, then type-check Astro + content schemas                                                                                              |
+| `npm run check:csp`                                             | Verify the three inline scripts (two theme scripts, the lead-photo chooser) match `staticwebapp.config.json`                                                   |
+| `npm test`                                                      | Run the Vitest suite: site helpers, API functions, prebuild validation, session/date logic, Blob/HTML helpers, hobby engines, and the photo + social pipelines |
+| `npm run test:watch`                                            | Same suite in watch mode while developing                                                                                                                      |
+| `npm run lint`                                                  | ESLint over the whole repo (blocking in CI)                                                                                                                    |
+| `npm run fixtures`                                              | Generate two synthetic sessions in `src/content/sessions/`                                                                                                     |
+| `npm run fixtures:many`                                         | Generate ~40 synthetic sessions across 5 years (great for testing the sidebar at scale)                                                                        |
+| `npm run prebuild:remote`                                       | Sync sessions from real Blob Storage (needs `AZURE_STORAGE_ACCOUNT` env and `az login`)                                                                        |
+| `npm run prebuild:local`                                        | Run prebuild in local-only mode; auto-seeds fixtures if no sessions exist                                                                                      |
+| `npm run photos -- <command>`                                   | Photo caption pipeline: `status`, `preview`, `redo`, `redescribe` ([photos.md](photos.md#day-to-day))                                                          |
+| `npm run social -- <command>`                                   | Instagram plan: `status`, `preview`, `skip`, `approve`, `retry` ([social.md](social.md#day-to-day))                                                            |
+| `npm run fetch:tidepool-photos`, `npm run fetch:herping-photos` | Refresh the CC-licensed reveal-card photos ([hobbies.md](hobbies.md))                                                                                          |
+| `npm run build:herp-geo`, `npm run build:day-list`              | Regenerate the committed herping map geometry and Day list puzzle data (`-- --extra` for More lists, `-- --retag` to refresh native/introduced labels only)    |
+| `npm run build:day-list-relief`                                 | Re-cut the Day list map's terrain tiles from Natural Earth ([hobbies.md](hobbies.md#the-map))                                                                  |
+| `npm run format`                                                | Prettier write                                                                                                                                                 |
+| `npm run format:check`                                          | Prettier check (currently advisory in CI)                                                                                                                      |
 
 ## Workflow you'll actually use day-to-day
 
@@ -60,13 +61,13 @@ The dev server hot-reloads on any file change. Component edits appear instantly;
 
 ## How the local site differs from the live site
 
-| Behavior | Local dev | Production |
-|---|---|---|
-| Image source | Synthetic JPEGs generated by `scripts/generate-fixtures.mjs` | Real photos in Azure Blob |
-| Lightbox full-res URL | The local file path | Direct anonymous Blob URL |
-| First-party analytics API | Disabled, because Astro dev does not host SWA Functions | Active; writes cookieless rows to Table Storage |
-| Security headers | Not enforced by the dev server | Applied by SWA from `staticwebapp.config.json` |
-| HTTPS | No (`http://localhost:4321`) | Yes, forced |
+| Behavior                  | Local dev                                                    | Production                                      |
+| ------------------------- | ------------------------------------------------------------ | ----------------------------------------------- |
+| Image source              | Synthetic JPEGs generated by `scripts/generate-fixtures.mjs` | Real photos in Azure Blob                       |
+| Lightbox full-res URL     | The local file path                                          | Direct anonymous Blob URL                       |
+| First-party analytics API | Disabled, because Astro dev does not host SWA Functions      | Active; writes cookieless rows to Table Storage |
+| Security headers          | Not enforced by the dev server                               | Applied by SWA from `staticwebapp.config.json`  |
+| HTTPS                     | No (`http://localhost:4321`)                                 | Yes, forced                                     |
 
 `npm run preview` serves the production files but does **not** interpret
 `staticwebapp.config.json`; validate deployed SWA headers with the commands in
@@ -130,11 +131,11 @@ The representative local fixtures validate component behavior, but production
 contains many more sessions and photographs. Before a product-facing release:
 
 1. Check the homepage, both local sessions, Hobbies landing/detail pages,
-  Admin's signed-out state, and a missing route at desktop, tablet, and mobile.
+   Admin's signed-out state, and a missing route at desktop, tablet, and mobile.
 2. Confirm the homepage has one H1 and no horizontal overflow.
 3. Confirm only the first card/gallery image has `loading="eager"` and
-  `fetchpriority="high"`; later images remain lazy.
+   `fetchpriority="high"`; later images remain lazy.
 4. Test session/contact drawers and the Admin edit dialog with Tab, Shift+Tab,
-  Escape, and focus restoration.
+   Escape, and focus restoration.
 5. Use production only for representative content/network measurements; local
-  fixtures intentionally contain just two small synthetic sessions.
+   fixtures intentionally contain just two small synthetic sessions.

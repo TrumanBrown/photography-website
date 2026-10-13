@@ -1,7 +1,137 @@
 import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
-import { bestPossible, tidyFact } from "./day-list";
+import {
+  EXTRA_PER_DAY,
+  bestPossible,
+  pickExtra,
+  readDaily,
+  readExtra,
+  scoreGuess,
+  tidyFact,
+  type Round,
+} from "./day-list";
 import puzzles from "./day-list.json";
+import extras from "./day-list-extra.json";
+
+const daily = puzzles.rounds as Round[];
+const extra = extras.rounds as Round[];
+
+describe("the two puzzle sets", () => {
+  it("never share a place, so an extra list can't spoil a daily one", () => {
+    const ids = new Set(daily.map((r) => r.placeId));
+    expect(extra.filter((r) => ids.has(r.placeId))).toEqual([]);
+  });
+
+  it("have six species and a real boundary in every round", () => {
+    for (const round of [...daily, ...extra]) {
+      expect(round.clues).toHaveLength(6);
+      expect(round.bbox.w).toBeLessThanOrEqual(round.bbox.e);
+      expect(round.bbox.s).toBeLessThanOrEqual(round.bbox.n);
+      expect(round.month).toBeGreaterThanOrEqual(1);
+      expect(round.month).toBeLessThanOrEqual(12);
+    }
+  });
+
+  it("hold enough extra places for a week of ten a day", () => {
+    expect(new Set(extra.map((r) => r.placeId)).size).toBeGreaterThanOrEqual(
+      EXTRA_PER_DAY * 6,
+    );
+  });
+});
+
+describe("scoreGuess", () => {
+  const round = { bbox: { w: 10, e: 12, s: 40, n: 42 }, month: 6 };
+
+  it("pays everything for a pin inside the place in the right month", () => {
+    const hit = scoreGuess(round, { lat: 41, lon: 11, month: 5, lines: 1 });
+    expect(hit).toMatchObject({ km: 0, off: 0, score: 6000 });
+    const late = scoreGuess(round, { lat: 41, lon: 11, month: 5, lines: 6 });
+    expect(late.score).toBe(bestPossible(6));
+  });
+
+  it("measures to the nearest edge and wraps months round the year", () => {
+    const miss = scoreGuess(round, { lat: 41, lon: 13, month: 11, lines: 1 });
+    expect(miss.km).toBeGreaterThan(80);
+    expect(miss.km).toBeLessThan(90);
+    expect(miss.off).toBe(6);
+    expect(miss.monthPoints).toBe(0);
+  });
+});
+
+describe("readDaily", () => {
+  const day = 20738;
+
+  it("treats a save from before rounds were remembered as locked in", () => {
+    const old = { day, lines: 3, lat: 45, lon: 29, month: 4 };
+    expect(readDaily(old, day)).toMatchObject({ lines: 3, done: true });
+  });
+
+  it("restores a round in progress without locking it in", () => {
+    const half = { day, lines: 2, lat: 45, lon: 29, done: false };
+    expect(readDaily(half, day)).toMatchObject({ lines: 2, done: false });
+    expect(readDaily({ day, lines: 4 }, day)).toMatchObject({ done: false });
+  });
+
+  it("ignores another day's save and junk", () => {
+    expect(readDaily({ day: day - 1, lines: 6 }, day)).toBeNull();
+    expect(readDaily("nonsense", day)).toBeNull();
+  });
+});
+
+describe("readExtra", () => {
+  const day = 20738;
+
+  it("keeps today's count and scores", () => {
+    const saved = {
+      day,
+      played: [1, 2],
+      scores: { "1": 900 },
+      seen: [1, 2],
+      current: { placeId: 2, lines: 1, done: false },
+    };
+    expect(readExtra(saved, day)).toEqual(saved);
+  });
+
+  it("starts a new day at zero but remembers every place seen", () => {
+    const yesterday = {
+      day: day - 1,
+      played: [1, 2, 3],
+      scores: { "1": 900, "2": 10, "3": 4000 },
+      seen: [1, 2, 3],
+      current: { placeId: 3, lines: 6, done: true },
+    };
+    expect(readExtra(yesterday, day)).toEqual({
+      day,
+      played: [],
+      scores: {},
+      seen: [1, 2, 3],
+      current: null,
+    });
+  });
+
+  it("carries a list left half-played into the new day", () => {
+    const yesterday = {
+      day: day - 1,
+      played: [4],
+      scores: {},
+      seen: [4],
+      current: { placeId: 4, lines: 2, done: false },
+    };
+    const today = readExtra(yesterday, day);
+    expect(today.played).toEqual([4]);
+    expect(today.current).toMatchObject({ placeId: 4, lines: 2 });
+  });
+});
+
+describe("pickExtra", () => {
+  it("deals a place this browser hasn't started", () => {
+    expect(pickExtra([1, 2, 3], [1, 3], () => 0.99)).toBe(2);
+  });
+
+  it("goes back to the one started longest ago once all are seen", () => {
+    expect(pickExtra([1, 2, 3], [2, 3, 1])).toBe(2);
+  });
+});
 
 describe("bestPossible", () => {
   it("drops with every species shown", () => {
