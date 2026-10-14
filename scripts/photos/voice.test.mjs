@@ -3,6 +3,7 @@ import {
   HIS_EMOJI,
   HIS_STORIES,
   cleanEmoji,
+  ownOpening,
   fillName,
   loadVoiceGuide,
   mockVoice,
@@ -288,26 +289,89 @@ describe("post voice", () => {
     ).toBe("");
   });
 
-  it("keeps one emoji he'd use, and never one from the last five posts", () => {
-    expect(cleanEmoji("🦋")).toBe("🦋");
-    expect(cleanEmoji(" ☁️ ")).toBe("☁️");
-    for (const e of ["✨", "🌿", "🔥", "📸", "🦋🐸", "bird", ""])
+  it("ends on the animal or the scene, never a face, heart or hand", () => {
+    for (const e of ["🦋", " ☁️ ", "🐊", "⛰️", "🚗", "🏞️"])
+      expect(cleanEmoji(e)).toBe(e.trim());
+    for (const e of [
+      "😍",
+      "😅",
+      "🤔",
+      "🤯",
+      "🥹",
+      "💚",
+      "🧡",
+      "👽",
+      "🙌",
+      "✨",
+      "🌿",
+      "🔥",
+      "📸",
+      "🦋🐸",
+      "bird",
+      "",
+    ])
       expect(cleanEmoji(e)).toBe("");
-    expect(pickEmoji("✨", { group: "frog" })).toBe("🐸");
-    expect(pickEmoji("🦋", { group: "butterfly", recent: ["🦋"] })).toBe("😍");
+    // A face from the model gives way to the animal.
+    expect(pickEmoji("😍", { group: "bird" })).toBe("🐦");
+    expect(pickEmoji("😂", { group: "other" })).toBe("");
+    // A different one from the last post when there's a choice...
     expect(
-      pickEmoji("⛰️", {
-        group: "mountain",
-        recent: ["⛰️", "🐸", "🦋", "😍", "🦎"],
-      }),
-    ).toBe("😅");
+      pickEmoji("🐦", { group: "bird", recent: ["🐦"], alternatives: ["🦅"] }),
+    ).toBe("🦅");
+    // ...but two birds in a row beat a face.
+    expect(pickEmoji("🐦", { group: "bird", recent: ["🐦"] })).toBe("🐦");
+  });
+
+  it("takes his own words as written, with the emoji he ended on", () => {
     expect(
-      pickEmoji("🦏", { recent: ["🦏", "🐸", "🦋", "😍", "🦎", "🐍"] }),
-    ).toBe("🦏");
-    // Its other options come before a stock fallback.
+      ownOpening(
+        "I spotted this brown caiman peering from underwater at me hahaha. They camouflage so well it's crazy.🐊",
+      ),
+    ).toEqual({
+      text: "I spotted this brown caiman peering from underwater at me hahaha. They camouflage so well it's crazy",
+      emoji: "🐊",
+    });
     expect(
-      pickEmoji("😅", { recent: ["😅"], alternatives: ["✨", "🐐", "😂"] }),
-    ).toBe("🐐");
+      ownOpening("she seemed to be teaching them how to hunt! 🦦 "),
+    ).toEqual({
+      text: "she seemed to be teaching them how to hunt!",
+      emoji: "🦦",
+    });
+    expect(ownOpening("Looks like he just finished a big meal.")).toEqual({
+      text: "Looks like he just finished a big meal",
+      emoji: "",
+    });
+  });
+
+  it("doesn't try to be clever: no quips about posture, attitude or plans", () => {
+    const marmot = {
+      named: true,
+      name: "hoary marmot (Marmota caligata)",
+      allowed: "Sauk Mountain",
+      grounding: "Sauk Mountain rock",
+    };
+    for (const text of [
+      "Spotted this {name} sitting up on a rock on Sauk Mountain. Looks like he is supervising the whole slope lol",
+      "Spotted this {name} sitting up on a rock on Sauk Mountain. Better posture than me, so cool",
+      "Spotted this {name} sitting up on a rock on Sauk Mountain. Takes his rock sitting very seriously, so cool",
+    ])
+      expect(normaliseStory(text, marmot)).toBe("");
+    expect(
+      normaliseStory(
+        "Spotted this {name} sitting up on a rock on Sauk Mountain. He had such a big round belly, pretty cool to see one this close",
+        marmot,
+      ),
+    ).not.toBe("");
+    // "looks like he's..." is fine now and then, not post after post.
+    expect(
+      normaliseStory(
+        "Spotted this {name} sitting up on a rock on Sauk Mountain. Looks like he's just woken up, pretty cool to see one this close",
+        {
+          ...marmot,
+          recent: ["Looks like it's waiting for something. So cool"],
+        },
+      ),
+    ).toBe("");
   });
 
   it("takes the first option that passes, with its emoji", () => {

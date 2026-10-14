@@ -237,6 +237,7 @@ When you want to steer it, these run on your computer (signed in with `az login`
 | `npm run social -- skip DSC01234 [why]` | Never post this shot, as a post or a story |
 | `npm run social -- unskip DSC01234` | Undo a skip |
 | `npm run social -- redraft DSC01234` | On the next Photo captions run, write the photo a new opening and first line (its website caption changes too) and give its post a different fact |
+| `npm run social -- opening DSC01234 "your words"` | Use your own words for the start of a planned post, exactly as written (end with an emoji, or the animal's is added). `--clear` goes back to a written one |
 | `npm run social -- note <trip> "canal boat tour"` | Tell the openings what you were doing on that trip (or, with a photo instead of a trip, at that photo). They only mention things like a hike, a drive or a boat tour when a note or the trip's name says so. `--clear` removes it |
 | `npm run social -- notes` | Every trip with its note and how many photos it has left to post |
 | `npm run social -- approve DSC01234` | Approve this exact caption (only matters with `SOCIAL_REQUIRE_APPROVAL=true`) |
@@ -384,13 +385,15 @@ Full resolution and the rest of this session are on example.com, link in bio
 - doesn't repeat its fun fact, and copies no phrase from your rewrites or another post
 - doesn't start with the same words as any of the four posts before it, and spreads your habits out: "lol" on one post in four at most (it's dropped rather than the post), "such a" never on two posts in a row (and opening a sentence on one post in four), "I love", "I like", "my favorite", "little", "pretty" and "almost" only every few posts
 
-The emoji has to be one emoji (not ✨, 🌿, 🔥, 📸 or the like) and not one used on the five posts before it; otherwise the opening's other suggestions, the animal's own emoji or a face take its place.
+The emoji has to be one emoji showing the animal or the scene (🐊 ⛰️ 🐦 🚗), never a face, heart or hand, and not ✨, 🌿, 🔥, 📸 or the like; otherwise the opening's other suggestions or the animal's own emoji take its place. It differs from the post before when there's a choice.
+
+The generator also mustn't try to be clever: no quips about an animal's posture, attitude or plans ("better posture than me", "supervising the whole slope"), and "looks like he's..." or "I'd..." only every few posts.
 
 A post whose options all fail (usually because it's too close to a post next to it) gets one more try in the same run, on its own so the model sees the posts right before it, and is tried again on the next two runs. Until it has an opening it isn't posted: it never goes out with a plain fallback. The poster also refuses a post built the old way (an older `POST_VERSION` in [compose.mjs](../scripts/social/compose.mjs)), so changing the format never lets an old-style post slip out before the next run rewrites it.
 
 **Your notes.** The best openings say what you were doing ("Pulled over on the side of the road to capture this canyon view"), and only you know that. `npm run social -- note <trip> "..."` stores a line about a trip, privately in `metadata/social/notes.json`; the openings and the trip's session description on the website draw on it but never post it as is, and both are rewritten with it on the next run. `npm run social -- notes` lists every trip and how many photos it has left to post, so you can start with the big ones.
 
-To change how posts sound, edit the skills; to rewrite the posts already planned, bump `VOICE_VERSION` in voice.mjs. To redo one post, `npm run social -- redraft <photo>` gives it a new opening and fact.
+To change how posts sound, edit the skills; to rewrite the posts already planned, bump `VOICE_VERSION` in voice.mjs. To redo one post, `npm run social -- redraft <photo>` gives it a new opening and fact. To write one yourself, `npm run social -- opening <photo> "..."`: your words go in as they are, and the rest of the post (place, fact, gear, link, hashtags) is built around them.
 
 A post is only written once its photo is planned for the coming two weeks, so rewording any part never means rewriting the whole archive. A written post keeps its fact while that fact still exists.
 

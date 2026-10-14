@@ -48,24 +48,36 @@ His six rewrites, with what the pipeline wrote first, are in
 7. **Honest hedges.** "likely (?) sucking nectar from the petals", "almost
    alien-like", "almost looks like a horn". The "(?)" is on purpose: he isn't
    sure, so he says so instead of sounding certain.
-8. **A little humour.** "Luckily for me, this little guy chose the wrong color
-   plant to land on lol, he stuck out like a sore thumb." "lol" turns up on
-   about one post in three, never twice in one.
-9. **Sometimes a small thought about the outdoors.** "I feel like some of the
+8. **Plain, not witty.** "Not everything has to be a quip" (his words). Most
+   reactions are a plain take on what's cool or crazy about it: "They
+   camouflage so well it's crazy", "That jagged cliff side is crazy, hope to
+   climb that one day". A light "lol" or "hahaha" turns up on some posts
+   ("He looks taken aback by my photograph of him lol"), never twice in one,
+   and never a clever comparison or a bit about the animal's attitude.
+   "Luckily for me, this little guy chose the wrong color plant to land on
+   lol" is about as far as his jokes go.
+9. **"He", and what he remembers.** One animal is "he" ("gunk on his jaws",
+   "He looks taken aback"), unless he knows otherwise ("she seemed to be
+   teaching them how to hunt!"). The best lines are memories nobody else has:
+   "It was a bit nerve-racking driving up this road... Had to stop for some
+   trucks though lol." Those come from him (his notes), never a guess.
+10. **Sometimes a small thought about the outdoors.** "I feel like some of the
    best wildlife experiences come when you're resting, and nature just comes
    to you." Now and then, never as a sign-off on every post.
-10. **Loose grammar, correct spelling.** "I am not using perfect grammar at
+11. **Loose grammar, correct spelling.** "I am not using perfect grammar at
     all times like a robot" (his words). Comma splices ("Such a unique bird,
     the beak goes so far up its head, almost looks like a horn lol"),
     fragments, dropped subjects ("Was taking a break..."), "Even still", "the
     Arenal Volcano", "pic". Spelling and "its"/"it's" are still right: his
     typos aren't a style to copy, but his "(?)" is.
-11. **The place, twice and two ways.** Casually in the sentence ("in
+12. **The place, twice and two ways.** Casually in the sentence ("in
     Bijagua", "near the Arenal Volcano in Costa Rica"), then properly on a
     line of its own ("Bijagua, Alajuela Province, Costa Rica."). The line is
     places only, said so anyone can place it: he changed "shrub-steppe,
     Eastern Washington" to "Eastern Washington state, USA".
-12. **Short.** Two or three sentences, roughly 25 to 60 words.
+13. **Short.** Usually two sentences, roughly 15 to 45 words.
+14. **One emoji at the end of a post: the animal or the scene.** 🐊 ⛰️ 🐦 🚗,
+    never a face or a heart.
 
 What he never writes:
 

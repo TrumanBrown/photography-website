@@ -32,7 +32,7 @@ import { backdropIn } from "./website.mjs";
 import { OPINION, stockIn, unbackedClaim } from "./claims.mjs";
 
 /** Bump when the prompt or the skills change enough that planned posts should be rewritten. */
-export const VOICE_VERSION = 6;
+export const VOICE_VERSION = 7;
 
 const SKILLS = join(ROOT, ".github/skills");
 
@@ -77,22 +77,23 @@ export const HIS_STORIES = [
   "Was taking a break on a hike and captured this two-tailed swallowtail (Papilio multicaudata) perched on a purple flower, likely (?) sucking nectar from the petals. I feel like some of the best wildlife experiences come when you're resting, and nature just comes to you",
   "A fun pic of this waterfall near the Arenal Volcano in Costa Rica. I love the landscape pictures from Costa Rica because there's so much green everywhere, like you can see surrounding this waterfall",
 ];
-/** The emoji on those six, in the same order. */
-export const HIS_EMOJI = ["🦏", "🤯", "☁️", "👽", "🦋", "💚"];
+/** The emoji on those six, in the same order: the animal or the scene. */
+export const HIS_EMOJI = ["🐦", "🦗", "☁️", "🐦", "🦋", "🏞️"];
 
 export function voicePrompt(items, guide = "", { recent = [] } = {}) {
   const field = (label, value) => (value ? `; ${label} "${value}"` : "");
   return `You write the opening of Instagram posts for Truman's wildlife and landscape photos, in his voice. People scroll straight past anything that reads like AI wrote it, so this has to sound like Truman typed it on his phone. His guide is below, with his own rewrites of posts that sounded like AI. Write the way he does, but never copy his examples' wording.
 
 For each photo, write "options": three different versions, best first. Each one has:
-- "text": two or three sentences, 15 to 60 words in all.
+- "text": usually two short sentences, 15 to 45 words in all; three only when there's more to tell.
   - First, what this is and how he came across it, said the way he'd tell a friend. He starts with "I" or a verb, like people do online: "I saw...", "I love how...", or the verb with the "I" dropped ("Saw this...", "Spotted this...", "Managed to capture this..."). Everyday verbs: saw, spotted, found, caught, got, captured, managed to capture, came across, ran into. Or start with what he was doing when his notes say so ("While on a canal tour in Tortuguero, ..."), or now and then "A fun pic of this...". Never bookish verbs like "came upon", "took in", "happened upon", "gazed at", "photographed" or "got a glimpse of". For a named animal or plant, write {name} exactly once, where the animal is first mentioned, right after "this" or "a" ("Saw this {name} munching on..."); code puts in the verified name. Never name it twice or tack it on after a comma ("this swan, a {name}", "a frog on a leaf, this {name}"). Say what it's doing in everyday words. Mention the place the casual way ("in Bijagua", "near the Arenal Volcano") when it fits.
-  - Then his reaction, with some feeling in it: what he loves about it, a comparison ("almost looks like a horn", "almost alien-like"), something funny ("chose the wrong color plant to land on lol"), or a small thought about being out there ("some of the best wildlife experiences come when you're resting"). Opinions are good ("such a unique bird", "so cool", "I love how..."). Hedge when he couldn't know for sure ("likely (?) sucking nectar"). Not a list of colours, textures or body parts: that's alt text, not him.
+  - Then his reaction, said plainly, the way he would: what's cool or crazy about it ("They camouflage so well it's crazy", "That jagged cliff side is crazy, hope to climb that one day"), a simple guess at what it was up to ("Looks like he just finished a big meal", "He looks taken aback by my photograph of him lol"), what he loves about it ("such a unique bird", "the iridescent shade of the feathers is so cool too"), or what it was like being there, from his notes only. Hedge when he couldn't know for sure ("likely (?) sucking nectar", "I think it was a mother and her baby"). Not a list of colours, textures or body parts: that's alt text, not him.
+  - Not a quip. Most of his posts aren't jokes, and none of them try to be clever: no witty comparisons, no wordplay, no bits about an animal's attitude, posture, plans or what it's "supervising", nothing like "better posture than me" or "should have made an appointment". A light "lol" or "hahaha" on some posts is the most of it.
   - Casual, not polished. He doesn't write perfect grammar like a robot: sentences run together with commas, the subject gets dropped ("Was taking a break..."), a thought starts with "Even still" or "Luckily for me". Spelling stays right.
   - He repeats words instead of reaching for synonyms, the way people do: "this waterfall" again rather than "the cascade", "Costa Rica" twice, "such a" and "so" more than once. Never swap in a fancier word to avoid saying something twice.
   - "lol" on roughly one post in four, wherever something's a bit funny or awkward (he uses it on a third of his); never twice in one.
-  - Plain, not poetic. An animal can have a personality; scenery doesn't get feelings or a "softer version of itself".
-- "emoji": the one emoji he'd put on the end. The animal itself (🦋 🐸 🦜), a face (😅 😂 🤯 😍 🥲), or the thing (🌋 ⛰️ ☁️ 🌊). Vary them: not the same one as any of the last few posts. Never ✨ 🌿 🍃 🔥 📸 🙌 💯 🚀 🌍 💫.
+  - Plain, not poetic. One animal is "he" ("He looks taken aback", "gunk on his jaws"), unless his notes say it's female; several are "they". Scenery doesn't get feelings or a "softer version of itself".
+- "emoji": the one emoji he'd put on the end: the animal itself (🐊 🐦 🐍 🦦 🦋 🐸) or the scene or thing (⛰️ 🌊 ☁️ 🌋 🚗). Never a face, heart or hand (no 😍 😅 😂 🤔 🤯 💚 🙌), and never ✨ 🌿 🍃 🔥 📸 💯 🚀 🌍 💫.
 
 Only what's true:
 - What he was doing, who he was with, the weather and the time of day: only when the trip name, the photo's notes or his own notes say so. "Pulled over on the side of the road" or "taking a break on a hike" are perfect when his notes say it, and made up when they don't. Without notes, keep the opening to what the photo and the trip name show.
@@ -117,6 +118,14 @@ Reply with JSON only: {"items": [{"id": "1", "options": [{"text": "...", "emoji"
 
 // His habits: each is fine on some posts and a tell on every one. [pattern, how many posts back it may not appear]
 const HABITS = [
+  // How a quip is usually built: a guess at the animal's thoughts, or what
+  // he'd do in its place. Fine now and then, a template on every post.
+  [
+    /\b(?:looks?|seems?) like (?:it|he|she|they)(?:'s| is| was|'re| are| were| has| had| wants?| needs?)\b/i,
+    2,
+  ],
+  [/\bi'd\b/i, 3],
+  [/\bcrazy\b/i, 1],
   // His on about half his posts: just not two in a row, and mostly
   // mid-sentence ("cast such a distinct shadow"). Opening a sentence with it
   // on every other post is a rhythm people notice.
@@ -349,9 +358,13 @@ const NOT_HIS = [
 ];
 const bare = (e) => String(e ?? "").replace(/\uFE0F/g, "");
 const DENIED = new Set(NOT_HIS.map(bare));
+// Faces, hearts, hands, people, aliens and skulls: he only puts the animal
+// or the scene at the end ("stick to emojis of the animals or scenes").
+const NOT_A_SCENE =
+  /[\u{1F600}-\u{1F64F}\u{1F910}-\u{1F92F}\u{1F970}-\u{1F97A}\u{1F9D0}-\u{1F9DF}\u{1FAE0}-\u{1FAEF}\u{1FAF0}-\u{1FAF8}\u{2639}\u{263A}\u{2763}\u{2764}\u{1F493}-\u{1F49F}\u{1F5A4}\u{1F90D}-\u{1F90F}\u{1F9E1}\u{1FA75}-\u{1FA77}\u{1F440}-\u{1F450}\u{1F466}-\u{1F487}\u{1F918}-\u{1F91F}\u{1F930}-\u{1F93E}\u{1F47B}-\u{1F480}\u{1F4A9}\u{1F4AA}\u{1F590}\u{1F595}\u{1F596}\u{270A}-\u{270D}\u{1F9E0}\u{1F4AB}\u{1F4A2}\u{1F4A4}\u{1F4A6}]/u;
 const graphemes = new Intl.Segmenter("en", { granularity: "grapheme" });
 
-/** One emoji he'd use, or "" for anything else (two of them, a word, a bot's favourite). */
+/** One emoji he'd use, or "" for anything else (two of them, a word, a face, a bot's favourite). */
 export function cleanEmoji(raw) {
   const parts = [...graphemes.segment(String(raw ?? "").trim())]
     .map((g) => g.segment)
@@ -359,11 +372,17 @@ export function cleanEmoji(raw) {
   if (parts.length !== 1) return "";
   const [one] = parts;
   if (!/\p{Extended_Pictographic}|\p{Regional_Indicator}/u.test(one)) return "";
-  return DENIED.has(bare(one)) ? "" : one;
+  return DENIED.has(bare(one)) || NOT_A_SCENE.test(one) ? "" : one;
 }
 
-// When the model's emoji won't do: the animal, else a face.
+// When the model's emoji won't do: the animal or the scene.
 const BY_GROUP = {
+  mammal: "🐾",
+  dragonfly: "🪰",
+  plant: "🪴",
+  city: "🏙️",
+  temple: "🛕",
+  village: "🏘️",
   frog: "🐸",
   toad: "🐸",
   salamander: "🦎",
@@ -386,35 +405,52 @@ const BY_GROUP = {
   glacier: "🧊",
   lake: "🏞️",
   river: "🏞️",
-  waterfall: "💦",
+  waterfall: "🏞️",
   coast: "🌊",
   forest: "🌲",
   desert: "🌵",
   sky: "☁️",
 };
-const FACES = ["😍", "😅", "🤩", "👀", "😮", "🥲", "😂"];
-
-/** No emoji on two of any six posts in a row. */
-const EMOJI_GAP = 5;
-
 /**
- * The emoji for the end of a post: the model's when it's fine and not on any
- * of the last five posts, else one from its other options, else the animal's,
- * else a face.
+ * The emoji for the end of a post: the model's when it's the animal or the
+ * scene, else one from its other options, else the animal's own. A different
+ * one from the post before when there's a choice; the same animal twice in a
+ * row is fine (two birds are two birds), a face never is.
  */
 export function pickEmoji(
   raw,
   { group = "", recent = [], alternatives = [] } = {},
 ) {
-  const lately = new Set(recent.slice(-EMOJI_GAP).map(bare));
-  for (const e of [
+  const fitting = [
     cleanEmoji(raw),
     ...alternatives.map(cleanEmoji),
-    BY_GROUP[group],
-    ...FACES,
-  ])
-    if (e && !lately.has(bare(e))) return e;
-  return "";
+    BY_GROUP[group] ?? "",
+  ].filter(Boolean);
+  const last = bare(recent.at(-1));
+  return fitting.find((e) => bare(e) !== last) ?? fitting[0] ?? "";
+}
+
+/**
+ * His own words for a post (`npm run social -- opening`), split into the text
+ * and the emoji he ended it with, if any. A last full stop goes, since the
+ * emoji takes its place.
+ */
+export function ownOpening(raw) {
+  const text = String(raw ?? "").trim();
+  const parts = [...graphemes.segment(text)].map((g) => g.segment);
+  let end = parts.length;
+  while (end > 0 && !parts[end - 1].trim()) end--;
+  const last = parts[end - 1] ?? "";
+  const emoji = /\p{Extended_Pictographic}|\p{Regional_Indicator}/u.test(last)
+    ? last
+    : "";
+  const words = parts
+    .slice(0, emoji ? end - 1 : end)
+    .join("")
+    .trim()
+    .replace(/\.$/, "")
+    .trim();
+  return { text: words, emoji };
 }
 
 /**

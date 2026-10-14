@@ -93,10 +93,12 @@ Three posts go out a day, so anything on every post becomes a tell:
 
 - Exactly one, at the very end of the opening, in place of the last full stop.
   One emoji reads like a person; a row of them reads like a bot.
-- The animal itself (🦋 🐸 🦜), a face (😅 😂 🤯 😍 🥲) or the thing (🌋 ⛰️ ☁️
-  🌊).
+- The animal itself (🐊 🐦 🐍 🦦 🦋 🐸) or the scene or thing (⛰️ 🌊 ☁️ 🌋 🚗).
+  "Stick to emojis of the animals or scenes" (his words).
+- Never a face, heart or hand: no 😍 😅 😂 🤔 🤯 🥹 💚 🙌. They read as too much.
 - Never ✨ 🌿 🍃 🔥 📸 🙌 💯 🚀 🌍 💫: these are what bot-written posts use.
-- Not one used on any of the five posts before it, so the grid isn't a row of ⛰️.
+- A different one from the post before when there's a choice; two birds in a
+  row can both be 🐦.
 
 ## The place line
 
@@ -123,7 +125,7 @@ for one at the end of every caption.
 
 > Waterfall plunging between plant-covered cliffs into a pool, Arenal Volcano, Alajuela Province, Costa Rica. So much greenery right beside that falling water.
 
-> A fun pic of this waterfall near the Arenal Volcano in Costa Rica. I love the landscape pictures from Costa Rica because there's so much green everywhere, like you can see surrounding this waterfall 💚
+> A fun pic of this waterfall near the Arenal Volcano in Costa Rica. I love the landscape pictures from Costa Rica because there's so much green everywhere, like you can see surrounding this waterfall 🏞️
 > Arenal Volcano, Alajuela Province, Costa Rica.
 
 **Two-tailed swallowtail**
@@ -137,7 +139,7 @@ for one at the end of every caption.
 
 > Green ibis (Mesembrinibis cayennensis) preening with its curved bill tucked into feathers, Tortuguero canals, Limón Province, Costa Rica. That green-blue sheen is my favourite thing about this bird.
 
-> While on a canal tour in Tortuguero, managed to capture this Green ibis (Mesembrinibis cayennensis) pretty close up. They are such unique looking birds, almost alien-like. The iridescent shade of the feathers is so cool too 👽
+> While on a canal tour in Tortuguero, managed to capture this Green ibis (Mesembrinibis cayennensis) pretty close up. They are such unique looking birds, almost alien-like. The iridescent shade of the feathers is so cool too 🐦
 > Tortuguero canals, Limón Province, Costa Rica.
 
 **Canyon, Kauai**
@@ -151,15 +153,50 @@ for one at the end of every caption.
 
 > Katydid (Mimetica incisa) showing off its incredible leaf mimicry, Monteverde Cloud Forest, Puntarenas Province, Costa Rica. I can't believe how they even mimic the punches and holes in natural leaves as well.
 
-> Spotted this katydid (Mimetica incisa) showing off its incredible leaf mimicry in Monteverde Cloud Forest at night. Luckily for me, this little guy chose the wrong color plant to land on lol, he stuck out like a sore thumb. Even still, I can't believe how they even mimic the punches and holes in natural leaves 🤯
+> Spotted this katydid (Mimetica incisa) showing off its incredible leaf mimicry in Monteverde Cloud Forest at night. Luckily for me, this little guy chose the wrong color plant to land on lol, he stuck out like a sore thumb. Even still, I can't believe how they even mimic the punches and holes in natural leaves 🦗
 > Monteverde Cloud Forest, Puntarenas Province, Costa Rica.
 
 **Groove-billed ani**
 
 > Groove-billed ani (Crotophaga sulcirostris) munching on an insect on a mossy post, Bijagua, Alajuela Province, Costa Rica. Such an interesting, unique beak on it.
 
-> Saw this Groove-billed ani (Crotophaga sulcirostris) munching on some insect in Bijagua. Such a unique bird, the beak goes so far up its head, almost looks like a horn lol 🦏
+> Saw this Groove-billed ani (Crotophaga sulcirostris) munching on some insect in Bijagua. Such a unique bird, the beak goes so far up its head, almost looks like a horn lol 🐦
 > Bijagua, Alajuela Province, Costa Rica.
+
+### Second round
+
+After the generator learned the first round, he rewrote six more of its
+drafts. Its versions were in his voice but tried too hard: "not everything
+has to be a quip". His are plainer and shorter, call the animal "he", and
+bring in things only he remembers. Typos fixed; his "hahaha", "lol" and "!"
+kept.
+
+> Found this brown caiman (Caiman crocodilus fuscus) among the leaves in the water in Tortuguero. I like how it looks like it's keeping an eye on everything without bothering to come out of the water 🐊
+
+> I spotted this brown caiman (Caiman crocodilus fuscus) peering from underwater at me hahaha. They camouflage so well it's crazy 🐊
+
+> Got this view of Gunn Peak rising above a small lake in Washington. That jagged top looks so rough compared to the lake, hard to imagine standing up there ⛰️
+
+> Got this view of Gunn Peak behind a small tarn. That jagged cliff side is crazy, hope to climb that one day ⛰️
+
+> Came across this grey-backed shrike (Lanius tephronotus) perched on a metal rail on the Tibetan plateau. Funny how a rail with peeling paint can look like a perfectly good place to sit when you're a bird 🐦
+
+> Came across this grey-backed shrike (Lanius tephronotus) perched on a metal rail on the Tibetan plateau. He looks taken aback by my photograph of him lol 🐦
+
+> Ran into this northwestern garter snake (Thamnophis ordinoides) with its mouth open among the grass and fallen leaves around Puget Sound. Can't tell what was going on, but that's such a big expression for a small snake lol 😅
+
+> Ran into this northwestern garter snake (Thamnophis ordinoides) with some gunk on his jaws. Looks like he just finished a big meal, was pretty lethargic when moving 🐍
+
+> I got this view of the winding road and white-water stream at Trollstigen. The stream looks like it gets a much more direct route down than anyone on that road 🚗
+
+> I got this view of the winding road and white-water stream at Trollstigen. It was a bit nerve-racking driving up this road, but had a somewhat small car so wasn't too difficult. Had to stop for some trucks though lol 🚗
+
+> I came across these two North American river otters (Lontra canadensis) beside a fallen log in Eastern Washington, both looking my way. Such a good pair of faces, I can't decide which one looks more curious 🦦
+
+> I came across these two North American river otters (Lontra canadensis) beside a fallen log in Eastern Washington, both looking my way. I think it was a mother and her baby, she seemed to be teaching them how to hunt! 🦦
+
+He also flagged the face emoji (😍 on a published post, 😅 above): only the
+animal or the scene.
 
 What changed, every time:
 
@@ -170,7 +207,9 @@ What changed, every time:
 | a comment on colours or rock | an opinion about the animal or the place, with "such a", "so", "I love" |
 | everything certain | hedges where he can't know: "likely (?)", "almost" |
 | place in the middle of the first sentence | place in passing, then in full on its own line |
-| no emoji | one emoji at the end |
+| no emoji | one emoji at the end: the animal or the scene |
+| a clever line about the animal's attitude or plans | a plain reaction: "it's crazy", "hope to climb that one day", or what happened |
+| "it" | "he", for one animal |
 
 ## When unsure
 
@@ -222,5 +261,8 @@ When writing or reviewing a caption by hand:
   rewrites there and above.
 - Trip notes: `npm run social -- note <trip> "canal boat tour"`, listed with
   `npm run social -- notes`. They're kept privately in `metadata/social/notes.json`.
+- His own words for one planned post: `npm run social -- opening <photo>
+  "..."`. Used exactly as written (end it with an emoji, or the animal's is
+  added), never checked or rewritten; `--clear` goes back to a written one.
 - Published posts can't be edited through Instagram's API (it only allows
   turning comments on or off and deleting). Edit those in the Instagram app.

@@ -104,6 +104,8 @@ import {
   loadVoiceGuide,
   mockVoice,
   normaliseVoice,
+  ownOpening,
+  pickEmoji,
   voicePrompt,
 } from "./voice.mjs";
 import {
@@ -181,7 +183,7 @@ const emptyCatalog = () => ({
 });
 
 /** Fields only a person sets (npm run photos / npm run social); the stored copy always wins. */
-const USER_FIELDS = ["skip", "note", "approved", "redraft", "redo"];
+const USER_FIELDS = ["skip", "note", "approved", "redraft", "redo", "opening"];
 
 async function saveCatalog(store, catalog) {
   await updateJson(
@@ -1072,6 +1074,29 @@ async function main() {
       Boolean(s.voice.named) === Boolean(namedFor(s))
         ? s.voice
         : null;
+    // The opening as it'll be posted: his own words when he's written them
+    // (`npm run social -- opening`), else the one written in his voice.
+    const openingOf = (s) => {
+      if (s.opening?.text) {
+        const mine = ownOpening(s.opening.text);
+        return {
+          mine: true,
+          story: mine.text,
+          emoji:
+            mine.emoji ||
+            pickEmoji(s.voice?.emoji, { group: s.analysis.group }) ||
+            "",
+        };
+      }
+      const voiced = voicedFor(s);
+      return voiced
+        ? {
+            mine: false,
+            story: fillName(voiced.text, storyNameFor(s)),
+            emoji: voiced.emoji ?? "",
+          }
+        : { mine: false, story: "", emoji: "" };
+    };
 
     // Everything in a post besides its fact; all of it decided by code, around
     // the opening written in Truman's voice (voice.mjs). A post without one
@@ -1081,7 +1106,7 @@ async function main() {
       const session = sessionOf(s.session);
       const taxon = taxonOf(s);
       const level = levelOf(s);
-      const voiced = voicedFor(s);
+      const opening = openingOf(s);
       const hashtags = buildHashtags({
         taxon,
         speciesOk: level === "species",
@@ -1096,8 +1121,9 @@ async function main() {
         session,
         taxon,
         level,
-        story: voiced ? fillName(voiced.text, storyNameFor(s)) : "",
-        emoji: voiced?.emoji ?? "",
+        story: opening.story,
+        emoji: opening.emoji,
+        mine: opening.mine,
         place: placeLine(session, placeLabel(session)),
         hashtags,
         gear: gearLine(cameraFacts(file)),
@@ -1327,13 +1353,15 @@ async function main() {
     // The opening in Truman's voice (voice.mjs), written once per planned
     // post, ten to a call, in the order they'll go out, and again on a
     // redraft or when his notes for the trip change.
+    // A post with his own words needs nothing written.
     const needsVoice = (d) =>
-      d.s.voice?.v !== VOICE_VERSION ||
-      d.s.voice?.at !== d.s.analysis.at ||
-      d.s.voice?.notes !== sha(notesOf(d.s, d.key)) ||
-      Boolean(d.s.voice?.named) !== Boolean(namedFor(d.s)) ||
-      (!d.s.voice?.text && (d.s.voice?.tries ?? 0) < 6) ||
-      redrafting(d.s, d.s.voice?.written);
+      !d.s.opening?.text &&
+      (d.s.voice?.v !== VOICE_VERSION ||
+        d.s.voice?.at !== d.s.analysis.at ||
+        d.s.voice?.notes !== sha(notesOf(d.s, d.key)) ||
+        Boolean(d.s.voice?.named) !== Boolean(namedFor(d.s)) ||
+        (!d.s.voice?.text && (d.s.voice?.tries ?? 0) < 6) ||
+        redrafting(d.s, d.s.voice?.written));
     const voiceQueue = drafts.filter(needsVoice);
     if (provider && voiceQueue.length) {
       const guide = loadVoiceGuide();
@@ -1348,10 +1376,7 @@ async function main() {
         ...HIS_EMOJI,
         ...postedOrder.map((p) => p.emoji).filter(Boolean),
       ];
-      const storyOf = (d) => {
-        const voiced = voicedFor(d.s);
-        return voiced ? fillName(voiced.text, storyNameFor(d.s)) : "";
-      };
+      const storyOf = (d) => openingOf(d.s).story;
       const position = new Map(drafts.map((d, i) => [d, i]));
       // What goes out before this post: those already out, then the planned
       // posts ahead of it, including ones written moments ago in this run.
@@ -1361,7 +1386,7 @@ async function main() {
           stories: [...outStories, ...ahead.map(storyOf)],
           emoji: [
             ...outEmoji,
-            ...ahead.map((a) => voicedFor(a.s).emoji).filter(Boolean),
+            ...ahead.map((a) => openingOf(a.s).emoji).filter(Boolean),
           ],
         };
       };
@@ -1463,6 +1488,7 @@ async function main() {
         v: POST_VERSION,
         story: parts.story,
         emoji: parts.emoji,
+        ...(parts.mine ? { own: true } : {}),
         place: parts.place,
         hashtags: parts.hashtags,
         gear: parts.gear,
@@ -1474,6 +1500,7 @@ async function main() {
       const caption = assembleCaption({
         story: parts.story,
         emoji: parts.emoji,
+        ...(parts.mine ? { own: true } : {}),
         place: parts.place,
         body: fact,
         iucn: parts.iucn,
@@ -1482,7 +1509,10 @@ async function main() {
         hashtags: parts.hashtags,
       });
       // The written parts are checked, not the "Fun fact:" label code adds.
-      const problems = lint([parts.story, fact, pointer].join("\n"));
+      // His own words aren't held to the generator's checks.
+      const problems = lint(
+        [parts.mine ? "" : parts.story, fact, pointer].join("\n"),
+      );
       if (problems.length) {
         s.status = "needs_review";
         s.problem = problems.join(", ");
@@ -1494,6 +1524,7 @@ async function main() {
         alt: tidy(s.analysis.description).slice(0, 1000),
         story: parts.story,
         emoji: parts.emoji,
+        ...(parts.mine ? { own: true } : {}),
         place: parts.place,
         fact,
         factKey: factKeyUsed,

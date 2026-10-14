@@ -8,6 +8,9 @@
  *   npm run social -- skip <photo> [why]  never post this shot, as a post or a story
  *   npm run social -- unskip <photo>
  *   npm run social -- redraft <photo>     new opening and a different fact on the next Photo captions run
+ *   npm run social -- opening <photo> <text...>
+ *                                         your own words for the start of a planned post, used exactly as
+ *                                         written (end it with an emoji, or one is added); --clear goes back
  *   npm run social -- note <trip|photo> <text...>
  *                                         what you were doing there ("canal boat tour", "pulled over on the
  *                                         drive up"), for the post openings and the trip's session
@@ -189,8 +192,9 @@ async function preview({ social, photos }, count) {
     const frame = canvasFor(f.width || 1, f.height || 1);
     const number = i === undefined ? "" : `Post ${i + 1} · `;
     const borders = frame.padded ? " · posted whole, with borders" : "";
+    const own = s.post?.own ? " · your words" : "";
     return `<article><div class="frame" style="aspect-ratio:${frame.width}/${frame.height}"><img src="${escape(src)}" loading="lazy" alt=""></div><div>
-<p class="meta">${number}${escape(s.pick)} · appeal ${escape(s.post?.appeal ?? s.analysis?.appeal ?? "?")} · ${escape(id)}${borders}${s.problem ? ` · ${escape(s.problem)}` : ""}</p>
+<p class="meta">${number}${escape(s.pick)} · appeal ${escape(s.post?.appeal ?? s.analysis?.appeal ?? "?")} · ${escape(id)}${borders}${own}${s.problem ? ` · ${escape(s.problem)}` : ""}</p>
 <pre>${escape(s.post?.caption ?? "(no caption yet)")}</pre>
 <p class="alt"><b>Alt text:</b> ${escape(s.post?.alt ?? "")}</p></div></article>`;
   };
@@ -355,6 +359,25 @@ async function main() {
     console.log(`${pick}: ${done}`);
     return;
   }
+  if (command === "opening") {
+    const clear = rest.includes("--clear");
+    const [needle, ...words] = rest.filter((a) => a !== "--clear");
+    const text = words.join(" ").replace(/\s+/g, " ").trim();
+    if (!needle || (!clear && !text))
+      throw new Error(
+        'Usage: npm run social -- opening <photo> "your words" (or --clear)',
+      );
+    const pick = await setFlag(stores.photos, needle, (shot) => {
+      if (clear) delete shot.opening;
+      else shot.opening = { text, at: new Date().toISOString() };
+    });
+    console.log(
+      clear
+        ? `${pick}: back to a written opening on the next Photo captions run.`
+        : `${pick}: saved. The next Photo captions run puts your words at the start of its post.`,
+    );
+    return;
+  }
   if (command === "note") {
     const clear = rest.includes("--clear");
     const words = rest.filter((a) => a !== "--clear");
@@ -395,7 +418,7 @@ async function main() {
     return;
   }
   console.log(
-    "Commands: status, preview [count], skip <photo> [why], unskip <photo>, redraft <photo>, note <trip|photo> <text>, notes, approve <photo>, retry <photo>|--all. Add --local for dry-run state.",
+    "Commands: status, preview [count], skip <photo> [why], unskip <photo>, redraft <photo>, opening <photo> <text>, note <trip|photo> <text>, notes, approve <photo>, retry <photo>|--all. Add --local for dry-run state.",
   );
 }
 
