@@ -221,10 +221,13 @@ await Promise.all(
   .rail-nav {
     display: flex;
     flex-direction: column;
-    gap: 1px;
-    margin-top: 12px;
+    margin-top: 8px;
   }
+  /* Each link is a 24px row: WCAG 2.2's smallest tap target (2.5.8). */
   .rail-link {
+    display: flex;
+    align-items: center;
+    min-height: 24px;
     color: var(--ink-2);
     text-decoration: none;
   }

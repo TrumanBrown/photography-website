@@ -1,0 +1,127 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+---
+
+<BaseLayout
+  title="Privacy"
+  description="What this site keeps when you visit or send me a message, and how to get it deleted."
+>
+  <section class="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+    <header class="mb-6">
+      <h1 class="text-2xl font-light tracking-tight sm:text-[30px]">Privacy</h1>
+    </header>
+
+    <div class="copy">
+      <p>
+        This site has no cookies and no ads. Here's what it does keep, and what
+        I do with it.
+      </p>
+
+      <h2 class="text-xl font-light tracking-tight">Messages</h2>
+      <p>
+        When you send me a message, the form passes along your name, email
+        address and message, plus the time you sent it. I only use them to
+        reply, and to arrange a print if it comes to that. Nobody else gets
+        them, and you won't end up on a mailing list.
+      </p>
+      <p>
+        Messages are kept in my own Microsoft Azure account, on servers in the
+        US. They stay there until I delete them. Ask through the form if you'd
+        like yours gone and I'll take care of it.
+      </p>
+      <p>
+        The form also counts how many messages come from one connection each
+        hour, to keep spam down. It does that with a scrambled code made from
+        your IP address, so the address itself is never saved.
+      </p>
+
+      <h2 class="text-xl font-light tracking-tight">Visit counts</h2>
+      <p>
+        Each page you open is noted, along with how long you stayed on it. If
+        another site sent you here, its name is saved too (google.com, say,
+        never the full link).
+      </p>
+      <p>
+        Visitors are counted without the site knowing who they are. It mixes
+        your IP address and browser with the date and a secret key, then keeps
+        only the scrambled result. That code changes every day, so visits on
+        different days can't be linked. Your IP address is never stored.
+      </p>
+
+      <h2 class="text-xl font-light tracking-tight">On your device</h2>
+      <p>
+        Your light or dark setting is saved in your browser, and so is your
+        progress on the hobby pages, like the tide pool critters you've found.
+        None of it leaves your device, and clearing this site's data in your
+        browser wipes it.
+      </p>
+      <p>
+        While a tab is open, it also holds a random code that matches each page
+        view with how long it lasted. Closing the tab clears it.
+      </p>
+      <p>
+        The selfie to bird generator reads your photo right on your device.
+        It's never uploaded.
+      </p>
+
+      <h2 class="text-xl font-light tracking-tight">Other sites</h2>
+      <p>
+        The site runs on Microsoft Azure, and their servers handle every
+        request, like any web host.
+      </p>
+      <p>
+        Some hobby pages load photos and sightings straight from iNaturalist.
+        When they do, your browser connects to iNaturalist, which sees your IP
+        address like any site you visit.
+      </p>
+      <p>
+        Nothing here follows you around other sites, and no one else gets to
+        either. Visit counts work the same whether or not your browser sends Do
+        Not Track. I don't sell or pass on anything about you.
+      </p>
+
+      <h2 class="text-xl font-light tracking-tight">Your data</h2>
+      <p>
+        Send me a message if you want to know what I have from you, or want it
+        fixed or deleted, and I'll sort it out. If any of this changes, I'll
+        update this page and the date below.
+      </p>
+      <button
+        type="button"
+        class="linkbtn draw"
+        data-contact-open
+        data-contact-message="I have a question about my data."
+      >
+        <span>Ask about your data</span>
+      </button>
+
+      <p class="updated">
+        Last updated <time datetime="2026-10-14">October 14, 2026</time>
+      </p>
+    </div>
+
+    <p class="mt-12">
+      <a class="u-label" href="/">← All sessions</a>
+    </p>
+  </section>
+</BaseLayout>
+
+<style>
+  .copy {
+    max-width: 65ch;
+  }
+  .copy p {
+    margin: 0 0 14px;
+    color: var(--ink-3);
+    font-size: 15px;
+    line-height: 1.6;
+  }
+  .copy h2 {
+    margin: 44px 0 12px;
+  }
+  .copy .updated {
+    margin-top: 32px;
+    color: var(--ink-2);
+    font-size: 13px;
+  }
+</style>

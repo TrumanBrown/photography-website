@@ -105,7 +105,7 @@ const facts = hobbyFacts(entry);
               data-pswp-height={media.hero.height}
               data-pswp-caption={media.hero.caption ?? ""}
               class="group block overflow-hidden border border-rule no-underline"
-              aria-label={media.hero.caption ?? "Open full-resolution photo"}
+              aria-label={media.hero.caption || "Open full-resolution photo"}
             >
               <img
                 src={media.hero.display}
@@ -127,7 +127,7 @@ const facts = hobbyFacts(entry);
                       data-pswp-height={it.height}
                       data-pswp-caption={it.caption ?? ""}
                       class="group block overflow-hidden bg-band no-underline"
-                      aria-label={it.caption ?? "Open full-resolution photo"}
+                      aria-label={it.caption || "Open full-resolution photo"}
                     >
                       <img
                         src={it.display}

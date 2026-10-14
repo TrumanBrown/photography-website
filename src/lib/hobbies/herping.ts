@@ -272,6 +272,8 @@ export function initHerping(root: HTMLElement): void {
   const resetBtn = root.querySelector<HTMLButtonElement>("[data-hp-reset]");
   const photoEl = root.querySelector<HTMLImageElement>("[data-hp-photo]");
   const creditEl = root.querySelector<HTMLElement>("[data-hp-credit]");
+  const frame = root.querySelector<HTMLElement>("[data-hp-frame]");
+  const live = root.querySelector<HTMLElement>("[data-hp-live]");
 
   if (
     !canvas ||
@@ -684,7 +686,10 @@ export function initHerping(root: HTMLElement): void {
   // ------------------------------------------------------------- the loop
   function update(dt: number): void {
     scrollY += SPEED * dt;
-    beamX += (beamTargetX - beamX) * Math.min(1, dt * 9);
+    // Reduced motion moves the beam straight to where it's aimed.
+    beamX = reduceMotion
+      ? beamTargetX
+      : beamX + (beamTargetX - beamX) * Math.min(1, dt * 9);
     if (brake > 0) brake = Math.max(0, brake - dt * 2);
 
     for (const a of animals) {
@@ -719,7 +724,9 @@ export function initHerping(root: HTMLElement): void {
   function step(now: number): void {
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
-    update(reduceMotion ? 0 : dt);
+    // SPEED already parks the car under reduced motion; the beam and the
+    // brake light still need real time to move and fade.
+    update(dt);
     updateRain(reduceMotion ? 0 : dt);
     render();
     raf = requestAnimationFrame(step);
@@ -738,7 +745,7 @@ export function initHerping(root: HTMLElement): void {
   // ----------------------------------------------------------- discovery
   function reveal(a: Animal): void {
     a.found = true;
-    a.wiggle = 0.9;
+    a.wiggle = reduceMotion ? 0 : 0.9;
     brake = 1;
     const sp = a.sp;
     const isNew = !discovered.has(sp.id);
@@ -945,6 +952,33 @@ export function initHerping(root: HTMLElement): void {
     if (e.pointerType !== "touch") {
       canvas.style.cursor = hitTest(p.x, p.y) ? "pointer" : "crosshair";
     }
+  });
+
+  // Keyboard play: the arrow keys steer the beam, and Enter or Space stops
+  // for the animal nearest the middle of it.
+  function inBeam(): Animal | null {
+    let best: Animal | null = null;
+    let bestD = 1;
+    for (const a of animals) {
+      if (a.found) continue;
+      const d = beamDist(a.x, a.y);
+      if (d < bestD) {
+        best = a;
+        bestD = d;
+      }
+    }
+    return best;
+  }
+  frame?.addEventListener("keydown", (e: KeyboardEvent) => {
+    if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+      const nudge = Math.max(24, W * 0.06) * (e.key === "ArrowLeft" ? -1 : 1);
+      beamTargetX = Math.max(0, Math.min(W, beamTargetX + nudge));
+    } else if (e.key === "Enter" || e.key === " ") {
+      const a = inBeam();
+      if (a) reveal(a);
+      else if (live) live.textContent = "Nothing in the beam yet.";
+    } else return;
+    e.preventDefault();
   });
 
   closeBtn.addEventListener("click", closeCard);

@@ -56,6 +56,8 @@ This follows the **cookieless, no-PII** approach used by privacy-first analytics
 - **Bots are filtered** by user-agent so they don't inflate the numbers.
 - **No cookie identifier or raw network address is retained.** Local legal requirements still depend on jurisdiction and site use.
 
+Visitors get the plain-language version of this on the site's privacy page ([src/pages/privacy.astro](../src/pages/privacy.astro)). If anything above changes, change that page and its date too.
+
 ## Storage
 
 - Table: `pageviews` (auto-created on first write).

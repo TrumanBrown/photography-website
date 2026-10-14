@@ -2,8 +2,9 @@
 /**
  * Fishing hobby island: two pixel maps (Minnesota + Washington) of where the
  * author fishes. Both maps render side-by-side on desktop; on mobile a segmented
- * toggle switches between them. Tap a fish (a named water) to open its species
- * panel. The bottom "fish I've caught" gallery pairs each fish's map sprite with
+ * toggle switches between them. Tap a fish (a named water), or pick one with the
+ * arrow keys and press Enter, to open its species panel. The bottom "fish I've
+ * caught" gallery pairs each fish's map sprite with
  * the real catch photo, which the lightbox shows at full size. All behaviour
  * lives in @/lib/hobbies/fishing, bound via [data-fish-*] hooks; the mounting
  * script is an Astro module so it satisfies the CSP.
@@ -83,42 +84,53 @@ const groups = [
     <div data-fish-map="mn" class="is-active space-y-3">
       <div>
         <div class="u-label mb-1">Minnesota</div>
-        <div class="overflow-hidden border border-rule bg-[#e9eff0]">
+        <div
+          class="overflow-hidden border border-rule bg-[#e9eff0]"
+          tabindex="0"
+          role="application"
+          aria-label="Pixel map of Minnesota fishing waters. Tap a fish to see its species. Arrow keys pick a water, Enter opens it.">
           <canvas
             data-fish-canvas="mn"
             class="block w-full"
             style="image-rendering: pixelated"
-            role="img"
-            aria-label="Pixel map of Minnesota fishing waters. Tap a fish to see its species"></canvas>
+            aria-hidden="true"></canvas>
         </div>
       </div>
       <div>
         <div class="u-label mb-1">Twin Cities metro</div>
-        <div class="overflow-hidden border border-rule bg-[#e9eff0]">
+        <div
+          class="overflow-hidden border border-rule bg-[#e9eff0]"
+          tabindex="0"
+          role="application"
+          aria-label="Zoomed pixel map of the Twin Cities metro lakes. Tap a fish to see its species. Arrow keys pick a lake, Enter opens it.">
           <canvas
             data-fish-canvas="metro"
             class="block w-full"
             style="image-rendering: pixelated"
-            role="img"
-            aria-label="Zoomed pixel map of the Twin Cities metro lakes"></canvas>
+            aria-hidden="true"></canvas>
         </div>
       </div>
     </div>
     <div data-fish-map="wa">
       <div class="u-label mb-1">Washington</div>
-      <div class="overflow-hidden border border-rule bg-[#e9eff0]">
+      <div
+        class="overflow-hidden border border-rule bg-[#e9eff0]"
+        tabindex="0"
+        role="application"
+        aria-label="Pixel map of Washington fishing waters. Tap a fish to see its species. Arrow keys pick a water, Enter opens it.">
         <canvas
           data-fish-canvas="wa"
           class="block w-full"
           style="image-rendering: pixelated"
-          role="img"
-          aria-label="Pixel map of Washington fishing waters. Tap a fish to see its species"></canvas>
+          aria-hidden="true"></canvas>
       </div>
     </div>
   </div>
+  <p class="sr-only" aria-live="polite" data-fish-live></p>
   <p class="mt-2 max-w-[72ch] text-xs leading-relaxed text-ink-2">
-    Each fish marks a real lake or river. Tap one to see what swims there. The boxed Twin Cities area gets its
-    own zoomed map, since that area is small and I spent most my time there.
+    Each fish marks a real lake or river. Tap one, or pick it with the arrow keys and press Enter, to see what
+    swims there. The boxed Twin Cities area gets its own zoomed map, since that area is small and I spent most my
+    time there.
   </p>
 
   <!-- species panel -->

@@ -13,19 +13,26 @@ import { SPECIES } from "@/lib/hobbies/tidepool-species";
 <section data-tidepool aria-label="Tide pooling game" class="not-prose">
   <FieldJournal prefix="tp" total={SPECIES.length} resetLabel="New beach" />
 
-  <div class="tp-frame">
+  <div
+    class="tp-frame"
+    data-tp-frame
+    tabindex="0"
+    role="application"
+    aria-label="A pixel beach at low tide. Tap rocks and driftwood logs to find the creatures hiding underneath. Arrow keys pick one, Enter looks underneath."
+  >
     <canvas
       data-tp-canvas
       class="block w-full touch-manipulation"
       style="image-rendering: pixelated"
-      role="img"
-      aria-label="A pixel beach at low tide. Tap rocks and driftwood logs to find the creatures hiding underneath."
+      aria-hidden="true"
     ></canvas>
   </div>
+  <p class="sr-only" aria-live="polite" data-tp-live></p>
   <p class="tp-note">
-    Tap a rock or driftwood log to look underneath. Every PNW critter comes with
-    a real fact, and your field journal remembers what you've found. Just like
-    IRL, put the rocks back where you found them.
+    Tap a rock or driftwood log to look underneath, or pick one with the arrow
+    keys and press Enter. Every PNW critter comes with a real fact, and your
+    field journal remembers what you've found. Just like IRL, put the rocks back
+    where you found them.
   </p>
 
   <SpecimenCard prefix="tp" closeLabel="Keep looking" />

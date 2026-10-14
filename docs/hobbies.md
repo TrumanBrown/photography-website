@@ -72,7 +72,8 @@ Every island follows the same rules so they stay cheap, safe, and consistent wit
 2. **CSP-safe by construction.** Use Astro's processed `<script>` (with `import`), **never** `is:inline`. Astro emits it as a same-origin module under `/_astro/…js`, which satisfies the strict `script-src 'self'` policy in [staticwebapp.config.json](../staticwebapp.config.json). No per-script hashes to maintain. (Confirmed in the build output: the aquarium ships as `/_astro/AquariumTank.astro_…js`.)
 3. **Lazy by route.** An island's script only loads on its own `/hobbies/<slug>` page, so Photography pages stay zero-JS and the build stays light.
 4. **Mobile-first-ish.** Works on touch, even if richer on desktop, same bar as the photography section. Responsive sizing (`ResizeObserver`), touch input (`pointerdown`, native range inputs), and pausing offscreen.
-5. **Minimal dependencies.** Prefer vanilla + canvas/SVG. Add a small library only if it _meaningfully_ improves graphics/accuracy, and document it here.
+5. **Keyboard too.** Anything a tap does needs a key. A canvas sits in a frame with `tabindex="0"`, `role="application"` and an `aria-label` that names the keys (the canvas itself is `aria-hidden`); the frame, not the canvas, takes focus because the frame's `overflow: hidden` would clip a ring on the canvas. Arrow keys move a pick that's ringed in dark and light while the frame has `:focus-visible`, Enter or Space does what a tap would, and a `sr-only` `aria-live="polite"` line says what's picked. Dialogs the toy opens hand focus back to the frame. Tide pooling, herping and the fishing maps work this way, the day-list map uses the same focusable frame, and the hiking canvas has its own arrow-key editing.
+6. **Minimal dependencies.** Prefer vanilla + canvas/SVG. Add a small library only if it _meaningfully_ improves graphics/accuracy, and document it here.
 
 Markup lives in a `.astro` component under `src/components/hobbies/`; non-trivial logic lives in `src/lib/hobbies/<name>.ts` and is imported by the component's `<script>`. The component binds to the engine via `data-*` hooks, so the engine owns behavior and the markup stays static.
 
@@ -236,6 +237,7 @@ Like the aquarium, the whole beach is **drawn in code** with canvas `fillRect`, 
 - **Rocks and logs are detailed and varied.** Rocks are rounded boulders with moss, barnacle clusters, and pock texture in a few stone tints; logs are driftwood billets with end-grain rings, wood grain, knots, and a mossy top edge. Each gets a soft contact shadow.
 - **Layout is seeded, stable, and reshuffleable.** Positions come from a seeded RNG keyed to the canvas width (so resizing doesn't reshuffle the beach), plus a “scene salt” the “New beach” button bumps to deal a fresh layout. The rock-to-log ratio is fixed (~78% rock) so every beach reads as a rocky flat instead of occasionally coming up all logs.
 - It pauses offscreen and when the tab is hidden, honors `prefers-reduced-motion`, and is touch-friendly (tap a rock to flip it).
+- **From the keyboard**, the beach takes focus as one stop. The arrow keys (and Home/End) walk the rocks and logs from left to right, Enter or Space flips the one they're on, and a ring marks it. A screen reader hears "Rock 3 of 14", and the reveal card hands focus back to the beach when it closes.
 
 ### Real photos in the reveal card
 
@@ -247,7 +249,7 @@ The reveal card shows the **pixel sprite by default and a real photo when one is
 
 ## Reference implementation: the fishing island
 
-A **clickable pixel map** of the two places I fish: Minnesota and Washington. Each map is drawn from a baked land/lake/river/sound mask, and every named water shows up as a small fish sprite of its signature species. Tap a water and a panel lists what you can catch there. The Twin Cities metro gets its own zoomed inset, since those lakes are tiny at full state scale. Below the maps, a **catch gallery** of real photos sits beside the matching pixel sprite, split into Washington and Minnesota; tapping a photo opens it full-screen in the same PhotoSwipe lightbox the photography pages use. There are 37 waters across the two states, 33 species, and 16 catches today.
+A **clickable pixel map** of the two places I fish: Minnesota and Washington. Each map is drawn from a baked land/lake/river/sound mask, and every named water shows up as a small fish sprite of its signature species. Tap a water and a panel lists what you can catch there. From the keyboard each map is one Tab stop: the arrow keys walk its waters from west to east, ringed and named, and Enter or Space opens the panel. The Twin Cities metro gets its own zoomed inset, since those lakes are tiny at full state scale. Below the maps, a **catch gallery** of real photos sits beside the matching pixel sprite, split into Washington and Minnesota; tapping a photo opens it full-screen in the same PhotoSwipe lightbox the photography pages use. There are 37 waters across the two states, 33 species, and 16 catches today.
 
 **Files**
 
@@ -323,7 +325,9 @@ A **road-cruising game**: a dark, wet Pacific Northwest back road scrolls toward
 
 **Snappy reveals (photo preloading).** So the reveal card feels instant, the engine **preloads every species photo in the background** once the island mounts (on `requestIdleCallback`, so it never competes with the initial page load). By the time you find your first animal the image is already in the browser cache, so the card shows a real photo with no per-reveal network round-trip. This — plus the right-sized `medium` images — is why reveals are immediate rather than waiting on iNaturalist's CDN. (The site itself is served from Azure Static Web Apps' global CDN; only these CC photos come from iNaturalist, and preloading hides that hop. If you ever want to drop the third-party dependency entirely, `--wire blob` serves your own copies from the `hobby-media` blob instead.)
 
-Like the other islands, everything is **drawn in code**, the loop pauses offscreen and when the tab is hidden, and it honors `prefers-reduced-motion` — which **parks the car** (the road stops moving) and degrades to a stationary headlamp-sweep so there's no vestibular motion.
+Like the other islands, everything is **drawn in code**, the loop pauses offscreen and when the tab is hidden, and it honors `prefers-reduced-motion` — which **parks the car** (the road stops moving) and degrades to a stationary headlamp-sweep so there's no vestibular motion. The beam still follows the pointer there; it just jumps to where it's aimed instead of easing.
+
+**From the keyboard**, the road takes focus as one stop: ← and → steer the beam, and Enter or Space stops for the unfound animal nearest the middle of the beam (or says "Nothing in the beam yet." through a polite live region).
 
 ## Reference implementation: Narrow nature (daily puzzle)
 
@@ -609,7 +613,7 @@ Any hobby can show a photo gallery, a hero image up top plus a thumbnail grid, e
    AZURE_STORAGE_ACCOUNT=<account> node scripts/upload-hobby-media.mjs <slug> [--hero <file>]
    ```
    For each photo it uploads a **full-resolution** blob (`full/…`, opened in the lightbox) and a smaller **display** JPEG (`display/…`, shown inline, max 1600px wide), reading orientation and true dimensions with `sharp`. It then writes the `media` block (hero + gallery) into `src/content/hobbies/<slug>.json`. The full-resolution files go through the private `incoming` container and are published by the next build, so their lightbox links work once that build has run.
-3. Optionally add `caption` text in the JSON, then commit + push. The gallery goes live on the next build.
+3. Optionally add `caption` text in the JSON, then commit + push. The gallery goes live on the next build. A photo without a caption is announced as "Open full-resolution photo", so captions are what make the gallery describable to a screen reader.
 
 Web-friendly originals (JPG/PNG/WebP) are published byte for byte as uploaded, with one exception: hobby photos are often taken at home, so the build removes any GPS position before they're public (metadata only, the image is untouched; [security.md](security.md#photo-locations)). HEIC/TIFF, which browsers can't show, become one full-size JPEG at quality 95 with full colour resolution, the same settings the photography build uses (HEIC needs `libheif` available to `sharp`). The `--hero` flag (or the first file alphabetically) chooses the large image at the top.
 

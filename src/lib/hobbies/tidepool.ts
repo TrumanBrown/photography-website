@@ -361,6 +361,8 @@ export function initTidepool(root: HTMLElement): void {
   const resetBtn = root.querySelector<HTMLButtonElement>('[data-tp-reset]');
   const photoEl = root.querySelector<HTMLImageElement>('[data-tp-photo]');
   const creditEl = root.querySelector<HTMLElement>('[data-tp-credit]');
+  const frame = root.querySelector<HTMLElement>('[data-tp-frame]');
+  const live = root.querySelector<HTMLElement>('[data-tp-live]');
 
   if (!canvas || !card || !revealCanvas || !nameEl || !sciEl || !factEl || !badgeEl || !closeBtn || !countEl || !barEl) {
     return;
@@ -378,6 +380,8 @@ export function initTidepool(root: HTMLElement): void {
   let H = 0;
   let dpr = 1;
   let stones: Stone[] = [];
+  // The stone the arrow keys are on; ringed while the beach has keyboard focus.
+  let picked: Stone | null = null;
   let sceneSalt = 0; // bumped by "New beach" so the layout reshuffles (but stays stable across resizes)
   const hand = { x: -100, y: -100, show: false };
   let onscreen = true;
@@ -410,6 +414,7 @@ export function initTidepool(root: HTMLElement): void {
   function buildScene(): void {
     const r = rng(Math.round(W) * 13 + 7 + sceneSalt * 101);
     stones = [];
+    picked = null;
     const sub = H * 0.4; // pools/sand start below this
     const count = Math.max(9, Math.round(W / 80));
     // fixed rock:log ratio so every beach is reliably rocky, then shuffle the
@@ -565,7 +570,22 @@ export function initTidepool(root: HTMLElement): void {
   function drawBeach(now: number): void {
     if (bg) ctx!.drawImage(bg, 0, 0, W, H);
     for (const s of stones) drawStone(s, now);
+    if (picked && frame?.matches(':focus-visible')) drawPickRing(picked);
     if (hand.show && !reduceMotion) drawHand(hand.x, hand.y);
+  }
+
+  // Dark and light rings, so the pick shows on sand, rock and pool alike.
+  function drawPickRing(s: Stone): void {
+    const pad = 6;
+    const left = snap(s.x - s.w / 2 - pad);
+    const top = snap(s.y - s.h / 2 - s.lift * (s.h + 14) - pad);
+    const w = snap(s.w + pad * 2);
+    const h = snap(s.y + s.h / 2 + pad) - top;
+    ctx!.lineWidth = 2;
+    ctx!.strokeStyle = '#16150f';
+    ctx!.strokeRect(left + 1, top + 1, w - 2, h - 2);
+    ctx!.strokeStyle = '#fbfaf8';
+    ctx!.strokeRect(left + 3, top + 3, w - 6, h - 6);
   }
 
   function drawStone(s: Stone, now: number): void {
@@ -793,7 +813,10 @@ export function initTidepool(root: HTMLElement): void {
   canvas.addEventListener('click', (e: MouseEvent) => {
     const rect2 = canvas.getBoundingClientRect();
     const s = hitTest(e.clientX - rect2.left, e.clientY - rect2.top);
-    if (s) flip(s);
+    if (s) {
+      picked = s;
+      flip(s);
+    }
   });
   canvas.addEventListener('pointermove', (e: PointerEvent) => {
     if (e.pointerType === 'touch') return;
@@ -806,6 +829,35 @@ export function initTidepool(root: HTMLElement): void {
   canvas.addEventListener('pointerleave', () => {
     hand.show = false;
   });
+
+  // Keyboard play: the arrow keys walk the stones from left to right, and
+  // Enter or Space flips the one they're on, the same as a tap.
+  function byX(): Stone[] {
+    return [...stones].sort((a, b) => a.x - b.x);
+  }
+  function pick(s: Stone): void {
+    picked = s;
+    const row = byX();
+    const name = s.kind === 'rock' ? 'Rock' : 'Driftwood log';
+    if (live) live.textContent = `${name} ${row.indexOf(s) + 1} of ${row.length}${s.open ? ', flipped over' : ''}`;
+  }
+  if (frame) {
+    frame.addEventListener('focus', () => {
+      if (!picked && stones.length && frame.matches(':focus-visible')) pick(byX()[0]);
+    });
+    frame.addEventListener('keydown', (e: KeyboardEvent) => {
+      const row = byX();
+      if (!row.length) return;
+      const at = picked ? row.indexOf(picked) : -1;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') pick(row[Math.min(row.length - 1, at + 1)]);
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') pick(row[Math.max(0, at - 1)]);
+      else if (e.key === 'Home') pick(row[0]);
+      else if (e.key === 'End') pick(row[row.length - 1]);
+      else if (e.key === 'Enter' || e.key === ' ') flip((picked ??= row[0]));
+      else return;
+      e.preventDefault();
+    });
+  }
 
   closeBtn.addEventListener('click', closeCard);
   card.addEventListener('click', (e) => {

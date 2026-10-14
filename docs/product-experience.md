@@ -63,6 +63,12 @@ Admin tabs now expose the tab/tablist/tabpanel relationship and support Arrow, H
 
 Every page starts with a "Skip to content" link that appears when Tab reaches it, so keyboard visitors don't have to walk the whole session rail to reach a photograph. Below 900px the page keeps 60px of scroll padding at the top, so a focused element never ends up under the sticky bar. The footer link uses `--ink-2`, which clears 4.5:1 in both themes (it was 2.4:1).
 
+An October 2026 audit ran axe-core (WCAG 2.2 A and AA) over every built page in both themes, plus the open contact form, and tabbed through each kind of page checking that every stop shows a focus ring. Contrast passed everywhere. What it fixed:
+
+- **The rail's two links are 24px rows.** "Photographs" and "Things to try" were 15px tall and 16px apart, under WCAG 2.2's 24px minimum tap target (2.5.8).
+- **Hobby gallery links always have a name.** An empty caption used to give the link an empty `aria-label`; it now falls back to "Open full-resolution photo", like a missing one.
+- **The canvas toys play from the keyboard** (2.1.1). The tide pool beach, the herping road and the three fishing maps each take focus, arrow keys pick (or steer), Enter or Space acts, and a polite live region says what's picked. See [docs/hobbies.md](hobbies.md#interactive-island-conventions).
+
 ### Motion that answers what you do
 
 A later pass borrowed mechanics from four React component libraries (Cult UI, Watermelon UI, Skiper UI, Magic UI) and rules from Vercel's web interface guidelines, UI/UX Pro Max and Bencium's motion spec. The site has no React, so each one is rewritten in plain CSS or TypeScript in the archive's ink and paper. Things move only in answer to the visitor; the lead photo is the one thing that changes on its own, and it now has a pause. Under `prefers-reduced-motion` all of it settles instantly.
@@ -82,6 +88,10 @@ Before this, nothing on the site said a photo could be printed or licensed, so i
 - **The "Licensable" badge in Google Images.** Each session photo's `ImageObject` gains `license` and `acquireLicensePage`, both pointing at `/prints/#licensing` (`src/lib/prints.ts`). Google shows the badge and a link to that page beside the image, so someone who finds a photo through image search can ask about it.
 
 It's inquiry-only on purpose: no shop, checkout, prices or new cloud service. Messages land in the same `contactmessages` table as any other contact. A print-on-demand store can come later if the inquiries show demand.
+
+### Privacy page
+
+`/privacy/` ([src/pages/privacy.astro](../src/pages/privacy.astro)) tells visitors, in the site's own voice, what the contact form keeps and for how long, how visit counts work without cookies or stored IP addresses, what stays in their browser, which outside hosts a page talks to (Azure, and iNaturalist on some hobby pages), how Do Not Track is handled, and how to have their data deleted. It's linked from the footer and from a line under the contact form's Send button. It has a "Last updated" date: change the page and the date together whenever any of those change ([docs/analytics.md](analytics.md), [docs/privacy.md](privacy.md)).
 
 ## What remains intentionally unchanged
 

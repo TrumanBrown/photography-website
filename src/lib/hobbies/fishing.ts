@@ -93,10 +93,14 @@ export function initFishing(root: HTMLElement): void {
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePanel(); });
 
   // map views
+  const live = root.querySelector<HTMLElement>('[data-fish-live]');
+  const announce = (text: string) => {
+    if (live) live.textContent = text;
+  };
   const views: Array<{ frame: (now: number) => void }> = [];
   root.querySelectorAll<HTMLCanvasElement>('[data-fish-canvas]').forEach((cv) => {
     const key = cv.dataset.fishCanvas ?? '';
-    if (REGIONS[key]) views.push(makeView(key, cv, openPanel, reduce, key in INSET_KEYS));
+    if (REGIONS[key]) views.push(makeView(key, cv, openPanel, reduce, key in INSET_KEYS, announce));
   });
 
   // mobile MN/WA toggle
@@ -136,7 +140,14 @@ export function initFishing(root: HTMLElement): void {
   if (!reduce) start();
 }
 
-function makeView(key: string, canvas: HTMLCanvasElement, onPick: (id: string) => void, reduce: boolean, alwaysLabel: boolean) {
+function makeView(
+  key: string,
+  canvas: HTMLCanvasElement,
+  onPick: (id: string) => void,
+  reduce: boolean,
+  alwaysLabel: boolean,
+  announce: (text: string) => void,
+) {
   const s = REGIONS[key];
   const ctx = canvas.getContext('2d')!;
   const W = s.gw * BAKE, Hpx = s.gh * BAKE;
@@ -192,6 +203,44 @@ function makeView(key: string, canvas: HTMLCanvasElement, onPick: (id: string) =
     if (hit) onPick(hit.id);
   });
 
+  // Keyboard: the map's frame takes focus, the arrow keys walk its waters from
+  // west to east, and Enter or Space opens the one they're on. Reduced motion
+  // has no animation loop, so each change repaints.
+  const box = canvas.parentElement;
+  const order = [...marks].sort((a, b) => a.px - b.px);
+  let chosen: (typeof marks)[number] | null = null;
+  const keyboardFocused = () => !!box && box.matches(':focus-visible');
+  const choose = (m: (typeof marks)[number]) => {
+    chosen = m;
+    hover = m;
+    frame(performance.now());
+    announce(`${WATERS[m.id].name}, ${order.indexOf(m) + 1} of ${order.length}`);
+  };
+  if (box?.hasAttribute('tabindex') && order.length) {
+    box.addEventListener('focus', () => {
+      if (chosen) {
+        hover = chosen;
+        frame(performance.now());
+      } else if (keyboardFocused()) choose(order[0]);
+    });
+    box.addEventListener('blur', () => {
+      if (hover === chosen) hover = null;
+      frame(performance.now());
+    });
+    box.addEventListener('keydown', (e) => {
+      const at = chosen ? order.indexOf(chosen) : -1;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') choose(order[Math.min(order.length - 1, at + 1)]);
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') choose(order[Math.max(0, at - 1)]);
+      else if (e.key === 'Home') choose(order[0]);
+      else if (e.key === 'End') choose(order[order.length - 1]);
+      else if (e.key === 'Enter' || e.key === ' ') {
+        if (!chosen) choose(order[0]);
+        if (chosen) onPick(chosen.id);
+      } else return;
+      e.preventDefault();
+    });
+  }
+
   function labelAt(text: string, cx: number, cy: number): void {
     ctx.font = 'bold 10px system-ui, sans-serif';
     ctx.textAlign = 'center';
@@ -235,6 +284,20 @@ function makeView(key: string, canvas: HTMLCanvasElement, onPick: (id: string) =
     if (!alwaysLabel && hover) {
       const u = 1.05 + hover.r * 1.05;
       labelAt(WATERS[hover.id].name, hover.px, hover.py - u * 4 - 7);
+    }
+    // Dark and light rings around the water the arrow keys are on.
+    if (chosen && keyboardFocused()) {
+      const k = canvas.width / (canvas.clientWidth || canvas.width);
+      const rad = (1.05 + chosen.r * 1.05) * 6.5 + 3 * k;
+      ctx.lineWidth = 2 * k;
+      ctx.strokeStyle = '#16150f';
+      ctx.beginPath();
+      ctx.arc(chosen.px, chosen.py, rad + 2 * k, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeStyle = '#fbfaf8';
+      ctx.beginPath();
+      ctx.arc(chosen.px, chosen.py, rad, 0, Math.PI * 2);
+      ctx.stroke();
     }
   }
   return { frame };

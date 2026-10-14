@@ -14,21 +14,27 @@ import { SPECIES } from "@/lib/hobbies/herping-species";
 <section data-herping aria-label="Herping night drive game" class="not-prose">
   <FieldJournal prefix="hp" total={SPECIES.length} resetLabel="New road" />
 
-  <div class="hp-frame">
+  <div
+    class="hp-frame"
+    data-hp-frame
+    tabindex="0"
+    role="application"
+    aria-label="A dark rainy road at night. Steer the headlight beam and look for the eyeshine of amphibians hiding on the road, then tap one to identify it. Arrow keys steer, Enter stops for whatever's in the beam."
+  >
     <canvas
       data-hp-canvas
       class="block w-full touch-none"
       style="image-rendering: pixelated"
-      role="img"
-      aria-label="A dark rainy road at night. Steer the headlight beam and look for the eyeshine of amphibians hiding on the road, then tap one to identify it."
+      aria-hidden="true"
     ></canvas>
   </div>
+  <p class="sr-only" aria-live="polite" data-hp-live></p>
   <p class="hp-note">
-    Move your headlight beam (mouse, or drag on touch) down the dark road. Watch
-    for a tiny eyeshine glint: that's an animal's eyes catching the light. Steer
-    onto it and tap to stop and ID it. Please never handle real salamanders with
-    bug-sprayed or lotioned hands, and put any cover you flip back the way you
-    found it.
+    Move your headlight beam (mouse, drag on touch, or the arrow keys) down the
+    dark road. Watch for a tiny eyeshine glint: that's an animal's eyes catching
+    the light. Steer onto it and tap, or press Enter, to stop and ID it. Please
+    never handle real salamanders with bug-sprayed or lotioned hands, and put
+    any cover you flip back the way you found it.
   </p>
 
   <SpecimenCard prefix="hp" closeLabel="Keep driving" />
