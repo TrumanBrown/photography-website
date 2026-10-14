@@ -114,17 +114,24 @@ async function preview(store, remote, only) {
     (s) => !only || s.slug === only,
   );
   let changes = 0;
+  // Photos link the full-size originals, so with every session on the page
+  // each one's photos stay folded until opened, and only those load.
+  const folded = sessions.length > 1;
   const blocks = sessions.map((s) => {
     const rec = catalog.sessions?.[s.slug] ?? {};
     // What the site shows now: the session file's description, and the
     // captions the pipeline last wrote there.
     const liveCaptions = rec.written?.captions ?? {};
+    let changedHere = 0;
     const cards = s.photos
       .map((p) => {
         const caption = rec.captions?.[p.file];
         const live = liveCaptions[p.file];
         const changed = Boolean(caption && live && live !== caption);
-        if (changed) changes++;
+        if (changed) {
+          changes++;
+          changedHere++;
+        }
         return `<figure><img src="${escape(p.url)}" loading="lazy" alt=""><figcaption>${caption ? escape(caption) : "<i>no caption yet</i>"}${changed ? `<span class="was">now: ${escape(live)}</span>` : ""}<small>${escape(p.file)} · ${caption?.length ?? 0} chars</small></figcaption></figure>`;
       })
       .join("\n");
@@ -134,13 +141,16 @@ async function preview(store, remote, only) {
         ? `<p class="was">On the site now: ${escape(s.description)}</p>`
         : "";
     if (describedNow) changes++;
-    return `<section><h2>${escape(s.title)}</h2><p class="desc">${escape(next)}${rec.problem ? `<br><b>Problem:</b> ${escape(rec.problem)}` : ""}</p>${describedNow}<div class="grid">${cards}</div></section>`;
+    const grid = `<div class="grid">${cards}</div>`;
+    const photosLabel = `${s.photos.length} photos and captions${changedHere ? `, ${changedHere} changed` : ""}`;
+    return `<section><h2>${escape(s.title)}</h2><p class="desc">${escape(next)}${rec.problem ? `<br><b>Problem:</b> ${escape(rec.problem)}` : ""}</p>${describedNow}${folded ? `<details><summary>${photosLabel}</summary>${grid}</details>` : grid}</section>`;
   });
   const html = `<!doctype html><meta charset="utf-8"><title>Photo captions</title>
 <style>body{font:15px system-ui;margin:2rem;max-width:1300px}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem}
 figure{margin:0}img{width:100%;height:220px;object-fit:cover;background:#eee}figcaption{font-size:14px;margin-top:.3rem}small{display:block;color:#888;font-size:12px}
 .desc{max-width:70ch;font-size:16px;line-height:1.5}h2{margin-top:2.5rem}
-.was{display:block;max-width:70ch;color:#999;font-size:13px;margin-top:.2rem}</style>
+.was{display:block;max-width:70ch;color:#999;font-size:13px;margin-top:.2rem}
+summary{cursor:pointer;color:#555;margin:.4rem 0}</style>
 <h1>Captions and descriptions</h1>
 <p>${changes ? `${changes} captions and descriptions would change on the site with the next run that writes it. The current text is in grey under each.` : "Everything here matches the site."}</p>${blocks.join("\n")}`;
   const out = join(ROOT, ".cache/photos/preview.html");
