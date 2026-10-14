@@ -12,12 +12,14 @@ import {
   fullPanelSize,
   imagesPayload,
   isEditorMode,
+  nearestShown,
   onlyFittingByDefault,
   previewUrl,
   ratioLabel,
   sessionFlags,
   thumbSrcSet,
   thumbUrl,
+  toggleShowcase,
   type AdminSession,
   type Draft,
   type EditorMode,
@@ -1146,10 +1148,9 @@ function applyPick(file: string) {
   } else if (mode === 'header') {
     draft.banner = draft.banner === file ? '' : file;
   } else if (mode === 'rotation') {
-    if (!fitsLeadBox(editor.session, file)) return;
-    draft.showcase = draft.showcase.includes(file)
-      ? draft.showcase.filter((f) => f !== file)
-      : [...draft.showcase, file];
+    const showcase = toggleShowcase(editor.session, draft.showcase, file);
+    if (showcase === draft.showcase) return;
+    draft.showcase = showcase;
   }
   renderGrid();
   renderSummary();
@@ -1191,7 +1192,9 @@ function renderGrid() {
     gridEl.appendChild(empty);
     return;
   }
-  if (!files.includes(state.focused)) state.focused = files[0];
+  if (!files.includes(state.focused)) {
+    state.focused = nearestShown(state.session.images, files, state.focused);
+  }
 
   const grid = document.createElement('div');
   grid.className = 'grid gap-3';
@@ -1267,6 +1270,15 @@ function autoTile(state: EditorState): HTMLElement {
   return wrap;
 }
 
+/** Hover text for a tile: the filename, and why the slot can't use it. */
+function tileTitle(mode: EditorMode, file: string, usable: boolean, picked: boolean): string {
+  if (usable) return file;
+  if (mode === 'header') return `${file}, too tall for the header crop`;
+  return picked
+    ? `${file}, not a 3:2 horizontal, so the home page skips it. Tap to take it out.`
+    : `${file}, not a 3:2 horizontal`;
+}
+
 function photoTile(state: EditorState, file: string): HTMLElement {
   const picked = isPicked(state, file);
   const usable = usableIn(state, file);
@@ -1288,13 +1300,12 @@ function photoTile(state: EditorState, file: string): HTMLElement {
     [file, ratio, ...roles.map((role) => role.toLowerCase())].filter(Boolean).join(', '),
   );
   // Dimmed frames stay focusable so the keyboard can still reach a preview;
-  // the click is what gets ignored.
-  if (!usable && state.mode === 'rotation') button.setAttribute('aria-disabled', 'true');
-  button.title = usable
-    ? file
-    : state.mode === 'rotation'
-      ? `${file}, not a 3:2 horizontal`
-      : `${file}, too tall for the header crop`;
+  // the click is what gets ignored. A pick that doesn't fit isn't locked, so
+  // it can still come out of the rotation.
+  if (!usable && !picked && state.mode === 'rotation') {
+    button.setAttribute('aria-disabled', 'true');
+  }
+  button.title = tileTitle(state.mode, file, usable, picked);
   button.className =
     'relative block w-full overflow-hidden rounded border-2 ' +
     (picked
@@ -1581,7 +1592,7 @@ function paintPreviewAssign() {
   }
   previewAssign.classList.remove('hidden');
   const picked = isPicked(editor, previewFile);
-  previewAssign.disabled = !usableIn(editor, previewFile) && mode === 'rotation';
+  previewAssign.disabled = mode === 'rotation' && !picked && !usableIn(editor, previewFile);
   previewAssign.textContent =
     mode === 'rotation'
       ? picked

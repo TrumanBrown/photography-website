@@ -337,6 +337,42 @@ export function framesToShow(
   return session.images;
 }
 
+/**
+ * The rotation after a tap on one frame.
+ *
+ * Only a frame that fits the lead box can go in, but a pick can always come
+ * out. A pick can stop fitting after it was made (its shape wasn't known yet,
+ * or the file was replaced), and without this it would be stuck in the session
+ * for good. Hands back the same array when nothing changes.
+ */
+export function toggleShowcase(
+  session: AdminSession,
+  showcase: string[],
+  file: string,
+): string[] {
+  if (showcase.includes(file)) return showcase.filter((f) => f !== file);
+  if (!fitsLeadBox(session, file)) return showcase;
+  return [...showcase, file];
+}
+
+/**
+ * Where the grid's focus goes when the focused frame is no longer shown.
+ *
+ * Taking out a pick that doesn't fit drops it from the filtered grid. The frame
+ * after it (or before it, at the end) keeps the place, where the first tile
+ * would scroll the grid back to the top.
+ */
+export function nearestShown(all: string[], shown: string[], file: string): string {
+  if (shown.includes(file)) return file;
+  const visible = new Set(shown);
+  const at = all.indexOf(file);
+  if (at >= 0) {
+    for (let i = at + 1; i < all.length; i++) if (visible.has(all[i])) return all[i];
+    for (let i = at - 1; i >= 0; i--) if (visible.has(all[i])) return all[i];
+  }
+  return shown[0] ?? '';
+}
+
 /** Captions ride along with the save as an ordered images array. */
 export function imagesPayload(
   session: AdminSession,

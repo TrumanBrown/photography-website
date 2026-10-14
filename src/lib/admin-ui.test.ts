@@ -14,6 +14,7 @@ import {
   isDirty,
   isEditorMode,
   matchesQuery,
+  nearestShown,
   needsWork,
   onlyFittingByDefault,
   previewUrl,
@@ -22,6 +23,7 @@ import {
   sortSessions,
   thumbSrcSet,
   thumbUrl,
+  toggleShowcase,
   type AdminSession,
 } from "./admin-ui";
 
@@ -333,5 +335,52 @@ describe("frames the grid shows", () => {
     const session = mk();
     const draft = draftFromSession(session);
     expect(framesToShow(session, draft, "captions", true)).toEqual(["DSC002.JPG", "DSC003.JPG"]);
+  });
+});
+
+describe("picking for the rotation", () => {
+  it("adds a 3:2 frame and takes it back out", () => {
+    const session = mk();
+    const picked = toggleShowcase(session, [], "DSC001.JPG");
+    expect(picked).toEqual(["DSC001.JPG"]);
+    expect(toggleShowcase(session, picked, "DSC001.JPG")).toEqual([]);
+  });
+
+  it("won't add a frame that doesn't fit the lead box", () => {
+    const session = mk();
+    const showcase = ["DSC001.JPG"];
+    expect(toggleShowcase(session, showcase, "DSC002.JPG")).toBe(showcase);
+    expect(toggleShowcase(session, showcase, "DSC003.JPG")).toBe(showcase);
+  });
+
+  it("still takes out a pick that doesn't fit", () => {
+    const session = mk({ showcase: ["DSC001.JPG", "DSC002.JPG"] });
+    const draft = draftFromSession(session);
+    const showcase = toggleShowcase(session, draft.showcase, "DSC002.JPG");
+    expect(showcase).toEqual(["DSC001.JPG"]);
+    expect(toggleShowcase(session, showcase, "DSC002.JPG")).toBe(showcase);
+  });
+
+  it("lets a frame of unknown shape in, like the rest of the pickers", () => {
+    const session = mk({ ratios: {} });
+    expect(toggleShowcase(session, [], "DSC002.JPG")).toEqual(["DSC002.JPG"]);
+  });
+});
+
+describe("focus when a frame leaves the grid", () => {
+  const all = ["A.JPG", "B.JPG", "C.JPG", "D.JPG"];
+
+  it("stays put while the frame is still shown", () => {
+    expect(nearestShown(all, all, "C.JPG")).toBe("C.JPG");
+  });
+
+  it("moves to the next frame shown, or the one before at the end", () => {
+    expect(nearestShown(all, ["A.JPG", "D.JPG"], "B.JPG")).toBe("D.JPG");
+    expect(nearestShown(all, ["A.JPG", "B.JPG"], "D.JPG")).toBe("B.JPG");
+  });
+
+  it("falls back to the first frame when it can't place the old one", () => {
+    expect(nearestShown(all, ["B.JPG", "C.JPG"], "")).toBe("B.JPG");
+    expect(nearestShown(all, [], "B.JPG")).toBe("");
   });
 });
