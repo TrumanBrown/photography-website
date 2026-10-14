@@ -46,8 +46,8 @@ const summary = [
   .filter(Boolean)
   .join(" · ");
 
-// The photographs that rotate in the lead box: whatever the admin panel put in
-// each session's `showcase`, or one 3:2 frame per session picked automatically.
+// The photographs that rotate in the lead box: only the ones picked in the
+// admin panel (each session's `showcase`). A session with no picks isn't in it.
 const lead: LeadItem[] = buildLeadFrames(sessions).map((frame) => ({
   slug: frame.slug,
   title: frame.title,

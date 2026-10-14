@@ -35,7 +35,7 @@ const sessions = defineCollection({
     order: z.number().int().nullable().optional(),
     /**
      * Filenames chosen in the admin panel to rotate in the lead box on the
-     * home page. Empty means "pick one automatically"; see buildLeadFrames.
+     * home page. Empty keeps the session out of it; see buildLeadFrames.
      */
     showcase: z.array(z.string()).default([]),
     images: z

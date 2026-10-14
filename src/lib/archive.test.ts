@@ -57,14 +57,29 @@ describe("buildPlaces", () => {
 });
 
 describe("buildLeadFrames", () => {
-  it("picks one near-3:2 frame per session when nothing is curated", () => {
+  it("leaves a session out when nothing is picked for it", () => {
     const frames = buildLeadFrames([
       session("a", {
         location: "Eastern Washington",
         images: [tall("portrait.jpg"), wide("landscape.jpg")],
       }),
     ]);
-    expect(frames.map((f) => f.file)).toEqual(["landscape.jpg"]);
+    expect(frames).toHaveLength(0);
+  });
+
+  it("only takes picked frames, even when other sessions have 3:2 ones", () => {
+    const frames = buildLeadFrames([
+      session("picked", {
+        location: "Eastern Washington",
+        showcase: ["b.jpg"],
+        images: [wide("a.jpg"), wide("b.jpg")],
+      }),
+      session("unpicked", {
+        location: "Møre og Romsdal, Norway",
+        images: [wide("c.jpg"), wide("d.jpg")],
+      }),
+    ]);
+    expect(frames.map((f) => f.file)).toEqual(["b.jpg"]);
   });
 
   it("uses the curated showcase list when there is one", () => {
@@ -89,10 +104,11 @@ describe("buildLeadFrames", () => {
     expect(frames).toHaveLength(0);
   });
 
-  it("sits a session out when nothing is close to 3:2", () => {
+  it("sits a session out when none of its picks are close to 3:2", () => {
     const frames = buildLeadFrames([
       session("a", {
         location: "Eastern Washington",
+        showcase: ["a.jpg", "b.jpg"],
         images: [tall("a.jpg"), pano("b.jpg")],
       }),
     ]);
@@ -103,14 +119,17 @@ describe("buildLeadFrames", () => {
     const frames = buildLeadFrames([
       session("wa1", {
         location: "Eastern Washington",
+        showcase: ["wa1.jpg"],
         images: [wide("wa1.jpg")],
       }),
       session("wa2", {
         location: "Puget Sound, Washington",
+        showcase: ["wa2.jpg"],
         images: [wide("wa2.jpg")],
       }),
       session("cr1", {
         location: "Limón Province, Costa Rica",
+        showcase: ["cr1.jpg"],
         images: [wide("cr1.jpg")],
       }),
     ]);

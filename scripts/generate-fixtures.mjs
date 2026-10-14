@@ -26,6 +26,7 @@ const baseFixtures = [
       location: 'Northern California coast',
       description: 'An afternoon of low-tide poking around.',
       order: 1,
+      showcase: ['anemone.jpg', 'kelp.jpg'],
     },
     images: [
       { name: 'anemone.jpg', color: '#0e7490', w: 1600, h: 1067, caption: 'Green anemone' },
@@ -41,6 +42,7 @@ const baseFixtures = [
       date: '2025-04-12',
       location: 'Beijing → Xi\u2019an → Chengdu',
       description: 'Three weeks across three cities.',
+      showcase: ['terracotta.jpg'],
     },
     images: [
       { name: 'great-wall.jpg', color: '#7c2d12', w: 1600, h: 900, caption: 'Mutianyu' },
@@ -73,6 +75,15 @@ function manyFixtures() {
     const month = String(((i * 3) % 12) + 1).padStart(2, '0');
     const day = String(((i * 7) % 27) + 1).padStart(2, '0');
     const slug = place.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + `-${year}`;
+    const images = [0, 1, 2].map((k) => {
+      const isPortrait = (i + k) % 3 === 0;
+      return {
+        name: `img-${k + 1}.jpg`,
+        color: swatches[(i + k) % swatches.length],
+        w: isPortrait ? 1067 : 1600,
+        h: isPortrait ? 1600 : 1067,
+      };
+    });
     out.push({
       slug,
       data: {
@@ -80,16 +91,10 @@ function manyFixtures() {
         date: `${year}-${month}-${day}`,
         location: place,
         description: '',
+        // The home page only rotates picked frames, so pick one now and then.
+        ...(i % 4 === 0 ? { showcase: [images.find((img) => img.w > img.h).name] } : {}),
       },
-      images: [0, 1, 2].map((k) => {
-        const isPortrait = (i + k) % 3 === 0;
-        return {
-          name: `img-${k + 1}.jpg`,
-          color: swatches[(i + k) % swatches.length],
-          w: isPortrait ? 1067 : 1600,
-          h: isPortrait ? 1600 : 1067,
-        };
-      }),
+      images,
     });
     i++;
   }

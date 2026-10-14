@@ -752,7 +752,7 @@ function renderList() {
       flags.hasBanner ? badge('Header pinned') : '',
       flags.inRotation
         ? badge(`${flags.inRotation} in rotation`, 'good')
-        : badge(flags.leadCandidates ? 'Rotation automatic' : 'No 3:2 frame'),
+        : badge(flags.leadCandidates ? 'Not in rotation' : 'No 3:2 frame'),
       s.order != null ? badge(`Order ${s.order}`) : '',
     ]
       .filter(Boolean)
@@ -872,7 +872,7 @@ const MODE_HELP: Record<EditorMode, string> = {
   header:
     "The photograph the session page opens on. It's cropped wide, so the filter hides upright frames, clear it to pick one anyway. Auto follows the cover.",
   rotation:
-    'Photographs worth leading with on the home page. Only wide 3:2 frames fit the lead box, so the rest are left out. Leave it empty and one gets picked for you.',
+    'Photographs worth leading with on the home page. Only wide 3:2 frames fit the lead box, so the rest are left out. Nothing from this session goes in unless you pick it.',
   captions:
     'Captions become the alt text in the lightbox and the line under each photograph. Short and specific beats clever.',
 };
@@ -1501,7 +1501,7 @@ function renderSummary() {
     summaryRow('Header', draft.banner || 'Follows the cover'),
     summaryRow(
       'Home rotation',
-      draft.showcase.length ? `${draft.showcase.length} of ${leadCandidates} usable` : 'Automatic',
+      draft.showcase.length ? `${draft.showcase.length} of ${leadCandidates} usable` : 'None picked',
     ),
     summaryRow('Captions', `${captioned} / ${session.images.length}`),
   ].join('');

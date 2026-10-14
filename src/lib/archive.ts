@@ -69,13 +69,13 @@ export interface LeadFrame {
 /**
  * Pick the photographs that rotate at the top of the home page.
  *
- * A session's `showcase` list wins when it has one — that's the admin panel's
- * job. Otherwise one frame is chosen automatically so the rotation works on a
- * fresh archive without anyone curating it first.
+ * Only frames picked in the admin panel (a session's `showcase`) go in. A
+ * session with nothing picked sits the rotation out rather than having a frame
+ * chosen for it, and with nothing picked anywhere the home page goes without a
+ * lead photo.
  *
- * Only frames close to 3:2 landscape are eligible, because the lead box is a
- * fixed 3:2 and nothing there is allowed to be cropped. Sessions with no such
- * frame simply sit the rotation out.
+ * A pick still has to be close to 3:2 landscape, because the lead box is a
+ * fixed 3:2 and nothing there is allowed to be cropped.
  */
 export function buildLeadFrames(sessions: Session[]): LeadFrame[] {
   const perSession: { region: string; frames: LeadFrame[] }[] = [];
@@ -83,15 +83,12 @@ export function buildLeadFrames(sessions: Session[]): LeadFrame[] {
   for (const entry of sessions) {
     const slug = sessionSlug(entry);
     const { title, location, images, showcase } = entry.data;
-    const eligible = images.filter((image) => {
-      const r = ratio(image);
-      return r >= LEAD_RATIO.min && r <= LEAD_RATIO.max;
-    });
-    if (!eligible.length) continue;
+    if (!showcase?.length) continue;
 
-    const picked = showcase?.length
-      ? eligible.filter((image) => showcase.includes(image.file))
-      : [eligible[Math.floor(eligible.length / 2)]];
+    const picked = images.filter((image) => {
+      const r = ratio(image);
+      return showcase.includes(image.file) && r >= LEAD_RATIO.min && r <= LEAD_RATIO.max;
+    });
     if (!picked.length) continue;
 
     perSession.push({
