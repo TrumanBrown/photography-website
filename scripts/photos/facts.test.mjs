@@ -227,6 +227,32 @@ describe("first lines", () => {
     });
   });
 
+  it("takes just the name for a photo of it sitting there, and never a pose", () => {
+    expect(normaliseLine({ action: "" }, { named: true })).toEqual({
+      action: "",
+    });
+    expect(
+      normaliseLine(
+        { action: "perched upright on a stem facing left" },
+        { named: true },
+      ),
+    ).toEqual({ action: "perched on a stem" });
+    expect(
+      normaliseLine({ action: "perched upright facing left" }, { named: true }),
+    ).toEqual({ action: "" });
+    expect(
+      normaliseLine(
+        { action: "perched on a stem with its bill raised" },
+        { named: true },
+      ),
+    ).toEqual({ action: "perched on a stem" });
+    expect(normaliseLine({ line: "A gull facing right" })).toEqual({
+      text: "A gull",
+    });
+    // An empty line for something unnamed says nothing at all.
+    expect(normaliseLine({ line: "" })).toBeNull();
+  });
+
   it("cuts the background if the model slips it in", () => {
     expect(
       normaliseLine(
@@ -276,18 +302,19 @@ describe("first lines", () => {
         { named: true },
       ),
     ).toEqual({ action: "with its mouth open among grass and fallen leaves" });
+    // A lowered head is a pose, so it comes out once it has its "with".
     expect(
       normaliseLine(
         { action: "standing head lowered on a slope" },
         { named: true },
       ),
-    ).toEqual({ action: "standing with its head lowered on a slope" });
+    ).toEqual({ action: "standing on a slope" });
     expect(
       normaliseLine(
         { action: "grazing heads lowered" },
         { named: true, plural: true },
       ),
-    ).toEqual({ action: "grazing with their heads lowered" });
+    ).toEqual({ action: "grazing" });
     expect(
       normaliseLine({ action: "flying with its tail fanned" }, { named: true }),
     ).toEqual({ action: "flying with its tail fanned" });

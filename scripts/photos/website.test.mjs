@@ -4,6 +4,7 @@ import {
   backdropIn,
   captionFor,
   descriptionProblems,
+  openerOf,
   placeAfter,
   placeLabel,
   plural,
@@ -91,6 +92,38 @@ describe("website captions", () => {
         line: { text: "Mount Baker from Yellow Aster Butte" },
       }),
     ).toBe("Mount Baker from Yellow Aster Butte");
+  });
+
+  it("takes just the name and place when the line says nothing more, and drops a pose from the notes", () => {
+    expect(
+      captionFor({
+        analysis: look(),
+        taxon: frog,
+        session: crarc,
+        line: { action: "" },
+      }),
+    ).toBe("Sylvia's tree frog (Cruziohyla sylviae), Guayacán");
+    // No written line: built from the notes, without their pose.
+    expect(
+      captionFor({
+        analysis: look({
+          scene: "perched on a twig facing right",
+          conditions: "",
+        }),
+        taxon: frog,
+        session: crarc,
+      }),
+    ).toBe(
+      "Sylvia's tree frog (Cruziohyla sylviae) perched on a twig, Guayacán",
+    );
+    expect(
+      captionFor({
+        analysis: look({ scene: "on a twig" }),
+        taxon: frog,
+        session: crarc,
+        line: { action: "on a twig with its head turned" },
+      }),
+    ).toBe("Sylvia's tree frog (Cruziohyla sylviae) on a twig, Guayacán");
   });
 
   it("falls back to the notes when a written line names something nobody wrote down", () => {
@@ -486,12 +519,70 @@ describe("session descriptions", () => {
   const check = (description, extra = {}) =>
     descriptionProblems({ description }, { session: crarc, digest, ...extra });
 
-  it("passes a plain, grounded description", () => {
+  it("passes a grounded description in his voice", () => {
+    expect(
+      check(
+        "Frogs, and most of them at night lol. Found a Sylvia's tree frog on a thin twig, and a heron by the canal in Guayacán.",
+      ),
+    ).toEqual([]);
+  });
+
+  it("wants his reaction in it, and nothing he didn't say happened", () => {
     expect(
       check(
         "Frogs, and most of them at night. A Sylvia's tree frog on a thin twig, and a heron by the canal in Guayacán.",
+      ).join(" "),
+    ).toMatch(/no reaction of his/);
+    for (const [text, said] of [
+      [
+        "We spent the night looking for frogs, such a fun walk with a Sylvia's tree frog on a twig.",
+        "We",
+      ],
+      [
+        "Went snorkeling off the bank and found a heron, such a cool bird.",
+        "snorkeling",
+      ],
+      [
+        "Waited ages for the Sylvia's tree frog to move, so cool when it finally did.",
+        "Waited",
+      ],
+    ])
+      expect(check(text).join(" ")).toContain(`It says "${said}"`);
+    // His notes are what back it up.
+    expect(
+      check(
+        "Went snorkeling off the bank and found a heron, such a cool bird.",
+        { notes: "Snorkeled the reef in the afternoon." },
       ),
     ).toEqual([]);
+  });
+
+  it("keeps it about the trip, not the pictures, and in plain punctuation", () => {
+    const voiced =
+      "Such a fun night, a Sylvia's tree frog on a twig and a heron by the canal.";
+    expect(check(voiced)).toEqual([]);
+    expect(check(`${voiced} These photos are mostly frogs.`).join(" ")).toMatch(
+      /talks about the photos/,
+    );
+    expect(check(`${voiced} Love it!`).join(" ")).toMatch(/exclamation/);
+    expect(check(`${voiced} Who knew?`).join(" ")).toMatch(/question/);
+    expect(check(voiced.replace("twig", "twig, likely (?)"))).toEqual([]);
+  });
+
+  it("keeps lol rare across sessions and opens differently from the rest", () => {
+    const lol =
+      "Frogs, and most of them at night lol. Found a Sylvia's tree frog on a thin twig.";
+    expect(
+      check(lol, { others: ["Big peaks lol.", "Lots of snow."] }).join(" "),
+    ).toMatch(/Enough other sessions already say "lol"/);
+    expect(check(`${lol} Such a cool spot lol`).join(" ")).toMatch(/2 times/);
+    expect(openerOf("I saw a heron.")).toBe("i saw");
+    expect(openerOf("Saw a heron.")).toBe("saw");
+    expect(
+      check("I saw a Sylvia's tree frog on a twig, such a cool one.", {
+        openerCounts: new Map([["i saw", 3]]),
+      }).join(" "),
+    ).toMatch(/open with "i saw"/);
   });
 
   it("catches the tells and the made-up names", () => {
@@ -542,8 +633,15 @@ describe("session descriptions", () => {
         "A dark brown bird faces right with one red foot raised. It has a raised crest and white flecks on its neck, against blurred green leaves and pale grass heads. The background is dark.",
       ),
     ).toBe(
-      "A dark brown bird with one red foot raised. It has a raised crest and white flecks on its neck.",
+      "A dark brown bird. It has a raised crest and white flecks on its neck.",
     );
+    // Poses read as the photo, not the moment.
+    for (const text of [
+      "A snowcap on a stem with its bill raised.",
+      "A crowned woodnymph perched upright on a stem.",
+      "A gull facing the camera on wet stones.",
+    ])
+      expect(check(text).join(" ")).toMatch(/describes the photo/);
   });
 
   it("checks the shape of a drafted title", () => {

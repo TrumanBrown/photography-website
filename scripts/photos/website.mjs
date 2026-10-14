@@ -7,11 +7,15 @@
  *                       coiled on a mossy log, Sauk Mountain"
  *   sessionDigest       everything known about a session's photos, condensed
  *   descriptionPrompt   one text-only call per session turns the digest into
- *                       the session description, in the site's voice
+ *                       the session description, in Truman's own voice
+ *                       (.github/skills/truman-voice)
  *   descriptionProblems the checks a description has to pass before it's used
  *
  * The caption is the photo's alt text, lightbox caption and structured-data
- * caption all at once, so it stays short, literal and free of hashtags.
+ * caption all at once, so it stays short, literal and free of hashtags: the
+ * name, what it's doing when that's the point, and the place. Photos of the
+ * same thing can share a caption; telling them apart by pose is what a
+ * machine does, not a photographer.
  */
 import { idLevel } from "./analyse.mjs";
 import { fixPlaceWord } from "./placenames.mjs";
@@ -22,6 +26,7 @@ import {
   ungroundedNames,
   unverifiedSpecies,
 } from "./text.mjs";
+import { OPINION, stockIn, unbackedClaim } from "./claims.mjs";
 
 /** Screen readers and image search both favour alt text around this length. */
 export const CAPTION_MAX = 125;
@@ -195,7 +200,8 @@ export function speciesSubject(taxon, count = 1, plain = "") {
     const lead = count <= 10 ? `${NUMBER_WORDS[count]} ${many}` : many;
     return `${capitalise(lead)} (${taxon.name})`;
   }
-  return `${name} (${taxon.name})`;
+  // iNaturalist has a few common names in lowercase ("rounded earthstar").
+  return `${capitalise(name)} (${taxon.name})`;
 }
 
 /** Ranks worth a scientific name in brackets; "Bird (Aves)" says nothing useful. */
@@ -350,7 +356,9 @@ export function placeAfter(phrase, place, subject = "") {
  * @param place    the place to end on; Instagram passes a fuller one
  * @param max      longest the line may be
  * @param line     the written first line (lines.mjs), used when it passes
- *                 the same checks; otherwise the line is built from the notes
+ *                 the same checks; otherwise the line is built from the notes.
+ *                 An empty action means the name and place say enough:
+ *                 "Snowcap (Microchera albocoronata), Bijagua"
  * @param strict   return "" instead of building from the notes when `line`
  *                 fails (Instagram then falls back to the plain line)
  */
@@ -395,21 +403,32 @@ export function captionFor({
   }
   let phrase = "";
   let after = "";
-  if (level && line?.action && clean(line.action, ctx)) {
+  // A pose in a stored line comes out rather than costing the line.
+  const lineAction =
+    typeof line?.action === "string" ? withoutPose(line.action) : null;
+  const lineText = line?.text ? withoutPose(line.text) : "";
+  if (level && lineAction === "") {
+    phrase = subject;
+    after = placeAfter("", place, subject);
+  } else if (
+    level &&
+    lineAction &&
+    clean(lineAction, ctx) &&
+    !backdropIn(lineAction)
+  ) {
     // "Two otters resting with its forepaws" -> "with their forepaws".
     const action =
-      (a.count ?? 1) > 1
-        ? line.action.replace(/\bits\b/g, "their")
-        : line.action;
+      (a.count ?? 1) > 1 ? lineAction.replace(/\bits\b/g, "their") : lineAction;
     phrase = `${subject} ${action}`;
     after = placeAfter(action, place, subject);
   } else if (
     !level &&
-    line?.text &&
-    clean(line.text, { ...ctx, first: true })
+    lineText &&
+    clean(lineText, { ...ctx, first: true }) &&
+    !backdropIn(lineText)
   ) {
-    phrase = line.text;
-    after = placeAfter(line.text, place);
+    phrase = lineText;
+    after = placeAfter(lineText, place);
   }
   if (phrase) {
     // "Near Seattle" is a session title's opening; after a comma it's "near".
@@ -420,7 +439,9 @@ export function captionFor({
   }
   if (strict) return "";
 
-  const scene = clean(a.scene, ctx) ? a.scene : "";
+  // Built from the notes: their pose and background left out.
+  const posed = clean(a.scene, ctx) ? withoutPose(a.scene) : "";
+  const scene = posed && !backdropIn(posed) ? posed : "";
   const conditions =
     clean(a.conditions, ctx) && telling(a.conditions) ? a.conditions : "";
   const said = norm(`${subject} ${scene}`);
@@ -460,9 +481,45 @@ export function captionFor({
 const BACKDROP_WORDS =
   /\b(?:backgrounds?|backdrops?|blurred|blurry|foreground|bokeh|out of focus)\b|\bagainst the dark\b|\b(?:behind|beyond) (?:it|them)\b|\b(?:faces|facing|turned|turning|pointing|extending|looking|leaning|angled|falling|stretched|stretching|curved|curving|curled|curling|coiled|bent|bending|tilted|tilting)\s+(?:to(?:ward)?s?\s+the\s+)?(?:left|right)\b|\bto the (?:left|right)\b|\b(?:under|in|with)\s+(?:the\s+|a\s+)?(?:direct\s+|bright\s+)?flash\b/i;
 
+// Pose and orientation: what a camera notices and a person doesn't say.
+// "with its bill raised", "head turned", "facing the camera", "perched upright".
+const BODY =
+  "heads?|bills?|beaks?|necks?|tails?|wings?|legs?|feet|foot|ears?|bod(?:y|ies)|crests?";
+const POSED =
+  "raised|lowered|turned|tilted|upright|curved|curled|bent|angled|lifted|cocked";
+const POSE_WORDS = new RegExp(
+  `\\b(?:its|their|his|her|one)\\s+(?:[\\w-]+\\s+)?(?:${BODY})\\s+(?:${POSED})\\b|\\b(?:its|their)\\s+(?:[\\w-]+\\s+){0,2}(?:tails?|bod(?:y|ies))\\s+(?:curls?|curling|curves?|curving|hangs?|hanging|bends?|bending)\\b|\\bhead turned\\b|\\b(?:faces|facing|turned|looking|pointing)\\s+(?:(?:to(?:ward)?s?\\s+)?(?:the\\s+)?(?:camera|viewer|lens|forward|away)|opposite directions|outward|sideways)\\b|\\bperched upright\\b|\\bin profile\\b`,
+  "i",
+);
+
 /** The first phrase in `text` that describes the photo rather than the moment, or null. */
 export function backdropIn(text) {
-  return BACKDROP_WORDS.exec(String(text ?? ""))?.[0] ?? null;
+  const t = String(text ?? "");
+  return BACKDROP_WORDS.exec(t)?.[0] ?? POSE_WORDS.exec(t)?.[0] ?? null;
+}
+
+/**
+ * A phrase with its pose taken out: "perched on a stem facing right" ->
+ * "perched on a stem", "standing with its head turned" -> "standing".
+ */
+export function withoutPose(phrase) {
+  return String(phrase ?? "")
+    .replace(
+      new RegExp(
+        `(?:^|,?\\s+)with\\s+(?:its|their|his|her|one)\\s+(?:[\\w-]+\\s+)?(?:${BODY})\\s+(?:${POSED})\\b(?:\\s+(?:to(?:ward)?s?\\s+)?(?:the\\s+)?(?:left|right|up|down|back|forward|sideways|away))?`,
+        "gi",
+      ),
+      "",
+    )
+    .replace(
+      /(?:^|,?\s+)(?:faces|facing|turned|turning|looking|pointing)\s+(?:(?:to(?:ward)?s?\s+)?(?:the\s+)?(?:left|right|camera|viewer|lens|forward|away)|opposite directions|outward|sideways)\b/gi,
+      "",
+    )
+    .replace(/\s+to(?:ward)?s?\s+the\s+(?:left|right)\b/gi, "")
+    .replace(/\bperched upright\b/gi, "perched")
+    .replace(/,?\s+in profile\b/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 }
 
 /**
@@ -474,7 +531,7 @@ export function withoutBackdrop(text) {
   return String(text ?? "")
     .split(/(?<=[.!?])\s+/)
     .map((s) =>
-      s
+      withoutPose(s)
         .replace(/,?\s+(?:set\s+)?against\s+[^,.;]+/gi, "")
         .replace(/,?\s+with\s+[^,.;]*\b(?:behind|beyond)\s+(?:it|them)\b/gi, "")
         .replace(
@@ -570,14 +627,14 @@ const monthYear = (date) => {
 
 /**
  * Shapes a description can take. Each session gets one, picked from its slug,
- * so thirty descriptions don't all walk the same three steps.
+ * so sixty descriptions don't all walk the same steps.
  */
 export const SHAPES = [
-  "Open with the one photo most worth a second look, then say in a sentence what the rest of the session is mostly of.",
-  "Open with the setting, then name two subjects.",
-  "Open with what most of the photos are of, then single out two subjects.",
-  "Two sentences only: one about the session as a whole, one about a single standout photo.",
-  "Open with a short fragment of three to six words, then two longer sentences.",
+  "Open with the animal or moment he liked most and what he thought of it, then say what else turned up.",
+  "Open with what the place was like, then name two animals or sights he liked.",
+  "Open with what there was the most of, then single out one favourite with a reaction.",
+  "Two sentences only: one about the trip as a whole, one about a single highlight.",
+  'Open with a short fragment about the place or the animals, three to six words ("Hummingbirds everywhere here.", "Mostly frogs, and a lot of them."), then one or two longer sentences.',
 ];
 
 export function shapeFor(slug) {
@@ -610,31 +667,40 @@ export function sharedPhrase(text, others = [], n = 6) {
 
 /**
  * One text-only call per session, from every photo's caption plus the
- * identifications. `needTitle` / `needLocation` ask for those too, for a
- * session nobody has titled yet.
+ * identifications and Truman's own notes about the trip, written in his
+ * voice. `needTitle` / `needLocation` ask for those too, for a session nobody
+ * has titled yet.
  */
 export function descriptionPrompt({
   session,
   digest,
   voiceRules = "",
+  voiceGuide = "",
+  notes = "",
   avoidOpeners = [],
+  others = [],
   needTitle = false,
   needLocation = false,
   feedback = null,
 }) {
+  const overused = HABITS_ACROSS.filter(
+    ([habit, share]) =>
+      others.length >= 3 &&
+      others.filter((o) => habit.test(o)).length >= others.length * share,
+  ).map(([, , said]) => `"${said}"`);
   const list = (items, fmt) =>
     items.length ? items.map(fmt).join("; ") : "(none)";
   const heading = [hasRealTitle(session) ? session.title : "", session.location]
     .filter(Boolean)
     .join(" · ");
   const facts = [
-    `Identified on iNaturalist (the only species you may name): ${list(digest.species, (s) => `${s.name}${s.count > 1 ? ` x${s.count}` : ""}`)}`,
+    `Identified on iNaturalist (the only species he may name): ${list(digest.species, (s) => `${s.name}${s.count > 1 ? ` x${s.count}` : ""}`)}`,
     `Identified only to a group: ${list(digest.groups, (g) => `${g.name}${g.count > 1 ? ` x${g.count}` : ""}`)}`,
     `Settings: ${list(digest.settings, (x) => x.name)}`,
     `Light and weather that stood out: ${list(digest.conditions, (c) => c.name)}`,
   ];
   const shape = [
-    `"description": "2 to 4 sentences, under ${DESCRIPTION_MAX - 100} characters"`,
+    `"description": "2 to 4 sentences, under ${DESCRIPTION_MAX - 150} characters"`,
     needTitle
       ? `"title": "Place, Region, Month Year, e.g. \\"Sauk Mountain, Washington, June 2026\\". Take the place from the folder name (${session.slug}) and the month from ${monthYear(session.date) || "the photos"}."`
       : "",
@@ -643,35 +709,59 @@ export function descriptionPrompt({
       : "",
   ].filter(Boolean);
 
-  return `Write the short description at the top of one photo session page on Truman's photography site, in his voice. ${heading ? `The page already shows "${heading}" right above it, so don't repeat the place name or the date.` : ""}
+  return `Write the short paragraph at the top of one trip's page on Truman's photography site, the way he'd write it himself. People leave a site the moment it reads like AI wrote it, so this has to sound like Truman telling a friend about the trip, not a description of photos.${heading ? ` The page shows "${heading}" right above it.` : ""}
 
-Every photo in the session, as captioned (${digest.photos} photos):
+What he photographed (${digest.photos} photos), as captioned:
 ${digest.captions.map((c) => `- ${c}`).join("\n")}
 
-A few of the best frames in more detail:
+A few of the best ones in more detail:
 ${digest.highlights
   .slice(0, 6)
   .map((h) => `- ${h}`)
   .join("\n")}
 
 ${facts.join("\n")}
+${notes ? `His own notes about this trip, the only source for what he was doing, who with, or how it went: "${notes}"` : "He hasn't left notes about this trip, so say nothing about what he was doing beyond what the trip name and the captions show."}
 
 How to write it:
+- In his voice (below): first person, casual, the way he talks. Start with "I", a verb ("Saw...", "Spent...", "Found..."), or the thing he liked most. Contractions, a comma splice, a dropped subject are all fine. Repeat words rather than reaching for synonyms.
 - ${shapeFor(session.slug)} Don't walk through the photos one by one.
-- Say what the animals are doing and what the place was like, the way you'd tell a friend. Never describe the photo itself: not the background, the blur or the framing ("against a dark background", "blurred leaves", "a bright foreground ridge", "with water behind them"), not which way something faces ("facing left", "head turned right"), not the flash or the shadows.
-- No filler: not "I also photographed", "There's also", "these frames", "this session".
-- First person where it fits. Plain, specific words, sentences of different lengths.
-- Common names mid-sentence are lowercase except proper nouns: "a turquoise-browed motmot", "an Ecuadorian hermit crab".
-- Name species only from the identified list, by common name. Anything else gets plain words ("a heron", "a small toad").
-- Only what the captions and facts support. Don't invent events, feelings, companions, weather, numbers or anything that happened off camera.
-- Don't open with any of these words: ${avoidOpeners.length ? avoidOpeners.join(", ") : "(none yet)"}.
-
-Two examples of the shape, from made-up sessions (don't copy their wording):
-- "Frogs, and most of them at night. Red-eyed tree frogs on the undersides of leaves, a glass frog over the stream, and one very wet toad."
-- "Granite spires and not much else. Snow still sits in the gullies, and the light is flat and gray in most of them."
-
-${voiceRules ? `Truman's voice rules (follow them):\n${voiceRules}\n\n` : ""}Reply with JSON only: { ${shape.join(", ")} }${feedback ? `\n\nYour previous draft was rejected: ${feedback} Fix that.` : ""}`;
+- What he saw and what he thought of it: the animals by common name and what they were up to, what the place was like, and at least one reaction of his. His reactions come in different kinds, so mix them up across trips: what he loves about it; a comparison ("almost looks like a horn", "almost alien-like"); a joke ("chose the wrong color plant to land on lol"); surprise ("I can't believe how..."); a small thought about being out there ("some of the best wildlife experiences come when you're resting"). A hedge when he can't be sure ("likely (?)"). "lol" at most once, only when something's funny.${overused.length ? `\n- Already said on enough other trips' pages, so not here: ${overused.join(", ")}.` : ""}
+- Don't talk about photos as photos: no "these photos", "this session", "frames", "shots", "images", "the rest". Never describe a picture: not the background, the blur, the framing, which way something faces, poses ("with its bill raised"), the flash or the light.
+- Common names only, no scientific names in brackets (the caption under each photo has those). Mid-sentence they're lowercase except proper nouns: "a turquoise-browed motmot", "an Ecuadorian hermit crab". Name species only from the identified list. Anything else gets plain words ("a heron", "some little toad").
+- One paragraph. No place line at the end like an Instagram post: the page already shows where it was.
+- Only what the captions, the facts and his notes support. Don't invent events, companions, waiting, weather, how long he was there, numbers, or anything off camera. No "today" or "last week".
+- No emoji, hashtags, exclamation marks, long dashes, questions (a hedging "(?)" is fine), or a last line that sums up.
+- Don't open with: ${avoidOpeners.length ? avoidOpeners.map((o) => `"${o}"`).join(", ") : "(nothing yet)"}.
+${
+  others.length
+    ? `\nOther trips' pages, newest last. Don't start like them or reuse their reactions:\n${others
+        .slice(-10)
+        .map((o) => `- ${o}`)
+        .join("\n")}\n`
+    : ""
 }
+
+Two examples of his voice, from made-up trips (don't copy their wording):
+- "The frogs here were everywhere lol, red-eyed tree frogs under the leaves and a glass frog right over the stream. I love how the glass frogs just look like part of the leaf."
+- "Mostly granite spires up here, with snow still hanging on in the gullies. Such a cool contrast with the dark rock, I'd go back just for that."
+
+${voiceGuide ? `How Truman writes (follow it):\n${voiceGuide}\n\n` : ""}${voiceRules ? `The site's copy rules (follow them too):\n${voiceRules}\n\n` : ""}Reply with JSON only: { ${shape.join(", ")} }${feedback ? `\n\nYour previous draft was rejected: ${feedback} Fix that.` : ""}`;
+}
+
+// His habits, each on only some descriptions: [pattern, the most other
+// sessions that may share it, how to name it in the feedback].
+const HABITS_ACROSS = [
+  [/\bi love\b/i, 0.2, "I love"],
+  [/\bsuch an?\b/i, 0.5, "such a"],
+  [/\bso cool\b/i, 0.2, "so cool"],
+  [/\bmy fav(?:ou)?rite\b/i, 0.2, "my favorite"],
+  [/\balso saw\b/i, 0.2, "Also saw"],
+];
+
+// Talking about the pictures instead of the trip.
+const PHOTO_TALK =
+  /\b(?:these (?:photos|pictures|frames|shots|images)|this (?:session|set|gallery|collection)|(?:the|most) (?:frames|shots|images)|the rest (?:is|are))\b/i;
 
 const EXTRA_BANNED =
   /\b(?:boasts?|nestled|dive in|serene|picturesque|myriad|plethora|teeming|bustling|a testament)\b/i;
@@ -699,6 +789,7 @@ export function descriptionProblems(
     openerCounts = new Map(),
     needTitle = false,
     others = [],
+    notes = "",
   },
 ) {
   const problems = [];
@@ -715,12 +806,66 @@ export function descriptionProblems(
     problems.push(
       `It describes the photo rather than the moment ("${backdrop}"). Say what the animals are doing or what the place is like instead.`,
     );
-  const opener = text
-    .split(/\s+/)[0]
-    ?.toLowerCase()
-    .replace(/[^a-z']/g, "");
+  const opener = openerOf(text);
   if (opener && (openerCounts.get(opener) ?? 0) >= 3)
     problems.push(`Three other sessions already open with "${opener}".`);
+  if (/!/.test(text)) problems.push("It has an exclamation mark.");
+  if (/\?/.test(text.replace(/\(\?\)/g, "")))
+    problems.push("It asks a question.");
+  const stock = stockIn(text);
+  if (stock) problems.push(`It says "${stock}", which reads as generated.`);
+  const photoTalk = PHOTO_TALK.exec(text)?.[0];
+  if (photoTalk)
+    problems.push(
+      `It talks about the photos ("${photoTalk}"). Talk about the trip: what he saw and what he thought.`,
+    );
+  if (!OPINION.test(text))
+    problems.push(
+      "It has no reaction of his. Add one: what he liked, or found funny or strange.",
+    );
+  const grounding = [
+    session.title,
+    session.location,
+    String(session.slug ?? "").replace(/-/g, " "),
+    ...digest.captions,
+    ...digest.highlights,
+    ...digest.settings.map((x) => x.name),
+    ...digest.conditions.map((x) => x.name),
+  ].join(" ");
+  const claim = unbackedClaim(text, { grounding, notes });
+  if (claim)
+    problems.push(
+      `It says "${claim}", which nothing about this trip backs up. Leave it out unless his notes say so.`,
+    );
+  if (/\n/.test(text))
+    problems.push(
+      "It has more than one paragraph. Write one, with no place line at the end.",
+    );
+  if (/\((?:[A-Z][a-z]+)(?: [a-z][a-z-]+){1,2}\)/.test(text))
+    problems.push(
+      "It has scientific names in brackets. Use common names only; the captions have the rest.",
+    );
+  // His habits, spread out across sessions like across posts.
+  for (const [habit, share, said] of HABITS_ACROSS) {
+    if (
+      habit.test(text) &&
+      others.length >= 3 &&
+      others.filter((o) => habit.test(o)).length >= others.length * share
+    )
+      problems.push(
+        `Enough other sessions already say "${said}". Say it another way.`,
+      );
+  }
+  const lols = (text.match(/\blol\b/gi) ?? []).length;
+  if (lols > 1) problems.push(`It says "lol" ${lols} times; once at most.`);
+  else if (
+    lols &&
+    others.length &&
+    others.filter((o) => /\blol\b/i.test(o)).length >= others.length / 4
+  )
+    problems.push(
+      'Enough other sessions already say "lol". Leave it out of this one.',
+    );
   const speciesNames = digest.species
     .flatMap((s) => [s.name, s.scientific])
     .concat(digest.groups.map((g) => g.name))
@@ -754,13 +899,15 @@ export function descriptionProblems(
   return problems;
 }
 
-/** First word of a description, for keeping openers varied across sessions. */
+/**
+ * How a description starts, for keeping openers varied across sessions: its
+ * first word, or the first two when that's "I" ("i saw", "i love").
+ */
 export function openerOf(text) {
-  return (
-    String(text ?? "")
-      .trim()
-      .split(/\s+/)[0]
-      ?.toLowerCase()
-      .replace(/[^a-z']/g, "") ?? ""
-  );
+  const [first = "", second = ""] = String(text ?? "")
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .map((w) => w.replace(/[^a-z']/g, ""));
+  return first === "i" && second ? `i ${second}` : first;
 }

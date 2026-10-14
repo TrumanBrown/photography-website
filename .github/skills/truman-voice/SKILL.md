@@ -85,8 +85,8 @@ What he never writes:
 | Where | How much of the voice |
 |---|---|
 | Instagram captions | All of it, plus one emoji at the end. Format and generator rules: [caption-voice](../caption-voice/SKILL.md) |
-| Website photo captions | Not yet. They double as alt text, so they stay plain for now; they're the next pass |
-| Session descriptions | Not yet; next pass, after the captions |
+| Website photo captions | Not his storytelling: they're a gallery's labels and the alt text, read thirty in a row. Short and plain the way he'd label his own photos: the name, what it's doing when that's the point, the place. No poses, and repeats are fine ([lines.mjs](../../../scripts/photos/lines.mjs)) |
+| Session descriptions | All of it except the emoji: first person, what he saw and what he thought of it, his reactions and hedges, the odd "lol" ([website.mjs](../../../scripts/photos/website.mjs) `descriptionPrompt`) |
 | Hobby intros and longer site prose | First person, contractions, underselling: [site-copy.instructions.md](../../instructions/site-copy.instructions.md). No "lol", no emoji |
 | Buttons, labels, errors | [site-copy.instructions.md](../../instructions/site-copy.instructions.md) only |
 
@@ -114,5 +114,11 @@ When writing anything in his voice:
   writes" from this file, plus caption-voice's rules and rewrites, into the
   prompt that writes each planned Instagram post. Bump `VOICE_VERSION` there
   when a change here should rewrite the posts already planned.
+- The session description prompt in
+  [website.mjs](../../../scripts/photos/website.mjs) carries "How he writes"
+  too. Bump `DESCRIPTION_VERSION` in catalog.mjs to rewrite every
+  description with a change here.
+- What text in his voice may claim (no made-up hike, boat or waiting) is
+  checked in [claims.mjs](../../../scripts/photos/claims.mjs), for both.
 - When he rewrites another post, add it to caption-voice's "His rewrites" and
   to `HIS_STORIES` in voice.mjs, so new posts learn from it without copying it.

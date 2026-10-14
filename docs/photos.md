@@ -24,8 +24,8 @@ Each photograph is looked at **once** by a vision model. What it sees is stored 
 
 | Output | Written by | Example |
 |---|---|---|
-| **Photo caption** (alt text, lightbox caption, image search) | Code, from the record, opening with a first line written once per photo (text only) | `Turquoise-browed motmot (Eumomota superciliosa) perched on a branch, Playa Flamingo` |
-| **Session description** (top of the session page, search snippet) | One text-only model call per session, from every photo's caption | `Jagged gray peaks and forested valleys fill most of these, with patches of snow on the rocky slopes...` |
+| **Photo caption** (alt text, lightbox caption, image search) | Code, from the record, opening with a first line written once per photo (text only) | `Groove-billed ani (Crotophaga sulcirostris) munching on some insect, Bijagua`, or just `Snowcap (Microchera albocoronata), Bijagua` |
+| **Session description** (top of the session page, search snippet) | One text-only model call per session, from every photo's caption and your trip notes, in your voice | `Mount Baker everywhere up here. I can't get over how much snow is on it while the slopes below are covered in red and yellow shrubs...` |
 | **Instagram posts** (optional, [docs/social.md](social.md)) | Code, plus a few facts per species or place written once from Wikipedia, and one text-only call per ten posts for the opening in your voice | An opening the way you'd tell it, one emoji, the place on its own line, a fun fact, gear, five hashtags |
 
 Because the photo is only ever looked at once, changing how captions or descriptions are worded never means paying to analyse the archive again.
@@ -125,17 +125,19 @@ Built by code in [website.mjs](../scripts/photos/website.mjs):
 <first line>, <place>
 ```
 
-**The first line** says what the photo is of and what it's doing, the way a person would say it:
+**The first line** is the short plain label a photographer puts under his own photo: what it is, and what it's doing when that's the point:
 
 - `Red-eyed tree frog (Agalychnis callidryas) clinging to a stem`
+- `Snowcap (Microchera albocoronata)`, when it's just sitting there
 - `A candy bar held up to Mount Rainier`
 - `Tiger Leaping Gorge with a winding river`
 
 It's written once per photo by [lines.mjs](../scripts/photos/lines.mjs), in one text-only call per outing, from the notes the one look already stored, so no photo is looked at again. Its rules:
 
 - **For an identified organism the model only writes what follows the name** ("clinging to a stem"). The name itself comes from iNaturalist, never the model: the iNaturalist name with its scientific name, counted when several are visible ("Two harbor seals (Phoca vitulina)"). A species with no English name is led by the model's plain word for what it is, because that's what people search for: "Jumping spider (Corythalia opima)".
-- **Never the background, the blur or the framing.** "Clinging to a green stem against a dark background" is how a camera describes a photo, not how a person does. Behind a person or an object, though, a landmark from the notes stays, because it's the point of the photo.
-- **Photos of the same subject from one outing are written together**, so eleven photos of one peak get eleven different lines rather than one line eleven times.
+- **Never the background, the blur, the framing or the pose.** "Clinging to a green stem against a dark background" and "perched on a stem facing right with its bill raised" are how a camera describes a photo, not how a person does. Poses that slip through are cut ([website.mjs](../scripts/photos/website.mjs) `withoutPose`). Behind a person or an object, though, a landmark from the notes stays, because it's the point of the photo.
+- **Photos of the same subject can share a line.** Twenty-seven hummingbird photos from one morning used to get twenty-seven different lines, and the only differences left to describe were poses ("facing left", "bill lowered"). That's what made the captions read as machine-written. People repeat themselves; now the captions do too.
+- **Weather only when it's the point** (fog, snow, a sunset, night), not "under gray clouds" on photo after photo.
 - **Checked like everything else:** none of the banned or vague words ("object", "illuminated"), no place or species name the record doesn't have. A body part gets its "with its" ("with its mouth open"). A line that fails falls back to one built from the notes: `<subject> <scene> <conditions>`.
 
 To rewrite every first line (after changing the prompt, say), bump `LINE_VERSION` in lines.mjs. The next run rewrites them all, text only, in a few minutes.
@@ -155,21 +157,29 @@ The caption is used as the photo's `alt` text, its lightbox caption, and the `ca
 
 ## Session descriptions
 
+The paragraph at the top of each session page is written the way you'd tell a friend about the trip, in the voice described in the [truman-voice skill](../.github/skills/truman-voice/SKILL.md): first person, casual, starting with "I" or a verb, with a reaction of yours. People leave a site the moment it reads like AI wrote it, and this is the most-read text on it.
+
 One text-only call per session ([website.mjs](../scripts/photos/website.mjs)) gets:
 
 - every photo's caption, without the place
 - the identified species, with counts
 - the settings and the light seen across the session
-- the six best frames in more detail, with any background, blur or framing cut out first
-- the site's voice rules from [site-copy.instructions.md](../.github/instructions/site-copy.instructions.md)
+- the six best frames in more detail, with any background, blur, framing or pose cut out first
+- your notes about the trip, if you've left any (`npm run social -- note <trip> "..."`, [docs/social.md](social.md)): the only source for what you were doing there
+- how you write (the truman-voice skill) and the site's voice rules from [site-copy.instructions.md](../.github/instructions/site-copy.instructions.md)
+- the other sessions' descriptions written so far, so it doesn't echo them
 
-It writes 2 to 4 sentences in your voice, without repeating the title or date that sit right above it. Each session is given one of five shapes, picked from its folder name (lead with the standout photo, lead with the setting, two sentences only, and so on), so the archive doesn't read as one template thirty times. Before a description is used, it has to pass these checks (`descriptionProblems`):
+It writes 2 to 4 sentences: what you saw, what the place was like, and at least one reaction (what you loved, a comparison, a joke, a surprise). Each session is given one of five shapes, picked from its folder name (lead with the favourite, lead with the place, two sentences only, and so on), so the archive doesn't read as one template sixty times. Before a description is used, it has to pass these checks (`descriptionProblems`):
 
-- no em dashes, emoji or banned marketing words
-- nothing that describes the photo rather than the moment: the background, the blur, the framing, which way something faces, the flash ("against a dark background", "facing left")
-- no species name that isn't identified in that session
+- no em dashes, emoji, exclamation marks, questions (a hedging "(?)" is fine), or banned marketing words
+- nothing that describes the photo rather than the moment: the background, the blur, the framing, a pose, which way something faces, the flash ("against a dark background", "facing left", "its tail curled beside its body")
+- no talking about the photos as photos ("these frames", "this session")
+- a reaction of yours in it, not just a description
+- nothing about what you were doing, who with, the weather or the time of day that the trip's name, its captions or your notes don't back up; nothing about waiting, company or a first sighting without your notes
+- common names only, no scientific names in brackets, and no species that isn't identified in that session
 - no capitalised name that isn't in the session's own text, so no invented places
-- not opening with the same word as three other sessions
+- one paragraph, with no Instagram-style place line
+- not opening with the same words as three other sessions ("I saw" counts as two words), and your habits spread out: "lol" on a quarter of sessions at most, "I love", "so cool", "my favorite" and "Also saw" on a fifth, "such a" on half
 - no run of six words copied from another session's description (sessions that share photos tend to)
 - under 700 characters
 
@@ -265,3 +275,4 @@ On this site's deployment (`gpt-6.1-sol`, 50K tokens a minute); times are measur
 | A description rewrite | seconds | under a cent |
 | Instagram facts for a new species or place | seconds | under a cent |
 | Instagram openings, two weeks of posts | about five minutes | a few cents |
+| Every session description again, ~60 sessions | about fifteen minutes | well under a dollar (estimate) |

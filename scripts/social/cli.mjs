@@ -10,7 +10,8 @@
  *   npm run social -- redraft <photo>     new opening and a different fact on the next Photo captions run
  *   npm run social -- note <trip|photo> <text...>
  *                                         what you were doing there ("canal boat tour", "pulled over on the
- *                                         drive up"), for the openings; --clear removes it
+ *                                         drive up"), for the post openings and the trip's session
+ *                                         description; --clear removes it
  *   npm run social -- notes               every trip with its note and how many photos it has left to post
  *   npm run social -- approve <photo>     only matters with SOCIAL_REQUIRE_APPROVAL=true
  *   npm run social -- retry <photo>|--all clear failed attempts so a photo can be tried again
@@ -289,7 +290,7 @@ async function setNote(stores, target, text, clear) {
   console.log(
     clear
       ? `${which}: note removed.`
-      : `${which}: saved. The next Photo captions run rewrites ${where === "trips" ? "this trip's planned posts" : "this photo's post, if it's planned,"} with it.`,
+      : `${which}: saved. The next Photo captions run rewrites ${where === "trips" ? "this trip's session description and its planned posts" : "this photo's post, if it's planned,"} with it.`,
   );
 }
 

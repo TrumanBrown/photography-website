@@ -15,6 +15,21 @@ const VOICE_SECTIONS = [
   "Do not write",
 ];
 
+const TRUMAN_VOICE = join(ROOT, ".github/skills/truman-voice/SKILL.md");
+
+/** How Truman writes, from the truman-voice skill: its "How he writes" section. */
+export function loadTrumanVoice(path = TRUMAN_VOICE) {
+  try {
+    const text = readFileSync(path, "utf8");
+    const start = text.indexOf("## How he writes");
+    if (start < 0) return "";
+    const end = text.indexOf("## Where it applies", start);
+    return text.slice(start, end > start ? end : undefined).trim();
+  } catch {
+    return "";
+  }
+}
+
 /** The parts of the site's copy rules that apply to captions (or the sections asked for). */
 export function loadVoiceRules(sections = VOICE_SECTIONS) {
   try {

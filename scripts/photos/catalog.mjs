@@ -86,6 +86,7 @@ import {
   compileLexicon,
   displayName,
   lint,
+  loadTrumanVoice,
   loadVoiceRules,
   tidy,
 } from "./text.mjs";
@@ -129,7 +130,7 @@ import { createClient } from "../social/instagram.mjs";
 import { info, redact, warn } from "./redact.mjs";
 
 /** Bump when the description prompt changes enough that every session should be redone. */
-const DESCRIPTION_VERSION = 2;
+const DESCRIPTION_VERSION = 3;
 
 /** Bump to read converted photos' originals again (those still without a capture time). */
 const CAPTURE_VERSION = 2;
@@ -699,6 +700,12 @@ async function main() {
   for (const [key, s] of Object.entries(shots))
     for (const id of s.files) fileShot.set(id, key);
   const voiceRules = loadVoiceRules();
+  const voiceGuide = loadTrumanVoice();
+  // What Truman has said about a trip or a photo (`npm run social -- note`):
+  // the only source the descriptions and post openings may use for what he
+  // was doing.
+  const notesFile = (await social.readJson("notes.json"))?.data ?? {};
+  const tripNote = (slug) => notesFile.trips?.[slug] ?? "";
   const sidecars =
     args.write && !onDisk
       ? await blobSidecars({ account: settings.storageAccount })
@@ -761,6 +768,7 @@ async function main() {
     const facts = complete
       ? sha({
           v: DESCRIPTION_VERSION,
+          notes: tripNote(session.slug),
           shots: list
             .map((s) => [
               s.pick,
@@ -839,14 +847,20 @@ async function main() {
             session,
             digest,
             voiceRules,
-            avoidOpeners: [...openerCounts.keys()],
+            voiceGuide,
+            notes: tripNote(session.slug),
+            // Openers two other sessions already use; a third is the last.
+            avoidOpeners: [...openerCounts]
+              .filter(([, n]) => n >= 2)
+              .map(([w]) => w),
+            others: descriptionsInUse(session.slug),
             needTitle,
             needLocation,
             feedback,
           }),
           mock: () => ({
             description:
-              "Mock description written without a model, long enough to pass the length check for a session.",
+              "Mock description written offline, such a fun trip to test with, long enough to pass the length check.",
             title: needTitle
               ? `${placeLabel(session) || "Somewhere"}, Nowhere, January 2026`
               : undefined,
@@ -864,6 +878,7 @@ async function main() {
           openerCounts,
           needTitle,
           others: descriptionsInUse(session.slug),
+          notes: tripNote(session.slug),
         });
         if (problems.length) feedback = problems.join(" ");
         else accepted = text;
@@ -1005,9 +1020,7 @@ async function main() {
         ? `Full resolution and the rest of this session are on ${settings.domain}, link in bio`
         : "");
 
-    // What Truman has said about a trip or a photo (`npm run social --
-    // note`). The only source the opening may use for what he was doing.
-    const notesFile = (await social.readJson("notes.json"))?.data ?? {};
+    // His notes (read for the website above) for this trip and this photo.
     const notesOf = (s, key) =>
       [notesFile.trips?.[s.session], notesFile.photos?.[key]]
         .filter(Boolean)

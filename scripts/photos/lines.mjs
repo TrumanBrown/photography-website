@@ -1,10 +1,16 @@
 /**
- * The first line of a caption, said the way a person would: what the photo
- * is of and what it's doing, nothing about the background or the blur.
+ * The first line of a caption, the short plain label a photographer puts
+ * under his own photo: what it is, what it's doing when that's the point,
+ * nothing about the pose, the background or the blur.
  *
  *   "Red-eyed tree frog (Agalychnis callidryas) clinging to a stem"
+ *   "Snowcap (Microchera albocoronata)"  (just sitting there: the name says it)
  *   "Mount Baker from Yellow Aster Butte"
  *   "Shanghai skyline across the river at night"
+ *
+ * Photos of the same thing may share a line. Telling near-identical frames
+ * apart by "facing left" and "bill raised" is what made the captions read
+ * as machine-written.
  *
  * Written by one text-only call per batch of photos, from the notes the
  * vision analysis already stored, so no photo is looked at again. For an
@@ -12,39 +18,42 @@
  * code supplies.
  */
 import { tidy } from "./text.mjs";
+import { backdropIn, withoutPose } from "./website.mjs";
 
 /** Bump when the prompt changes enough that every first line should be rewritten. */
-export const LINE_VERSION = 3;
+export const LINE_VERSION = 4;
 
 export function linesPrompt(items) {
-  return `Each item below is notes on one photograph. Write the first line of its caption, the way a person would say it.
+  return `Each item below is notes on one photograph from Truman's photography site. Write the first line of its caption: the short plain label under the photo, which screen readers read out too. Write it like a photographer captioning his own gallery, short and plain, nothing a person wouldn't bother saying.
 
-- When "named" is given (an identified species), write only the words that follow that name: what it's doing, and what it's on. Field "action".
-- Otherwise write the whole line: what the photo is of, and what it's doing or what makes the view. Field "line". Start with a capital.
+- When "named" is given (an identified species), write only what follows the name: what it's doing, when that's what makes the photo, in everyday words ("munching on some insect", "in flight", "preening", "swallowing a fish", "basking on a log", "hanging under a leaf", "on a leaf at night"). When it's just sitting, perched or standing there, write an empty action (""): the name and the place say enough. Field "action".
+- Otherwise write the whole line: what the photo is of, and the one thing that makes it ("Mount Baker from Yellow Aster Butte", "River winding below the hills", "A hiker on the coastal trail"). Field "line". Start with a capital.
 
 Rules:
-- 2 to 8 words, no full stop. Lowercase except names.
-- The photos are from one outing, and ones with the same subject (the same peak, the same species) are listed together. Give each its own line from what's different in its notes: the light, the clouds, the season, what it's doing, what's in front. No two lines the same.
-- Animals, plants and close-ups: never describe the background, the blur, the framing or the light: no "against", "background", "blurred", "frame", "foreground".
-- People, objects and views: when the notes give a landmark and it's behind them, it's usually the point, so keep it ("a candy bar held up to Mount Rainier", "a hiker below Everest"). Only a landmark from the notes.
-- Body parts take "with": "with its mouth open", "standing with its head lowered", not "mouth open".
-- Never vague words like "object", "item", "surface", "something": say what it is if the notes do, or leave it out.
-- Colours only when they're the point.
-- Keep "at night", "in fog", "in the snow", "at sunrise" when the notes say so; they're part of the moment.
-- Landscapes: the one thing that makes the view, or "from <place>" when the subject is a named peak seen from the place in the notes.
-- Plain verbs: perched, clinging, preening, resting, hunting, basking, swimming, calling.
-- Never "illuminated", "majestic", "towering", "nestled", "lush", "vibrant". Don't say the same word twice.
+- An action is 0 to 6 words, a line 2 to 8. No full stop. Lowercase except names.
+- The photos are from one outing, and ones with the same subject are listed together. They can share the same line: people don't invent differences between near-identical photos.
+- Never pose or orientation: which way it faces or looks, a head turned, a bill, tail or wings raised or lowered, perched upright, in profile.
+- Never the background, the blur, the framing or the light: no "against", "background", "blurred", "frame", "foreground".
+- Weather only when it's the point of the photo: fog, snow, a sunset, night. Not "under gray clouds" on photo after photo.
+- People, objects and views: when the notes give a landmark and it's behind them, it's usually the point, so keep it ("a hiker below Everest"). Only a landmark from the notes.
+- Body parts take "with" ("with its mouth open"), and only when that's what it's doing.
+- Never vague words like "object", "item", "surface", "something".
+- Never "illuminated", "majestic", "towering", "nestled", "lush", "vibrant".
 - Use only names that are in the notes.
 
 Examples:
+- "perched on a stem facing right" -> action ""
+- "perched upright on a stem with its bill raised" -> action ""
 - "clinging to a green stem against a dark background" -> action "clinging to a stem"
-- "preening its feathers against a blurred green background" -> action "preening its feathers"
-- "perched on a diagonal branch against blurred greenery" -> action "perched on a branch"
+- "preening its feathers against a blurred green background" -> action "preening"
+- "holding an insect in its bill on a mossy post" -> action "munching on some insect"
 - "on a broad green leaf against a dark background" (a frog, at night) -> action "on a leaf at night"
+- "flying with its wings raised against a blue sky" -> action "in flight"
 - "swallowing a fish among rocks" -> action "swallowing a fish"
 - "rising above rocky meadows and tree-covered ridges" (Mount Baker, from Yellow Aster Butte) -> line "Mount Baker from Yellow Aster Butte"
+- "River winding below hills under gray clouds" -> line "River winding below the hills"
+- "Gull facing right on wet stones" -> line "A gull on the shore"
 - "Illuminated city skyline overlooking a river with a lit boat" (at night) -> line "The skyline across the river at night"
-- "Moss-covered forest with hanging moss above a fern-covered floor" -> line "Hanging moss over a fern-covered floor"
 - "Monkey sitting on a railing before forested rock pillars" -> line "A monkey on the railing"
 - "Person standing on a ridge in front of a snow-covered peak" (landmark Mount Rainier) -> line "A hiker on a ridge below Mount Rainier"
 
@@ -66,6 +75,8 @@ const BARE_BODY_PART =
 /** A model reply's first-line parts, cleaned, or null when unusable. */
 export function normaliseLine(raw, { named = false, plural = false } = {}) {
   const pick = named ? raw?.action : raw?.line;
+  // Just the name, on purpose: the photo is of it sitting there.
+  if (named && typeof pick === "string" && !pick.trim()) return { action: "" };
   let text = tidy(pick ?? "")
     .replace(/[.]+$/, "")
     .replace(BACKDROP, "")
@@ -78,7 +89,13 @@ export function normaliseLine(raw, { named = false, plural = false } = {}) {
       ? m
       : `${lead}with ${plural ? "their" : "its"} ${part} ${how}`,
   );
-  if (!text || text.length > 70 || NEVER.test(text)) return null;
+  // Then the pose comes out: "standing with its head lowered" is "standing".
+  text = withoutPose(text);
+  // "perched", "standing": all that's left once the pose is gone says nothing.
+  if (named && /^(?:perched|sitting|standing|resting|posing)$/i.test(text))
+    return { action: "" };
+  if (!text || text.length > 70 || NEVER.test(text) || backdropIn(text))
+    return null;
   if (named) text = text.replace(/^\p{Lu}(?!\p{Lu})/u, (c) => c.toLowerCase());
   else text = text.charAt(0).toUpperCase() + text.slice(1);
   return named ? { action: text } : { text };
