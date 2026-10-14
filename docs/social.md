@@ -382,11 +382,11 @@ Full resolution and the rest of this session are on example.com, link in bio
 - says nothing about what you were doing, who you were with, the weather or the time of day unless the trip's name, the photo's record or your trip notes back it up: "on a canal tour" needs a trip named for the canals or a note saying so, and waiting, "finally" or company need your notes
 - has no numbers, no "today" or "last week", no questions (a hedging "(?)" is fine), no stock phrases ("nature never disappoints") and none of the words the voice rules ban
 - doesn't repeat its fun fact, and copies no phrase from your rewrites or another post
-- doesn't start like any of the four posts before it, and spreads your habits out: "lol" on one post in four at most (it's dropped rather than the post), "such a", "I love", "pretty" and "almost" only every few posts
+- doesn't start like any of the four posts before it, starts with "I" on one post in four at most, and spreads your habits out: "lol" on one post in four at most (it's dropped rather than the post), "such a", "I love", "pretty" and "almost" only every few posts
 
 The emoji has to be one emoji (not ✨, 🌿, 🔥, 📸 or the like) and not one used on the five posts before it; otherwise the opening's other suggestions, the animal's own emoji or a face take its place.
 
-A post whose options all fail gets one more try in the same run and is tried again on the next two runs. Until it has an opening it isn't posted: it never goes out with a plain fallback. The poster also refuses a post built the old way (an older `POST_VERSION` in [compose.mjs](../scripts/social/compose.mjs)), so changing the format never lets an old-style post slip out before the next run rewrites it.
+A post whose options all fail (usually because it's too close to a post next to it) gets one more try in the same run, on its own so the model sees the posts right before it, and is tried again on the next two runs. Until it has an opening it isn't posted: it never goes out with a plain fallback. The poster also refuses a post built the old way (an older `POST_VERSION` in [compose.mjs](../scripts/social/compose.mjs)), so changing the format never lets an old-style post slip out before the next run rewrites it.
 
 **Your notes.** The best openings say what you were doing ("Pulled over on the side of the road to capture this canyon view"), and only you know that. `npm run social -- note <trip> "..."` stores a line about a trip, privately in `metadata/social/notes.json`; the openings draw on it but never post it as is, and the trip's planned posts are rewritten with it on the next run. `npm run social -- notes` lists every trip and how many photos it has left to post, so you can start with the big ones.
 

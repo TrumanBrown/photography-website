@@ -25,7 +25,7 @@ import { lint, tidy, ungroundedNames, unverifiedSpecies } from "./text.mjs";
 import { backdropIn } from "./website.mjs";
 
 /** Bump when the prompt or the skills change enough that planned posts should be rewritten. */
-export const VOICE_VERSION = 2;
+export const VOICE_VERSION = 3;
 
 const SKILLS = join(ROOT, ".github/skills");
 
@@ -79,7 +79,7 @@ export function voicePrompt(items, guide = "", { recent = [] } = {}) {
 
 For each photo, write "options": three different versions, best first. Each one has:
 - "text": two or three sentences, 15 to 60 words in all.
-  - First, what this is and how he came across it, said the way he'd tell a friend. Start with a plain verb, dropping the "I" like people do online: saw, spotted, found, caught, got, captured, managed to capture, came across, ran into ("Saw this...", "Managed to capture this..."). Or start with "I", or with what he was doing when his notes say so ("While on a canal tour in Tortuguero, ..."), or now and then "A fun pic of this...". Never bookish verbs like "came upon", "took in", "happened upon", "gazed at" or "got a glimpse of". For a named animal or plant, write {name} exactly once where its name goes, usually right after "this"; code puts in the verified name. Say what it's doing in everyday words. Mention the place the casual way ("in Bijagua", "near the Arenal Volcano") when it fits.
+  - First, what this is and how he came across it, said the way he'd tell a friend. Start with a plain verb, dropping the "I" like people do online: saw, spotted, found, caught, got, captured, managed to capture, came across, ran into ("Saw this...", "Managed to capture this..."). Or start with "I", or with what he was doing when his notes say so ("While on a canal tour in Tortuguero, ..."), or now and then "A fun pic of this...". Never bookish verbs like "came upon", "took in", "happened upon", "gazed at", "photographed" or "got a glimpse of". Mostly drop the "I"; he starts with "I" only now and then. For a named animal or plant, write {name} exactly once where its name goes, usually right after "this"; code puts in the verified name. Say what it's doing in everyday words. Mention the place the casual way ("in Bijagua", "near the Arenal Volcano") when it fits.
   - Then his reaction, with some feeling in it: what he loves about it, a comparison ("almost looks like a horn", "almost alien-like"), something funny ("chose the wrong color plant to land on lol"), or a small thought about being out there ("some of the best wildlife experiences come when you're resting"). Opinions are good ("such a unique bird", "so cool", "I love how..."). Hedge when he couldn't know for sure ("likely (?) sucking nectar"). Not a list of colours, textures or body parts: that's alt text, not him.
   - Casual: contractions, fragments, a comma splice, "pretty", "so", "such a". "lol" at most once, only when something's actually funny.
   - Plain, not poetic. An animal can have a personality; scenery doesn't get feelings or a "softer version of itself".
@@ -158,6 +158,8 @@ const OPINION =
   /\b(?:i|i'm|i've|i'd|my|me|love|loved|like|such|so|pretty|really|cool|crazy|wild|unique|interesting|incredible|amazing|lol|can't|couldn't|almost|fun|favou?rite|neat|weird|funny|wish|never|always|hard to|kind of|kinda|wow)\b/i;
 // His habits: each is fine on some posts and a tell on every one. [pattern, how many posts back it may not appear]
 const HABITS = [
+  // He mostly drops the "I": starting with it is fine on one post in four.
+  [/^i\b/i, 3],
   [/\bsuch an?\b/i, 2],
   [/\bi love\b/i, 2],
   [/\bso cool\b/i, 3],

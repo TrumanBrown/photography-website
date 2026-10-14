@@ -199,6 +199,13 @@ describe("post voice", () => {
     expect(storyOpener("Saw these two coatis")).toBe(
       storyOpener("Saw this {name}"),
     );
+    // Mostly no "I" up front: once in four posts.
+    expect(
+      normaliseStory(
+        "I spotted this {name} munching on some insect in Bijagua. Such a goofy beak, almost looks like a horn",
+        { ...ani, recent: ["I found this tiny frog on a leaf. So cool"] },
+      ),
+    ).toBe("");
   });
 
   it("keeps one emoji he'd use, and never one from the last five posts", () => {

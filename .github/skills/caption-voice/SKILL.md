@@ -69,7 +69,7 @@ the one posting the lie. So:
 
 Three posts go out a day, so anything on every post becomes a tell:
 
-- No two of any five posts in a row start the same way.
+- No two of any five posts in a row start the same way, and only one in four starts with "I": he mostly drops it.
 - "lol" on one post in four at most, and never twice in one.
 - "such a", "I love", "pretty", "almost", "so cool", "unique": each only
   every few posts.

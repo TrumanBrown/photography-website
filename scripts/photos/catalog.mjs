@@ -1319,7 +1319,7 @@ async function main() {
       d.s.voice?.at !== d.s.analysis.at ||
       d.s.voice?.notes !== sha(notesOf(d.s, d.key)) ||
       Boolean(d.s.voice?.named) !== Boolean(namedFor(d.s)) ||
-      (!d.s.voice?.text && (d.s.voice?.tries ?? 0) < 4) ||
+      (!d.s.voice?.text && (d.s.voice?.tries ?? 0) < 6) ||
       redrafting(d.s, d.s.voice?.written);
     const voiceQueue = drafts.filter(needsVoice);
     if (provider && voiceQueue.length) {
@@ -1353,11 +1353,13 @@ async function main() {
         };
       };
       // One batch at a time, in posting order. A post whose options all fail
-      // their checks gets one more go in the same run, and up to two more runs.
-      const writeVoices = async (list) => {
+      // their checks (usually too close to a post next to it) gets one more go
+      // in the same run, on its own so the prompt shows the posts right before
+      // it, and the same again on the next two runs.
+      const writeVoices = async (list, size = 10) => {
         const batches = [];
-        for (let i = 0; i < list.length; i += 10)
-          batches.push(list.slice(i, i + 10));
+        for (let i = 0; i < list.length; i += size)
+          batches.push(list.slice(i, i + size));
         await pool(batches, 1, async (batch) => {
           const notes = batch.map((d, i) => ({
             id: String(i + 1),
@@ -1429,7 +1431,10 @@ async function main() {
         });
       };
       await writeVoices(voiceQueue);
-      await writeVoices(voiceQueue.filter((d) => !voicedFor(d.s)));
+      await writeVoices(
+        voiceQueue.filter((d) => !voicedFor(d.s)),
+        1,
+      );
     }
 
     // Put each planned post together, or bring it up to date.
