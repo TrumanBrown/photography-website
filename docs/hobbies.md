@@ -247,7 +247,7 @@ The reveal card shows the **pixel sprite by default and a real photo when one is
 
 ## Reference implementation: the fishing island
 
-A **clickable pixel map** of the two places I fish: Minnesota and Washington. Each map is drawn from a baked land/lake/river/sound mask, and every named water shows up as a small fish sprite of its signature species. Tap a water and a panel lists what you can catch there. The Twin Cities metro gets its own zoomed inset, since those lakes are tiny at full state scale. Below the maps, a **catch gallery** of real photos sits beside the matching pixel sprite, split into Washington and Minnesota; tapping a photo opens it full-screen in the same PhotoSwipe lightbox the photography pages use. There are 37 waters across the two states, 33 species, and 17 catches today.
+A **clickable pixel map** of the two places I fish: Minnesota and Washington. Each map is drawn from a baked land/lake/river/sound mask, and every named water shows up as a small fish sprite of its signature species. Tap a water and a panel lists what you can catch there. The Twin Cities metro gets its own zoomed inset, since those lakes are tiny at full state scale. Below the maps, a **catch gallery** of real photos sits beside the matching pixel sprite, split into Washington and Minnesota; tapping a photo opens it full-screen in the same PhotoSwipe lightbox the photography pages use. There are 37 waters across the two states, 33 species, and 16 catches today.
 
 **Files**
 

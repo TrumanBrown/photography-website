@@ -44,7 +44,7 @@
     ]
   },
   "fishing": {
-    "note": "Coho salmon · near the Sauk River, October 2025",
+    "note": "Coho salmon · a small river, October 2025",
     "src": "~/.cache/stipple-plates/sources/originals/coho-DSC06668.jpg",
     "crop": [0.0, 0.25, 0.86, 0.82],
     "fill": [0.86, 0.56],
