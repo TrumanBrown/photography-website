@@ -4,7 +4,9 @@
  *
  *   npm run photos -- status                 what's analysed, matched and written
  *   npm run photos -- preview [session]      open every photo with its caption, and each
- *                                            description, as a page in your browser
+ *                                            description, as a page in your browser; where the
+ *                                            next run would change what's on the site, the
+ *                                            current text is shown under the new one
  *   npm run photos -- redo <photo>           look at this photo again on the next run
  *   npm run photos -- redo --session <slug>  ...or every photo in a session
  *   npm run photos -- redescribe <slug>      rewrite this session's description next run
@@ -111,21 +113,36 @@ async function preview(store, remote, only) {
   const sessions = (await loadSessionsFromIndex(remote)).filter(
     (s) => !only || s.slug === only,
   );
+  let changes = 0;
   const blocks = sessions.map((s) => {
     const rec = catalog.sessions?.[s.slug] ?? {};
+    // What the site shows now: the session file's description, and the
+    // captions the pipeline last wrote there.
+    const liveCaptions = rec.written?.captions ?? {};
     const cards = s.photos
       .map((p) => {
         const caption = rec.captions?.[p.file];
-        return `<figure><img src="${escape(p.url)}" loading="lazy" alt=""><figcaption>${caption ? escape(caption) : "<i>no caption yet</i>"}<small>${escape(p.file)} · ${caption?.length ?? 0} chars</small></figcaption></figure>`;
+        const live = liveCaptions[p.file];
+        const changed = Boolean(caption && live && live !== caption);
+        if (changed) changes++;
+        return `<figure><img src="${escape(p.url)}" loading="lazy" alt=""><figcaption>${caption ? escape(caption) : "<i>no caption yet</i>"}${changed ? `<span class="was">now: ${escape(live)}</span>` : ""}<small>${escape(p.file)} · ${caption?.length ?? 0} chars</small></figcaption></figure>`;
       })
       .join("\n");
-    return `<section><h2>${escape(s.title)}</h2><p class="desc">${escape(rec.description ?? s.description ?? "")}${rec.problem ? `<br><b>Problem:</b> ${escape(rec.problem)}` : ""}</p><div class="grid">${cards}</div></section>`;
+    const next = rec.description ?? s.description ?? "";
+    const describedNow =
+      s.description && next && s.description !== next
+        ? `<p class="was">On the site now: ${escape(s.description)}</p>`
+        : "";
+    if (describedNow) changes++;
+    return `<section><h2>${escape(s.title)}</h2><p class="desc">${escape(next)}${rec.problem ? `<br><b>Problem:</b> ${escape(rec.problem)}` : ""}</p>${describedNow}<div class="grid">${cards}</div></section>`;
   });
   const html = `<!doctype html><meta charset="utf-8"><title>Photo captions</title>
 <style>body{font:15px system-ui;margin:2rem;max-width:1300px}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem}
 figure{margin:0}img{width:100%;height:220px;object-fit:cover;background:#eee}figcaption{font-size:14px;margin-top:.3rem}small{display:block;color:#888;font-size:12px}
-.desc{max-width:70ch;font-size:16px;line-height:1.5}h2{margin-top:2.5rem}</style>
-<h1>Captions and descriptions</h1>${blocks.join("\n")}`;
+.desc{max-width:70ch;font-size:16px;line-height:1.5}h2{margin-top:2.5rem}
+.was{display:block;max-width:70ch;color:#999;font-size:13px;margin-top:.2rem}</style>
+<h1>Captions and descriptions</h1>
+<p>${changes ? `${changes} captions and descriptions would change on the site with the next run that writes it. The current text is in grey under each.` : "Everything here matches the site."}</p>${blocks.join("\n")}`;
   const out = join(ROOT, ".cache/photos/preview.html");
   await mkdir(join(ROOT, ".cache/photos"), { recursive: true });
   await writeFile(out, html);
