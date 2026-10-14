@@ -73,7 +73,10 @@ jobs:
         env:
           LIMIT: ${{ inputs.limit || '300' }}
           OVERWRITE: ${{ inputs.overwrite && '--overwrite' || '' }}
-          DRY_RUN: ${{ inputs.dry_run && '--no-write' || '' }}
+          # PHOTOS_HOLD_WEBSITE=true makes every run a dry run, scheduled ones
+          # included, while you review a change to how the copy is written.
+          DRY_RUN: ${{ (inputs.dry_run || vars.PHOTOS_HOLD_WEBSITE == 'true') && '--no-write' || '' }}
+          HOLD: ${{ vars.PHOTOS_HOLD_WEBSITE }}
           AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
           # Keyless Azure OpenAI: the Azure sign-in above is the credential.
           AZURE_OPENAI_ENDPOINT: ${{ vars.AZURE_OPENAI_ENDPOINT }}
@@ -97,7 +100,11 @@ jobs:
           IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
           IG_USER_ID: ${{ secrets.IG_USER_ID }}
           SOCIAL_SECRET_KEY: ${{ secrets.SOCIAL_SECRET_KEY }}
-        run: node scripts/photos/catalog.mjs --limit "$LIMIT" $OVERWRITE $DRY_RUN
+        run: |
+          if [ "$HOLD" = "true" ]; then
+            echo "::notice::Website copy is on hold (PHOTOS_HOLD_WEBSITE=true): captions and descriptions are written privately, not to the site."
+          fi
+          node scripts/photos/catalog.mjs --limit "$LIMIT" $OVERWRITE $DRY_RUN
 
       # Runs even when the Instagram stage failed the step, so new website
       # copy always goes live.
