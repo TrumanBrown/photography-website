@@ -130,7 +130,7 @@ import { createClient } from "../social/instagram.mjs";
 import { info, redact, warn } from "./redact.mjs";
 
 /** Bump when the description prompt changes enough that every session should be redone. */
-const DESCRIPTION_VERSION = 3;
+const DESCRIPTION_VERSION = 4;
 
 /** Bump to read converted photos' originals again (those still without a capture time). */
 const CAPTURE_VERSION = 2;
