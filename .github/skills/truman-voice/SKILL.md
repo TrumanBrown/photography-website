@@ -102,8 +102,8 @@ What he never writes:
 | Where | How much of the voice |
 |---|---|
 | Instagram captions | All of it, plus one emoji at the end. Format and generator rules: [caption-voice](../caption-voice/SKILL.md) |
-| Website photo captions | Not his storytelling: they're a gallery's labels and the alt text, read thirty in a row. Short and plain the way he'd label his own photos: the name, what it's doing when that's the point, the place. No poses, and repeats are fine ([lines.mjs](../../../scripts/photos/lines.mjs)) |
-| Session descriptions | All of it except the emoji: first person, what he saw and what he thought of it, his reactions and hedges, the odd "lol" ([website.mjs](../../../scripts/photos/website.mjs) `descriptionPrompt`) |
+| Website photo captions | Not his voice: they're the alt text and what image search reads. Specific and plain: the name, what it's doing and what it's on, what's in front of a view, in searchable words ("reflected in a tarn", "fall colors"). No poses or background blur ([lines.mjs](../../../scripts/photos/lines.mjs)) |
+| Session descriptions | Search first: the place, landmarks and main animals by name in the first sentence, in plain words. A light touch of his voice at most (one short reaction, first person optional), never "lol" or emoji ([website.mjs](../../../scripts/photos/website.mjs) `descriptionPrompt`). "The website first-party voice isn't as important" (his words) |
 | Hobby intros and longer site prose | First person, contractions, underselling: [site-copy.instructions.md](../../instructions/site-copy.instructions.md). No "lol", no emoji |
 | Buttons, labels, errors | [site-copy.instructions.md](../../instructions/site-copy.instructions.md) only |
 

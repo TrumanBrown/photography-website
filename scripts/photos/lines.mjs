@@ -1,16 +1,16 @@
 /**
- * The first line of a caption, the short plain label a photographer puts
- * under his own photo: what it is, what it's doing when that's the point,
- * nothing about the pose, the background or the blur.
+ * The first line of a caption: the photo's alt text and image-search text,
+ * so it's specific about what's actually in the frame, in plain words:
  *
- *   "Red-eyed tree frog (Agalychnis callidryas) clinging to a stem"
- *   "Snowcap (Microchera albocoronata)"  (just sitting there: the name says it)
- *   "Mount Baker from Yellow Aster Butte"
+ *   "Red-eyed tree frog (Agalychnis callidryas) clinging to a stem at night"
+ *   "Mount Baker reflected in a tarn"
+ *   "Mount Baker above fall-colored huckleberry"
  *   "Shanghai skyline across the river at night"
  *
- * Photos of the same thing may share a line. Telling near-identical frames
- * apart by "facing left" and "bill raised" is what made the captions read
- * as machine-written.
+ * What a photographer would say and someone would search for: what it's
+ * doing, what it's on, what's in front of the view. Never the pose or which
+ * way it faces, the background blur or the framing: nobody searches for
+ * those, and they're what made the captions read as machine-written.
  *
  * Written by one text-only call per batch of photos, from the notes the
  * vision analysis already stored, so no photo is looked at again. For an
@@ -21,40 +21,36 @@ import { tidy } from "./text.mjs";
 import { backdropIn, withoutPose } from "./website.mjs";
 
 /** Bump when the prompt changes enough that every first line should be rewritten. */
-export const LINE_VERSION = 4;
+export const LINE_VERSION = 5;
 
 export function linesPrompt(items) {
-  return `Each item below is notes on one photograph from Truman's photography site. Write the first line of its caption: the short plain label under the photo, which screen readers read out too. Write it like a photographer captioning his own gallery, short and plain, nothing a person wouldn't bother saying.
+  return `Each item below is notes on one photograph from Truman's photography site. Write the first line of its caption. It's the photo's alt text too, and what Google Images reads to decide which searches it shows up for, so be specific about what's in the photo, in the plain words people search with.
 
-- When "named" is given (an identified species), write only what follows the name: what it's doing, when that's what makes the photo, in everyday words ("munching on some insect", "in flight", "preening", "swallowing a fish", "basking on a log", "hanging under a leaf", "on a leaf at night"). When it's just sitting, perched or standing there, write an empty action (""): the name and the place say enough. Field "action".
-- Otherwise write the whole line: what the photo is of, and the one thing that makes it ("Mount Baker from Yellow Aster Butte", "River winding below the hills", "A hiker on the coastal trail"). Field "line". Start with a capital.
+- When "named" is given (an identified species), write only what follows the name: what it's doing and what it's on or in ("feeding on a heliconia flower", "on barnacle-covered rock", "in a tide pool", "perched on a mossy branch", "swallowing a fish", "in flight"). Field "action".
+- Otherwise write the whole line: what the photo is of, then what makes this one: what's in front of the view or around it, the season, the weather or light when it's the point ("Mount Baker reflected in a tarn", "Mount Baker above fall-colored shrubs", "Gunn Peak above a small tarn", "Waterfall dropping into a rocky gorge"). Field "line". Start with a capital.
 
 Rules:
-- An action is 0 to 6 words, a line 2 to 8. No full stop. Lowercase except names.
-- The photos are from one outing, and ones with the same subject are listed together. They can share the same line: people don't invent differences between near-identical photos.
-- Never pose or orientation: which way it faces or looks, a head turned, a bill, tail or wings raised or lowered, perched upright, in profile.
-- Never the background, the blur, the framing or the light: no "against", "background", "blurred", "frame", "foreground".
-- Weather only when it's the point of the photo: fog, snow, a sunset, night. Not "under gray clouds" on photo after photo.
+- An action is 2 to 8 words, a line 3 to 10. No full stop. Lowercase except names.
+- The photos are from one outing, and ones with the same subject (the same peak, the same species) are listed together. Give each its own line from what really differs in its notes: what's in front, a reflection, the season, the light, the weather, what it's doing, what it's on. If two are truly the same, they can share a line.
+- Never pose or orientation: which way it faces or looks, a head turned, a bill, tail or wings raised or lowered, perched upright, in profile. Nobody searches for those.
+- Never the background blur or the framing: no "against", "background", "blurred", "frame", "foreground". For a view, what's behind the subject is the scene, so name it plainly ("Mount Baker beyond a ridge").
+- Words people search: "tarn" for a small lake or pond in the mountains, "reflected in" for a reflection, "fall colors" for autumn foliage, "wildflowers", "at sunset", "in fog", "at night".
 - People, objects and views: when the notes give a landmark and it's behind them, it's usually the point, so keep it ("a hiker below Everest"). Only a landmark from the notes.
 - Body parts take "with" ("with its mouth open"), and only when that's what it's doing.
 - Never vague words like "object", "item", "surface", "something".
-- Never "illuminated", "majestic", "towering", "nestled", "lush", "vibrant".
+- Never "illuminated", "majestic", "towering", "nestled", "lush", "vibrant", "stunning", "breathtaking".
 - Use only names that are in the notes.
 
 Examples:
-- "perched on a stem facing right" -> action ""
-- "perched upright on a stem with its bill raised" -> action ""
-- "clinging to a green stem against a dark background" -> action "clinging to a stem"
-- "preening its feathers against a blurred green background" -> action "preening"
-- "holding an insect in its bill on a mossy post" -> action "munching on some insect"
-- "on a broad green leaf against a dark background" (a frog, at night) -> action "on a leaf at night"
+- "perched on a stem facing right" (a hummingbird) -> action "perched on a flower stem"
+- "clinging to a green stem against a dark background" -> action "clinging to a stem at night"
+- "holding an insect in its bill on a mossy post" -> action "with an insect in its bill on a mossy post"
+- "preening its feathers against a blurred green background" -> action "preening along the canal"
 - "flying with its wings raised against a blue sky" -> action "in flight"
-- "swallowing a fish among rocks" -> action "swallowing a fish"
-- "rising above rocky meadows and tree-covered ridges" (Mount Baker, from Yellow Aster Butte) -> line "Mount Baker from Yellow Aster Butte"
-- "River winding below hills under gray clouds" -> line "River winding below the hills"
-- "Gull facing right on wet stones" -> line "A gull on the shore"
+- "rising beyond a pond reflecting trees" (Mount Baker, from Yellow Aster Butte) -> line "Mount Baker reflected in a tarn"
+- "rising above red and yellow shrubs" (Mount Baker) -> line "Mount Baker above fall-colored shrubs"
+- "Gull facing right on wet stones" -> line "A gull on the stony shore"
 - "Illuminated city skyline overlooking a river with a lit boat" (at night) -> line "The skyline across the river at night"
-- "Monkey sitting on a railing before forested rock pillars" -> line "A monkey on the railing"
 - "Person standing on a ridge in front of a snow-covered peak" (landmark Mount Rainier) -> line "A hiker on a ridge below Mount Rainier"
 
 Items:

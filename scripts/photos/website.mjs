@@ -26,7 +26,7 @@ import {
   ungroundedNames,
   unverifiedSpecies,
 } from "./text.mjs";
-import { OPINION, stockIn, unbackedClaim } from "./claims.mjs";
+import { stockIn, unbackedClaim } from "./claims.mjs";
 
 /** Screen readers and image search both favour alt text around this length. */
 export const CAPTION_MAX = 125;
@@ -630,11 +630,11 @@ const monthYear = (date) => {
  * so sixty descriptions don't all walk the same steps.
  */
 export const SHAPES = [
-  "Open with the animal or moment he liked most and what he thought of it, then say what else turned up.",
-  "Open with what the place was like, then name two animals or sights he liked.",
-  "Open with what there was the most of, then single out one favourite with a reaction.",
-  "Two sentences only: one about the trip as a whole, one about a single highlight.",
-  'Open with a short fragment about the place or the animals, three to six words ("Hummingbirds everywhere here.", "Mostly frogs, and a lot of them."), then one or two longer sentences.',
+  "Open with the place and the main subjects by name, then say what else turned up.",
+  "Open with what the place was like (the landmark, the season, the weather), then name the main animals or sights.",
+  "Open with what there was the most of and where, then single out one standout.",
+  "Two sentences only: the place and the main subjects, then one standout.",
+  'Open with a short fragment naming the place and the main subject ("Mount Baker and tarns at Yellow Aster Butte."), then one or two longer sentences.',
 ];
 
 export function shapeFor(slug) {
@@ -709,7 +709,7 @@ export function descriptionPrompt({
       : "",
   ].filter(Boolean);
 
-  return `Write the short paragraph at the top of one trip's page on Truman's photography site, the way he'd write it himself. People leave a site the moment it reads like AI wrote it, so this has to sound like Truman telling a friend about the trip, not a description of photos.${heading ? ` The page shows "${heading}" right above it.` : ""}
+  return `Write the short paragraph at the top of one trip's page on Truman's photography site. It's also the page's search snippet, and Google reads it to decide which searches the page and its photos show up for, so it has to say clearly what and where: the place, the landmarks and the main animals by name. Write it plainly, the way Truman would tell someone what the trip was, not like a brochure or an AI summary.${heading ? ` The page shows "${heading}" right above it.` : ""}
 
 What he photographed (${digest.photos} photos), as captioned:
 ${digest.captions.map((c) => `- ${c}`).join("\n")}
@@ -724,29 +724,28 @@ ${facts.join("\n")}
 ${notes ? `His own notes about this trip, the only source for what he was doing, who with, or how it went: "${notes}"` : "He hasn't left notes about this trip, so say nothing about what he was doing beyond what the trip name and the captions show."}
 
 How to write it:
-- In his voice (below): first person, casual, the way he talks. Start with "I", a verb ("Saw...", "Spent...", "Found..."), or the thing he liked most. Contractions, a comma splice, a dropped subject are all fine. Repeat words rather than reaching for synonyms.
+- The first sentence is what search results show: name the place and the main subjects in it ("Mount Baker and the tarns at Yellow Aster Butte", "Hummingbirds and red-eyed tree frogs in Bijagua").
 - ${shapeFor(session.slug)} Don't walk through the photos one by one.
-- What he saw and what he thought of it: the animals by common name and what they were up to, what the place was like, and at least one reaction of his, said plainly: what's cool or crazy about it ("they camouflage so well it's crazy"), what he loves about it, a simple guess at what an animal was up to ("looks like he just finished a big meal"), surprise ("I can't believe how..."), or a small thought about being out there ("some of the best wildlife experiences come when you're resting"). A hedge when he can't be sure ("likely (?)", "I think it was a mother and her baby"). One animal is "he" unless his notes say otherwise.
-- Not a quip. Don't try to be witty or clever: no punchlines, no wordplay, no bits about an animal's attitude or plans, no "solid chunk of stone on top of even more stone". Most of it is just what was there and what he thought of it. "lol" at most once, only when something's funny. "Little" at most once.
-- When one of his phrases is used up on other pages, don't swap in a fancier way to say it ("I dig", "I'm a fan of", "got a kick out of", "I was struck by"): react in a different way instead.${overused.length ? `\n- Already said on enough other trips' pages, so not here: ${overused.join(", ")}.` : ""}
+- Then what else is there: other animals by common name and what they were doing, what the place was like, in the words people search with ("tarn" for a small mountain lake, "fall colors", "wildflowers", "tide pools").
+- Plain and natural. First person is fine but not needed. At most one short reaction of his ("such a cool spot", "it's crazy how blue the water is"), never a quip, wordplay or a punchline. No "lol" on the website.
 - Don't talk about photos as photos: no "these photos", "this session", "frames", "shots", "images", "the rest". Never describe a picture: not the background, the blur, the framing, which way something faces, poses ("with its bill raised"), the flash or the light.
-- Common names only, no scientific names in brackets (the caption under each photo has those). Mid-sentence they're lowercase except proper nouns: "a turquoise-browed motmot", "an Ecuadorian hermit crab". Name species only from the identified list. Anything else gets plain words ("a heron", "some little toad").
-- One paragraph. No place line at the end like an Instagram post: the page already shows where it was.
+- Common names only, no scientific names in brackets (the caption under each photo has those). Mid-sentence they're lowercase except proper nouns: "a turquoise-browed motmot", "an Ecuadorian hermit crab". Name species only from the identified list. Anything else gets plain words ("a heron", "a small toad").
+- One paragraph. No place line at the end like an Instagram post.
 - Only what the captions, the facts and his notes support. Don't invent events, companions, waiting, weather, how long he was there, numbers, or anything off camera. No "today" or "last week".
-- No emoji, hashtags, exclamation marks, long dashes, questions (a hedging "(?)" is fine), or a last line that sums up.
+- No emoji, hashtags, exclamation marks, long dashes, questions (a hedging "(?)" is fine), marketing words, or a last line that sums up.${overused.length ? `\n- Already said on enough other trips' pages, so not here: ${overused.join(", ")}.` : ""}
 - Don't open with: ${avoidOpeners.length ? avoidOpeners.map((o) => `"${o}"`).join(", ") : "(nothing yet)"}.
 ${
   others.length
-    ? `\nOther trips' pages, newest last. Don't start like them or reuse their reactions:\n${others
+    ? `\nOther trips' pages, newest last. Don't start like them or reuse their phrasing:\n${others
         .slice(-10)
         .map((o) => `- ${o}`)
         .join("\n")}\n`
     : ""
 }
 
-Two examples of his voice, from made-up trips (don't copy their wording):
-- "The frogs here were everywhere lol, red-eyed tree frogs under the leaves and a glass frog right over the stream. I love how the glass frogs just look like part of the leaf."
-- "Mostly granite spires up here, with snow still hanging on in the gullies. Such a cool contrast with the dark rock, I'd go back just for that."
+Two examples of the shape, from made-up trips (don't copy their wording):
+- "Red-eyed tree frogs and glass frogs along a rainforest stream at night in Guayacán. The red-eyed tree frogs were under the leaves, and a glass frog sat right over the water, such a cool find."
+- "Granite spires and tarns at Gunn Peak in the Central Cascades, with snow still in the gullies in June. A gray-crowned rosy-finch flew over the snowfields."
 
 ${voiceGuide ? `How Truman writes (follow it):\n${voiceGuide}\n\n` : ""}${voiceRules ? `The site's copy rules (follow them too):\n${voiceRules}\n\n` : ""}Reply with JSON only: { ${shape.join(", ")} }${feedback ? `\n\nYour previous draft was rejected: ${feedback} Fix that.` : ""}`;
 }
@@ -828,9 +827,16 @@ export function descriptionProblems(
     problems.push(
       `It talks about the photos ("${photoTalk}"). Talk about the trip: what he saw and what he thought.`,
     );
-  if (!OPINION.test(text))
+  // Search results show this paragraph, and the place is what people search for.
+  const placeWords = new Set(
+    allowedNames(session)
+      .flatMap((p) => norm(p).split(/[^a-z0-9]+/))
+      .filter((w) => w.length >= 4 && !PLACE_GENERIC.has(w)),
+  );
+  const said = new Set(norm(text).split(/[^a-z0-9]+/));
+  if (placeWords.size && ![...placeWords].some((w) => said.has(w)))
     problems.push(
-      "It has no reaction of his. Add one: what he liked, or found funny or strange.",
+      `It doesn't say where it was. Name the place (for example "${placeLabel(session) || allowedNames(session)[0]}"): search results show this paragraph, and the place is what people search for.`,
     );
   const grounding = [
     session.title,
@@ -868,16 +874,8 @@ export function descriptionProblems(
   const littles = (text.match(/\blittle\b/gi) ?? []).length;
   if (littles > 1)
     problems.push(`It says "little" ${littles} times; once at most.`);
-  const lols = (text.match(/\blol\b/gi) ?? []).length;
-  if (lols > 1) problems.push(`It says "lol" ${lols} times; once at most.`);
-  else if (
-    lols &&
-    others.length &&
-    others.filter((o) => /\blol\b/i.test(o)).length >= others.length / 4
-  )
-    problems.push(
-      'Enough other sessions already say "lol". Leave it out of this one.',
-    );
+  const lols = (text.match(/\b(?:lol|haha\w*)\b/gi) ?? []).length;
+  if (lols) problems.push('It says "lol". Not on the website, only Instagram.');
   const speciesNames = digest.species
     .flatMap((s) => [s.name, s.scientific])
     .concat(digest.groups.map((g) => g.name))

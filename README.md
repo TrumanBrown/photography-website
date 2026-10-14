@@ -252,14 +252,14 @@ each one once with a vision model, matches it to your iNaturalist
 observations, and writes:
 
 - **a caption for every photo**, e.g. `Northwestern garter snake (Thamnophis
-  ordinoides) coiled on a mossy log, Sauk Mountain`: short and plain, the way
-  a photographer labels his own gallery, with no poses or backgrounds. It's
-  the photo's `alt` text and lightbox caption, which is what image search
-  actually reads.
+  ordinoides) coiled on a mossy log, Sauk Mountain` or `Mount Baker reflected
+  in a tarn, Yellow Aster Butte`: specific and plain, in the words people
+  search with, with no poses or background blur. It's the photo's `alt` text
+  and lightbox caption, which is what image search actually reads.
 - **a description for every session**, written from all of its photos'
-  captions and identifications in your own voice (first person, casual, with
-  a reaction of yours), using any notes you've left about the trip. How you
-  write lives in the [truman-voice skill](.github/skills/truman-voice/SKILL.md).
+  captions and identifications: the place and the main subjects by name first
+  (it's the search snippet), with a light touch of your voice and any notes
+  you've left about the trip.
 
 Both land in the session's `_session.json` and the site rebuilds, usually
 within half an hour of the upload. Edit either in `/admin` and your version

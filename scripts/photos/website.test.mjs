@@ -519,31 +519,40 @@ describe("session descriptions", () => {
   const check = (description, extra = {}) =>
     descriptionProblems({ description }, { session: crarc, digest, ...extra });
 
-  it("passes a grounded description in his voice", () => {
+  it("passes a plain, grounded description that says what and where", () => {
     expect(
       check(
-        "Frogs, and most of them at night lol. Found a Sylvia's tree frog on a thin twig, and a heron by the canal in Guayacán.",
+        "Sylvia's tree frogs at night in Guayacán, and a heron by the canal. Such a cool spot for frogs.",
+      ),
+    ).toEqual([]);
+    // No reaction needed on the website: being specific matters more.
+    expect(
+      check(
+        "Sylvia's tree frogs at night in Guayacán, on thin twigs above the stream, and a heron by the canal.",
       ),
     ).toEqual([]);
   });
 
-  it("wants his reaction in it, and nothing he didn't say happened", () => {
+  it("names the place, since search results show this paragraph", () => {
     expect(
       check(
-        "Frogs, and most of them at night. A Sylvia's tree frog on a thin twig, and a heron by the canal in Guayacán.",
+        "Sylvia's tree frogs at night on thin twigs above the stream, and a heron by the canal.",
       ).join(" "),
-    ).toMatch(/no reaction of his/);
+    ).toMatch(/doesn't say where it was.*Guayacán/);
+  });
+
+  it("says nothing he didn't say happened", () => {
     for (const [text, said] of [
       [
-        "We spent the night looking for frogs, such a fun walk with a Sylvia's tree frog on a twig.",
+        "We spent the night in Guayacán looking for frogs, and found a Sylvia's tree frog on a twig.",
         "We",
       ],
       [
-        "Went snorkeling off the bank and found a heron, such a cool bird.",
+        "Went snorkeling off the bank in Guayacán and found a heron by the canal.",
         "snorkeling",
       ],
       [
-        "Waited ages for the Sylvia's tree frog to move, so cool when it finally did.",
+        "Waited ages in Guayacán for the Sylvia's tree frog to move, and it finally did.",
         "Waited",
       ],
     ])
@@ -551,22 +560,22 @@ describe("session descriptions", () => {
     // His notes are what back it up.
     expect(
       check(
-        "Went snorkeling off the bank and found a heron, such a cool bird.",
+        "Went snorkeling off the bank in Guayacán and found a heron by the canal.",
         { notes: "Snorkeled the reef in the afternoon." },
       ),
     ).toEqual([]);
   });
 
   it("keeps it about the trip, not the pictures, and in plain punctuation", () => {
-    const voiced =
-      "Such a fun night, a Sylvia's tree frog on a twig and a heron by the canal.";
-    expect(check(voiced)).toEqual([]);
-    expect(check(`${voiced} These photos are mostly frogs.`).join(" ")).toMatch(
+    const plain =
+      "A Sylvia's tree frog on a twig at night in Guayacán, and a heron by the canal.";
+    expect(check(plain)).toEqual([]);
+    expect(check(`${plain} These photos are mostly frogs.`).join(" ")).toMatch(
       /talks about the photos/,
     );
-    expect(check(`${voiced} Love it!`).join(" ")).toMatch(/exclamation/);
-    expect(check(`${voiced} Who knew?`).join(" ")).toMatch(/question/);
-    expect(check(voiced.replace("twig", "twig, likely (?)"))).toEqual([]);
+    expect(check(`${plain} Love it!`).join(" ")).toMatch(/exclamation/);
+    expect(check(`${plain} Who knew?`).join(" ")).toMatch(/question/);
+    expect(check(plain.replace("twig", "twig, likely (?)"))).toEqual([]);
   });
 
   it("spreads the model's favourite phrases across pages, and little once a page", () => {
@@ -590,19 +599,21 @@ describe("session descriptions", () => {
     ).toMatch(/I really dig/);
   });
 
-  it("keeps lol rare across sessions and opens differently from the rest", () => {
-    const lol =
-      "Frogs, and most of them at night lol. Found a Sylvia's tree frog on a thin twig.";
+  it("keeps lol off the website and opens differently from the rest", () => {
     expect(
-      check(lol, { others: ["Big peaks lol.", "Lots of snow."] }).join(" "),
-    ).toMatch(/Enough other sessions already say "lol"/);
-    expect(check(`${lol} Such a cool spot lol`).join(" ")).toMatch(/2 times/);
+      check(
+        "Sylvia's tree frogs at night in Guayacán lol, and a heron by the canal.",
+      ).join(" "),
+    ).toMatch(/only Instagram/);
     expect(openerOf("I saw a heron.")).toBe("i saw");
     expect(openerOf("Saw a heron.")).toBe("saw");
     expect(
-      check("I saw a Sylvia's tree frog on a twig, such a cool one.", {
-        openerCounts: new Map([["i saw", 3]]),
-      }).join(" "),
+      check(
+        "I saw a Sylvia's tree frog on a twig in Guayacán, such a cool one.",
+        {
+          openerCounts: new Map([["i saw", 3]]),
+        },
+      ).join(" "),
     ).toMatch(/open with "i saw"/);
   });
 

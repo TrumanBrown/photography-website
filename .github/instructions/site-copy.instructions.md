@@ -124,9 +124,9 @@ Instagram posts are the exception to this section and to first-person-only-where
 follow the [caption-voice skill](../skills/caption-voice/SKILL.md), which wants an opening in his
 voice with one emoji, the place on its own line, and a `Fun fact: ` label on the fact. How he
 writes in general is in the [truman-voice skill](../skills/truman-voice/SKILL.md); it's being
-brought to the site's longer prose one surface at a time: Instagram first, then the session
-descriptions, which are written in it ([website.mjs](../../scripts/photos/website.mjs)
-`descriptionPrompt`).
+used in full on Instagram. On the site, photo captions and session descriptions are written for
+search first (specific, plain, the place and the species by name) with at most a light touch of
+it ([website.mjs](../../scripts/photos/website.mjs) `descriptionPrompt`).
 
 - Two or three facts per species, one picked at random. Give one ID/field-mark tip and one
   behavior or story fact.
