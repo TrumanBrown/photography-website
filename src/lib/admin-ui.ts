@@ -251,6 +251,12 @@ export function isEditorMode(value: string): value is EditorMode {
   return (EDITOR_MODES as string[]).includes(value);
 }
 
+/** Header and Rotation open on just the frames that fit their crop. Cover has
+ *  no filter, and Captions starts with every row so written ones stay editable. */
+export function onlyFittingByDefault(mode: EditorMode): boolean {
+  return mode === 'header' || mode === 'rotation';
+}
+
 /** Every editable value in the dialog, as one comparable object. */
 export interface Draft {
   title: string;
@@ -301,6 +307,34 @@ export function draftSignature(draft: Draft): string {
 
 export function isDirty(original: Draft, draft: Draft): boolean {
   return draftSignature(original) !== draftSignature(draft);
+}
+
+/**
+ * The frames the photograph grid shows, in session order.
+ *
+ * The filter drops what the slot can't use (in Captions, what's already
+ * written), but a frame that already holds the slot stays, so an upright header
+ * picked on purpose doesn't vanish from its own tab.
+ */
+export function framesToShow(
+  session: AdminSession,
+  draft: Draft,
+  mode: EditorMode,
+  onlyFitting: boolean,
+): string[] {
+  if (!onlyFitting) return session.images;
+  if (mode === 'captions') {
+    return session.images.filter((file) => !(draft.captions[file] ?? '').trim());
+  }
+  if (mode === 'header') {
+    return session.images.filter((file) => file === draft.banner || fitsBanner(session, file));
+  }
+  if (mode === 'rotation') {
+    return session.images.filter(
+      (file) => draft.showcase.includes(file) || fitsLeadBox(session, file),
+    );
+  }
+  return session.images;
 }
 
 /** Captions ride along with the save as an ordered images array. */

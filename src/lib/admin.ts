@@ -8,9 +8,11 @@ import {
   filterSessions,
   fitsBanner,
   fitsLeadBox,
+  framesToShow,
   fullPanelSize,
   imagesPayload,
   isEditorMode,
+  onlyFittingByDefault,
   previewUrl,
   ratioLabel,
   sessionFlags,
@@ -868,9 +870,9 @@ const MODE_HELP: Record<EditorMode, string> = {
   cover:
     "The frame that stands for the session on the home page and in the archive. Tap one, or tap Auto to let the first photograph do it.",
   header:
-    "The photograph the session page opens on. It's cropped wide, so upright frames are dimmed, pick one anyway if you want it. Auto follows the cover.",
+    "The photograph the session page opens on. It's cropped wide, so the filter hides upright frames, clear it to pick one anyway. Auto follows the cover.",
   rotation:
-    'Photographs worth leading with on the home page. Only wide 3:2 frames fit the lead box, so the rest are greyed out. Leave it empty and one gets picked for you.',
+    'Photographs worth leading with on the home page. Only wide 3:2 frames fit the lead box, so the rest are left out. Leave it empty and one gets picked for you.',
   captions:
     'Captions become the alt text in the lightbox and the line under each photograph. Short and specific beats clever.',
 };
@@ -906,7 +908,7 @@ function openEdit(slug: string, trigger?: HTMLElement) {
     original,
     draft: structuredClone(original),
     mode: prefs.mode,
-    onlyFitting: false,
+    onlyFitting: onlyFittingByDefault(prefs.mode),
     focused: session.images[0] ?? '',
   };
 
@@ -918,7 +920,7 @@ function openEdit(slug: string, trigger?: HTMLElement) {
   document.getElementById('edit-modal-title')!.textContent = `Edit: ${session.title}`;
   viewLink.href = `/sessions/${session.thumbSlug}`;
   tileSizeEl.value = String(prefs.tile);
-  onlyFittingEl.checked = false;
+  onlyFittingEl.checked = editor.onlyFitting;
   statusEl.textContent = 'Arrow keys move, P previews, Ctrl+S saves.';
   document.getElementById('edit-error')!.classList.add('hidden');
 
@@ -1091,8 +1093,8 @@ for (const button of modeButtons) {
     const mode = button.dataset.mode;
     if (!mode || !isEditorMode(mode)) return;
     editor.mode = mode;
-    editor.onlyFitting = false;
-    onlyFittingEl.checked = false;
+    editor.onlyFitting = onlyFittingByDefault(mode);
+    onlyFittingEl.checked = editor.onlyFitting;
     savePrefs({ mode });
     paintModes();
     renderGrid();
@@ -1112,14 +1114,7 @@ tileSizeEl.addEventListener('input', () => {
 
 /** Which frames the grid shows, after the "only" filter. */
 function visibleFiles(state: EditorState): string[] {
-  const { session, mode, draft, onlyFitting } = state;
-  if (!onlyFitting) return session.images;
-  if (mode === 'captions') {
-    return session.images.filter((file) => !(draft.captions[file] ?? '').trim());
-  }
-  if (mode === 'header') return session.images.filter((file) => fitsBanner(session, file));
-  if (mode === 'rotation') return session.images.filter((file) => fitsLeadBox(session, file));
-  return session.images;
+  return framesToShow(state.session, state.draft, state.mode, state.onlyFitting);
 }
 
 function roleLabels(state: EditorState, file: string): string[] {
@@ -1599,11 +1594,16 @@ function paintPreviewAssign() {
 
 function stepPreview(delta: number) {
   if (!editor || !previewFile) return;
-  const files = visibleFiles(editor);
-  const index = files.indexOf(previewFile);
-  if (index < 0) return;
-  const next = files[(index + delta + files.length) % files.length];
-  openPreview(next);
+  const all = editor.session.images;
+  const shown = new Set(visibleFiles(editor));
+  let index = all.indexOf(previewFile);
+  if (index < 0 || shown.size === 0) return;
+  // Walk the session order, not the filtered list: clearing an upright header
+  // from here drops it out of the grid, and the arrows should still move on.
+  do {
+    index = (index + delta + all.length) % all.length;
+  } while (!shown.has(all[index]));
+  openPreview(all[index]);
 }
 
 function closePreview() {

@@ -30,21 +30,23 @@ does, and the grid is drawn in the shape that slot actually uses on the site:
 - **Cover**: the frame that stands for the session on the home page and in the archive. Tapping the
   chosen cover again, or the dashed **Auto** tile, hands it back to the first photograph.
 - **Header**: the frame the session page opens on, cropped wide (tiles are drawn at 5:2). Upright
-  frames are dimmed because the crop eats most of their height, but they can still be picked.
-  **Auto** follows the cover.
+  frames are hidden at first because the crop eats most of their height. Clear **Only frames that
+  fit** to see them dimmed and pick one anyway. **Auto** follows the cover.
 - **Rotation**: the photographs offered to the rotating lead box on the home page. The box is a
-  fixed 3:2, so anything else is greyed out and can't be chosen. An empty list means the site picks
-  one frame automatically. Every visit opens on a random frame from the pool and then rotates on
-  from there, so the home page shows a different photograph each time rather than always the same
-  one.
+  fixed 3:2, so anything else is hidden at first (greyed out once the filter is cleared) and can't be
+  chosen. An empty list means the site picks one frame automatically. Every visit opens on a random
+  frame from the pool and then rotates on from there, so the home page shows a different photograph
+  each time rather than always the same one.
 - **Captions**: a list view with a thumbnail per row. Captions become the alt text in the lightbox
   and the line under each photograph.
 
 Every tile carries badges for the roles it already holds (Cover, Header, Rotation, Caption) and its
 aspect ratio, so the state of a session is readable without switching modes. The **Size** slider
 scales the thumbnails from 120px to 640px and is remembered between sessions. **Only frames that
-fit** hides the frames the chosen slot can't use; in Captions mode it hides the ones already
-written.
+fit** hides the frames the chosen slot can't use. It's ticked whenever Header or Rotation opens, and
+a frame that already holds the slot stays in view even if it doesn't fit, so an upright header
+picked on purpose is still there to see. In Captions mode the same box hides the ones already
+written, and it starts unticked there.
 
 The ⤢ button on a tile (or `P` on a focused tile) opens the full-size photograph over the editor,
 with arrow keys to step through the session and a button that applies the current mode to it.

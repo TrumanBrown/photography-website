@@ -8,12 +8,14 @@ import {
   filterSessions,
   fitsBanner,
   fitsLeadBox,
+  framesToShow,
   fullPanelSize,
   imagesPayload,
   isDirty,
   isEditorMode,
   matchesQuery,
   needsWork,
+  onlyFittingByDefault,
   previewUrl,
   ratioLabel,
   sessionFlags,
@@ -284,5 +286,52 @@ describe("editor modes", () => {
     expect(isEditorMode("cover")).toBe(true);
     expect(isEditorMode("captions")).toBe(true);
     expect(isEditorMode("banner")).toBe(false);
+  });
+
+  it("opens Header and Rotation on just the frames that fit", () => {
+    expect(onlyFittingByDefault("header")).toBe(true);
+    expect(onlyFittingByDefault("rotation")).toBe(true);
+    expect(onlyFittingByDefault("cover")).toBe(false);
+    expect(onlyFittingByDefault("captions")).toBe(false);
+  });
+});
+
+describe("frames the grid shows", () => {
+  it("shows every frame with the filter off", () => {
+    const session = mk();
+    const draft = draftFromSession(session);
+    for (const mode of ["cover", "header", "rotation", "captions"] as const) {
+      expect(framesToShow(session, draft, mode, false)).toEqual(session.images);
+    }
+  });
+
+  it("drops frames the slot can't use", () => {
+    const session = mk();
+    const draft = draftFromSession(session);
+    expect(framesToShow(session, draft, "header", true)).toEqual(["DSC001.JPG", "DSC003.JPG"]);
+    expect(framesToShow(session, draft, "rotation", true)).toEqual(["DSC001.JPG"]);
+    expect(framesToShow(session, draft, "cover", true)).toEqual(session.images);
+  });
+
+  it("keeps an upright header that was picked on purpose", () => {
+    const session = mk({ banner: "DSC002.JPG" });
+    const draft = draftFromSession(session);
+    expect(framesToShow(session, draft, "header", true)).toEqual(session.images);
+    expect(framesToShow(session, { ...draft, banner: "" }, "header", true)).toEqual([
+      "DSC001.JPG",
+      "DSC003.JPG",
+    ]);
+  });
+
+  it("keeps a rotation pick that no longer fits the lead box", () => {
+    const session = mk({ showcase: ["DSC003.JPG"] });
+    const draft = draftFromSession(session);
+    expect(framesToShow(session, draft, "rotation", true)).toEqual(["DSC001.JPG", "DSC003.JPG"]);
+  });
+
+  it("leaves only the frames still missing a caption in Captions", () => {
+    const session = mk();
+    const draft = draftFromSession(session);
+    expect(framesToShow(session, draft, "captions", true)).toEqual(["DSC002.JPG", "DSC003.JPG"]);
   });
 });
