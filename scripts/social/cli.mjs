@@ -32,7 +32,7 @@ import { join } from "node:path";
 import { ROOT, loadSettings } from "./settings.mjs";
 import { blobStore, localStore, updateJson } from "../photos/store.mjs";
 import { isPlannable, isPostable } from "./plan.mjs";
-import { canvasFor } from "./render.mjs";
+import { CROP_VERSION, canvasFor } from "./render.mjs";
 import { STORY_LEDGER, pickStory, storyCandidates } from "./story.mjs";
 import { localParts } from "./schedule.mjs";
 import { showPage } from "../photos/open.mjs";
@@ -188,13 +188,24 @@ async function preview({ social, photos }, count) {
     const id = s.inat
       ? `iNaturalist ${s.speciesOk ? "species" : "group-level"} ID`
       : "no iNaturalist match";
-    // The photo inside the frame Instagram will show, borders and all.
-    const frame = canvasFor(f.width || 1, f.height || 1);
+    // The photo inside the frame Instagram will show: cropped where the
+    // catalog placed the crop (the middle until it has), or with borders.
+    const fit = settings.tallImages === "pad" ? "pad" : "crop";
+    const frame = canvasFor(f.width || 1, f.height || 1, { fit });
+    const placed = f.crop?.v === CROP_VERSION ? f.crop.at : null;
+    const at = `${Math.round((placed ?? 0.5) * 100)}%`;
+    const fill = frame.crop
+      ? ` style="object-fit:cover;object-position:${frame.crop.side === "y" ? `50% ${at}` : `${at} 50%`}"`
+      : "";
     const number = i === undefined ? "" : `Post ${i + 1} · `;
-    const borders = frame.padded ? " · posted whole, with borders" : "";
+    const shape = frame.padded
+      ? " · posted whole, with borders"
+      : frame.crop
+        ? ` · cropped to fit${placed === null ? " (from the middle until the next Photo captions run places it)" : ""}`
+        : "";
     const own = s.post?.own ? " · your words" : "";
-    return `<article><div class="frame" style="aspect-ratio:${frame.width}/${frame.height}"><img src="${escape(src)}" loading="lazy" alt=""></div><div>
-<p class="meta">${number}${escape(s.pick)} · appeal ${escape(s.post?.appeal ?? s.analysis?.appeal ?? "?")} · ${escape(id)}${borders}${own}${s.problem ? ` · ${escape(s.problem)}` : ""}</p>
+    return `<article><div class="frame" style="aspect-ratio:${frame.width}/${frame.height}"><img src="${escape(src)}" loading="lazy" alt=""${fill}></div><div>
+<p class="meta">${number}${escape(s.pick)} · appeal ${escape(s.post?.appeal ?? s.analysis?.appeal ?? "?")} · ${escape(id)}${shape}${own}${s.problem ? ` · ${escape(s.problem)}` : ""}</p>
 <pre>${escape(s.post?.caption ?? "(no caption yet)")}</pre>
 <p class="alt"><b>Alt text:</b> ${escape(s.post?.alt ?? "")}</p></div></article>`;
   };
@@ -230,7 +241,7 @@ async function preview({ social, photos }, count) {
 pre{white-space:pre-wrap;font:15px system-ui;margin:.4rem 0}.meta{color:#666;font-size:13px;margin:0}.alt{color:#444;font-size:13px}.lede{color:#444;max-width:70ch}</style>
 ${storyCard}
 <h1>Next ${shown.length} posts</h1>
-<p class="lede">In the order they'll go out, ${settings.postsPerDay} a day. Each photo is shown in the frame Instagram will use: never cropped, with plain borders where it doesn't fit (black or white, matched to the photo when it's posted).</p>
+<p class="lede">In the order they'll go out, ${settings.postsPerDay} a day. Each photo is shown in the frame Instagram will use. ${settings.tallImages === "pad" ? "Where it doesn't fit, it's posted whole with plain borders (black or white, matched to the photo when it's posted)." : "Where it's taller than 4:5 or wider than 1.91:1 it's cropped to fit, from the middle unless one end is empty sky, water or blur."}</p>
 ${shown.map((key, i) => card(key, i)).join("\n")}
 ${
   review.length

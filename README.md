@@ -285,8 +285,9 @@ day by default, each one once, in an order that mixes sessions and subjects
 rather than going oldest to newest, with one post in every three a landscape
 or place. Each post is:
 
-- **the whole photo at Instagram's full resolution** (1440 px), never cropped.
-  Frames Instagram can't take as they are get plain borders.
+- **the photo at Instagram's full resolution** (1440 px), whole when it fits
+  Instagram's shape. Frames too tall or too wide for it are cropped to fit,
+  from the middle unless one end is empty sky, water or blur.
 - **a caption written from the photo's own record**: an opening in your voice
   (how you came across it, the species from your iNaturalist identification of
   that exact photo with its scientific name, what it's doing and your reaction,

@@ -99,6 +99,7 @@ jobs:
           IG_USER_ID: ${{ secrets.IG_USER_ID }}
           SOCIAL_SECRET_KEY: ${{ secrets.SOCIAL_SECRET_KEY }}
           SOCIAL_REQUIRE_APPROVAL: ${{ vars.SOCIAL_REQUIRE_APPROVAL }}
+          SOCIAL_TALL_IMAGES: ${{ vars.SOCIAL_TALL_IMAGES }}
           SOCIAL_PAD_COLOR: ${{ vars.SOCIAL_PAD_COLOR }}
         run: |
           node scripts/social/post.mjs $FORCE

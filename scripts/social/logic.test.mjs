@@ -2,8 +2,8 @@ import {
   burstGroups,
   cameraFacts,
   chooseVersion,
+  cropFraction,
   originalFor,
-  padFraction,
   shotKey,
 } from "../photos/shots.mjs";
 import { countsToward, decide, localParts, previousDay } from "./schedule.mjs";
@@ -67,10 +67,12 @@ describe("shots", () => {
     ).toBe(names[2]);
   });
 
-  it("posts the version that needs no border, then the biggest", () => {
+  it("posts the version that needs no crop, then the biggest", () => {
     const crop = { id: "s/DSC08826.JPEG", width: 2907, height: 4128 };
     const full = { id: "s/DSC08826-1.JPEG", width: 6192, height: 4128 };
-    expect(padFraction(crop.width, crop.height)).toBeGreaterThan(0);
+    expect(cropFraction(crop.width, crop.height)).toBeGreaterThan(0);
+    expect(cropFraction(4128, 6192)).toBeCloseTo(1 / 6, 5);
+    expect(cropFraction(full.width, full.height)).toBe(0);
     expect(chooseVersion([crop, full]).id).toBe(full.id);
     expect(
       chooseVersion([

@@ -44,8 +44,8 @@ import {
   burstGroups,
   cameraFacts,
   chooseVersion,
+  cropFraction,
   originalFor,
-  padFraction,
   shotKey,
 } from "./shots.mjs";
 import {
@@ -129,6 +129,7 @@ import { buildHashtags } from "../social/hashtags.mjs";
 import { SCENES, planQueue } from "../social/plan.mjs";
 import { resolveToken } from "../social/token.mjs";
 import { createClient } from "../social/instagram.mjs";
+import { CROP_VERSION, placeCrop } from "../social/render.mjs";
 import { info, redact, warn } from "./redact.mjs";
 
 /** Bump when the description prompt changes enough that every session should be redone. */
@@ -949,7 +950,14 @@ async function main() {
   await store.writeJson("taxa.json", taxa);
 
   // 6. instagram
-  const ig = { rendered: 0, voiced: 0, facts: 0, review: 0, planned: 0 };
+  const ig = {
+    rendered: 0,
+    voiced: 0,
+    facts: 0,
+    review: 0,
+    planned: 0,
+    cropped: 0,
+  };
   if (args.instagram && process.env.SOCIAL_ENABLED === "true") {
     try {
       await instagramStage();
@@ -1004,8 +1012,11 @@ async function main() {
         for (const [key, s] of Object.entries(shots)) {
           if (posted.has(key)) continue;
           const onAccount = s.files.some((id) =>
-            // Generous on purpose: a false match only skips a near-identical frame.
-            prints.some((p) => hamming(catalog.files[id].hash, p) <= 12),
+            // Generous on purpose: a false match only skips a near-identical
+            // frame. A post cropped to fit is matched by its crop's print.
+            [catalog.files[id].hash, catalog.files[id].crop?.hash].some(
+              (hash) => hash && prints.some((p) => hamming(hash, p) <= 12),
+            ),
           );
           if (onAccount) s.blocked = "already-on-account";
           else delete s.blocked;
@@ -1149,7 +1160,7 @@ async function main() {
         s.skipReason = "low-resolution";
       } else if (
         settings.tallImages === "skip" &&
-        padFraction(file.width, file.height) > 0
+        cropFraction(file.width, file.height) > 0
       ) {
         s.status = "skipped";
         s.skipReason = "outside-instagram-shape";
@@ -1174,6 +1185,29 @@ async function main() {
       sceneEvery: settings.landscapeEvery,
     });
 
+    // A planned photo taller than 4:5 or wider than 1.91:1 is cropped to fit
+    // when it's posted. Where the crop sits is worked out here, once, so the
+    // preview shows the crop the post will get (render.mjs).
+    if (settings.tallImages === "crop") {
+      const unplaced = [...new Set(items.map((k) => shots[k].pick))].filter(
+        (id) => {
+          const f = catalog.files[id];
+          return (
+            cropFraction(f.width, f.height) > 0 && f.crop?.v !== CROP_VERSION
+          );
+        },
+      );
+      await pool(unplaced, 4, async (id) => {
+        const f = catalog.files[id];
+        try {
+          const buf = await readPhoto(photoById.get(id) ?? { url: f.url });
+          f.crop = await placeCrop(buf, { width: f.width, height: f.height });
+          ig.cropped++;
+        } catch {
+          // Unreadable for now; tried again next run, or placed when posted.
+        }
+      });
+    }
     // Facts for the species and places the plan needs (facts.mjs), written
     // once from Wikipedia and kept privately. A species with nothing usable
     // falls back to its place; a lookup that found nothing waits 30 days.
@@ -1570,7 +1604,7 @@ async function main() {
       `iNaturalist matches: ${count((s) => s.inat?.via === "frame")} exact frame, ${count((s) => s.inat?.via === "moment")} same moment; ${count((s) => s.analysis?.idCheck === "conflict")} flagged as not matching.`,
       `Website: ${site.captions} captions (${linesWritten} first lines written), ${site.described} descriptions written${site.describeFailed ? `, ${site.describeFailed} failed checks` : ""}, ${site.waiting} sessions still being analysed, ${site.written} session files updated${site.kept ? `, ${site.kept} of your edits left alone` : ""}${sidecars ? "" : " (not written: dry run)"}.`,
       process.env.SOCIAL_ENABLED === "true" && args.instagram
-        ? `Instagram: ${ig.rendered} posts written (${ig.voiced} new openings), facts for ${ig.facts} new species or places, ${ig.review} need review, ${ig.planned} planned.`
+        ? `Instagram: ${ig.rendered} posts written (${ig.voiced} new openings), facts for ${ig.facts} new species or places, ${ig.review} need review, ${ig.planned} planned${ig.cropped ? `, ${ig.cropped} crops placed` : ""}.`
         : "",
     ]
       .filter(Boolean)

@@ -34,7 +34,7 @@ import { IN_FLIGHT, decide, localParts, previousDay } from "./schedule.mjs";
 import { isPostable, planQueue } from "./plan.mjs";
 import { resolveToken } from "./token.mjs";
 import { createClient, notReadyToPublish } from "./instagram.mjs";
-import { renderForInstagram } from "./render.mjs";
+import { CROP_VERSION, renderForInstagram } from "./render.mjs";
 import { POST_VERSION } from "./compose.mjs";
 import { info, redact, registerSecret } from "../photos/redact.mjs";
 
@@ -365,6 +365,8 @@ export async function runPost({
     let rendered;
     try {
       rendered = await render(await readImage(pick.file), {
+        fit: settings.tallImages === "pad" ? "pad" : "crop",
+        at: pick.file.crop?.v === CROP_VERSION ? pick.file.crop.at : null,
         padColor: settings.padColor,
       });
     } catch (e) {
@@ -397,7 +399,7 @@ export async function runPost({
         checked = ` Instagram accepted the image and caption, and the account can publish (${limit.used} of ${limit.total} posts used in the last 24 hours).`;
       }
       log(
-        `Dry run: post ${n + 1} for today is ready (${rendered.width}x${rendered.height}${rendered.padded ? ", with borders" : ""}).${checked} ` +
+        `Dry run: post ${n + 1} for today is ready (${rendered.width}x${rendered.height}${rendered.padded ? ", with borders" : rendered.crop ? ", cropped to fit" : ""}).${checked} ` +
           'Nothing was published because SOCIAL_LIVE is not "true".',
       );
       keepMedia = store.kind === "local";

@@ -49,8 +49,12 @@ export function originalFor(prefix, file, names) {
   );
 }
 
-/** How much of the Instagram frame would be border (0 when the photo fits as-is). */
-export function padFraction(width, height) {
+/**
+ * How much of a photo Instagram's shape can't hold: the share cropped off to
+ * fit it (or, with borders, the share of the frame that's border). 0 when the
+ * photo fits as it is.
+ */
+export function cropFraction(width, height) {
   const r = width / height;
   if (r < IG_MIN_RATIO) return 1 - r / IG_MIN_RATIO;
   if (r > IG_MAX_RATIO) return 1 - IG_MAX_RATIO / r;
@@ -58,14 +62,15 @@ export function padFraction(width, height) {
 }
 
 /**
- * Among the files of one shot, pick the one to post: the version that needs
- * the least border, then the most pixels. Your own crops are respected as-is;
- * nothing here crops anything.
+ * Among the files of one shot, pick the one to post: the version Instagram's
+ * shape cuts least (ideally not at all), then the most pixels. Nothing here
+ * crops anything; render.mjs crops a frame that doesn't fit when it's posted.
  */
 export function chooseVersion(files) {
   return [...files].sort((a, b) => {
-    const pad = padFraction(a.width, a.height) - padFraction(b.width, b.height);
-    if (Math.abs(pad) > 0.001) return pad;
+    const cut =
+      cropFraction(a.width, a.height) - cropFraction(b.width, b.height);
+    if (Math.abs(cut) > 0.001) return cut;
     return b.width * b.height - a.width * a.height || a.id.localeCompare(b.id);
   })[0];
 }

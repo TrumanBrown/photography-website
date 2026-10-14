@@ -22,7 +22,7 @@
 
 - Posts photographs from the site to one Instagram account: **3 a day** by default, at 08:30, 12:30 and 18:00 Pacific.
 - **Never posts the same photograph twice**, even when it exists as several files (crops, re-exports, copies in two sessions), and never re-posts anything already on the account.
-- Posts the **whole frame at Instagram's full resolution** (1440 px wide). It never crops. Frames too tall or too wide for Instagram get plain borders instead.
+- Posts each photo at **Instagram's full resolution** (1440 px wide). Frames that fit Instagram's shape go out whole. Frames too tall or too wide for it (mostly 2:3 portraits) are **cropped to fit**, from the middle unless one end is empty sky, water or blur ([The image](#2-the-image)).
 - **Writes each caption from the photo's record**: the same one-time analysis that writes the website's captions ([docs/photos.md](photos.md)). Each post gets what the photo is of and what it's doing, where it is, **one true fact about the species or the place** taken from Wikipedia, the camera and lens, alt text, and five hashtags. For animals and plants it uses **your own iNaturalist identification of that exact photo**.
 - **Mixes the feed**: one post in every three is a landscape or place, the rest wildlife.
 - Posts **one story a day**, at a different time each day: a photo from the archive, vertical ones first, with nothing added ([Stories](#stories)).
@@ -210,7 +210,7 @@ npm run social -- status     # how many are ready, and roughly when the archive 
 npm run social -- preview    # opens the next week of posts in your browser
 ```
 
-The preview shows each post in the order it'll go out, with its full caption and alt text, and the photo in the frame Instagram will use (whole, with borders where it doesn't fit). The page is written to `.cache/social/preview.html` and never leaves your machine. The storage account is read from `blobHost` in `site.config.ts`; set `AZURE_STORAGE_ACCOUNT` only if yours is different.
+The preview shows each post in the order it'll go out, with its full caption and alt text, and the photo in the frame Instagram will use (cropped where it doesn't fit, the way it'll be posted). The page is written to `.cache/social/preview.html` and never leaves your machine. The storage account is read from `blobHost` in `site.config.ts`; set `AZURE_STORAGE_ACCOUNT` only if yours is different.
 
 To keep a photo from ever being posted, run `npm run social -- skip DSC01234`.
 
@@ -282,8 +282,8 @@ Set these as **secrets** (masked in logs) or **variables** under Settings → Se
 | `SOCIAL_TIMEZONE` | variable | `America/Los_Angeles` | Time zone for the slots |
 | `SOCIAL_MIN_GAP_MINUTES` | variable | `150` | Minimum time between two posts |
 | `SOCIAL_DAY_END` | variable | `23:00` | No new posts after this time |
-| `SOCIAL_TALL_IMAGES` | variable | `pad` | `skip` leaves out frames that would need borders |
-| `SOCIAL_PAD_COLOR` | variable | `auto` | Border colour. `auto` picks black or white from the photo's edges |
+| `SOCIAL_TALL_IMAGES` | variable | `crop` | Frames taller than 4:5 or wider than 1.91:1. `crop` trims them to fit, `pad` posts them whole with plain borders, `skip` leaves them out |
+| `SOCIAL_PAD_COLOR` | variable | `auto` | Border colour with `SOCIAL_TALL_IMAGES=pad`. `auto` picks black or white from the photo's edges |
 | `SOCIAL_REQUIRE_APPROVAL` | variable | off | `true` posts only captions you've approved |
 | `SOCIAL_STORIES` | variable | off | `true` posts one story a day (only while `SOCIAL_LIVE` is `true`); `rehearse` does everything but publish |
 | `SOCIAL_STORY_WINDOW` | variable | `10:00-21:00` | The day's story goes out at a time picked within this window, different each day |
@@ -297,7 +297,7 @@ The timer's own settings are parameters of [scheduler.bicep](../infra/modules/sc
 
 ### 1. Choosing the photograph
 
-"Never twice" works on **shots**, meaning presses of the shutter, rather than files. A shot is identified by the camera model and the capture time recorded in the photo. Files without a capture time fall back to a fingerprint of the image. When a shot exists as several files, the one that fits Instagram without borders is posted, then the largest. Your own crops are used exactly as you made them.
+"Never twice" works on **shots**, meaning presses of the shutter, rather than files. A shot is identified by the camera model and the capture time recorded in the photo. Files without a capture time fall back to a fingerprint of the image. When a shot exists as several files, the one that fits Instagram without cropping is posted, then the largest. A crop of your own that fits Instagram's shape is posted exactly as you made it.
 
 Each Photo captions run plans the next two weeks. Each next post is the best-scoring shot that doesn't repeat something recent:
 
@@ -319,8 +319,12 @@ Instagram only accepts JPEGs between 4:5 (portrait) and 1.91:1 (landscape), at m
 - starts from the untouched original and turns it the right way up from its EXIF data, as the site does
 - sends it at 1440 px wide with high-quality resizing, and never enlarges it
 - sends a frame inside Instagram's limits whole, with nothing added
-- gives a frame outside them (mostly 2:3 portraits) **plain borders, never a crop**, black or white to match the photo's own edges
+- **crops a frame outside them** to the nearest shape Instagram takes. A 2:3 portrait loses a sixth of its height, a 3:4 phone photo a sixteenth. The crop comes from the middle unless one end of the frame is empty (plain sky, still water, out-of-focus background) and the other isn't. Then it comes off the empty end, stopping a little short of whatever's there. A busy end doesn't pull the crop toward it, so a heron near the top isn't cut off to keep the twigs at the bottom
 - writes sRGB, 4:4:4 colour, JPEG quality 95, with camera metadata removed
+
+Where each crop sits is worked out once, when the photo is first planned, and kept in the catalog along with the cropped frame's fingerprint. The preview shows the same crop the post will get. If a crop doesn't work for a photo, `npm run social -- skip DSC01234` keeps it off Instagram.
+
+Borders that follow each viewer's light or dark mode aren't possible: a border is part of the JPEG, and Instagram has no transparency, so it's black or white for everyone. `SOCIAL_TALL_IMAGES=pad` still posts these frames whole with plain borders (black or white, matched to the photo's edges), and `skip` leaves them out.
 
 ### 3. What's in the photo, and what it is
 

@@ -5,6 +5,7 @@ import { localStore } from "../photos/store.mjs";
 import { loadSettings } from "./settings.mjs";
 import { runPost } from "./post.mjs";
 import { POST_VERSION } from "./compose.mjs";
+import { CROP_VERSION } from "./render.mjs";
 import { _resetSecrets } from "../photos/redact.mjs";
 
 // Wednesday 2026-10-14, Los Angeles (UTC-7).
@@ -148,6 +149,33 @@ describe("runPost", () => {
       altText: "Alt s1",
     });
     expect(await readdir(join(dir, "media")).catch(() => [])).toEqual([]);
+  });
+
+  it("crops a tall photo where the catalog placed its crop", async () => {
+    const catalog = (await store.readJson("catalog.json")).data;
+    const tall = (crop) => ({ width: 2000, height: 3000, crop });
+    Object.assign(
+      catalog.files["a/s1.jpg"],
+      tall({ v: CROP_VERSION, at: 0.25, hash: "0".repeat(32) }),
+    );
+    Object.assign(
+      catalog.files["b/s2.jpg"],
+      tall({ v: CROP_VERSION - 1, at: 0.25, hash: "0".repeat(32) }),
+    );
+    await store.writeJson("catalog.json", catalog);
+    const calls = [];
+    const spy = async (buf, options) => {
+      calls.push(options);
+      return render(buf, options);
+    };
+    const client = fakeClient();
+    await run(client, at(TODAY, "08:35"), { render: spy });
+    await run(client, at(TODAY, "12:35"), { render: spy });
+    expect(calls).toEqual([
+      expect.objectContaining({ fit: "crop", at: 0.25 }),
+      // Placed by an older version: placed again when it's rendered.
+      expect.objectContaining({ fit: "crop", at: null }),
+    ]);
   });
 
   it("finishes a publish interrupted mid-way instead of posting twice", async () => {

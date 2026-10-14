@@ -102,9 +102,15 @@ export function loadSettings(env = process.env) {
     minGapMinutes: int(env.SOCIAL_MIN_GAP_MINUTES, 150, 30, 720),
     /** No new posts after this local time; a missed slot waits for tomorrow. */
     dayEnd: clockMinutes(env.SOCIAL_DAY_END || "") ?? 23 * 60,
-    /** "pad" adds plain borders to frames Instagram can't take as-is; "skip" leaves them out. */
-    tallImages: env.SOCIAL_TALL_IMAGES === "skip" ? "skip" : "pad",
-    /** Border colour for padded frames: "auto" picks black or white from the photo's edges. */
+    /**
+     * Frames Instagram can't take as they are (taller than 4:5, wider than
+     * 1.91:1): "crop" trims them to fit, "pad" keeps them whole with plain
+     * borders, "skip" leaves them out.
+     */
+    tallImages: ["pad", "skip"].includes(env.SOCIAL_TALL_IMAGES)
+      ? env.SOCIAL_TALL_IMAGES
+      : "crop",
+    /** Border colour with tallImages "pad": "auto" picks black or white from the photo's edges. */
     padColor: env.SOCIAL_PAD_COLOR || "auto",
     minWidth: int(env.SOCIAL_MIN_WIDTH, 1080, 320, 4000),
     ...photoSettings(env),
