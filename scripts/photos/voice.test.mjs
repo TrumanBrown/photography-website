@@ -177,6 +177,34 @@ describe("post voice", () => {
     ).toBe("So cool. Katydid (Mimetica incisa) hanging off a leaf");
   });
 
+  it("makes the words in front of the name agree with it", () => {
+    const otters = "two North American river otters (Lontra canadensis)";
+    expect(fillName("I came across this {name} beside a log", otters)).toBe(
+      `I came across these ${otters} beside a log`,
+    );
+    expect(fillName("This {name} looked my way", otters)).toBe(
+      `These ${otters} looked my way`,
+    );
+    expect(fillName("Found a {name} beside a log", otters)).toBe(
+      `Found ${otters} beside a log`,
+    );
+    expect(fillName("A {name} beside a log. So cool", otters)).toBe(
+      "Two North American river otters (Lontra canadensis) beside a log. So cool",
+    );
+    expect(
+      fillName("I caught a {name} in the reeds", "agami heron (Agamia agami)"),
+    ).toBe("I caught an agami heron (Agamia agami) in the reeds");
+    expect(
+      fillName(
+        "Saw an {name} on a post",
+        "groove-billed ani (Crotophaga sulcirostris)",
+      ),
+    ).toBe("Saw a groove-billed ani (Crotophaga sulcirostris) on a post");
+    expect(
+      fillName("Spotted a {name}", "European robin (Erithacus rubecula)"),
+    ).toBe("Spotted a European robin (Erithacus rubecula)");
+  });
+
   it("spreads his habits out: openers, lol, such a, and phrases from other posts", () => {
     const text =
       "Saw this {name} munching on some insect in Bijagua. Such a goofy beak, almost looks like a horn lol";

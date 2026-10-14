@@ -190,9 +190,36 @@ export function storyOpener(text) {
 
 const capitalise = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 
-/** The opening with the verified name in place of {name}, capitalised at the start of a sentence. */
+// "two harbor seals (...)": counted, so "this {name}" has to be "these".
+const COUNTED =
+  /^(?:two|three|four|five|six|seven|eight|nine|ten|several|many|some)\b/i;
+// Starts with a vowel sound, so "a {name}" has to be "an": "an agami heron",
+// but "a European robin", "a unicorn grasshopper".
+const vowelSound = (name) =>
+  /^[aeiou]/i.test(name) &&
+  !/^(?:eu|ewe|one|once|uni|use|usu|ur[aeo]|uk)/i.test(name);
+const keepCase = (word, like) =>
+  /^\p{Lu}/u.test(like) ? capitalise(word) : word;
+
+/**
+ * The opening with the verified name in place of {name}, capitalised at the
+ * start of a sentence, with the words in front of it agreeing with it: "these
+ * two otters", "an agami heron". The model writes the sentence before it
+ * knows the name, so it can't get those right itself.
+ */
 export function fillName(text, name) {
+  const counted = COUNTED.test(name);
   return String(text ?? "")
+    .replace(/\b(this|that)\s+\{name\}/gi, (m, w) =>
+      counted
+        ? `${keepCase(/^this$/i.test(w) ? "these" : "those", w)} {name}`
+        : m,
+    )
+    .replace(/\b(an?)\s+\{name\}/gi, (m, w) =>
+      counted
+        ? "{name}"
+        : `${keepCase(vowelSound(name) ? "an" : "a", w)} {name}`,
+    )
     .replace(
       /(^|[.!?]\s+)\{name\}/g,
       (_, start) => `${start}${capitalise(name)}`,
