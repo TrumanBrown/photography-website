@@ -73,10 +73,13 @@ import {
   descriptionProblems,
   descriptionPrompt,
   hasRealTitle,
+  humanize,
   openerOf,
   placeLabel,
   sessionDigest,
   speciesSubject,
+  telling,
+  withoutBackdrop,
 } from "./website.mjs";
 import { blobSidecars, mergeWebsiteText } from "./sidecars.mjs";
 import {
@@ -93,8 +96,10 @@ import {
   normaliseLine,
 } from "./lines.mjs";
 import {
-  HIS_REACTIONS,
+  HIS_EMOJI,
+  HIS_STORIES,
   VOICE_VERSION,
+  fillName,
   loadVoiceGuide,
   mockVoice,
   normaliseVoice,
@@ -112,6 +117,7 @@ import {
 import { wikiClient } from "./wiki.mjs";
 import { fixSlug, slugTypos } from "./placenames.mjs";
 import {
+  POST_VERSION,
   assembleCaption,
   placeLine,
   sessionNames,
@@ -124,9 +130,6 @@ import { info, redact, warn } from "./redact.mjs";
 
 /** Bump when the description prompt changes enough that every session should be redone. */
 const DESCRIPTION_VERSION = 2;
-
-/** Bump when the way posts are put together changes, so planned posts are rebuilt. */
-const POST_VERSION = 4;
 
 /** Bump to read converted photos' originals again (those still without a capture time). */
 const CAPTURE_VERSION = 2;
@@ -1002,30 +1005,70 @@ async function main() {
         ? `Full resolution and the rest of this session are on ${settings.domain}, link in bio`
         : "");
 
-    // Everything in a post besides its fact; all of it decided by code, from
-    // the first line and reaction written in Truman's voice (voice.mjs) when
-    // they pass the caption checks, else from the website's plain first line.
+    // What Truman has said about a trip or a photo (`npm run social --
+    // note`). The only source the opening may use for what he was doing.
+    const notesFile = (await social.readJson("notes.json"))?.data ?? {};
+    const notesOf = (s, key) =>
+      [notesFile.trips?.[s.session], notesFile.photos?.[key]]
+        .filter(Boolean)
+        .join(" ");
+    const tripName = (slug) => {
+      const session = sessionOf(slug);
+      return hasRealTitle(session) ? session.title : humanize(slug);
+    };
+    // Everything the opening's "what he was doing" may lean on besides his notes.
+    const groundingFor = (s) => {
+      const session = sessionOf(s.session);
+      return [
+        session.title,
+        session.location,
+        s.session.replace(/-/g, " "),
+        s.analysis.subject,
+        s.analysis.scene,
+        s.analysis.setting,
+        s.analysis.conditions,
+        s.analysis.landmark,
+        s.analysis.description,
+      ]
+        .filter(Boolean)
+        .join(" ");
+    };
+    // What {name} becomes mid-sentence: "groove-billed ani (Crotophaga
+    // sulcirostris)", "two harbor seals (Phoca vitulina)".
+    const lowerFirst = (t) =>
+      t && !/^\p{Lu}{2}/u.test(t) ? t.charAt(0).toLowerCase() + t.slice(1) : t;
+    const storyNameFor = (s) => {
+      const taxon = taxonOf(s);
+      const level = levelOf(s);
+      const count = s.analysis.count ?? 1;
+      if (level === "species") {
+        if (count > 1)
+          return lowerFirst(speciesSubject(taxon, count, s.analysis.subject));
+        const common =
+          displayName(taxon.common, { midSentence: true }) ||
+          lowerFirst(s.analysis.subject ?? "");
+        return common ? `${common} (${taxon.name})` : taxon.name;
+      }
+      if (level === "group")
+        return `${lowerFirst(s.analysis.subject)} (${taxon.name})`;
+      return "";
+    };
+    const voicedFor = (s) =>
+      s.voice?.v === VOICE_VERSION &&
+      s.voice.text &&
+      Boolean(s.voice.named) === Boolean(namedFor(s))
+        ? s.voice
+        : null;
+
+    // Everything in a post besides its fact; all of it decided by code, around
+    // the opening written in Truman's voice (voice.mjs). A post without one
+    // waits for it rather than going out sounding like a machine.
     const partsFor = (s) => {
       const file = catalog.files[s.pick];
       const session = sessionOf(s.session);
       const taxon = taxonOf(s);
       const level = levelOf(s);
-      const base = {
-        analysis: s.analysis,
-        taxon,
-        session,
-        lexicon,
-        place: placeLine(session, placeLabel(session)),
-        max: 220,
-      };
-      const voiced = s.voice?.action
-        ? { action: s.voice.action }
-        : s.voice?.text
-          ? { text: s.voice.text }
-          : null;
-      const headline =
-        (voiced && captionFor({ ...base, line: voiced, strict: true })) ||
-        captionFor({ ...base, line: s.line });
+      const voiced = voicedFor(s);
       const hashtags = buildHashtags({
         taxon,
         speciesOk: level === "species",
@@ -1040,8 +1083,9 @@ async function main() {
         session,
         taxon,
         level,
-        headline,
-        comment: s.voice?.comment ?? "",
+        story: voiced ? fillName(voiced.text, storyNameFor(s)) : "",
+        emoji: voiced?.emoji ?? "",
+        place: placeLine(session, placeLabel(session)),
         hashtags,
         gear: gearLine(cameraFacts(file)),
         iucn: level === "species" ? (taxon.iucn ?? null) : null,
@@ -1267,35 +1311,69 @@ async function main() {
       return { key, s, fact, factKeyUsed };
     });
 
-    // The first line and reaction in Truman's voice (voice.mjs), written once
-    // per planned post, ten to a call, and again on a redraft.
-    const needsVoice = (s) =>
-      s.voice?.v !== VOICE_VERSION ||
-      s.voice?.at !== s.analysis.at ||
-      redrafting(s, s.voice?.written);
-    const voiceQueue = drafts.filter((d) => needsVoice(d.s));
+    // The opening in Truman's voice (voice.mjs), written once per planned
+    // post, ten to a call, in the order they'll go out, and again on a
+    // redraft or when his notes for the trip change.
+    const needsVoice = (d) =>
+      d.s.voice?.v !== VOICE_VERSION ||
+      d.s.voice?.at !== d.s.analysis.at ||
+      d.s.voice?.notes !== sha(notesOf(d.s, d.key)) ||
+      Boolean(d.s.voice?.named) !== Boolean(namedFor(d.s)) ||
+      (!d.s.voice?.text && (d.s.voice?.tries ?? 0) < 4) ||
+      redrafting(d.s, d.s.voice?.written);
+    const voiceQueue = drafts.filter(needsVoice);
     if (provider && voiceQueue.length) {
       const guide = loadVoiceGuide();
-      const queued = new Set(voiceQueue.map((d) => d.s));
-      // Reactions staying put, and his own examples, so new ones don't echo them.
-      const usedComments = [
-        ...HIS_REACTIONS,
-        ...Object.values(shots)
-          .filter((s) => !queued.has(s))
-          .map((s) => s.voice?.comment ?? s.post?.comment)
-          .filter(Boolean),
+      // The posts already out, oldest first: his own rewrites of the first
+      // ones, then every post this voice wrote. New openings mustn't echo them.
+      const postedOrder = Object.entries(ledger.posted ?? {})
+        .sort((a, b) => String(a[1].at).localeCompare(String(b[1].at)))
+        .map(([k]) => shots[k]?.post)
+        .filter((p) => p?.story);
+      const outStories = [...HIS_STORIES, ...postedOrder.map((p) => p.story)];
+      const outEmoji = [
+        ...HIS_EMOJI,
+        ...postedOrder.map((p) => p.emoji).filter(Boolean),
       ];
-      // One batch at a time, each seeing the reactions the last ones chose.
-      // A post whose reactions all failed their checks gets one more go, and
-      // keeps the first line it already has.
-      const writeVoices = async (list, second) => {
+      const storyOf = (d) => {
+        const voiced = voicedFor(d.s);
+        return voiced ? fillName(voiced.text, storyNameFor(d.s)) : "";
+      };
+      const position = new Map(drafts.map((d, i) => [d, i]));
+      // What goes out before this post: those already out, then the planned
+      // posts ahead of it, including ones written moments ago in this run.
+      const before = (d) => {
+        const ahead = drafts.slice(0, position.get(d)).filter(storyOf);
+        return {
+          stories: [...outStories, ...ahead.map(storyOf)],
+          emoji: [
+            ...outEmoji,
+            ...ahead.map((a) => voicedFor(a.s).emoji).filter(Boolean),
+          ],
+        };
+      };
+      // One batch at a time, in posting order. A post whose options all fail
+      // their checks gets one more go in the same run, and up to two more runs.
+      const writeVoices = async (list) => {
         const batches = [];
         for (let i = 0; i < list.length; i += 10)
           batches.push(list.slice(i, i + 10));
         await pool(batches, 1, async (batch) => {
           const notes = batch.map((d, i) => ({
             id: String(i + 1),
-            ...notesFor(d.s),
+            named: namedFor(d.s),
+            count: d.s.analysis.count ?? 1,
+            subject: d.s.analysis.subject,
+            scene: d.s.analysis.scene,
+            setting: d.s.analysis.setting,
+            conditions: telling(d.s.analysis.conditions)
+              ? d.s.analysis.conditions
+              : "",
+            landmark: d.s.analysis.landmark,
+            description: withoutBackdrop(d.s.analysis.description),
+            place: allowedNames(sessionOf(d.s.session)).join(", "),
+            trip: tripName(d.s.session),
+            notes: notesOf(d.s, d.key),
             fact: d.fact,
           }));
           try {
@@ -1303,7 +1381,7 @@ async function main() {
               provider,
               model,
               prompt: voicePrompt(notes, guide, {
-                recent: usedComments.slice(-25),
+                recent: before(batch[0]).stories.slice(-12),
               }),
               mock: () => mockVoice(notes),
             });
@@ -1312,32 +1390,36 @@ async function main() {
             );
             batch.forEach((d, i) => {
               const taxon = levelOf(d.s) ? taxonOf(d.s) : null;
+              const prior = before(d);
               const got = normaliseVoice(byId.get(String(i + 1)), {
                 named: Boolean(notes[i].named),
-                plural: (d.s.analysis.count ?? 1) > 1,
+                name: storyNameFor(d.s),
                 fact: d.fact,
                 lexicon,
                 allowed: allowedNames(sessionOf(d.s.session)).join(" "),
                 taxonText: taxon
                   ? `${taxon.name} ${taxon.common ?? ""} ${notes[i].named}`
                   : "",
-                avoid: usedComments,
+                grounding: groundingFor(d.s),
+                notes: notes[i].notes,
+                recent: prior.stories,
+                recentEmoji: prior.emoji,
+                avoid: HIS_STORIES,
+                group: d.s.analysis.group,
               });
-              d.s.voice = second
-                ? {
-                    ...d.s.voice,
-                    ...(got.comment ? { comment: got.comment } : {}),
-                  }
-                : {
-                    v: VOICE_VERSION,
-                    at: d.s.analysis.at,
-                    written: new Date().toISOString(),
-                    ...got,
-                  };
-              if (got.comment) {
-                usedComments.push(got.comment);
-                ig.voiced++;
-              }
+              const failedBefore =
+                d.s.voice?.v === VOICE_VERSION && !d.s.voice.text
+                  ? (d.s.voice.tries ?? 0)
+                  : 0;
+              d.s.voice = {
+                v: VOICE_VERSION,
+                at: d.s.analysis.at,
+                written: new Date().toISOString(),
+                notes: sha(notes[i].notes),
+                named: Boolean(notes[i].named),
+                ...(got.text ? got : { tries: failedBefore + 1 }),
+              };
+              if (got.text) ig.voiced++;
             });
           } catch (e) {
             warn(
@@ -1346,22 +1428,24 @@ async function main() {
           }
         });
       };
-      await writeVoices(voiceQueue, false);
-      await writeVoices(
-        voiceQueue.filter(
-          (d) => d.s.voice?.v === VOICE_VERSION && !d.s.voice.comment,
-        ),
-        true,
-      );
+      await writeVoices(voiceQueue);
+      await writeVoices(voiceQueue.filter((d) => !voicedFor(d.s)));
     }
 
     // Put each planned post together, or bring it up to date.
     for (const { s, fact, factKeyUsed } of drafts) {
       const parts = partsFor(s);
+      if (!parts.story) {
+        delete s.post;
+        s.status = "new";
+        s.problem = "waiting for its opening";
+        continue;
+      }
       const basis = sha({
         v: POST_VERSION,
-        headline: parts.headline,
-        comment: parts.comment,
+        story: parts.story,
+        emoji: parts.emoji,
+        place: parts.place,
         hashtags: parts.hashtags,
         gear: parts.gear,
         pointer,
@@ -1370,8 +1454,9 @@ async function main() {
       });
       if (s.post?.basis === basis) continue;
       const caption = assembleCaption({
-        headline: parts.headline,
-        comment: parts.comment,
+        story: parts.story,
+        emoji: parts.emoji,
+        place: parts.place,
         body: fact,
         iucn: parts.iucn,
         gear: parts.gear,
@@ -1379,9 +1464,7 @@ async function main() {
         hashtags: parts.hashtags,
       });
       // The written parts are checked, not the "Fun fact:" label code adds.
-      const problems = lint(
-        [parts.headline, parts.comment, fact, pointer].join("\n"),
-      );
+      const problems = lint([parts.story, fact, pointer].join("\n"));
       if (problems.length) {
         s.status = "needs_review";
         s.problem = problems.join(", ");
@@ -1391,8 +1474,9 @@ async function main() {
       s.post = {
         caption,
         alt: tidy(s.analysis.description).slice(0, 1000),
-        headline: parts.headline,
-        comment: parts.comment,
+        story: parts.story,
+        emoji: parts.emoji,
+        place: parts.place,
         fact,
         factKey: factKeyUsed,
         v: POST_VERSION,
@@ -1438,7 +1522,7 @@ async function main() {
       `iNaturalist matches: ${count((s) => s.inat?.via === "frame")} exact frame, ${count((s) => s.inat?.via === "moment")} same moment; ${count((s) => s.analysis?.idCheck === "conflict")} flagged as not matching.`,
       `Website: ${site.captions} captions (${linesWritten} first lines written), ${site.described} descriptions written${site.describeFailed ? `, ${site.describeFailed} failed checks` : ""}, ${site.waiting} sessions still being analysed, ${site.written} session files updated${site.kept ? `, ${site.kept} of your edits left alone` : ""}${sidecars ? "" : " (not written: dry run)"}.`,
       process.env.SOCIAL_ENABLED === "true" && args.instagram
-        ? `Instagram: ${ig.rendered} posts written (${ig.voiced} new reactions), facts for ${ig.facts} new species or places, ${ig.review} need review, ${ig.planned} planned.`
+        ? `Instagram: ${ig.rendered} posts written (${ig.voiced} new openings), facts for ${ig.facts} new species or places, ${ig.review} need review, ${ig.planned} planned.`
         : "",
     ]
       .filter(Boolean)

@@ -283,15 +283,18 @@ or place. Each post is:
 
 - **the whole photo at Instagram's full resolution** (1440 px), never cropped.
   Frames Instagram can't take as they are get plain borders.
-- **a caption written from the photo's own record**: the species from your
-  iNaturalist identification of that exact photo with its scientific name and
-  the most interesting thing about it, the place, a one-line reaction in your
-  voice, a fun fact about the species or the place taken from Wikipedia and
-  checked against the article, the camera and lens, five hashtags built from
-  data, alt text, and a last line sending people to the full-resolution photo
-  on your site through the link in your bio. How it sounds comes from your own
+- **a caption written from the photo's own record**: an opening in your voice
+  (how you came across it, the species from your iNaturalist identification of
+  that exact photo with its scientific name, what it's doing and your reaction,
+  with one emoji), the place on its own line, a fun fact about the species or
+  the place taken from Wikipedia and checked against the article, the camera
+  and lens, five hashtags built from data, alt text, and a last line sending
+  people to the full-resolution photo on your site through the link in your
+  bio. It only says what you were doing (a hike, a boat tour) when the trip's
+  name or your private trip notes say so. How it sounds comes from your own
   rewrites, kept in the
-  [caption-voice skill](.github/skills/caption-voice/SKILL.md); edit that file
+  [truman-voice](.github/skills/truman-voice/SKILL.md) and
+  [caption-voice](.github/skills/caption-voice/SKILL.md) skills; edit those
   to change it.
 
 It can also post **one story a day**, at a different time each day: a photo
@@ -339,7 +342,8 @@ photography-website/
 ├── .github/
 │   ├── workflows/             # CI/CD, see docs/cicd.md
 │   ├── instructions/          # voice rules for every visitor-facing string
-│   └── skills/stipple-plates/ # agent skill that draws the hobby card plates
+│   └── skills/                # agent skills: the owner's writing voice (truman-voice,
+│                              # caption-voice, humanizer) and the hobby card plates (stipple-plates)
 ├── api/                       # Azure Functions: contact, sessionmgr, track (+ shared/ helpers)
 ├── docs/                      # detailed docs (this README is the index)
 ├── infra/                     # Bicep IaC, see docs/iac-bicep.md

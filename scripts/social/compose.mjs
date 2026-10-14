@@ -2,9 +2,8 @@
  * Putting an Instagram post together from what's already known about the
  * photo:
  *
- *   - the first line and the reaction after it, in Truman's voice
- *     (scripts/photos/voice.mjs), with the fuller place; the website's plain
- *     first line (scripts/photos/lines.mjs) when there's no voiced one
+ *   - the opening in Truman's voice, with one emoji on the end
+ *     (scripts/photos/voice.mjs), then the place on its own line
  *   - one fact about the species, or the place when there's no species, from
  *     its Wikipedia article (scripts/photos/facts.mjs), rotated across posts
  *   - the IUCN line, only from iNaturalist's global IUCN status
@@ -13,6 +12,13 @@
  *   - five hashtags (hashtags.mjs)
  */
 import { allowedNames } from "../photos/website.mjs";
+
+/**
+ * Bump when the way posts are put together changes. Planned posts are
+ * rebuilt on the next Photo captions run, and the poster won't publish one
+ * built the old way in the meantime.
+ */
+export const POST_VERSION = 5;
 
 // Words that say how big a place is, not which: "Portland area" is Portland.
 const PLACE_SIZE = new Set(["area", "region", "range", "around", "greater"]);
@@ -41,20 +47,35 @@ export function placeLine(session, first) {
 
 /**
  * Assemble the caption from its parts; empty parts are left out. The first
- * paragraph is the first line, then the reaction; the fact gets its label
- * here, because the copy rules ban "Fun fact" everywhere else.
+ * paragraph is his opening with its emoji, then the place on a line of its
+ * own; the fact gets its label here, because the copy rules ban "Fun fact"
+ * everywhere else.
  */
 export function assembleCaption({
-  headline,
-  comment = "",
+  story,
+  emoji = "",
+  place = "",
   body,
   iucn,
   gear,
   pointer,
   hashtags,
 }) {
+  const opening = String(story ?? "").trim();
+  // An emoji takes the place of the last full stop, the way people type.
+  const end = emoji
+    ? ` ${emoji}`
+    : !opening || /(?:[.!?)]|\blol)$/i.test(opening)
+      ? ""
+      : ".";
+  const where = String(place ?? "").trim();
   const text = [
-    comment ? `${headline}. ${comment}` : headline,
+    [
+      opening ? `${opening}${end}` : "",
+      where && !/[.!?]$/.test(where) ? `${where}.` : where,
+    ]
+      .filter(Boolean)
+      .join("\n"),
     [
       body ? `Fun fact: ${body}` : "",
       iucn ? `Listed as ${iucn} on the IUCN Red List.` : "",

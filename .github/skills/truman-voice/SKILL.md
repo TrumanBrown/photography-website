@@ -1,0 +1,109 @@
+---
+name: truman-voice
+description: "How Truman writes about his own photos and trips: he's in the story ('Was taking a break on a hike and captured this...', 'Pulled over on the side of the road to...'), points at the subject ('this katydid'), gives one specific opinion with 'such a'/'so' intensifiers, hedges honestly ('likely (?)', 'almost looks like'), jokes a little ('lol'), and keeps loose grammar without misspellings. Use when writing, rewriting or reviewing anything in his voice: Instagram captions, photo captions, session descriptions, hobby intros, site prose, comments or replies; when copy reads like AI, alt text, a field guide or a press release; or for 'anti AI slop' work."
+---
+
+# Truman's voice
+
+How Truman writes when he talks about his own photos. It comes from his
+rewrites, in October 2026, of six Instagram posts the pipeline wrote. The
+pipeline's versions were accurate and read like a machine had labelled
+the photo; his read like a person showing a friend his phone. People scroll
+past anything that sounds AI-made, so this is the difference between a post
+someone reads and one they skip.
+
+His six rewrites, with what the pipeline wrote first, are in
+[caption-voice](../caption-voice/SKILL.md#his-rewrites).
+
+## How he writes
+
+1. **He's in the story.** He opens with what he was doing or how he came
+   across it, not with a label. The "I" is usually dropped, the way people
+   type online:
+   - "Was taking a break on a hike and captured this..."
+   - "Pulled over on the side of the road to capture this canyon view in Kauai."
+   - "While on a canal tour in Tortuguero, managed to capture this..."
+   - "Spotted this...", "Saw this...", "A fun pic of this..."
+2. **He points at it.** "this waterfall", "this katydid", "this canyon view".
+   It's his phone and he's holding it out.
+3. **Names stay exact.** The species gets its common name with the scientific
+   name in brackets, once: "this two-tailed swallowtail (Papilio multicaudata)".
+   After that it's "it", "they", "he" or "this little guy".
+4. **What it's doing, in plain words.** "munching on some insect", "perched on
+   a purple flower", "chose the wrong color plant to land on". Never the photo
+   itself: no background, blur, framing, angle or light.
+5. **One specific opinion.** Something he noticed and has a feeling about:
+   "the beak goes so far up its head", "the iridescent shade of the feathers
+   is so cool too", "I love how the low clouds cast such a distinct shadow on
+   the cliffs". Not a verdict on the photo, and not a generic "beautiful".
+6. **Intensifiers he doesn't edit out.** "such a unique bird", "such unique
+   looking birds", "so much green everywhere", "so far up", "pretty close up".
+   Repeating himself across posts is fine; repeating himself on every post
+   isn't.
+7. **Honest hedges.** "likely (?) sucking nectar from the petals", "almost
+   alien-like", "almost looks like a horn". The "(?)" is on purpose: he isn't
+   sure, so he says so instead of sounding certain.
+8. **A little humour.** "Luckily for me, this little guy chose the wrong color
+   plant to land on lol, he stuck out like a sore thumb." "lol" turns up on
+   about one post in three, never twice in one.
+9. **Sometimes a small thought about the outdoors.** "I feel like some of the
+   best wildlife experiences come when you're resting, and nature just comes
+   to you." Now and then, never as a sign-off on every post.
+10. **Loose grammar, correct spelling.** Comma splices ("Such a unique bird,
+    the beak goes so far up its head, almost looks like a horn lol"),
+    fragments, "Even still", "the Arenal Volcano", "pic". Spelling and
+    "its"/"it's" are still right: his typos aren't a style to copy.
+11. **The place, twice and two ways.** Casually in the sentence ("in
+    Bijagua", "near the Arenal Volcano in Costa Rica"), then properly on a
+    line of its own ("Bijagua, Alajuela Province, Costa Rica.").
+12. **Short.** Two or three sentences, roughly 25 to 60 words.
+
+What he never writes:
+
+- A label for an opening: "Waterfall plunging between plant-covered cliffs
+  into a pool, Arenal Volcano, Alajuela Province, Costa Rica."
+- The photo described as a photo: "against a blurred green background",
+  "orange toes grip the thick green stem with the eye peeking around the side".
+- Backstory he didn't give. "Was taking a break on a hike" is perfect from him
+  and a lie from a model that guessed it.
+- Sales or brochure words: stunning, breathtaking, vibrant, majestic, nestled,
+  showcasing, a true gem, nature at its finest.
+- Questions to the reader, "Did you know", morals, sign-offs, lists of three,
+  exclamation marks, em dashes.
+
+## Where it applies
+
+| Where | How much of the voice |
+|---|---|
+| Instagram captions | All of it, plus one emoji at the end. Format and generator rules: [caption-voice](../caption-voice/SKILL.md) |
+| Website photo captions | Not yet. They double as alt text, so they stay plain for now; they're the next pass |
+| Session descriptions | Not yet; next pass, after the captions |
+| Hobby intros and longer site prose | First person, contractions, underselling: [site-copy.instructions.md](../../instructions/site-copy.instructions.md). No "lol", no emoji |
+| Buttons, labels, errors | [site-copy.instructions.md](../../instructions/site-copy.instructions.md) only |
+
+## Procedure
+
+When writing anything in his voice:
+
+1. Collect the facts: what's in the photo, the names, the place. Backstory
+   only from what he has said himself: a trip's name, his notes
+   (`npm run social -- notes`), something he told you. Never invent it.
+2. Open the way he does: what he was doing, or how he came across it, then
+   "this" and the name.
+3. Add one opinion about something specific. A hedge or a small joke if it
+   fits; not both every time.
+4. Read it out loud. Would he type this on his phone? If it sounds like a
+   brochure, a field guide or alt text, say it the way you'd tell a friend.
+5. When unsure, check it against the [humanizer](../humanizer/SKILL.md)
+   skill. One difference from humanizer's defaults: his enthusiasm and
+   intensifiers ("so cool", "such a", "I love") stay, as long as they're about
+   something specific.
+
+## For maintainers
+
+- [scripts/photos/voice.mjs](../../../scripts/photos/voice.mjs) puts "How he
+  writes" from this file, plus caption-voice's rules and rewrites, into the
+  prompt that writes each planned Instagram post. Bump `VOICE_VERSION` there
+  when a change here should rewrite the posts already planned.
+- When he rewrites another post, add it to caption-voice's "His rewrites" and
+  to `HIS_STORIES` in voice.mjs, so new posts learn from it without copying it.

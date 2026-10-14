@@ -35,6 +35,7 @@ import { isPostable, planQueue } from "./plan.mjs";
 import { resolveToken } from "./token.mjs";
 import { createClient, notReadyToPublish } from "./instagram.mjs";
 import { renderForInstagram } from "./render.mjs";
+import { POST_VERSION } from "./compose.mjs";
 import { info, redact, registerSecret } from "../photos/redact.mjs";
 
 const dayFile = (day) => `days/${day}.json`;
@@ -114,6 +115,8 @@ async function nextShot(store, photos, settings, busy) {
       s &&
       isPostable(s) &&
       s.post?.caption &&
+      // A draft built the old way waits for the next Photo captions run.
+      s.post.v === POST_VERSION &&
       !ledger.posted?.[key] &&
       !busy.has(key) &&
       (ledger.failed?.[key]?.count ?? 0) < 2 &&

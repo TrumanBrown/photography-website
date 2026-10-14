@@ -62,7 +62,7 @@ Adding iNaturalist observations later is fine: the next Photo captions run match
 | Which account, and its access token | GitHub secrets, plus an encrypted copy in the private `metadata` storage container | No |
 | Each photo's record (what's in it, its identification, its written post) | `metadata/photos/` in the private container | No |
 | The facts posts draw on, and which Wikipedia article each came from | `metadata/photos/facts.json` in the private container | No |
-| The posting plan, posting history, story history | `metadata/social/` in the private container | No |
+| The posting plan, posting history, story history, your trip notes | `metadata/social/` in the private container | No |
 | The images sent to Instagram | Uploaded to the private container, given to Instagram as a link that expires after two hours, deleted after posting | No |
 | Workflow logs | Public, like every Actions log in a public repository | Yes, but they only contain counts and generic messages. Errors pass through [redact.mjs](../scripts/photos/redact.mjs), which strips tokens, account and media ids, signed links and provider ids |
 | This code and these docs | The repository | Yes, by design |
@@ -236,7 +236,9 @@ When you want to steer it, these run on your computer (signed in with `az login`
 | `npm run social -- preview` | Opens the next story and the next week of posts in your browser (`--no-open` just writes the page) |
 | `npm run social -- skip DSC01234 [why]` | Never post this shot, as a post or a story |
 | `npm run social -- unskip DSC01234` | Undo a skip |
-| `npm run social -- redraft DSC01234` | On the next Photo captions run, write the photo a new first line (its website caption changes too) and give its post a different fact |
+| `npm run social -- redraft DSC01234` | On the next Photo captions run, write the photo a new opening and first line (its website caption changes too) and give its post a different fact |
+| `npm run social -- note <trip> "canal boat tour"` | Tell the openings what you were doing on that trip (or, with a photo instead of a trip, at that photo). They only mention things like a hike, a drive or a boat tour when a note or the trip's name says so. `--clear` removes it |
+| `npm run social -- notes` | Every trip with its note and how many photos it has left to post |
 | `npm run social -- approve DSC01234` | Approve this exact caption (only matters with `SOCIAL_REQUIRE_APPROVAL=true`) |
 | `npm run social -- retry DSC01234` | Clear failed attempts so a photo can be tried again (`--all` for every photo) |
 
@@ -353,7 +355,8 @@ Wikipedia is read through its public API, one request at a time, with a user age
 ### 5. The caption
 
 ```
-Groove-billed ani (Crotophaga sulcirostris) munching on an insect on a mossy post, Bijagua, Alajuela Province, Costa Rica. Such an interesting, unique beak on it.
+Saw this groove-billed ani (Crotophaga sulcirostris) munching on some insect in Bijagua. Such a unique bird, the beak goes so far up its head, almost looks like a horn lol 🦏
+Bijagua, Alajuela Province, Costa Rica.
 
 Fun fact: Groove-billed anis lay their eggs in one communal nest, and all group members incubate the eggs and care for the young.
 
@@ -363,21 +366,31 @@ Full resolution and the rest of this session are on example.com, link in bio
 #groovebilledani #birdsofinstagram #bijagua #birdphotography #sonya6700
 ```
 
-- **First line and reaction**, in your voice: what it is and the most interesting thing about it, said the way a person would ("munching on an insect", not "holding an insect"), then the fuller place, then one short reaction of yours. See below.
+- **Opening**, in your voice: how you came across it, the name with its scientific name, what it's doing, and your reaction, the way you'd tell a friend. Two or three sentences. See below.
+- **One emoji** at the end of the opening, in place of its last full stop.
+- **Place**, in full, on its own line.
 - **Fact:** one of the species' or place's facts, as above, after `Fun fact: `.
 - **Red List line:** added when the global IUCN status is Near Threatened or worse.
 - **Gear line:** from the photo's EXIF data.
 - **Link line:** captions can't hold clickable links, so it sends people to the link in your profile, for the full-resolution photo and the rest of the session. Put the site's address in your bio for it to work. Change the wording with `linkLine` in the [private settings file](#private-settings-file); posts already written are updated with it on the next run.
 - **Alt text:** the record's plain description of the frame, sent with every post. Instagram and Google both read it.
 
-**The voice.** The first paragraph follows the [caption-voice skill](../.github/skills/caption-voice/SKILL.md): your own rewrites of posts that sounded like AI, and the rules drawn from them, with the [humanizer](../.github/skills/humanizer/SKILL.md) skill (blader/humanizer, MIT) for anything they don't settle. [voice.mjs](../scripts/photos/voice.mjs) puts that file into one text-only call per ten planned posts, which writes each one's first line and three candidate reactions. A reaction is kept only if it:
+**The voice.** People scroll past posts that read as AI-written, so the opening is written in your voice, from your own rewrites of posts that didn't sound like you. How you write is in the [truman-voice skill](../.github/skills/truman-voice/SKILL.md); the post format, the generator's rules and your rewrites are in the [caption-voice skill](../.github/skills/caption-voice/SKILL.md), with the [humanizer](../.github/skills/humanizer/SKILL.md) skill (blader/humanizer, MIT) for anything they don't settle. [voice.mjs](../scripts/photos/voice.mjs) puts both into one text-only call per ten planned posts, in the order they'll go out, and asks for three versions of each opening with an emoji. An identified species is written as `{name}`, and code fills in the verified name. An opening is kept only if it:
 
-- reads as a reaction, not a description of the photo (first person or an opinion word)
-- tells no story the notes can't back up (no waiting, "finally", companions), adds no numbers, and names nothing the record doesn't
-- doesn't repeat its first line or fun fact, and shares no phrase with another post's reaction or with your own examples
-- avoids stock phrases ("stands out against") and the words the voice rules ban, and uses the same praise word ("impressive") on two posts at most
+- has `{name}` exactly once for an identified species, and no other species name
+- has an opinion in it (a reaction, a comparison, a joke), not just a description of the photo, and never mentions the background, blur or framing
+- says nothing about what you were doing, who you were with, the weather or the time of day unless the trip's name, the photo's record or your trip notes back it up: "on a canal tour" needs a trip named for the canals or a note saying so, and waiting, "finally" or company need your notes
+- has no numbers, no "today" or "last week", no questions (a hedging "(?)" is fine), no stock phrases ("nature never disappoints") and none of the words the voice rules ban
+- doesn't repeat its fun fact, and copies no phrase from your rewrites or another post
+- doesn't start like any of the four posts before it, and spreads your habits out: "lol" on one post in four at most (it's dropped rather than the post), "such a", "I love", "pretty" and "almost" only every few posts
 
-A post whose reactions all fail gets one more try in the same run; if that fails too, it goes out without one. A first line that fails the caption checks falls back to the website's plain one. To change how posts sound, edit the skill; to rewrite the posts already planned, bump `VOICE_VERSION` in voice.mjs. To redo one post, `npm run social -- redraft <photo>` gives it a new first line, reaction and fact.
+The emoji has to be one emoji (not ✨, 🌿, 🔥, 📸 or the like) and not one used on the five posts before it; otherwise the opening's other suggestions, the animal's own emoji or a face take its place.
+
+A post whose options all fail gets one more try in the same run and is tried again on the next two runs. Until it has an opening it isn't posted: it never goes out with a plain fallback. The poster also refuses a post built the old way (an older `POST_VERSION` in [compose.mjs](../scripts/social/compose.mjs)), so changing the format never lets an old-style post slip out before the next run rewrites it.
+
+**Your notes.** The best openings say what you were doing ("Pulled over on the side of the road to capture this canyon view"), and only you know that. `npm run social -- note <trip> "..."` stores a line about a trip, privately in `metadata/social/notes.json`; the openings draw on it but never post it as is, and the trip's planned posts are rewritten with it on the next run. `npm run social -- notes` lists every trip and how many photos it has left to post, so you can start with the big ones.
+
+To change how posts sound, edit the skills; to rewrite the posts already planned, bump `VOICE_VERSION` in voice.mjs. To redo one post, `npm run social -- redraft <photo>` gives it a new opening and fact.
 
 A post is only written once its photo is planned for the coming two weeks, so rewording any part never means rewriting the whole archive. A written post keeps its fact while that fact still exists.
 
@@ -397,8 +410,8 @@ When there's no subject tag (most landscapes), the broad region takes the slot (
 
 **Checks before a caption is saved:**
 
-- **Fixed automatically:** em dashes, emoji, exclamation marks, and stray `#` or `@`.
-- **Already checked on the way in:** the first line and the fact each pass their own checks before they're stored (banned words, names nobody wrote down, species the photo isn't identified as, facts that can't be traced to their article).
+- **Fixed automatically:** em dashes, exclamation marks, stray `#` or `@`, and any emoji inside the text (the one at the end is added by code).
+- **Already checked on the way in:** the opening and the fact each pass their own checks before they're stored (banned words, names nobody wrote down, species the photo isn't identified as, facts that can't be traced to their article).
 - **Held back:** a caption that still fails the copy checks is marked "needs review" and is never posted unprompted.
 
 ---
@@ -462,7 +475,7 @@ With `SOCIAL_STORIES=true` (and `SOCIAL_LIVE=true`), the Social post workflow al
   - Check that `SOCIAL_ENABLED` and `SOCIAL_LIVE` are both `true`.
   - Run `npm run social -- status` and check "Ready to post".
   - Look for photos "left out after failing twice" in the same output.
-- **A caption is wrong.** Run `npm run social -- skip` or `npm run social -- redraft`. If the mistake is in what the photo shows or what it is, fix the record instead: `npm run photos -- redo <photo>`, or the identification on iNaturalist ([docs/photos.md](photos.md#troubleshooting)).
+- **A caption is wrong.** Run `npm run social -- skip` or `npm run social -- redraft`. If an opening keeps getting what you were doing wrong, add a trip note. If the mistake is in what the photo shows or what it is, fix the record instead: `npm run photos -- redo <photo>`, or the identification on iNaturalist ([docs/photos.md](photos.md#troubleshooting)).
 
 ## Optional extras
 

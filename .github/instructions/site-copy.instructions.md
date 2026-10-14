@@ -121,8 +121,10 @@ rather than only writing it down here.
 ## Species facts and data blurbs
 
 Instagram posts are the exception to this section and to first-person-only-where-it-fits: they
-follow the [caption-voice skill](../skills/caption-voice/SKILL.md), which wants a `Fun fact: `
-label on the fact and a short first-person reaction after the first line.
+follow the [caption-voice skill](../skills/caption-voice/SKILL.md), which wants an opening in his
+voice with one emoji, the place on its own line, and a `Fun fact: ` label on the fact. How he
+writes in general is in the [truman-voice skill](../skills/truman-voice/SKILL.md); it's being
+brought to the site's longer prose one surface at a time, Instagram first.
 
 - Two or three facts per species, one picked at random. Give one ID/field-mark tip and one
   behavior or story fact.

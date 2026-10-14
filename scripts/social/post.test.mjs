@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { localStore } from "../photos/store.mjs";
 import { loadSettings } from "./settings.mjs";
 import { runPost } from "./post.mjs";
+import { POST_VERSION } from "./compose.mjs";
 import { _resetSecrets } from "../photos/redact.mjs";
 
 // Wednesday 2026-10-14, Los Angeles (UTC-7).
@@ -81,6 +82,7 @@ async function seed(store, shots) {
         hashtags: ["#a", "#b"],
         appeal: 7,
         group: "frog",
+        v: POST_VERSION,
       },
     };
   }
@@ -379,6 +381,16 @@ describe("runPost", () => {
       posted: { s2: { at: "2026-10-13T16:00:00Z" } },
       failed: {},
     });
+    const client = fakeClient();
+    await run(client, at(TODAY, "08:35"));
+    expect(client.log[0][1].caption).toBe("Caption s3");
+  });
+
+  it("never publishes a draft built the old way; it waits for the rewrite", async () => {
+    const catalog = (await store.readJson("catalog.json")).data;
+    catalog.shots.s1.post.v = POST_VERSION - 1;
+    delete catalog.shots.s2.post.v;
+    await store.writeJson("catalog.json", catalog);
     const client = fakeClient();
     await run(client, at(TODAY, "08:35"));
     expect(client.log[0][1].caption).toBe("Caption s3");

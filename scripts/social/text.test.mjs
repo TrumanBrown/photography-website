@@ -163,11 +163,12 @@ describe("caption text", () => {
     expect(lint("Orange hands and a barred yellow side")).toEqual([]);
   });
 
-  it("puts a post together: first line and reaction, fun fact, IUCN line, gear and link, hashtags", () => {
+  it("puts a post together: opening with its emoji, the place on its own line, fun fact, IUCN line, gear and link, hashtags", () => {
     const caption = assembleCaption({
-      headline:
-        "Agami heron (Agamia agami) with its neck stretched out, Tortuguero canals, Limón Province, Costa Rica",
-      comment: "Those colours look painted on.",
+      story:
+        "While on a canal tour in Tortuguero, got pretty close to this agami heron (Agamia agami). Those colours almost look painted on",
+      emoji: "😍",
+      place: "Tortuguero canals, Limón Province, Costa Rica",
       body: "Its bill is longer than its head.",
       iucn: "Near Threatened",
       gear: gearLine(a6700macro),
@@ -177,23 +178,29 @@ describe("caption text", () => {
     });
     const parts = caption.split("\n\n");
     expect(parts[0]).toBe(
-      "Agami heron (Agamia agami) with its neck stretched out, Tortuguero canals, Limón Province, Costa Rica. Those colours look painted on.",
+      "While on a canal tour in Tortuguero, got pretty close to this agami heron (Agamia agami). Those colours almost look painted on 😍\nTortuguero canals, Limón Province, Costa Rica.",
     );
     expect(parts[1]).toBe(
       "Fun fact: Its bill is longer than its head. Listed as Near Threatened on the IUCN Red List.",
     );
     expect(parts[2]).toMatch(/^Sony a6700 .*\nFull resolution/);
     expect(parts[3]).toBe("#agamiheron #birdsofinstagram");
-    // No reaction and no fact: the post simply skips them.
+    // No emoji: the opening keeps its full stop, unless it ends on "lol".
     expect(
       assembleCaption({
-        headline: "Hanging moss",
+        story: "Spotted this hanging moss",
+        place: "Hoh Rainforest, Washington.",
         body: "",
         gear: "",
         pointer: "",
         hashtags: ["#forest"],
       }),
-    ).toBe("Hanging moss\n\n#forest");
+    ).toBe(
+      "Spotted this hanging moss.\nHoh Rainforest, Washington.\n\n#forest",
+    );
+    expect(
+      assembleCaption({ story: "Such a goofy face lol", hashtags: [] }),
+    ).toBe("Such a goofy face lol");
   });
 
   it("keeps place names and people's names inside species names", () => {

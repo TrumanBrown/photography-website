@@ -26,7 +26,7 @@ Each photograph is looked at **once** by a vision model. What it sees is stored 
 |---|---|---|
 | **Photo caption** (alt text, lightbox caption, image search) | Code, from the record, opening with a first line written once per photo (text only) | `Turquoise-browed motmot (Eumomota superciliosa) perched on a branch, Playa Flamingo` |
 | **Session description** (top of the session page, search snippet) | One text-only model call per session, from every photo's caption | `Jagged gray peaks and forested valleys fill most of these, with patches of snow on the rocky slopes...` |
-| **Instagram posts** (optional, [docs/social.md](social.md)) | Code, plus a few facts per species or place written once from Wikipedia, and one text-only call per ten posts for the first line and reaction in your voice | A livelier first line with the fuller place, your one-line reaction, a fun fact, gear, five hashtags |
+| **Instagram posts** (optional, [docs/social.md](social.md)) | Code, plus a few facts per species or place written once from Wikipedia, and one text-only call per ten posts for the opening in your voice | An opening the way you'd tell it, one emoji, the place on its own line, a fun fact, gear, five hashtags |
 
 Because the photo is only ever looked at once, changing how captions or descriptions are worded never means paying to analyse the archive again.
 
@@ -264,4 +264,4 @@ On this site's deployment (`gpt-6.1-sol`, 50K tokens a minute); times are measur
 | A new session of 30 photos | 2 to 3 minutes | a few cents |
 | A description rewrite | seconds | under a cent |
 | Instagram facts for a new species or place | seconds | under a cent |
-| Instagram first lines and reactions, two weeks of posts | about a minute | a few cents |
+| Instagram openings, two weeks of posts | about five minutes | a few cents |

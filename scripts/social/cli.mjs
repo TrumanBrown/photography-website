@@ -7,7 +7,11 @@
  *                                         (.cache/social/preview.html; --no-open just writes it)
  *   npm run social -- skip <photo> [why]  never post this shot, as a post or a story
  *   npm run social -- unskip <photo>
- *   npm run social -- redraft <photo>     new first line and a different fact on the next Photo captions run
+ *   npm run social -- redraft <photo>     new opening and a different fact on the next Photo captions run
+ *   npm run social -- note <trip|photo> <text...>
+ *                                         what you were doing there ("canal boat tour", "pulled over on the
+ *                                         drive up"), for the openings; --clear removes it
+ *   npm run social -- notes               every trip with its note and how many photos it has left to post
  *   npm run social -- approve <photo>     only matters with SOCIAL_REQUIRE_APPROVAL=true
  *   npm run social -- retry <photo>|--all clear failed attempts so a photo can be tried again
  *
@@ -23,7 +27,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { ROOT, loadSettings } from "./settings.mjs";
 import { blobStore, localStore, updateJson } from "../photos/store.mjs";
-import { isPostable } from "./plan.mjs";
+import { isPlannable, isPostable } from "./plan.mjs";
 import { canvasFor } from "./render.mjs";
 import { STORY_LEDGER, pickStory, storyCandidates } from "./story.mjs";
 import { localParts } from "./schedule.mjs";
@@ -237,6 +241,84 @@ ${
   showPage(out, { open: openPage });
 }
 
+/** Every trip's slug, from the catalog. */
+const tripSlugs = (catalog) => [
+  ...new Set(Object.values(catalog.shots ?? {}).map((s) => s.session)),
+];
+
+/**
+ * A note on a trip (any unique part of its slug) or a photo. Notes are
+ * private: the openings may draw on them, but they're never posted as is.
+ */
+async function setNote(stores, target, text, clear) {
+  const catalog = (await stores.photos.readJson("catalog.json"))?.data ?? {
+    shots: {},
+  };
+  const slugs = tripSlugs(catalog);
+  const trips = slugs.filter((s) => s === target || s.includes(target));
+  const exact = slugs.find((s) => s === target);
+  let where;
+  let id;
+  if (exact || trips.length === 1) {
+    where = "trips";
+    id = exact ?? trips[0];
+  } else if (trips.length > 1) {
+    throw new Error(
+      `"${target}" matches ${trips.length} trips: ${trips.slice(0, 8).join(", ")}`,
+    );
+  } else {
+    where = "photos";
+    [id] = findShot(catalog, target);
+  }
+  const note = text.replace(/\s+/g, " ").trim().slice(0, 300);
+  if (!clear && !note)
+    throw new Error("Usage: npm run social -- note <trip|photo> <text...>");
+  await updateJson(
+    stores.social,
+    "notes.json",
+    (n) => {
+      n.trips = n.trips ?? {};
+      n.photos = n.photos ?? {};
+      if (clear) delete n[where][id];
+      else n[where][id] = note;
+      return n;
+    },
+    { fallback: { trips: {}, photos: {} } },
+  );
+  const which = where === "trips" ? id : catalog.shots[id].pick;
+  console.log(
+    clear
+      ? `${which}: note removed.`
+      : `${which}: saved. The next Photo captions run rewrites ${where === "trips" ? "this trip's planned posts" : "this photo's post, if it's planned,"} with it.`,
+  );
+}
+
+async function listNotes(stores) {
+  const catalog = (await stores.photos.readJson("catalog.json"))?.data ?? {
+    shots: {},
+  };
+  const ledger = (await stores.social.readJson("ledger.json"))?.data ?? {
+    posted: {},
+  };
+  const notes = (await stores.social.readJson("notes.json"))?.data ?? {};
+  const left = new Map(tripSlugs(catalog).map((slug) => [slug, 0]));
+  for (const [key, s] of Object.entries(catalog.shots ?? {}))
+    if (isPlannable(s) && !ledger.posted?.[key])
+      left.set(s.session, left.get(s.session) + 1);
+  const rows = [...left.entries()].sort((a, b) => b[1] - a[1]);
+  for (const [slug, n] of rows)
+    console.log(`${slug} (${n} to post): ${notes.trips?.[slug] ?? "-"}`);
+  const photos = Object.entries(notes.photos ?? {});
+  if (photos.length) {
+    console.log("\nPhotos:");
+    for (const [key, note] of photos)
+      console.log(`${catalog.shots?.[key]?.pick ?? key}: ${note}`);
+  }
+  console.log(
+    `\n${Object.keys(notes.trips ?? {}).length} of ${rows.length} trips have a note. Add one with: npm run social -- note <trip> "what you were doing there"`,
+  );
+}
+
 async function main() {
   const stores = await openStores();
   if (command === "status") return status(stores);
@@ -267,11 +349,21 @@ async function main() {
       unskip:
         "Unskipped it. The next Photo captions run puts it back in the plan.",
       redraft:
-        "The next Photo captions run writes it a new first line and reaction (the website's caption changes too) and gives its post a different fact.",
+        "The next Photo captions run writes it a new opening and first line (the website's caption changes too) and gives its post a different fact.",
     }[command];
     console.log(`${pick}: ${done}`);
     return;
   }
+  if (command === "note") {
+    const clear = rest.includes("--clear");
+    const words = rest.filter((a) => a !== "--clear");
+    if (!words[0])
+      throw new Error(
+        "Usage: npm run social -- note <trip|photo> <text...> (or --clear)",
+      );
+    return setNote(stores, words[0], words.slice(1).join(" "), clear);
+  }
+  if (command === "notes") return listNotes(stores);
   if (command === "retry") {
     if (!rest[0])
       throw new Error("Usage: npm run social -- retry <photo> | --all");
@@ -302,7 +394,7 @@ async function main() {
     return;
   }
   console.log(
-    "Commands: status, preview [count], skip <photo> [why], unskip <photo>, redraft <photo>, approve <photo>, retry <photo>|--all. Add --local for dry-run state.",
+    "Commands: status, preview [count], skip <photo> [why], unskip <photo>, redraft <photo>, note <trip|photo> <text>, notes, approve <photo>, retry <photo>|--all. Add --local for dry-run state.",
   );
 }
 
