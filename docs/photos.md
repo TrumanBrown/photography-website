@@ -179,7 +179,8 @@ It writes 2 to 4 sentences: what you saw, what the place was like, and at least 
 - common names only, no scientific names in brackets, and no species that isn't identified in that session
 - no capitalised name that isn't in the session's own text, so no invented places
 - one paragraph, with no Instagram-style place line
-- not opening with the same words as three other sessions ("I saw" counts as two words), and your habits spread out: "lol" on a quarter of sessions at most, "I love", "so cool", "my favorite" and "Also saw" on a fifth, "such a" on half
+- not opening with the same words as three other sessions ("I saw" counts as two words), and habits spread out across pages: your own words can repeat ("such a" on half the pages, "I love" on a third, "I like" on 30%), the model's tics can't ("my favorite" on 15%, "little" on a quarter and once a page, "almost looks like", "so cool" and "Also saw" on a fifth, "can't get over" on a tenth, "lol" on a quarter)
+- no forced-casual stand-ins for "I love" ("I dig", "I'm a fan of", "got a kick out of", "I was struck by"): real people repeat their words
 - no run of six words copied from another session's description (sessions that share photos tend to)
 - under 700 characters
 

@@ -35,9 +35,13 @@ from EXIF, the link line and the hashtags.
   across it, often with the "I" dropped ("Saw this...", "Spotted this...",
   "Came across this...", "While on a canal tour in Tortuguero, managed to
   capture this...", "I love how..."). Then "this" and the name.
-- An identified species is written `{name}`, once. Code puts in the verified
-  name with its scientific name: "this {name}" becomes "this groove-billed ani
-  (Crotophaga sulcirostris)". The generator never types a species name itself.
+- An identified species is written `{name}`, once, where the animal first
+  comes up, right after "this" or "a". Code puts in the verified name with its
+  scientific name, and fixes the words in front of it: "this {name}" becomes
+  "this groove-billed ani (Crotophaga sulcirostris)", or "these two North
+  American river otters (...)", and "a {name}" becomes "an agami heron (...)".
+  The generator never types a species name itself, and never tacks it on
+  after a comma ("Got this swan, a {name}").
 - Say what it's doing in everyday words: munching on, perched on, peeking out
   of, hanging off. Only what the notes say is in the photo.
 - Then his reaction: one specific thing he likes, or finds funny or strange,
@@ -75,8 +79,12 @@ Three posts go out a day, so anything on every post becomes a tell:
 - "lol" on one post in four at most, and never twice in one.
 - "such a" on about half the posts (never two in a row), mostly
   mid-sentence like his "cast such a distinct shadow"; a sentence starting
-  "Such a..." on one post in four. "I love", "pretty", "almost", "so cool",
-  "unique" only every few posts.
+  "Such a..." on one post in four. "I love", "I like", "my favorite",
+  "pretty", "almost", "little", "so cool", "unique" only every few posts.
+- When "I love" was used recently, react a different way (a comparison, a
+  joke, a surprise) rather than with a fancier word for it: "I dig", "I'm a
+  fan of", "got a kick out of", "I was struck by" are a model dodging a
+  repeat, not him.
 - Inside one caption, repeat words rather than swapping in synonyms: "this
   waterfall" twice is him, "the cascade" isn't.
 - Never copy a phrase from his rewrites or from a recent post.

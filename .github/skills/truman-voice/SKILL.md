@@ -77,6 +77,11 @@ What he never writes:
   and a lie from a model that guessed it.
 - Sales or brochure words: stunning, breathtaking, vibrant, majestic, nestled,
   showcasing, a true gem, nature at its finest.
+- A fancier word to avoid repeating himself: "I dig", "I'm a fan of", "I'm
+  really into", "got a kick out of", "I was struck by". He'd say "I love"
+  again, or react a different way.
+- The same filler on every page: "little" on everything, "X was my
+  favorite", "almost looks like", "can't get over". Once in a while, fine.
 - Questions to the reader, "Did you know", morals, sign-offs, lists of three,
   exclamation marks, em dashes.
 

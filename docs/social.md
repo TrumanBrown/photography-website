@@ -377,12 +377,12 @@ Full resolution and the rest of this session are on example.com, link in bio
 
 **The voice.** People scroll past posts that read as AI-written, so the opening is written in your voice, from your own rewrites of posts that didn't sound like you. How you write is in the [truman-voice skill](../.github/skills/truman-voice/SKILL.md); the post format, the generator's rules and your rewrites are in the [caption-voice skill](../.github/skills/caption-voice/SKILL.md), with the [humanizer](../.github/skills/humanizer/SKILL.md) skill (blader/humanizer, MIT) for anything they don't settle. [voice.mjs](../scripts/photos/voice.mjs) puts both into one text-only call per ten planned posts, in the order they'll go out, and asks for three versions of each opening with an emoji. An identified species is written as `{name}`, and code fills in the verified name. An opening is kept only if it:
 
-- has `{name}` exactly once for an identified species, and no other species name
+- has `{name}` exactly once for an identified species, where the animal first comes up (not tacked on after a comma), and no other species name; code fixes the words in front of it ("these two otters", "an agami heron")
 - has an opinion in it (a reaction, a comparison, a joke), not just a description of the photo, and never mentions the background, blur or framing
 - says nothing about what you were doing, who you were with, the weather or the time of day unless the trip's name, the photo's record or your trip notes back it up: "on a canal tour" needs a trip named for the canals or a note saying so, and waiting, "finally" or company need your notes
-- has no numbers, no "today" or "last week", no questions (a hedging "(?)" is fine), no stock phrases ("nature never disappoints") and none of the words the voice rules ban
+- has no numbers, no "today" or "last week", no questions (a hedging "(?)" is fine), no stock phrases ("nature never disappoints"), no forced-casual stand-ins for "I love" ("I dig", "I'm a fan of", "got a kick out of") and none of the words the voice rules ban
 - doesn't repeat its fun fact, and copies no phrase from your rewrites or another post
-- doesn't start with the same words as any of the four posts before it, and spreads your habits out: "lol" on one post in four at most (it's dropped rather than the post), "such a" never on two posts in a row (and opening a sentence on one post in four), "I love", "pretty" and "almost" only every few posts
+- doesn't start with the same words as any of the four posts before it, and spreads your habits out: "lol" on one post in four at most (it's dropped rather than the post), "such a" never on two posts in a row (and opening a sentence on one post in four), "I love", "I like", "my favorite", "little", "pretty" and "almost" only every few posts
 
 The emoji has to be one emoji (not ✨, 🌿, 🔥, 📸 or the like) and not one used on the five posts before it; otherwise the opening's other suggestions, the animal's own emoji or a face take its place.
 
