@@ -17,20 +17,32 @@ const solid = (width, height, background, extra = (s) => s) =>
 
 /**
  * Plain blue-grey, like an empty sky, with a checkerboard ("something there")
- * over each [x, y, width, height] area.
+ * over each [x, y, width, height] area. Made once per shape: these tests share
+ * CI's CPU with the other image tests.
  */
-const scene = (width, height, areas) =>
-  sharp(
-    Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
-<defs><pattern id="c" width="80" height="80" patternUnits="userSpaceOnUse">
-<rect width="80" height="80" fill="#fff"/><rect width="40" height="40" fill="#000"/><rect x="40" y="40" width="40" height="40" fill="#000"/>
-</pattern></defs>
-<rect width="100%" height="100%" fill="#8a9bb0"/>
-${areas.map(([x, y, w, h]) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="url(#c)"/>`).join("")}
-</svg>`),
-  )
-    .jpeg()
-    .toBuffer();
+const scenes = new Map();
+const scene = (width, height, areas) => {
+  const key = JSON.stringify([width, height, areas]);
+  if (!scenes.has(key)) {
+    const data = Buffer.alloc(width * height * 3);
+    for (let i = 0; i < data.length; i += 3) data.set([0x8a, 0x9b, 0xb0], i);
+    for (const [x0, y0, w, h] of areas)
+      for (let y = y0; y < y0 + h; y++)
+        for (let x = x0; x < x0 + w; x++)
+          data.fill(
+            (Math.floor(x / 40) + Math.floor(y / 40)) % 2 ? 255 : 0,
+            (y * width + x) * 3,
+            (y * width + x) * 3 + 3,
+          );
+    scenes.set(
+      key,
+      sharp(data, { raw: { width, height, channels: 3 } })
+        .jpeg()
+        .toBuffer(),
+    );
+  }
+  return scenes.get(key);
+};
 
 /** How much the top rows of a rendered post vary: ~0 for plain sky. */
 const topVariation = async ({ buffer, width }) => {
@@ -110,58 +122,63 @@ describe("canvasFor", () => {
   });
 });
 
-describe("cropPosition", () => {
+// The image tests share CI's CPU with each other; give them room.
+const slow = { timeout: 20_000 };
+
+// cropPosition looks at a 384 px copy, so a 960×1440 frame (2:3, 240 px to
+// trim) is as good a test as a full-size one.
+describe("cropPosition", slow, () => {
   it("has nothing to place when the frame fits", async () => {
-    expect(await cropPosition(await scene(3000, 2000, []))).toBeNull();
+    expect(await cropPosition(await scene(960, 640, []))).toBeNull();
   });
 
   it("crops from the middle when both ends hold something", async () => {
     expect(
-      await cropPosition(await scene(2000, 3000, [[0, 0, 2000, 3000]])),
+      await cropPosition(await scene(960, 1440, [[0, 0, 960, 1440]])),
     ).toBe(0.5);
   });
 
   it("takes the crop off an empty end", async () => {
     // Plain sky over the top third: the crop comes off the top.
     expect(
-      await cropPosition(await scene(2000, 3000, [[0, 1000, 2000, 2000]])),
+      await cropPosition(await scene(960, 1440, [[0, 480, 960, 960]])),
     ).toBe(1);
     // Plain water under the bottom third: it comes off the bottom.
+    expect(await cropPosition(await scene(960, 1440, [[0, 0, 960, 960]]))).toBe(
+      0,
+    );
+    // A 4:1 panorama (836 px to trim) with empty sky over its left 1000 px.
     expect(
-      await cropPosition(await scene(2000, 3000, [[0, 0, 2000, 2000]])),
-    ).toBe(0);
-    // A panorama with empty sky over its left 2500 px: off the left.
-    expect(
-      await cropPosition(await scene(4000, 1000, [[2500, 0, 1500, 1000]])),
+      await cropPosition(await scene(1600, 400, [[1000, 0, 600, 400]])),
     ).toBe(1);
   });
 
   it("stops short of what's at the empty end", async () => {
-    // Something 450 px down: trimming all 500 px from the top would cut into
+    // Something 216 px down: trimming all 240 px from the top would cut into
     // it, so the crop leaves room above it and takes the rest off the bottom.
     const at = await cropPosition(
-      await scene(2000, 3000, [[0, 450, 2000, 2550]]),
+      await scene(960, 1440, [[0, 216, 960, 1224]]),
     );
     expect(at).toBeGreaterThan(0.5);
-    expect(at * 500).toBeLessThan(450 - 60);
+    expect(at * 240).toBeLessThan(216 - 28);
   });
 
   it("keeps a subject near one end even when the other end is busier", async () => {
     // A heron's head near the top, a tangle of twigs filling the bottom.
     const at = await cropPosition(
-      await scene(2000, 3000, [
-        [800, 300, 400, 180],
-        [0, 2500, 2000, 500],
+      await scene(960, 1440, [
+        [384, 144, 192, 86],
+        [0, 1200, 960, 240],
       ]),
     );
     expect(at).toBe(0.5);
-    expect(at * 500).toBeLessThan(300);
+    expect(at * 240).toBeLessThan(144);
   });
 });
 
-describe("renderForInstagram", () => {
+describe("renderForInstagram", slow, () => {
   it("keeps a frame that fits whole, with no border or crop", async () => {
-    const out = await renderForInstagram(await solid(3000, 2000, "#808080"));
+    const out = await renderForInstagram(await solid(1500, 1000, "#808080"));
     expect([out.width, out.height, out.padded, out.crop]).toEqual([
       1440,
       960,
@@ -176,7 +193,7 @@ describe("renderForInstagram", () => {
 
   it("crops a too-tall frame to 4:5 instead of adding borders", async () => {
     const out = await renderForInstagram(
-      await scene(2000, 3000, [[0, 1000, 2000, 2000]]),
+      await scene(1440, 2160, [[0, 720, 1440, 1440]]),
     );
     expect([out.width, out.height, out.padded, out.background]).toEqual([
       1440,
@@ -189,27 +206,28 @@ describe("renderForInstagram", () => {
 
   it("crops a panorama to 1.91:1", async () => {
     const out = await renderForInstagram(
-      await scene(4000, 1000, [[0, 0, 1500, 1000]]),
+      await scene(1600, 400, [[0, 0, 600, 400]]),
     );
-    expect([out.width, out.height]).toEqual([1440, 754]);
+    expect([out.width, out.height]).toEqual([764, 400]);
     expect(out.crop).toEqual({ side: "x", at: 0 });
   });
 
   it("uses the crop the catalog placed", async () => {
-    const photo = await scene(2000, 3000, [[0, 500, 2000, 2500]]);
-    const kept = await renderForInstagram(photo, { at: 0 });
-    const trimmed = await renderForInstagram(photo, { at: 1 });
+    const photo = await scene(960, 1440, [[0, 240, 960, 1200]]);
+    const kept = await renderForInstagram(photo, { at: 0, maxWidth: 360 });
+    const trimmed = await renderForInstagram(photo, { at: 1, maxWidth: 360 });
     expect([kept.crop.at, trimmed.crop.at]).toEqual([0, 1]);
     expect(await topVariation(kept)).toBeLessThan(5);
     expect(await topVariation(trimmed)).toBeGreaterThan(40);
   });
 
   it("borders a too-tall frame when asked to, matching its edges", async () => {
-    const dark = await renderForInstagram(await solid(2000, 3000, "#101010"), {
+    const dark = await renderForInstagram(await solid(1440, 2160, "#101010"), {
       fit: "pad",
     });
-    const light = await renderForInstagram(await solid(2000, 3000, "#f0f0f0"), {
+    const light = await renderForInstagram(await solid(1440, 2160, "#f0f0f0"), {
       fit: "pad",
+      maxWidth: 360,
     });
     expect([dark.width, dark.height, dark.background, dark.crop]).toEqual([
       1440,
@@ -225,16 +243,16 @@ describe("renderForInstagram", () => {
   });
 
   it("crops an EXIF-rotated photo exactly like the same photo stored upright", async () => {
-    const upright = await scene(2000, 3000, [[0, 1000, 2000, 2000]]);
+    const upright = await scene(960, 1440, [[0, 480, 960, 960]]);
     const sideways = await sharp(upright)
       .rotate(270)
       .withMetadata({ orientation: 6 })
       .jpeg()
       .toBuffer();
-    expect(await orientedSize(sideways)).toEqual({ width: 2000, height: 3000 });
-    const a = await renderForInstagram(upright);
-    const b = await renderForInstagram(sideways);
-    expect([b.width, b.height]).toEqual([1440, 1800]);
+    expect(await orientedSize(sideways)).toEqual({ width: 960, height: 1440 });
+    const a = await renderForInstagram(upright, { maxWidth: 360 });
+    const b = await renderForInstagram(sideways, { maxWidth: 360 });
+    expect([b.width, b.height]).toEqual([360, 450]);
     expect(b.crop).toEqual(a.crop);
     const [pa, pb] = await Promise.all(
       [a, b].map((r) =>
@@ -247,24 +265,26 @@ describe("renderForInstagram", () => {
   });
 });
 
-describe("placeCrop", () => {
+describe("placeCrop", slow, () => {
   it("places a crop once, with a fingerprint that matches the post", async () => {
-    const photo = await scene(2000, 3000, [
-      [0, 900, 1200, 700],
-      [600, 1700, 1400, 500],
-      [300, 2300, 600, 700],
+    const photo = await scene(1440, 2160, [
+      [0, 648, 864, 504],
+      [432, 1224, 1008, 360],
+      [216, 1656, 432, 504],
     ]);
     const placed = await placeCrop(photo);
     expect(placed).toMatchObject({ v: CROP_VERSION, at: 1 });
     expect(placed.hash).toMatch(/^[0-9a-f]{32}$/);
-    // The account's posts are fingerprinted at 1080 px with edges trimmed,
-    // and match a shot within 12 bits.
-    const post = await renderForInstagram(photo, { at: placed.at });
-    const served = await sharp(post.buffer).resize(1080).jpeg().toBuffer();
+    // The account's posts are fingerprinted as Instagram serves them (1080
+    // px), edges trimmed, and match a shot within 12 bits.
+    const post = await renderForInstagram(photo, {
+      at: placed.at,
+      maxWidth: 1080,
+    });
     expect(
-      hamming(placed.hash, await dhash(served, { trim: true })),
+      hamming(placed.hash, await dhash(post.buffer, { trim: true })),
     ).toBeLessThanOrEqual(12);
-    expect(await placeCrop(await scene(3000, 2000, []))).toBeNull();
+    expect(await placeCrop(await scene(960, 640, []))).toBeNull();
   });
 });
 

@@ -206,7 +206,8 @@ describe("when the story goes out", () => {
   });
 });
 
-describe("the story frame", () => {
+// Three full-size frames: room for CI, where the image tests share the CPU.
+describe("the story frame", { timeout: 20_000 }, () => {
   const photo = (width, height) =>
     sharp({ create: { width, height, channels: 3, background: "#3a7" } })
       .jpeg()
