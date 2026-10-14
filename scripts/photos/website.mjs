@@ -897,7 +897,24 @@ export function descriptionProblems(
     problems.push(
       `It names ${strangers.slice(0, 4).join(", ")}, which the facts don't mention.`,
     );
-  const repeated = sharedPhrase(text, others);
+  // Species names are facts, not phrasing: two sessions with the same bee
+  // on the same twig can both say "a Hunt's bumble bee on a twig".
+  const nameList = [
+    ...digest.species.flatMap((x) => [x.name, x.scientific]),
+    ...digest.groups.map((g) => g.name),
+  ]
+    .filter(Boolean)
+    .sort((a, b) => b.length - a.length);
+  const unnamed = (t) =>
+    nameList.reduce(
+      (acc, name) =>
+        acc.replace(
+          new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"),
+          " ",
+        ),
+      String(t ?? ""),
+    );
+  const repeated = sharedPhrase(unnamed(text), others.map(unnamed));
   if (repeated)
     problems.push(
       `It repeats "${repeated}" from another session's description. Word it differently.`,

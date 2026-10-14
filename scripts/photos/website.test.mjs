@@ -730,14 +730,27 @@ describe("session descriptions", () => {
       null,
     );
     const problems = check(
-      "Frogs, and most of them at night. A Sylvia's tree frog on a thin twig, and a heron by the canal in Guayacán.",
+      "Sylvia's tree frogs in Guayacán, with water droplets beading on every leaf along the stream.",
       {
         others: [
-          "Somewhere else, a Sylvia's tree frog on a thin twig at dusk.",
+          "Somewhere else, with water droplets beading on every leaf along the stream at dusk.",
         ],
       },
     );
     expect(problems.join(" ")).toMatch(/repeats/);
+  });
+
+  it("doesn't count a shared species name as copied wording", () => {
+    expect(
+      check(
+        "Found a Sylvia's tree frog on a thin twig at night in Guayacán, and a heron by the canal.",
+        {
+          others: [
+            "Elsewhere there was a Sylvia's tree frog on a thin twig after dark.",
+          ],
+        },
+      ),
+    ).toEqual([]);
   });
 
   it("gives sessions different shapes, the same one every run", () => {
