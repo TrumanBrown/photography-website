@@ -17,13 +17,15 @@ His six rewrites, with what the pipeline wrote first, are in
 
 ## How he writes
 
-1. **He's in the story.** He opens with what he was doing or how he came
-   across it, not with a label. The "I" is usually dropped, the way people
-   type online:
+1. **He starts with "I" or a verb**, "because that's how humans write
+   captions" (his words). He's in the story: what he was doing or how he came
+   across it, never a label. Often the "I" is dropped, the way people type
+   online:
    - "Was taking a break on a hike and captured this..."
    - "Pulled over on the side of the road to capture this canyon view in Kauai."
    - "While on a canal tour in Tortuguero, managed to capture this..."
-   - "Spotted this...", "Saw this...", "A fun pic of this..."
+   - "Spotted this...", "Saw this...", "A fun pic of this...", "I love how..."
+   - "capture" is a favourite: "captured this", "managed to capture this".
 2. **He points at it.** "this waterfall", "this katydid", "this canyon view".
    It's his phone and he's holding it out.
 3. **Names stay exact.** The species gets its common name with the scientific
@@ -36,10 +38,13 @@ His six rewrites, with what the pipeline wrote first, are in
    "the beak goes so far up its head", "the iridescent shade of the feathers
    is so cool too", "I love how the low clouds cast such a distinct shadow on
    the cliffs". Not a verdict on the photo, and not a generic "beautiful".
-6. **Intensifiers he doesn't edit out.** "such a unique bird", "such unique
-   looking birds", "so much green everywhere", "so far up", "pretty close up".
-   Repeating himself across posts is fine; repeating himself on every post
-   isn't.
+6. **He repeats words instead of reaching for synonyms.** "such a unique
+   bird", "such unique looking birds", "such a distinct shadow", "so much
+   green everywhere", "so far up", "pretty close up". Within one caption too:
+   "...near the Arenal Volcano in Costa Rica. I love the landscape pictures
+   from Costa Rica because...", "this waterfall" twice. Swapping in a fancier
+   word the second time ("the cascade", "this Central American nation") is a
+   machine's habit, not his. "Such a" is on about half his posts.
 7. **Honest hedges.** "likely (?) sucking nectar from the petals", "almost
    alien-like", "almost looks like a horn". The "(?)" is on purpose: he isn't
    sure, so he says so instead of sounding certain.
@@ -49,13 +54,17 @@ His six rewrites, with what the pipeline wrote first, are in
 9. **Sometimes a small thought about the outdoors.** "I feel like some of the
    best wildlife experiences come when you're resting, and nature just comes
    to you." Now and then, never as a sign-off on every post.
-10. **Loose grammar, correct spelling.** Comma splices ("Such a unique bird,
+10. **Loose grammar, correct spelling.** "I am not using perfect grammar at
+    all times like a robot" (his words). Comma splices ("Such a unique bird,
     the beak goes so far up its head, almost looks like a horn lol"),
-    fragments, "Even still", "the Arenal Volcano", "pic". Spelling and
-    "its"/"it's" are still right: his typos aren't a style to copy.
+    fragments, dropped subjects ("Was taking a break..."), "Even still", "the
+    Arenal Volcano", "pic". Spelling and "its"/"it's" are still right: his
+    typos aren't a style to copy, but his "(?)" is.
 11. **The place, twice and two ways.** Casually in the sentence ("in
     Bijagua", "near the Arenal Volcano in Costa Rica"), then properly on a
-    line of its own ("Bijagua, Alajuela Province, Costa Rica.").
+    line of its own ("Bijagua, Alajuela Province, Costa Rica."). The line is
+    places only, said so anyone can place it: he changed "shrub-steppe,
+    Eastern Washington" to "Eastern Washington state, USA".
 12. **Short.** Two or three sentences, roughly 25 to 60 words.
 
 What he never writes:

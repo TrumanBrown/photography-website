@@ -31,10 +31,10 @@ from EXIF, the link line and the hashtags.
 
 ## The opening
 
-- Start the way he does: with what he was doing or how he came across it,
-  dropping the "I" ("Saw this...", "Spotted this...", "Came across this...",
-  "While on a canal tour in Tortuguero, managed to capture this..."), or with
-  "I". Then "this" and the name.
+- Start the way he does, with "I" or a verb: what he was doing or how he came
+  across it, often with the "I" dropped ("Saw this...", "Spotted this...",
+  "Came across this...", "While on a canal tour in Tortuguero, managed to
+  capture this...", "I love how..."). Then "this" and the name.
 - An identified species is written `{name}`, once. Code puts in the verified
   name with its scientific name: "this {name}" becomes "this groove-billed ani
   (Crotophaga sulcirostris)". The generator never types a species name itself.
@@ -69,10 +69,16 @@ the one posting the lie. So:
 
 Three posts go out a day, so anything on every post becomes a tell:
 
-- No two of any five posts in a row start the same way, and only one in four starts with "I": he mostly drops it.
+- No two of any five posts in a row start with the same words ("Saw this"
+  twice). Starting with "I" is fine as often as not, with different words
+  after it.
 - "lol" on one post in four at most, and never twice in one.
-- "such a", "I love", "pretty", "almost", "so cool", "unique": each only
-  every few posts.
+- "such a" on about half the posts (never two in a row), mostly
+  mid-sentence like his "cast such a distinct shadow"; a sentence starting
+  "Such a..." on one post in four. "I love", "pretty", "almost", "so cool",
+  "unique" only every few posts.
+- Inside one caption, repeat words rather than swapping in synonyms: "this
+  waterfall" twice is him, "the cascade" isn't.
 - Never copy a phrase from his rewrites or from a recent post.
 
 ## The emoji
@@ -88,6 +94,9 @@ Three posts go out a day, so anything on every post becomes a tell:
 
 On its own line straight after the opening, most specific first, with a full
 stop: "Bijagua, Alajuela Province, Costa Rica." Code builds it from the trip.
+Places only, said so anyone can place them: no habitat words, and Washington
+always ends "Washington state, USA" (his swallowtail rewrite changed
+"shrub-steppe, Eastern Washington" to "Eastern Washington state, USA").
 
 ## Fun fact
 

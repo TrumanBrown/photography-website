@@ -118,7 +118,7 @@ export function allowedNames(session) {
 const ACTIVITY_TAIL =
   /\s+(?:night walks?|walks?|macro|camping|hikes?|hiking|birding|wildlife|adventures?|weekend|trip|and nearby|and around)$/i;
 // A habitat rather than a named place reads lowercase mid-sentence: "…, shrub-steppe, Eastern Washington".
-const HABITAT =
+export const HABITAT =
   /^(?:shrub-steppe|sagebrush steppe|steppe|desert|rainforest|cloud forest|tide ?pools?|wetlands?|grasslands?|old-growth forest)$/i;
 
 /** The most specific place for a caption: "Yellow Aster Butte", "Tortuguero canals". */

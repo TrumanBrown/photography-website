@@ -11,7 +11,7 @@
  *   - the link line, pointing at the site through the link in the bio
  *   - five hashtags (hashtags.mjs)
  */
-import { allowedNames } from "../photos/website.mjs";
+import { HABITAT, allowedNames } from "../photos/website.mjs";
 
 /**
  * Bump when the way posts are put together changes. Planned posts are
@@ -23,11 +23,17 @@ export const POST_VERSION = 5;
 // Words that say how big a place is, not which: "Portland area" is Portland.
 const PLACE_SIZE = new Set(["area", "region", "range", "around", "greater"]);
 
-/** "Yellow Aster Butte, North Cascades, Washington": the most specific place, then the region. */
+/**
+ * "Yellow Aster Butte, North Cascades, Washington state, USA": the most
+ * specific place, then the region, the way Truman writes it. A habitat
+ * ("shrub-steppe") isn't a place, and Washington gets "state, USA" so
+ * nobody reads it as the city (his swallowtail post: "Eastern Washington
+ * state, USA").
+ */
 export function placeLine(session, first) {
   const parts = [first, ...String(session.location ?? "").split(",")]
     .map((s) => s?.trim())
-    .filter(Boolean);
+    .filter((s) => s && !HABITAT.test(s));
   const kept = [];
   const words = (p) =>
     p
@@ -42,7 +48,8 @@ export function placeLine(session, first) {
       continue;
     kept.push(part);
   }
-  return kept.join(", ");
+  const line = kept.join(", ");
+  return /\bWashington$/.test(line) ? `${line} state, USA` : line;
 }
 
 /**

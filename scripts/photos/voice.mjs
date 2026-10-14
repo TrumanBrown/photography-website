@@ -25,7 +25,7 @@ import { lint, tidy, ungroundedNames, unverifiedSpecies } from "./text.mjs";
 import { backdropIn } from "./website.mjs";
 
 /** Bump when the prompt or the skills change enough that planned posts should be rewritten. */
-export const VOICE_VERSION = 3;
+export const VOICE_VERSION = 4;
 
 const SKILLS = join(ROOT, ".github/skills");
 
@@ -79,9 +79,11 @@ export function voicePrompt(items, guide = "", { recent = [] } = {}) {
 
 For each photo, write "options": three different versions, best first. Each one has:
 - "text": two or three sentences, 15 to 60 words in all.
-  - First, what this is and how he came across it, said the way he'd tell a friend. Start with a plain verb, dropping the "I" like people do online: saw, spotted, found, caught, got, captured, managed to capture, came across, ran into ("Saw this...", "Managed to capture this..."). Or start with "I", or with what he was doing when his notes say so ("While on a canal tour in Tortuguero, ..."), or now and then "A fun pic of this...". Never bookish verbs like "came upon", "took in", "happened upon", "gazed at", "photographed" or "got a glimpse of". Mostly drop the "I"; he starts with "I" only now and then. For a named animal or plant, write {name} exactly once where its name goes, usually right after "this"; code puts in the verified name. Say what it's doing in everyday words. Mention the place the casual way ("in Bijagua", "near the Arenal Volcano") when it fits.
+  - First, what this is and how he came across it, said the way he'd tell a friend. He starts with "I" or a verb, like people do online: "I saw...", "I love how...", or the verb with the "I" dropped ("Saw this...", "Spotted this...", "Managed to capture this..."). Everyday verbs: saw, spotted, found, caught, got, captured, managed to capture, came across, ran into. Or start with what he was doing when his notes say so ("While on a canal tour in Tortuguero, ..."), or now and then "A fun pic of this...". Never bookish verbs like "came upon", "took in", "happened upon", "gazed at", "photographed" or "got a glimpse of". For a named animal or plant, write {name} exactly once where its name goes, usually right after "this"; code puts in the verified name. Say what it's doing in everyday words. Mention the place the casual way ("in Bijagua", "near the Arenal Volcano") when it fits.
   - Then his reaction, with some feeling in it: what he loves about it, a comparison ("almost looks like a horn", "almost alien-like"), something funny ("chose the wrong color plant to land on lol"), or a small thought about being out there ("some of the best wildlife experiences come when you're resting"). Opinions are good ("such a unique bird", "so cool", "I love how..."). Hedge when he couldn't know for sure ("likely (?) sucking nectar"). Not a list of colours, textures or body parts: that's alt text, not him.
-  - Casual: contractions, fragments, a comma splice, "pretty", "so", "such a". "lol" at most once, only when something's actually funny.
+  - Casual, not polished. He doesn't write perfect grammar like a robot: sentences run together with commas, the subject gets dropped ("Was taking a break..."), a thought starts with "Even still" or "Luckily for me". Spelling stays right.
+  - He repeats words instead of reaching for synonyms, the way people do: "this waterfall" again rather than "the cascade", "Costa Rica" twice, "such a" and "so" more than once. Never swap in a fancier word to avoid saying something twice.
+  - "lol" at most once, only when something's actually funny.
   - Plain, not poetic. An animal can have a personality; scenery doesn't get feelings or a "softer version of itself".
 - "emoji": the one emoji he'd put on the end. The animal itself (🦋 🐸 🦜), a face (😅 😂 🤯 😍 🥲), or the thing (🌋 ⛰️ ☁️ 🌊). Vary them: not the same one as any of the last few posts. Never ✨ 🌿 🍃 🔥 📸 🙌 💯 🚀 🌍 💫.
 
@@ -91,7 +93,7 @@ Only what's true:
 - Only the names in the notes. No numbers. Don't say the fun fact; it's posted underneath.
 - Never describe the photo itself: no background, blur, framing, angle or lighting.
 
-These go out three a day, so across all the photos below no two may start the same way or share a phrase, and none may start like the recent posts listed. Spread "such a", "I love", "so cool", "pretty", "almost" and "lol" out; each belongs on only some posts.
+These go out three a day, so across all the photos below no two may start with the same words or share a phrase, and none may start like the recent posts listed. "Such a" and "so" are his on about half his posts; spread "I love", "so cool", "pretty", "almost" and "lol" out more, each on only some posts.
 
 Don't write questions (a hedging "(?)" is fine), hashtags, exclamation marks, long dashes, quotation marks, sales words (stunning, breathtaking, vibrant, majestic, nestled), stock lines ("nature never disappoints", "living its best life", "stopped me in my tracks", "what a sight"), or a last line that sums up.
 ${recent.length ? `\nRecent posts, newest last. Don't start like these or reuse their phrases:\n${recent.map((r) => `- ${r}`).join("\n")}\n` : ""}
@@ -158,9 +160,11 @@ const OPINION =
   /\b(?:i|i'm|i've|i'd|my|me|love|loved|like|such|so|pretty|really|cool|crazy|wild|unique|interesting|incredible|amazing|lol|can't|couldn't|almost|fun|favou?rite|neat|weird|funny|wish|never|always|hard to|kind of|kinda|wow)\b/i;
 // His habits: each is fine on some posts and a tell on every one. [pattern, how many posts back it may not appear]
 const HABITS = [
-  // He mostly drops the "I": starting with it is fine on one post in four.
-  [/^i\b/i, 3],
-  [/\bsuch an?\b/i, 2],
+  // His on about half his posts: just not two in a row, and mostly
+  // mid-sentence ("cast such a distinct shadow"). Opening a sentence with it
+  // on every other post is a rhythm people notice.
+  [/\bsuch an?\b/i, 1],
+  [/(?:^|[.!?]\s+)such an?\b/i, 3],
   [/\bi love\b/i, 2],
   [/\bso cool\b/i, 3],
   [/\bi feel like\b/i, 4],
@@ -169,7 +173,7 @@ const HABITS = [
   [/\balmost\b/i, 2],
   [/\bpretty\b/i, 2],
   [/\bluck(?:y|ily)\b/i, 4],
-  [/\bunique\b/i, 3],
+  [/\bunique\b/i, 2],
   [/\binteresting\b/i, 3],
   [/\bincredible\b/i, 3],
   [/\bfun pic\b/i, 6],

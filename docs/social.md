@@ -368,7 +368,7 @@ Full resolution and the rest of this session are on example.com, link in bio
 
 - **Opening**, in your voice: how you came across it, the name with its scientific name, what it's doing, and your reaction, the way you'd tell a friend. Two or three sentences. See below.
 - **One emoji** at the end of the opening, in place of its last full stop.
-- **Place**, in full, on its own line.
+- **Place**, in full, on its own line: places only (no habitat words like "shrub-steppe"), and Washington as "Washington state, USA", the way you wrote it.
 - **Fact:** one of the species' or place's facts, as above, after `Fun fact: `.
 - **Red List line:** added when the global IUCN status is Near Threatened or worse.
 - **Gear line:** from the photo's EXIF data.
@@ -382,7 +382,7 @@ Full resolution and the rest of this session are on example.com, link in bio
 - says nothing about what you were doing, who you were with, the weather or the time of day unless the trip's name, the photo's record or your trip notes back it up: "on a canal tour" needs a trip named for the canals or a note saying so, and waiting, "finally" or company need your notes
 - has no numbers, no "today" or "last week", no questions (a hedging "(?)" is fine), no stock phrases ("nature never disappoints") and none of the words the voice rules ban
 - doesn't repeat its fun fact, and copies no phrase from your rewrites or another post
-- doesn't start like any of the four posts before it, starts with "I" on one post in four at most, and spreads your habits out: "lol" on one post in four at most (it's dropped rather than the post), "such a", "I love", "pretty" and "almost" only every few posts
+- doesn't start with the same words as any of the four posts before it, and spreads your habits out: "lol" on one post in four at most (it's dropped rather than the post), "such a" never on two posts in a row (and opening a sentence on one post in four), "I love", "pretty" and "almost" only every few posts
 
 The emoji has to be one emoji (not ✨, 🌿, 🔥, 📸 or the like) and not one used on the five posts before it; otherwise the opening's other suggestions, the animal's own emoji or a face take its place.
 

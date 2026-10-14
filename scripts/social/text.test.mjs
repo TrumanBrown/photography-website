@@ -236,7 +236,7 @@ describe("caption text", () => {
 
   it("doesn't repeat a place the line already names", () => {
     expect(placeLine({ location: "Washington" }, "Western Washington")).toBe(
-      "Western Washington",
+      "Western Washington state, USA",
     );
     expect(placeLine({ location: "Tibet, China" }, "Tibetan plateau")).toBe(
       "Tibetan plateau, Tibet, China",
@@ -246,13 +246,20 @@ describe("caption text", () => {
         { location: "North Cascades, Washington" },
         "Yellow Aster Butte",
       ),
-    ).toBe("Yellow Aster Butte, North Cascades, Washington");
+    ).toBe("Yellow Aster Butte, North Cascades, Washington state, USA");
     expect(placeLine({ location: "Portland area, Oregon" }, "Portland")).toBe(
       "Portland, Oregon",
     );
     expect(
       placeLine({ location: "Cascade Range, Washington" }, "Cascades"),
-    ).toBe("Cascades, Washington");
+    ).toBe("Cascades, Washington state, USA");
+    // His swallowtail post: a habitat isn't a place.
+    expect(placeLine({ location: "Eastern Washington" }, "shrub-steppe")).toBe(
+      "Eastern Washington state, USA",
+    );
+    expect(placeLine({ location: "Kauai, Hawaii" }, "Napali Coast")).toBe(
+      "Napali Coast, Kauai, Hawaii",
+    );
   });
 
   it("keeps demonyms capitalised mid-sentence", () => {

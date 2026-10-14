@@ -199,11 +199,39 @@ describe("post voice", () => {
     expect(storyOpener("Saw these two coatis")).toBe(
       storyOpener("Saw this {name}"),
     );
-    // Mostly no "I" up front: once in four posts.
+    // He starts with "I" or a verb: "I" on two posts in a row is fine,
+    // as long as the words after it differ.
     expect(
       normaliseStory(
         "I spotted this {name} munching on some insect in Bijagua. Such a goofy beak, almost looks like a horn",
         { ...ani, recent: ["I found this tiny frog on a leaf. So cool"] },
+      ),
+    ).not.toBe("");
+    // Opening a sentence with "Such a" is for one post in four...
+    expect(
+      normaliseStory(
+        "Spotted this {name} munching on some insect in Bijagua. Such a goofy beak, almost looks like a horn",
+        {
+          ...ani,
+          recent: ["Found a tiny frog. Such a funny face", "One", "Two"],
+        },
+      ),
+    ).toBe("");
+    // ...but mid-sentence it's back two posts later.
+    expect(
+      normaliseStory(
+        "Spotted this {name} munching on some insect in Bijagua. It has such a goofy beak, almost looks like a horn",
+        {
+          ...ani,
+          recent: ["Found a tiny frog. Such a funny face", "One", "Two"],
+        },
+      ),
+    ).not.toBe("");
+    // "Such a" on two posts in a row is the one thing too many.
+    expect(
+      normaliseStory(
+        "I spotted this {name} munching on some insect in Bijagua. Such a goofy beak, almost looks like a horn",
+        { ...ani, recent: ["Found such a tiny frog on a leaf. So cool"] },
       ),
     ).toBe("");
   });
