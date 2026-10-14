@@ -169,8 +169,18 @@ describe("runPost", () => {
       return render(buf, options);
     };
     const client = fakeClient();
-    await run(client, at(TODAY, "08:35"), { render: spy });
-    await run(client, at(TODAY, "12:35"), { render: spy });
+    // A post is stamped with the real clock and the next one waits out the
+    // gap from that stamp, so the clock has to read each run's time. Left
+    // alone, this only passed before 10:05 on the day in TODAY.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      for (const time of ["08:35", "12:35"]) {
+        vi.setSystemTime(at(TODAY, time));
+        await run(client, at(TODAY, time), { render: spy });
+      }
+    } finally {
+      vi.useRealTimers();
+    }
     expect(calls).toEqual([
       expect.objectContaining({ fit: "crop", at: 0.25 }),
       // Placed by an older version: placed again when it's rendered.
