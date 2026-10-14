@@ -12,6 +12,12 @@ describe("coordsFor", () => {
       lat: 26.87,
       lon: 100.23,
     });
+    // Sessions from one trip get their own pins, not the "Tibet, China" one.
+    expect(coordsFor("Nagqu, Tibet, China")).toEqual({ lat: 31.48, lon: 92.06 });
+    expect(coordsFor("Shannan and Shigatse, Tibet, China")).toEqual({
+      lat: 29.1,
+      lon: 89.7,
+    });
   });
 
   it("ignores case and accents", () => {

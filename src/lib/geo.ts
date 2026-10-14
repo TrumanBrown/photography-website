@@ -55,6 +55,8 @@ const GAZETTEER: Record<string, Coords> = {
   "lijiang, yunnan, china": { lat: 26.87, lon: 100.23 },
   "yunnan, china": { lat: 25.04, lon: 102.71 },
   "shanghai, china": { lat: 31.23, lon: 121.47 },
+  "nagqu, tibet, china": { lat: 31.48, lon: 92.06 },
+  "shannan and shigatse, tibet, china": { lat: 29.1, lon: 89.7 },
   "tibet, china": { lat: 29.65, lon: 91.13 },
   china: { lat: 34.0, lon: 108.0 },
   beijing: { lat: 39.9, lon: 116.4 },
