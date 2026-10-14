@@ -394,9 +394,7 @@ async function processSession({ prefix, originalsClient, derivativesClient, serv
 
     // Read intrinsic dimensions + EXIF date.
     const { default: sharp } = await import('sharp');
-    const meta = await sharp(localPath).metadata();
-    const width = meta.width ?? 0;
-    const height = meta.height ?? 0;
+    const { width, height } = uprightSize(await sharp(localPath).metadata());
 
     let captureDate;
     let exifSettings;
@@ -959,6 +957,19 @@ export async function generateAdminThumbs({ slug, imagesDir, images, containerCl
   for (const [dir, count] of uploaded) {
     if (count > 0) console.log(`  ${dir}: ${count} new for ${slug}`);
   }
+}
+
+/**
+ * Width and height the way the photograph is shown. A camera held sideways
+ * stores landscape pixels plus an EXIF orientation of 5 to 8, and browsers and
+ * Astro's image service turn those upright. Recording the stored size would
+ * call a portrait 3:2, so the admin would offer it for the 3:2 lead box and the
+ * home page would put it there.
+ */
+export function uprightSize(meta) {
+  const width = meta.width ?? 0;
+  const height = meta.height ?? 0;
+  return (meta.orientation ?? 1) >= 5 ? { width: height, height: width } : { width, height };
 }
 
 export function sanitizeSlug(prefix) {

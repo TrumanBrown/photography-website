@@ -9,6 +9,7 @@ import {
   reorderByList,
   sanitizeSlug,
   targetFileForBlob,
+  uprightSize,
   validateImageTargets,
   validateSessionSidecar,
   validateSessionSlugs,
@@ -141,6 +142,57 @@ describe("session sidecar validation", () => {
         images: [{ file: "DSC0123.jpg", caption: "x".repeat(501) }],
       }),
     ).toThrow("caption must be at most 500 characters");
+  });
+});
+
+describe("image sizes", () => {
+  it("records a portrait the camera stored sideways the way it's shown", () => {
+    expect(uprightSize({ width: 6192, height: 4128, orientation: 8 })).toEqual({
+      width: 4128,
+      height: 6192,
+    });
+    expect(uprightSize({ width: 5712, height: 4284, orientation: 6 })).toEqual({
+      width: 4284,
+      height: 5712,
+    });
+  });
+
+  it("leaves upright, upside-down, and untagged frames alone", () => {
+    expect(uprightSize({ width: 6192, height: 4128, orientation: 1 })).toEqual({
+      width: 6192,
+      height: 4128,
+    });
+    expect(uprightSize({ width: 6192, height: 4128, orientation: 3 })).toEqual({
+      width: 6192,
+      height: 4128,
+    });
+    expect(uprightSize({ width: 4128, height: 6192 })).toEqual({
+      width: 4128,
+      height: 6192,
+    });
+  });
+
+  it("reads the orientation sharp reports for a real JPEG", async () => {
+    const { default: sharp } = await import("sharp");
+    const sideways = await sharp({
+      create: {
+        width: 300,
+        height: 200,
+        channels: 3,
+        background: { r: 0, g: 0, b: 0 },
+      },
+    })
+      .jpeg()
+      .withMetadata({ orientation: 6 })
+      .toBuffer();
+    expect(uprightSize(await sharp(sideways).metadata())).toEqual({
+      width: 200,
+      height: 300,
+    });
+  });
+
+  it("reports nothing for a file sharp couldn't size", () => {
+    expect(uprightSize({})).toEqual({ width: 0, height: 0 });
   });
 });
 
