@@ -266,6 +266,15 @@ const ogImageAbsolute = ogImage
         z-index: 50;
       }
     }
+    /* Left to wrap, "Things to try" breaks after "to" and its underline sits
+       under "try" alone. From 360px up there's room for every label on one
+       line; only the name stacks. */
+    @media (min-width: 360px) and (max-width: 899px) {
+      .archive-bar .bar-link,
+      .archive-bar .bar-button {
+        white-space: nowrap;
+      }
+    }
   </style>
 
   <script>

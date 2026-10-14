@@ -231,7 +231,22 @@ const first = resolved[0];
     border: 0;
     color: var(--ink-2);
     cursor: pointer;
+    min-width: 24px;
+    min-height: 24px;
     padding: 2px 4px;
+  }
+  /* A finger gets a 44px-tall target that spills into the gaps and the empty
+     space below the caption, so nothing moves and the title above stays
+     tappable. */
+  @media (pointer: coarse) {
+    .steps button {
+      position: relative;
+    }
+    .steps button::after {
+      content: "";
+      position: absolute;
+      inset: -4px -6px -16px;
+    }
   }
   .steps button:hover {
     color: var(--ink);

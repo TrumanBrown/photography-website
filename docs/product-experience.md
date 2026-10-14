@@ -93,6 +93,17 @@ It's inquiry-only on purpose: no shop, checkout, prices or new cloud service. Me
 
 `/privacy/` ([src/pages/privacy.astro](../src/pages/privacy.astro)) tells visitors, in the site's own voice, what the contact form keeps and for how long, how visit counts work without cookies or stored IP addresses, what stays in their browser, which outside hosts a page talks to (Azure, and iNaturalist on some hobby pages), how Do Not Track is handled, and how to have their data deleted. It's linked from the footer and from a line under the contact form's Send button. It has a "Last updated" date: change the page and the date together whenever any of those change ([docs/analytics.md](analytics.md), [docs/privacy.md](privacy.md)).
 
+### The design, written down
+
+A later review took five ideas from a reel about AI-built interfaces looking generic: give the agent design direction, audit what it built against written guidelines, work from a real design system, build from references, and let the agent open the browser and look at the result. The site already had a direction and its references (`mocks/`). What it lacked was the design written somewhere an agent reads it, and the drift showed: the places pages, the 404 and the contact drawer had picked up stock Tailwind, including `font-semibold` headings that the browser has to fake because Libre Franklin is only self-hosted at weights 300 to 500.
+
+- **Design rules for agents.** [site-design.instructions.md](../.github/instructions/site-design.instructions.md) sits beside the copy rules and applies to every `.astro` and CSS file: tokens, weights, parts, motion, images, touch targets, and where Vercel's Web Interface Guidelines give way to house style (`...`, sentence case, first person).
+- **Places and 404 back on the system.** Light H1, `.u-label` meta line and back link, ink tokens. The places grid loads its first row eagerly, like the home page.
+- **Line breaks.** Headings wrap `balance` and everything else `pretty`, so rail and card titles no longer end on a lone "Rica".
+- **Touch.** The lead photo's arrows and Pause are at least 24px, and on touch screens they get 44px-tall hit areas that don't move the caption. "Things to try" stays on one line in the phone bar from 360px up.
+- **The mail button.** The footer keeps 96px free below its links, so the fixed button no longer sits on "How this site is built" at the bottom of short pages.
+- **Contact form.** Name and email declare `autocomplete` (WCAG 1.3.5, which axe doesn't check), and the email field skips spellcheck.
+
 ## What remains intentionally unchanged
 
 - Static Astro rendering and Blob-hosted variants remain the right architecture.
@@ -104,15 +115,17 @@ It's inquiry-only on purpose: no shop, checkout, prices or new cloud service. Me
 
 ## Ranked roadmap
 
-| Opportunity                                               | Visitor/owner value                                                 |         Effort | Confidence | Recommendation                                                              |
-| --------------------------------------------------------- | ------------------------------------------------------------------- | -------------: | ---------: | --------------------------------------------------------------------------- |
-| Write session descriptions and captions for featured work | Stronger storytelling, SEO, and non-visual access                   | Content effort |       High | Start now in Admin; prioritize covers and the first 5–10 photos per session |
-| Add optional `featured` editorial ordering                | Lets the owner lead with strongest work rather than only chronology |         Medium |     Medium | Near term after enough curated captions exist                               |
-| Add related sessions from explicit tags/collections       | Better discovery than date adjacency when the archive grows         |         Medium |     Medium | Add only with an owner-maintained taxonomy                                  |
-| Draft/preview publication status                          | Safer metadata review before public builds                          |         Medium |     Medium | Useful when publishing becomes frequent                                     |
-| Static map or timeline exploration                        | Spatial/temporal discovery                                          |          Large |     Medium | Proposal only; avoid an always-loaded map SDK                               |
-| Bulk caption editing/import                               | Faster metadata work for hundreds of images                         |         Medium |       High | Add if per-session Admin editing becomes tedious                            |
-| Structured production monitoring                          | Faster diagnosis of Function/storage failures                       |         Medium |     Medium | Enable optional diagnostics when traffic or operational value justifies it  |
+| Opportunity                                               | Visitor/owner value                                                            |         Effort | Confidence | Recommendation                                                                                  |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------ | -------------: | ---------: | ----------------------------------------------------------------------------------------------- |
+| Write session descriptions and captions for featured work | Stronger storytelling, SEO, and non-visual access                              | Content effort |       High | Start now in Admin; prioritize covers and the first 5–10 photos per session                     |
+| Add optional `featured` editorial ordering                | Lets the owner lead with strongest work rather than only chronology            |         Medium |     Medium | Near term after enough curated captions exist                                                   |
+| Add related sessions from explicit tags/collections       | Better discovery than date adjacency when the archive grows                    |         Medium |     Medium | Add only with an owner-maintained taxonomy                                                      |
+| Draft/preview publication status                          | Safer metadata review before public builds                                     |         Medium |     Medium | Useful when publishing becomes frequent                                                         |
+| Static map or timeline exploration                        | Spatial/temporal discovery                                                     |          Large |     Medium | Proposal only; avoid an always-loaded map SDK                                                   |
+| Bulk caption editing/import                               | Faster metadata work for hundreds of images                                    |         Medium |       High | Add if per-session Admin editing becomes tedious                                                |
+| Structured production monitoring                          | Faster diagnosis of Function/storage failures                                  |         Medium |     Medium | Enable optional diagnostics when traffic or operational value justifies it                      |
+| Restyle the contact drawer and mail button                | The last stock-Tailwind UI on the public site; one design language everywhere  |          Small |       High | Paper panel, square inputs with a 1px rule, `.btn-ink`, a square mail button without the shadow |
+| Committed browser check for layout regressions            | Catches overflow, covered links, faux bold and lazy first images before deploy |         Medium |     Medium | A Playwright script over the validation routes first; CI only if it stays fast                  |
 
 ## Validation checklist
 

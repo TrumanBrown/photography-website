@@ -77,6 +77,20 @@
   body {
     @apply min-h-screen font-sans;
     background: var(--paper);
+    /* No one-word last lines ("Tortuguero canals, Costa / Rica"). Inherited,
+       so it reaches the rail, the cards and the captions too. The longhand
+       leaves white-space: nowrap alone wherever it's set. */
+    text-wrap-style: pretty;
+  }
+
+  /* Headings break into even lines instead of a full line and a stub. */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    text-wrap-style: balance;
   }
 
   a {

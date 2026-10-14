@@ -4,7 +4,11 @@ import { PRINTS_PATH } from '@/lib/prints';
 import { siteConfig } from '../../site.config';
 ---
 
-<footer class="mt-16 border-t border-rule py-8 text-sm text-ink-2">
+{
+  /* pb-24 leaves room under the links for the fixed mail button, which would
+     otherwise sit on top of them once you reach the bottom of a page. */
+}
+<footer class="mt-16 border-t border-rule pb-24 pt-8 text-sm text-ink-2">
   <div class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 sm:px-6">
     <p>{copyrightLine()}</p>
     <div class="flex flex-wrap gap-x-5 gap-y-2">
