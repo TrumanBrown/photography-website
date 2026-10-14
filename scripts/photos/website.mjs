@@ -726,7 +726,8 @@ ${notes ? `His own notes about this trip, the only source for what he was doing,
 How to write it:
 - In his voice (below): first person, casual, the way he talks. Start with "I", a verb ("Saw...", "Spent...", "Found..."), or the thing he liked most. Contractions, a comma splice, a dropped subject are all fine. Repeat words rather than reaching for synonyms.
 - ${shapeFor(session.slug)} Don't walk through the photos one by one.
-- What he saw and what he thought of it: the animals by common name and what they were up to, what the place was like, and at least one reaction of his. His reactions come in different kinds, so mix them up across trips: what he loves about it; a comparison ("almost looks like a horn", "almost alien-like"); a joke ("chose the wrong color plant to land on lol"); surprise ("I can't believe how..."); a small thought about being out there ("some of the best wildlife experiences come when you're resting"). A hedge when he can't be sure ("likely (?)"). "lol" at most once, only when something's funny.${overused.length ? `\n- Already said on enough other trips' pages, so not here: ${overused.join(", ")}.` : ""}
+- What he saw and what he thought of it: the animals by common name and what they were up to, what the place was like, and at least one reaction of his. His reactions come in different kinds, so mix them up across trips: what he loves about it; a comparison ("almost looks like a horn", "almost alien-like"); a joke ("chose the wrong color plant to land on lol"); surprise ("I can't believe how..."); a small thought about being out there ("some of the best wildlife experiences come when you're resting"). A hedge when he can't be sure ("likely (?)"). "lol" at most once, only when something's funny. "Little" at most once.
+- When one of his phrases is used up on other pages, don't swap in a fancier way to say it ("I dig", "I'm a fan of", "got a kick out of", "I was struck by"): react in a different way instead.${overused.length ? `\n- Already said on enough other trips' pages, so not here: ${overused.join(", ")}.` : ""}
 - Don't talk about photos as photos: no "these photos", "this session", "frames", "shots", "images", "the rest". Never describe a picture: not the background, the blur, the framing, which way something faces, poses ("with its bill raised"), the flash or the light.
 - Common names only, no scientific names in brackets (the caption under each photo has those). Mid-sentence they're lowercase except proper nouns: "a turquoise-browed motmot", "an Ecuadorian hermit crab". Name species only from the identified list. Anything else gets plain words ("a heron", "some little toad").
 - One paragraph. No place line at the end like an Instagram post: the page already shows where it was.
@@ -752,11 +753,18 @@ ${voiceGuide ? `How Truman writes (follow it):\n${voiceGuide}\n\n` : ""}${voiceR
 // His habits, each on only some descriptions: [pattern, the most other
 // sessions that may share it, how to name it in the feedback].
 const HABITS_ACROSS = [
-  [/\bi love\b/i, 0.2, "I love"],
+  // His own words, which he repeats: fine on a good share of pages.
+  [/\bi love\b/i, 0.35, "I love"],
   [/\bsuch an?\b/i, 0.5, "such a"],
+  [/\bi (?:really )?like\b/i, 0.3, "I like"],
+  // The model's, which turn into a template.
   [/\bso cool\b/i, 0.2, "so cool"],
-  [/\bmy fav(?:ou)?rite\b/i, 0.2, "my favorite"],
+  [/\bmy favou?rite\b/i, 0.15, "my favorite"],
   [/\balso saw\b/i, 0.2, "Also saw"],
+  [/\balmost looks? like\b/i, 0.2, "almost looks like"],
+  [/\blittle\b/i, 0.25, "little"],
+  [/\b(?:can'?t|couldn'?t) get over\b/i, 0.1, "can't get over"],
+  [/\btoo\.(?:\s|$)/i, 0.25, "...too."],
 ];
 
 // Talking about the pictures instead of the trip.
@@ -856,6 +864,9 @@ export function descriptionProblems(
         `Enough other sessions already say "${said}". Say it another way.`,
       );
   }
+  const littles = (text.match(/\blittle\b/gi) ?? []).length;
+  if (littles > 1)
+    problems.push(`It says "little" ${littles} times; once at most.`);
   const lols = (text.match(/\blol\b/gi) ?? []).length;
   if (lols > 1) problems.push(`It says "lol" ${lols} times; once at most.`);
   else if (

@@ -32,7 +32,7 @@ import { backdropIn } from "./website.mjs";
 import { OPINION, stockIn, unbackedClaim } from "./claims.mjs";
 
 /** Bump when the prompt or the skills change enough that planned posts should be rewritten. */
-export const VOICE_VERSION = 5;
+export const VOICE_VERSION = 6;
 
 const SKILLS = join(ROOT, ".github/skills");
 
@@ -86,7 +86,7 @@ export function voicePrompt(items, guide = "", { recent = [] } = {}) {
 
 For each photo, write "options": three different versions, best first. Each one has:
 - "text": two or three sentences, 15 to 60 words in all.
-  - First, what this is and how he came across it, said the way he'd tell a friend. He starts with "I" or a verb, like people do online: "I saw...", "I love how...", or the verb with the "I" dropped ("Saw this...", "Spotted this...", "Managed to capture this..."). Everyday verbs: saw, spotted, found, caught, got, captured, managed to capture, came across, ran into. Or start with what he was doing when his notes say so ("While on a canal tour in Tortuguero, ..."), or now and then "A fun pic of this...". Never bookish verbs like "came upon", "took in", "happened upon", "gazed at", "photographed" or "got a glimpse of". For a named animal or plant, write {name} exactly once where its name goes, usually right after "this"; code puts in the verified name. Say what it's doing in everyday words. Mention the place the casual way ("in Bijagua", "near the Arenal Volcano") when it fits.
+  - First, what this is and how he came across it, said the way he'd tell a friend. He starts with "I" or a verb, like people do online: "I saw...", "I love how...", or the verb with the "I" dropped ("Saw this...", "Spotted this...", "Managed to capture this..."). Everyday verbs: saw, spotted, found, caught, got, captured, managed to capture, came across, ran into. Or start with what he was doing when his notes say so ("While on a canal tour in Tortuguero, ..."), or now and then "A fun pic of this...". Never bookish verbs like "came upon", "took in", "happened upon", "gazed at", "photographed" or "got a glimpse of". For a named animal or plant, write {name} exactly once, where the animal is first mentioned, right after "this" or "a" ("Saw this {name} munching on..."); code puts in the verified name. Never name it twice or tack it on after a comma ("this swan, a {name}", "a frog on a leaf, this {name}"). Say what it's doing in everyday words. Mention the place the casual way ("in Bijagua", "near the Arenal Volcano") when it fits.
   - Then his reaction, with some feeling in it: what he loves about it, a comparison ("almost looks like a horn", "almost alien-like"), something funny ("chose the wrong color plant to land on lol"), or a small thought about being out there ("some of the best wildlife experiences come when you're resting"). Opinions are good ("such a unique bird", "so cool", "I love how..."). Hedge when he couldn't know for sure ("likely (?) sucking nectar"). Not a list of colours, textures or body parts: that's alt text, not him.
   - Casual, not polished. He doesn't write perfect grammar like a robot: sentences run together with commas, the subject gets dropped ("Was taking a break..."), a thought starts with "Even still" or "Luckily for me". Spelling stays right.
   - He repeats words instead of reaching for synonyms, the way people do: "this waterfall" again rather than "the cascade", "Costa Rica" twice, "such a" and "so" more than once. Never swap in a fancier word to avoid saying something twice.
@@ -100,7 +100,7 @@ Only what's true:
 - Only the names in the notes. No numbers. Don't say the fun fact; it's posted underneath.
 - Never describe the photo itself: no background, blur, framing, angle or lighting.
 
-These go out three a day, so across all the photos below no two may start with the same words or share a phrase, and none may start like the recent posts listed. "Such a" and "so" are his on about half his posts; spread "I love", "so cool", "pretty", "almost" and "lol" out more, each on only some posts.
+These go out three a day, so across all the photos below no two may start with the same words or share a phrase, and none may start like the recent posts listed. "Such a" and "so" are his on about half his posts; spread "I love", "I like", "my favorite", "so cool", "pretty", "almost", "little" and "lol" out more, each on only some posts. When "I love" was used recently, don't swap in a fancier way to say it ("I dig", "I'm a fan of", "got a kick out of"): react in a different way instead, with a comparison, a joke or a surprise.
 
 Don't write questions (a hedging "(?)" is fine), hashtags, exclamation marks, long dashes, quotation marks, sales words (stunning, breathtaking, vibrant, majestic, nestled), stock lines ("nature never disappoints", "living its best life", "stopped me in my tracks", "what a sight"), or a last line that sums up.
 ${recent.length ? `\nRecent posts, newest last. Don't start like these or reuse their phrases:\n${recent.map((r) => `- ${r}`).join("\n")}\n` : ""}
@@ -123,6 +123,10 @@ const HABITS = [
   [/\bsuch an?\b/i, 1],
   [/(?:^|[.!?]\s+)such an?\b/i, 3],
   [/\bi love\b/i, 2],
+  [/\bi (?:really )?like\b/i, 2],
+  [/\bmy favou?rite\b/i, 3],
+  [/\blittle\b/i, 2],
+  [/\bcan'?t get over\b/i, 4],
   [/\bso cool\b/i, 3],
   [/\bi feel like\b/i, 4],
   [/\bcan'?t believe\b/i, 3],
@@ -226,6 +230,10 @@ export function checkStory(raw, opts = {}) {
   const slots = (text.match(/\{name\}/g) ?? []).length;
   if (named ? slots !== 1 : slots !== 0)
     return no(named ? "needs {name} once" : "{name} on a photo with no name");
+  // "Got this swan, a {name}", "a frog on a blade of grass, this {name}":
+  // the name tacked on after a comma reads like a form being filled in.
+  if (/,\s+(?:this|that|a|an|the)\s+\{name\}/i.test(text))
+    return no("{name} tacked on after a comma");
   // "lol" on one post in four at most: it comes off rather than costing the post.
   if (recent.slice(-LOL_GAP).some((r) => LOL.test(r)))
     text = text

@@ -569,6 +569,27 @@ describe("session descriptions", () => {
     expect(check(voiced.replace("twig", "twig, likely (?)"))).toEqual([]);
   });
 
+  it("spreads the model's favourite phrases across pages, and little once a page", () => {
+    const fav =
+      "The Sylvia's tree frog was my favorite, so bright on that twig in Guayacán.";
+    expect(
+      check(fav, {
+        others: ["A was my favorite.", "B.", "C.", "D.", "E.", "F."],
+      }).join(" "),
+    ).toMatch(/already say "my favorite"/);
+    expect(check(fav, { others: ["B.", "C.", "D.", "E.", "F."] })).toEqual([]);
+    expect(
+      check(
+        "Such a little frog on such a little twig in Guayacán, I love it.",
+      ).join(" "),
+    ).toMatch(/"little" 2 times/);
+    expect(
+      check(
+        "I really dig the Sylvia's tree frog on that twig in Guayacán, so bright.",
+      ).join(" "),
+    ).toMatch(/I really dig/);
+  });
+
   it("keeps lol rare across sessions and opens differently from the rest", () => {
     const lol =
       "Frogs, and most of them at night lol. Found a Sylvia's tree frog on a thin twig.";

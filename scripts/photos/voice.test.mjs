@@ -115,6 +115,30 @@ describe("post voice", () => {
     ).toBe("");
   });
 
+  it("puts the name where the animal comes up, not tacked on after a comma", () => {
+    for (const text of [
+      "Got this bird, a {name}, munching on some insect in Bijagua. Such a goofy beak on it",
+      "Spotted a bird on a mossy post in Bijagua, this {name}. Such a goofy beak on it",
+    ])
+      expect(normaliseStory(text, ani)).toBe("");
+  });
+
+  it("won't swap in a fancier way to say I love", () => {
+    for (const text of [
+      "Saw this {name} munching on some insect in Bijagua. I really dig that goofy beak",
+      "Saw this {name} munching on some insect in Bijagua. I'm a fan of that goofy beak",
+      "Saw this {name} munching on some insect in Bijagua. Got a kick out of that goofy beak",
+    ])
+      expect(normaliseStory(text, ani)).toBe("");
+    // ...and "I like" two posts running is a tic too.
+    expect(
+      normaliseStory(
+        "Saw this {name} munching on some insect in Bijagua. I like how goofy that beak is",
+        { ...ani, recent: ["I like how the frog sits. So cool"] },
+      ),
+    ).toBe("");
+  });
+
   it("wants {name} exactly once for an identified species, and never for a landscape", () => {
     expect(
       normaliseStory(

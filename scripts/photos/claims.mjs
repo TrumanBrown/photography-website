@@ -10,9 +10,11 @@
  * to sound human, and time words that would be wrong months later, are out.
  */
 
-// Phrases a model reaches for on every photo, or to sound like a person.
+// Phrases a model reaches for on every photo, or to sound like a person,
+// including the forced-casual ones it swaps in to avoid repeating "I love"
+// ("I dig", "I'm a fan of", "got a kick out of"). He'd just say "I love" again.
 export const STOCK =
-  /\b(?:stands? out against|catch(?:es)? my eye|caught my eye|hard to look past|can't stop looking|worth a closer look|funny little detail|thoroughly|wins? me over|nature never disappoints|nature at its finest|mother nature|living (?:its|his|her|their) best life|stopped me in my tracks|what a sight|feast for the eyes|in all (?:its|their) glory|never gets old|hidden gem|true gem|picture[- ]perfect|magical|paradise|simply|truly|came upon|happened upon|took in|gaz(?:e|ed|ing) (?:at|out|over)|beheld|marvel(?:l?ed)? at|got a glimpse)\b/i;
+  /\b(?:stands? out against|catch(?:es)? my eye|caught my eye|hard to look past|can't stop looking|worth a closer look|funny little detail|thoroughly|wins? me over|nature never disappoints|nature at its finest|mother nature|living (?:its|his|her|their) best life|stopped me in my tracks|what a sight|feast for the eyes|in all (?:its|their) glory|never gets old|hidden gem|true gem|picture[- ]perfect|magical|paradise|simply|truly|came upon|happened upon|took in|gaz(?:e|ed|ing) (?:at|out|over)|beheld|marvel(?:l?ed)? at|got a glimpse|i (?:really )?dig|i'm (?:a |a big |such a )?fan of|(?:i'm|i was) (?:really |pretty |so )?into|(?:got|get|getting) a kick out of|soft spot|(?:i was |was )?struck by|there's something about)\b/i;
 
 // Said as if it happened just now; posts and pages are read months later.
 export const WHEN =
