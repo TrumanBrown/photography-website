@@ -356,42 +356,122 @@ for (let a = -60; a <= 60; a += 30) {
   PARALLELS.push(line);
 }
 
-/** Grid lines `step` degrees apart around the middle of a close-up. Lines
- *  that a coarser grid already draws are left out. */
-function closeGrid(step: number, view: GlobeView, span: number): number[][][] {
-  const lines: number[][][] = [];
-  const coarser = step < 10 ? 10 : 30;
-  const spanLon = Math.min(
-    180,
-    span / Math.max(0.15, Math.cos(view.lat * RAD)),
-  );
-  const lat0 = Math.max(-88, view.lat - span);
-  const lat1 = Math.min(88, view.lat + span);
-  const along = step / 4;
-  for (
-    let l = Math.ceil((view.lon - spanLon) / step) * step;
-    l <= view.lon + spanLon;
-    l += step
-  ) {
-    if (Math.round(l) % coarser === 0) continue;
-    const line: number[][] = [];
-    for (let a = lat0; a <= lat1 + 1e-9; a += along) line.push([l, a]);
-    lines.push(line);
-  }
-  for (let a = Math.ceil(lat0 / step) * step; a <= lat1; a += step) {
-    if (Math.round(a) % coarser === 0) continue;
-    const line: number[][] = [];
-    for (let l = view.lon - spanLon; l <= view.lon + spanLon + 1e-9; l += along)
-      line.push([l, a]);
-    lines.push(line);
-  }
-  return lines;
+/**
+ * Lines kept as the sines and cosines of their points, worked out once. Turning
+ * the globe is then a few multiplications a point, with nothing left over for
+ * the garbage collector to stop a frame for.
+ */
+interface Lines {
+  sinLat: Float64Array;
+  cosLat: Float64Array;
+  sinLon: Float64Array;
+  cosLon: Float64Array;
+  /** Where each line starts in the arrays above, and how many points it has. */
+  start: number[];
+  size: number[];
 }
+
+function flatten(lines: number[][][]): Lines {
+  let total = 0;
+  for (const line of lines) total += line.length;
+  const out: Lines = {
+    sinLat: new Float64Array(total),
+    cosLat: new Float64Array(total),
+    sinLon: new Float64Array(total),
+    cosLon: new Float64Array(total),
+    start: [],
+    size: [],
+  };
+  let i = 0;
+  for (const line of lines) {
+    out.start.push(i);
+    out.size.push(line.length);
+    for (const [lon, lat] of line) {
+      out.sinLat[i] = Math.sin(lat * RAD);
+      out.cosLat[i] = Math.cos(lat * RAD);
+      out.sinLon[i] = Math.sin(lon * RAD);
+      out.cosLon[i] = Math.cos(lon * RAD);
+      i++;
+    }
+  }
+  return out;
+}
+
+let graticule: Lines | null = null;
+let coastline: Lines | null = null;
+
+/* The line being drawn, on screen: where each point lands, whether it faces
+   us, and the runs of points that do. Shared by every line and every frame,
+   and only ever grown. */
+let xs = new Float64Array(512);
+let ys = new Float64Array(512);
+let facing = new Uint8Array(512);
+let runFrom = new Int32Array(257);
+let runSize = new Int32Array(257);
+
+function room(n: number) {
+  if (n <= xs.length) return;
+  let size = xs.length;
+  while (size < n) size *= 2;
+  xs = new Float64Array(size);
+  ys = new Float64Array(size);
+  facing = new Uint8Array(size);
+  runFrom = new Int32Array(size / 2 + 1);
+  runSize = new Int32Array(size / 2 + 1);
+}
+
+/** The part of the canvas that shows, in the units drawing happens in. */
+function frameOf(ctx: CanvasRenderingContext2D) {
+  const { width, height } = ctx.canvas;
+  const m = ctx.getTransform();
+  const det = m.a * m.d - m.b * m.c;
+  if (!det || !width || !height)
+    return {
+      left: -Infinity,
+      top: -Infinity,
+      right: Infinity,
+      bottom: Infinity,
+    };
+  let left = Infinity;
+  let top = Infinity;
+  let right = -Infinity;
+  let bottom = -Infinity;
+  for (let corner = 0; corner < 4; corner++) {
+    const dx = (corner & 1 ? width : 0) - m.e;
+    const dy = (corner & 2 ? height : 0) - m.f;
+    const x = (m.d * dx - m.c * dy) / det;
+    const y = (m.a * dy - m.b * dx) / det;
+    left = Math.min(left, x);
+    right = Math.max(right, x);
+    top = Math.min(top, y);
+    bottom = Math.max(bottom, y);
+  }
+  return { left, top, right, bottom };
+}
+
+/**
+ * Half the width, in degrees of longitude, of the circle `span` degrees round
+ * a point at latitude `lat`: all the way round if it takes in a pole.
+ */
+export function capWidth(lat: number, span: number): number {
+  if (span >= 90 || Math.abs(lat) + span >= 90) return 180;
+  return (
+    Math.asin(Math.min(1, Math.sin(span * RAD) / Math.cos(lat * RAD))) / RAD
+  );
+}
+
+/** How far off the canvas a line still counts as showing: half its width,
+ *  its antialiasing, and some to spare. */
+const EDGE = 2;
 
 /**
  * Draw the globe: rim, graticule, coastlines and a dot per place. The rail's
  * little globe and the full-screen one a spin lifts into both draw through
  * here, so the hand-off between them can't show a seam.
+ *
+ * Close up, most of the coastline and grid on the near side is off the canvas.
+ * Those pieces are left out of the path, and nothing is allocated per point,
+ * so a dive into a place costs about what the whole globe does.
  */
 export function drawGlobe(
   ctx: CanvasRenderingContext2D,
@@ -403,80 +483,194 @@ export function drawGlobe(
   const { cx, cy, radius } = view;
   const sinP0 = Math.sin(view.lat * RAD);
   const cosP0 = Math.cos(view.lat * RAD);
+  const sinL0 = Math.sin(view.lon * RAD);
+  const cosL0 = Math.cos(view.lon * RAD);
+  graticule ??= flatten([...MERIDIANS, ...PARALLELS]);
+  coastline ??= flatten(LAND);
 
-  function project(pLon: number, pLat: number): [number, number] | null {
-    const dl = (pLon - view.lon) * RAD;
-    const ph = pLat * RAD;
-    const sp = Math.sin(ph);
-    const cp = Math.cos(ph);
-    const cd = Math.cos(dl);
-    if (sinP0 * sp + cosP0 * cp * cd < 0) return null; // far side
-    return [
-      cx + radius * cp * Math.sin(dl),
-      cy - radius * (cosP0 * sp - sinP0 * cp * cd),
-    ];
+  const frame = frameOf(ctx);
+  const left = frame.left - EDGE;
+  const right = frame.right + EDGE;
+  const top = frame.top - EDGE;
+  const bottom = frame.bottom + EDGE;
+
+  /** Put a point on screen, as point `i` of the line being drawn. */
+  function project(
+    i: number,
+    sinLat: number,
+    cosLat: number,
+    sinLon: number,
+    cosLon: number,
+  ) {
+    const sinD = sinLon * cosL0 - cosLon * sinL0;
+    const cosD = cosLon * cosL0 + sinLon * sinL0;
+    facing[i] = sinP0 * sinLat + cosP0 * cosLat * cosD < 0 ? 0 : 1;
+    xs[i] = cx + radius * cosLat * sinD;
+    ys[i] = cy - radius * (cosP0 * sinLat - sinP0 * cosLat * cosD);
   }
 
-  function stroke(points: number[][], close: boolean) {
-    // Split into the runs that face us; the rest is round the back.
-    const runs: [number, number][][] = [];
-    let run: [number, number][] = [];
-    for (const [pLon, pLat] of points) {
-      const q = project(pLon, pLat);
-      if (q) {
-        run.push(q);
-        continue;
-      }
-      if (run.length) runs.push(run);
-      run = [];
+  /* The pen. A piece of line wholly off the canvas only moves it; the next
+     piece that shows starts a new stretch of path from where it got to. */
+  let penX = 0;
+  let penY = 0;
+  let down = false;
+  let drew = false;
+  let skipped = false;
+
+  function moveTo(x: number, y: number) {
+    penX = x;
+    penY = y;
+    down = false;
+  }
+
+  /** A piece from the pen to (x, y), curving toward (qx, qy) unless straight. */
+  function to(qx: number, qy: number, x: number, y: number, straight: boolean) {
+    // The piece stays inside the triangle of its three points.
+    const off =
+      (penX < left && qx < left && x < left) ||
+      (penX > right && qx > right && x > right) ||
+      (penY < top && qy < top && y < top) ||
+      (penY > bottom && qy > bottom && y > bottom);
+    if (off) {
+      down = false;
+      skipped = true;
+    } else {
+      if (!down) ctx.moveTo(penX, penY);
+      if (straight) ctx.lineTo(x, y);
+      else ctx.quadraticCurveTo(qx, qy, x, y);
+      down = drew = true;
     }
-    if (run.length) runs.push(run);
-    const whole =
-      close && runs.length === 1 && runs[0].length === points.length;
-    // A ring that starts mid-way along its visible stretch wraps round.
-    if (
-      close &&
-      !whole &&
-      runs.length > 1 &&
-      project(points[0][0], points[0][1])
-    ) {
-      const tail = runs.pop()!;
-      if (project(points.at(-1)![0], points.at(-1)![1]))
-        runs[0] = tail.concat(runs[0]);
-      else runs.push(tail);
-    }
-    ctx.beginPath();
-    for (const pts of runs) curve(pts, whole);
-    ctx.stroke();
+    penX = x;
+    penY = y;
   }
 
   /* Through the midpoints of each segment, so a close-up shows coastlines
-     and parallels as curves rather than the steps of the half-degree data. */
-  function curve(pts: [number, number][], loop: boolean) {
-    const n = pts.length;
-    if (n < 3) {
-      ctx.moveTo(pts[0][0], pts[0][1]);
-      for (let i = 1; i < n; i++) ctx.lineTo(pts[i][0], pts[i][1]);
-      return;
-    }
-    const mid = (a: [number, number], b: [number, number]) =>
-      [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] as const;
-    if (loop) {
-      const start = mid(pts[n - 1], pts[0]);
-      ctx.moveTo(start[0], start[1]);
-      for (let i = 0; i < n; i++) {
-        const m = mid(pts[i], pts[(i + 1) % n]);
-        ctx.quadraticCurveTo(pts[i][0], pts[i][1], m[0], m[1]);
+     and parallels as curves rather than the steps of the half-degree data.
+     The run starts at point `from` of `n` and may wrap past the last one. */
+  function curve(from: number, count: number, n: number, loop: boolean) {
+    let i = from;
+    moveTo(xs[i], ys[i]);
+    if (count < 3) {
+      for (let k = 1; k < count; k++) {
+        i = i + 1 === n ? 0 : i + 1;
+        to(xs[i], ys[i], xs[i], ys[i], true);
       }
-      ctx.closePath();
       return;
     }
-    ctx.moveTo(pts[0][0], pts[0][1]);
-    for (let i = 1; i < n - 1; i++) {
-      const m = mid(pts[i], pts[i + 1]);
-      ctx.quadraticCurveTo(pts[i][0], pts[i][1], m[0], m[1]);
+    if (loop) {
+      moveTo((xs[n - 1] + xs[0]) / 2, (ys[n - 1] + ys[0]) / 2);
+      skipped = false;
+      for (let k = 0; k < n; k++) {
+        const j = k + 1 === n ? 0 : k + 1;
+        to(xs[k], ys[k], (xs[k] + xs[j]) / 2, (ys[k] + ys[j]) / 2, false);
+      }
+      // With a piece left out, closing would join the last stretch of path
+      // back to where that stretch began.
+      if (!skipped) ctx.closePath();
+      return;
     }
-    ctx.lineTo(pts[n - 1][0], pts[n - 1][1]);
+    for (let k = 1; k < count - 1; k++) {
+      i = i + 1 === n ? 0 : i + 1;
+      const j = i + 1 === n ? 0 : i + 1;
+      to(xs[i], ys[i], (xs[i] + xs[j]) / 2, (ys[i] + ys[j]) / 2, false);
+    }
+    i = i + 1 === n ? 0 : i + 1;
+    to(xs[i], ys[i], xs[i], ys[i], true);
+  }
+
+  /** Stroke the first `n` points put on screen as one line or ring. */
+  function stroke(n: number, close: boolean) {
+    // Split into the runs that face us; the rest is round the back.
+    let runs = 0;
+    for (let i = 0; i < n; ) {
+      if (!facing[i]) {
+        i++;
+        continue;
+      }
+      runFrom[runs] = i;
+      while (i < n && facing[i]) i++;
+      runSize[runs] = i - runFrom[runs];
+      runs++;
+    }
+    if (!runs) return;
+    const whole = close && runs === 1 && runSize[0] === n;
+    // A ring that starts mid-way along its visible stretch wraps round.
+    if (close && runs > 1 && facing[0] && facing[n - 1]) {
+      runs--;
+      runFrom[0] = runFrom[runs];
+      runSize[0] += runSize[runs];
+    }
+    drew = false;
+    ctx.beginPath();
+    for (let r = 0; r < runs; r++) curve(runFrom[r], runSize[r], n, whole);
+    if (drew) ctx.stroke();
+  }
+
+  function strokeLines(lines: Lines, close: boolean) {
+    const { sinLat, cosLat, sinLon, cosLon, start, size } = lines;
+    for (let line = 0; line < start.length; line++) {
+      const first = start[line];
+      const n = size[line];
+      room(n);
+      for (let k = 0; k < n; k++) {
+        const p = first + k;
+        project(k, sinLat[p], cosLat[p], sinLon[p], cosLon[p]);
+      }
+      stroke(n, close);
+    }
+  }
+
+  /** Grid lines `step` degrees apart round the middle of a close-up, as far as
+   *  `span` degrees from it. Lines that a coarser grid already draws are left
+   *  out. Points along a line are a fixed angle apart, so each is the last
+   *  one turned a little further, without a call to sin or cos. */
+  function strokeGrid(step: number, span: number) {
+    const coarser = step < 10 ? 10 : 30;
+    const spanLon = capWidth(view.lat, span);
+    const lat0 = Math.max(-88, view.lat - span);
+    const lat1 = Math.min(88, view.lat + span);
+    const along = step / 4;
+    const cosAlong = Math.cos(along * RAD);
+    const sinAlong = Math.sin(along * RAD);
+
+    const tall = Math.floor((lat1 - lat0 + 1e-9) / along) + 1;
+    room(tall);
+    for (
+      let l = Math.ceil((view.lon - spanLon) / step) * step;
+      l <= view.lon + spanLon;
+      l += step
+    ) {
+      if (Math.round(l) % coarser === 0) continue;
+      const sinLon = Math.sin(l * RAD);
+      const cosLon = Math.cos(l * RAD);
+      let sin = Math.sin(lat0 * RAD);
+      let cos = Math.cos(lat0 * RAD);
+      for (let k = 0; k < tall; k++) {
+        project(k, sin, cos, sinLon, cosLon);
+        const turned = sin * cosAlong + cos * sinAlong;
+        cos = cos * cosAlong - sin * sinAlong;
+        sin = turned;
+      }
+      stroke(tall, false);
+    }
+
+    const lon0 = view.lon - spanLon;
+    const wide = Math.floor((2 * spanLon + 1e-9) / along) + 1;
+    room(wide);
+    for (let a = Math.ceil(lat0 / step) * step; a <= lat1; a += step) {
+      if (Math.round(a) % coarser === 0) continue;
+      const sinLat = Math.sin(a * RAD);
+      const cosLat = Math.cos(a * RAD);
+      let sin = Math.sin(lon0 * RAD);
+      let cos = Math.cos(lon0 * RAD);
+      for (let k = 0; k < wide; k++) {
+        project(k, sinLat, cosLat, sin, cos);
+        const turned = sin * cosAlong + cos * sinAlong;
+        cos = cos * cosAlong - sin * sinAlong;
+        sin = turned;
+      }
+      stroke(wide, false);
+    }
   }
 
   ctx.lineWidth = 1;
@@ -486,34 +680,45 @@ export function drawGlobe(
   ctx.stroke();
 
   ctx.strokeStyle = palette.grid;
-  for (const line of MERIDIANS) stroke(line, false);
-  for (const line of PARALLELS) stroke(line, false);
+  strokeLines(graticule, false);
   if (grids.length) {
-    // The farthest a close-up can show from its middle: the screen diagonal.
-    const reach = Math.hypot(ctx.canvas.clientWidth, ctx.canvas.clientHeight);
+    // The farthest a close-up can show from its middle: the canvas's
+    // farthest corner.
+    const reach = Math.hypot(
+      Math.max(cx - frame.left, frame.right - cx),
+      Math.max(cy - frame.top, frame.bottom - cy),
+    );
     const span = Math.asin(Math.min(1, reach / radius)) / RAD + 2;
     for (const { step, alpha } of grids) {
       if (alpha <= 0) continue;
       ctx.globalAlpha = Math.min(1, alpha);
-      for (const line of closeGrid(step, view, span)) stroke(line, false);
+      strokeGrid(step, span);
     }
     ctx.globalAlpha = 1;
   }
 
   ctx.strokeStyle = palette.coast;
-  for (const ring of LAND) stroke(ring, true);
+  strokeLines(coastline, true);
 
   for (const place of places) {
-    const q = project(place.lon, place.lat);
-    if (!q) continue;
+    project(
+      0,
+      Math.sin(place.lat * RAD),
+      Math.cos(place.lat * RAD),
+      Math.sin(place.lon * RAD),
+      Math.cos(place.lon * RAD),
+    );
+    if (!facing[0]) continue; // far side
+    const x = xs[0];
+    const y = ys[0];
     const here = place === active;
     ctx.beginPath();
-    ctx.arc(q[0], q[1], here ? mark : dot, 0, Math.PI * 2);
+    ctx.arc(x, y, here ? mark : dot, 0, Math.PI * 2);
     ctx.fillStyle = here ? palette.ink : palette.dim;
     ctx.fill();
     if (here && ring > 0) {
       ctx.beginPath();
-      ctx.arc(q[0], q[1], ring, 0, Math.PI * 2);
+      ctx.arc(x, y, ring, 0, Math.PI * 2);
       ctx.strokeStyle = palette.ink;
       ctx.lineWidth = 1;
       ctx.stroke();

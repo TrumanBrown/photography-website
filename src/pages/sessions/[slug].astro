@@ -237,6 +237,11 @@ const structuredData = {
 
   <article class="session">
     <header class="banner">
+      {
+        /* Decoded before it's painted: a page landing from a spin or a card
+          opens on this photograph alone (src/lib/landing.ts), and a first
+          frame without it is a flash of bare paper. */
+      }
       <Picture
         src={bannerImage.src}
         alt={bannerImage.caption || fallbackAlt}
@@ -247,6 +252,7 @@ const structuredData = {
         fallbackFormat="jpeg"
         loading="eager"
         fetchpriority="high"
+        decoding="sync"
         class="banner-img"
         style={`object-position:${bannerFocus}`}
       />

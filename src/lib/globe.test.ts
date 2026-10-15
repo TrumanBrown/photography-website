@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  capWidth,
+  drawGlobe,
   pickSpinTarget,
   planGlide,
   planSpin,
@@ -257,5 +259,195 @@ describe("planGlide", () => {
     const plan = planGlide(from, PLACES[5]); // Kauai, at -159.5
     expectLanded(plan);
     expect(plan.lon.at(plan.duration)[0]).toBeCloseTo(200.5, 9);
+  });
+});
+
+const RAD = Math.PI / 180;
+
+/** The point `distance` degrees from (lat, lon), heading `bearing` degrees. */
+function destination(
+  lat: number,
+  lon: number,
+  distance: number,
+  bearing: number,
+) {
+  const from = lat * RAD;
+  const d = distance * RAD;
+  const heading = bearing * RAD;
+  const to = Math.asin(
+    Math.sin(from) * Math.cos(d) +
+      Math.cos(from) * Math.sin(d) * Math.cos(heading),
+  );
+  const turn = Math.atan2(
+    Math.sin(heading) * Math.sin(d) * Math.cos(from),
+    Math.cos(d) - Math.sin(from) * Math.sin(to),
+  );
+  return { lat: to / RAD, lon: lon + turn / RAD };
+}
+
+describe("capWidth", () => {
+  it("is the span itself on the equator", () => {
+    for (const span of [1, 10, 45, 80])
+      expect(capWidth(0, span)).toBeCloseTo(span, 9);
+  });
+
+  it("takes in every point of the circle, and no more", () => {
+    for (const lat of [-70, -41, 0, 22, 47, 64]) {
+      for (const span of [3, 12, 25]) {
+        if (Math.abs(lat) + span >= 90) continue;
+        const width = capWidth(lat, span);
+        let widest = 0;
+        for (let bearing = 0; bearing < 360; bearing += 0.5)
+          widest = Math.max(
+            widest,
+            Math.abs(destination(lat, 0, span, bearing).lon),
+          );
+        expect(widest).toBeLessThanOrEqual(width + 1e-9);
+        expect(widest).toBeGreaterThan(width - 0.05);
+      }
+    }
+  });
+
+  it("goes all the way round once the circle takes in a pole", () => {
+    expect(capWidth(70, 25)).toBe(180);
+    expect(capWidth(-80, 15)).toBe(180);
+    expect(capWidth(10, 95)).toBe(180);
+  });
+});
+
+/** A 2D context that keeps what each stroke() drew, piece by piece: start,
+ *  control point and end. It shows `width` × `height` from `left`, `top`. */
+function recorder(width: number, height: number, left = 0, top = 0) {
+  const strokes: { style: string; alpha: number; pieces: number[][] }[] = [];
+  let path: number[][] = [];
+  let x = 0;
+  let y = 0;
+  let startX = 0;
+  let startY = 0;
+  const ctx = {
+    canvas: { width, height },
+    lineWidth: 1,
+    strokeStyle: "",
+    fillStyle: "",
+    globalAlpha: 1,
+    getTransform: () => ({ a: 1, b: 0, c: 0, d: 1, e: -left, f: -top }),
+    beginPath() {
+      path = [];
+    },
+    moveTo(px: number, py: number) {
+      x = startX = px;
+      y = startY = py;
+    },
+    lineTo(px: number, py: number) {
+      path.push([x, y, px, py, px, py]);
+      x = px;
+      y = py;
+    },
+    quadraticCurveTo(qx: number, qy: number, px: number, py: number) {
+      path.push([x, y, qx, qy, px, py]);
+      x = px;
+      y = py;
+    },
+    closePath() {
+      if (x !== startX || y !== startY)
+        path.push([x, y, startX, startY, startX, startY]);
+      x = startX;
+      y = startY;
+    },
+    arc() {},
+    fill() {},
+    stroke() {
+      strokes.push({
+        style: ctx.strokeStyle,
+        alpha: ctx.globalAlpha,
+        pieces: path,
+      });
+    },
+  };
+  return { ctx: ctx as unknown as CanvasRenderingContext2D, strokes };
+}
+
+describe("drawGlobe", () => {
+  const PALETTE = {
+    ink: "ink",
+    dim: "dim",
+    rule: "rule",
+    grid: "grid",
+    coast: "coast",
+  };
+  const PLACES: [number, number][] = [
+    [22.1, -159.5],
+    [64.1, -21.9],
+    [31.2, 121.5],
+    [-54.8, -68.3],
+  ];
+  const lines = (
+    strokes: ReturnType<typeof recorder>["strokes"],
+    style: string,
+  ) => strokes.filter((s) => s.style === style).map((s) => s.pieces);
+  // Within 2px of a 1440 × 900 canvas: the line's width and antialiasing.
+  const onCanvas = ([ax, ay, qx, qy, bx, by]: number[]) =>
+    !(
+      (ax < -2 && qx < -2 && bx < -2) ||
+      (ax > 1442 && qx > 1442 && bx > 1442) ||
+      (ay < -2 && qy < -2 && by < -2) ||
+      (ay > 902 && qy > 902 && by > 902)
+    );
+
+  it("leaves out the pieces of line off the canvas, and only those", () => {
+    for (const [lat, lon] of PLACES) {
+      for (const radius of [150, 900, 2500, 6000]) {
+        const view = { cx: 720, cy: 450, radius, lon, lat };
+        const shown = recorder(1440, 900);
+        drawGlobe(shown.ctx, view, PALETTE, []);
+        // A canvas far bigger than the globe shows all of it.
+        const all = recorder(2e5, 2e5, -1e5, -1e5);
+        drawGlobe(all.ctx, view, PALETTE, []);
+        for (const style of ["grid", "coast"]) {
+          const expected = lines(all.strokes, style)
+            .map((pieces) => pieces.filter(onCanvas))
+            .filter((pieces) => pieces.length);
+          expect(lines(shown.strokes, style)).toEqual(expected);
+        }
+      }
+    }
+  });
+
+  it("draws a small part of the globe's lines in a close-up", () => {
+    const view = { cx: 720, cy: 450, radius: 2500, lon: -159.5, lat: 22.1 };
+    const count = (strokes: ReturnType<typeof recorder>["strokes"]) =>
+      strokes.reduce((sum, s) => sum + s.pieces.length, 0);
+    const shown = recorder(1440, 900);
+    drawGlobe(shown.ctx, view, PALETTE, []);
+    const all = recorder(2e5, 2e5, -1e5, -1e5);
+    drawGlobe(all.ctx, view, PALETTE, []);
+    expect(count(shown.strokes)).toBeLessThan(count(all.strokes) / 10);
+  });
+
+  it("carries a close-up's grid out past every corner of the canvas", () => {
+    for (const [lat, lon] of PLACES) {
+      for (const radius of [1200, 2500, 6000]) {
+        const { ctx, strokes } = recorder(1440, 900);
+        drawGlobe(ctx, { cx: 720, cy: 450, radius, lon, lat }, PALETTE, [], {
+          grids: [{ step: 2, alpha: 0.5 }],
+        });
+        const ends = strokes
+          .filter((s) => s.alpha === 0.5)
+          .flatMap((s) => s.pieces.map((p) => [p[4], p[5]]));
+        // Two degrees apart, as they are on screen in the middle.
+        const apart = 2 * RAD * radius;
+        for (const [x, y] of [
+          [0, 0],
+          [1440, 0],
+          [0, 900],
+          [1440, 900],
+        ]) {
+          const nearest = Math.min(
+            ...ends.map(([ex, ey]) => Math.hypot(ex - x, ey - y)),
+          );
+          expect(nearest).toBeLessThan(apart);
+        }
+      }
+    }
   });
 });

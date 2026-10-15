@@ -206,6 +206,10 @@ export async function loadBanner(
   if (!img) return null;
   img.className = "flight-photo";
   img.alt = "";
+  // decode() below has it ready before it shows. The opening redraws it at
+  // every size, and those frames shouldn't wait on a decode the way the
+  // session page's first frame does.
+  img.decoding = "async";
   into.insertBefore(copy, before);
   await img.decode();
   return signal.aborted ? null : img;
