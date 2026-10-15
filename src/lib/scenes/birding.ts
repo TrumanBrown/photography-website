@@ -143,6 +143,10 @@ function wingShape() {
 /** Its wing, from above (dark) or below (a shade paler). */
 function makeWing(r0: number, under: boolean): Dots {
   const { edge, parts } = wingShape();
+  const feathers = parts.map(
+    ([px, py, rake]) =>
+      [px, py, rake, 0.5 * (trailLine(px) - lead(px))] as const,
+  );
   const dots = stipple(
     (x, y) => {
       if (!edge.inside(x, y)) return 0;
@@ -150,8 +154,9 @@ function makeWing(r0: number, under: boolean): Dots {
       const top = lead(x);
       const chord = (y - top) / Math.max(20, trailLine(x) - top);
       // Feathers part along lines from each notch, raked toward the tip.
-      for (const [px, py, rake] of parts) {
-        const k = (py - y) / (0.5 * (trailLine(px) - lead(px)));
+      for (const [px, py, rake, half] of feathers) {
+        if (x > px + 1.2 || x < px - 20) continue;
+        const k = (py - y) / half;
         if (k < 0 || k > 1) continue;
         if (Math.abs(x - (px - 18 * k + rake * 30 * k)) < 1.1)
           return under ? 0.12 : 0.18;
@@ -195,18 +200,37 @@ interface Prep {
 /** Where the plate's dots leave white gaps for its legs, filled at the shadow's density. */
 function legGaps(d: Dots, r0: number): Dots {
   const box = [384, 384, 482, 484] as const;
-  const near: number[] = [];
-  for (let i = 0; i < d.n; i++)
-    if (
-      d.x[i] > box[0] - 8 &&
-      d.x[i] < box[2] + 8 &&
-      d.y[i] > box[1] - 8 &&
-      d.y[i] < box[3] + 8
-    )
-      near.push(d.x[i], d.y[i]);
+  // The plate's dots round the legs, in 4-unit buckets.
+  const CELL = 4;
+  const gx0 = box[0] - 8;
+  const gy0 = box[1] - 8;
+  const gw = Math.ceil((box[2] - box[0] + 16) / CELL) + 1;
+  const gh = Math.ceil((box[3] - box[1] + 16) / CELL) + 1;
+  const buckets: number[][] = Array.from({ length: gw * gh }, () => []);
+  for (let i = 0; i < d.n; i++) {
+    const gx = Math.floor((d.x[i] - gx0) / CELL);
+    const gy = Math.floor((d.y[i] - gy0) / CELL);
+    if (gx >= 0 && gy >= 0 && gx < gw && gy < gh)
+      buckets[gy * gw + gx].push(d.x[i], d.y[i]);
+  }
   const clear = (x: number, y: number, r: number) => {
-    for (let i = 0; i < near.length; i += 2)
-      if (Math.hypot(near[i] - x, near[i + 1] - y) < r) return false;
+    const cx = Math.floor((x - gx0) / CELL);
+    const cy = Math.floor((y - gy0) / CELL);
+    const reach = Math.ceil(r / CELL);
+    for (
+      let j = Math.max(0, cy - reach);
+      j <= Math.min(gh - 1, cy + reach);
+      j++
+    )
+      for (
+        let k = Math.max(0, cx - reach);
+        k <= Math.min(gw - 1, cx + reach);
+        k++
+      ) {
+        const b = buckets[j * gw + k];
+        for (let i = 0; i < b.length; i += 2)
+          if (Math.hypot(b[i] - x, b[i + 1] - y) < r) return false;
+      }
     return true;
   };
   return stipple(

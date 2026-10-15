@@ -244,18 +244,54 @@ export function outline(poly: readonly Pt[], most = 4) {
   const gw = Math.ceil((x1 - x0) / size) + 1;
   const gh = Math.ceil((y1 - y0) / size) + 1;
   const cells: number[][] = Array.from({ length: gw * gh }, () => []);
+  // And for the inside test, the edges each row of cells crosses: a ray
+  // across the shape only ever meets those.
+  const rows: number[][] = Array.from({ length: gh }, () => []);
   poly.forEach((b, i) => {
     const a = poly[(i + poly.length - 1) % poly.length];
     const l = Math.floor((Math.min(a[0], b[0]) - most - x0) / size);
     const r = Math.floor((Math.max(a[0], b[0]) + most - x0) / size);
     const t = Math.floor((Math.min(a[1], b[1]) - most - y0) / size);
     const btm = Math.floor((Math.max(a[1], b[1]) + most - y0) / size);
-    for (let j = t; j <= btm; j++)
+    for (let j = t; j <= btm; j++) {
+      rows[j].push(i);
       for (let k = l; k <= r; k++) cells[j * gw + k].push(i);
+    }
   });
+  // Inside is read off a mask, filled a row at a time between the edges'
+  // crossings, a quarter of a unit fine (coarser for a big shape).
+  const res = Math.max(0.25, Math.max(x1 - x0, y1 - y0) / 1600);
+  const mw = Math.ceil((x1 - x0) / res) + 1;
+  const mh = Math.ceil((y1 - y0) / res) + 1;
+  let mask: Uint8Array | null = null;
+  const fill = () => {
+    const m = new Uint8Array(mw * mh);
+    const xs: number[] = [];
+    for (let j = 0; j < mh; j++) {
+      const y = y0 + (j + 0.5) * res;
+      xs.length = 0;
+      for (const i of rows[Math.min(gh - 1, Math.floor((y - y0) / size))]) {
+        const [xi, yi] = poly[i];
+        const [xj, yj] = poly[(i + poly.length - 1) % poly.length];
+        if (yi > y !== yj > y) xs.push(xi + ((xj - xi) * (y - yi)) / (yj - yi));
+      }
+      xs.sort((p, q) => p - q);
+      for (let k = 0; k + 1 < xs.length; k += 2) {
+        const from = Math.max(0, Math.ceil((xs[k] - x0) / res - 0.5));
+        const to = Math.min(mw - 1, Math.floor((xs[k + 1] - x0) / res - 0.5));
+        if (to >= from) m.fill(1, j * mw + from, j * mw + to + 1);
+      }
+    }
+    return m;
+  };
   return {
-    inside: (x: number, y: number) =>
-      x >= x0 && x <= x1 && y >= y0 && y <= y1 && inPoly(poly, x, y),
+    inside(x: number, y: number) {
+      if (x < x0 || x > x1 || y < y0 || y > y1) return false;
+      mask ??= fill();
+      return (
+        mask[Math.floor((y - y0) / res) * mw + Math.floor((x - x0) / res)] === 1
+      );
+    },
     near(x: number, y: number, reach: number) {
       if (x < x0 || x > x1 || y < y0 || y > y1) return false;
       const cell =

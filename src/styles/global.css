@@ -394,16 +394,29 @@ html.landing-dots body::after {
   inset: 0;
   z-index: 999;
   background: var(--landing-dots, none), var(--paper);
-  /* A scene carrying on over this page is in its hold: the frame eases in
-     a touch from the moment it left, as the canvas did and will again. */
+  /* A scene carrying on over this page pushes in a touch from the moment it
+     left, as its canvas does (PUSH_EASE in src/lib/scenes/engine.ts). */
   transform-origin: 50% 50%;
-  animation: landing-hold var(--landing-hold, 0ms) ease-in-out
-    var(--landing-delay, 0ms) both;
+  animation: landing-hold var(--landing-hold, 0ms)
+    cubic-bezier(0.33, 1, 0.68, 1) var(--landing-delay, 0ms) both;
 }
 @keyframes landing-hold {
   to {
     transform: scale(var(--landing-zoom, 1));
   }
+}
+/* A scene's frame, painted by the head script at the size it was laid out
+   in, over the paper above until the scene's own canvas takes over. It
+   pushes in just as the paper's background does. */
+.landing-frame {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 1000;
+  pointer-events: none;
+  transform-origin: 50% 50%;
+  animation: landing-hold var(--landing-hold, 0ms)
+    cubic-bezier(0.33, 1, 0.68, 1) var(--landing-delay, 0ms) both;
 }
 
 /* Leaving from a card (src/lib/open.ts): a session's cover growing to fill

@@ -1,4 +1,5 @@
 import land from "../geo-land.json";
+import { scratch2d } from "./label";
 import { defineScene, LIFT_MS } from "./engine";
 import {
   backOut,
@@ -62,11 +63,9 @@ interface Prep {
 function landRaster(): (lat: number, lon: number) => boolean {
   const W = 720;
   const H = 360;
-  const canvas = document.createElement("canvas");
-  canvas.width = W;
-  canvas.height = H;
-  const ctx = canvas.getContext("2d", { willReadFrequently: true });
-  if (!ctx) return () => false;
+  const pad = scratch2d(W, H, { willReadFrequently: true });
+  if (!pad) return () => false;
+  const { ctx } = pad;
   ctx.fillStyle = "#000";
   // One fill per outline, so overlapping outlines add up rather than cancel.
   for (const ring of land as number[][][]) {

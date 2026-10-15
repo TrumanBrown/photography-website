@@ -1,23 +1,27 @@
-import type { Reveal } from "../landing";
+import type { HeldFrame, Reveal } from "../landing";
+import { type Renderer, renderer } from "./gl";
+import { applyLook, type Look } from "./look";
+import {
+  canvasSink,
+  type Colors,
+  type Op,
+  pageLabels,
+  Pen,
+  type Sink,
+} from "./pen";
 import {
   camLerp,
-  camMat,
   type Cam,
-  clamp01,
-  cssEaseInOut,
+  cubicBezier,
   type Dots,
-  grow,
-  ID,
   type Mat,
   median,
-  mul,
   type PartTest,
   PLATE_H,
   PLATE_W,
   type Pt,
   seeded,
   smootherstep,
-  toScreen,
 } from "./stage";
 
 /**
@@ -44,12 +48,26 @@ import {
 export const LIFT_MS = 450;
 /** Scenes that carry on over the hobby page change page as the lift ends... */
 export const LEAVE = LIFT_MS;
-/** ...hold, the camera easing in a touch, while it loads... */
+/** ...hold while it loads... */
 export const HOLD = 420;
 /** ...and start moving here. */
 export const ACT = LEAVE + HOLD;
-/** How far the camera eases in over the hold (the landing CSS does the same). */
+/**
+ * From the moment the page changes the camera pushes in a touch, easing out
+ * by the clock over PUSH_MS, so a hobby page that's slow to pick the scene
+ * up shows it still drifting in rather than stopped. The landing CSS plays
+ * the same curve.
+ */
 export const HOLD_ZOOM = 1.03;
+export const PUSH_MS = 1400;
+export const PUSH_EASE = [0.33, 1, 0.68, 1] as const;
+const pushEase = cubicBezier(...PUSH_EASE);
+/** The push in, `ms` after the page changed (or 1 before it does). */
+export function pushZoom(ms: number): number {
+  return ms <= 0
+    ? 1
+    : 1 + (HOLD_ZOOM - 1) * pushEase(Math.min(1, ms / PUSH_MS));
+}
 /** How long the paper takes to cover the page behind. */
 const PAPER_MS = 320;
 /** How much faster the rest of a scene plays once you click again. */
@@ -60,7 +78,7 @@ const SWAP_MS = 300;
 /** At most this many big dots are handed to the next page. */
 const KEEP = 900;
 
-export type { Reveal };
+export type { Colors, Look, Reveal };
 
 export interface DrawOpts {
   alpha?: number;
@@ -170,10 +188,11 @@ export type Final =
     }
   | {
       kind: "scene";
-      /** Where it left off, ms into the scene. */
+      /** Where it left off, ms into the scene, and when, by Date.now(). */
       t: number;
-      /** That frame, as a CSS background layer, for the next page's first paint. */
-      art: string;
+      at: number;
+      /** That frame, for the next page to paint first. */
+      frame: HeldFrame;
       w: number;
       h: number;
       rect: [number, number, number, number];
@@ -183,12 +202,6 @@ export type Final =
       hold: number;
       zoom: number;
     };
-
-export interface Colors {
-  ink: string;
-  red: string;
-  paper: string;
-}
 
 export interface ShowOptions {
   scene: Scene<unknown>;
@@ -205,246 +218,29 @@ export interface ShowOptions {
   font: string;
   dark: boolean;
   seed: number;
-}
-
-interface Op {
-  color: string;
-  alpha: number;
-  xyr: number[];
-}
-
-let scratch = new Float32Array(3 * 4096);
-const bent = new Float64Array(3);
-
-class Pen implements Painter {
-  w = 0;
-  h = 0;
-  recorded: number[] = [];
-  /** While set, every dot drawn is noted here too, for the next page's first paint. */
-  ops: Op[] | null = null;
-  opacity = 1;
-  blur = 0;
-  sources: Array<{ parts: Record<string, Dots>; weight: number }> = [];
-  private m: Mat = ID;
-  private c: Cam = { ax: 0, ay: 0, fx: 0, fy: 0, s: 1 };
-
-  constructor(
-    private ctx: CanvasRenderingContext2D,
-    private colors: Colors,
-    private font: string,
-  ) {}
-
-  cam(c: Cam) {
-    this.c = c;
-    this.m = camMat(c);
-  }
-
-  screen(x: number, y: number) {
-    return toScreen(this.c, x, y);
-  }
-
-  look(o: { opacity?: number; blur?: number }) {
-    if (o.opacity !== undefined) this.opacity = o.opacity;
-    if (o.blur !== undefined) this.blur = o.blur;
-  }
-
-  cut(holes: ArrayLike<number>, count = Math.floor(holes.length / 3)) {
-    if (!count) return;
-    const ctx = this.ctx;
-    ctx.globalCompositeOperation = "destination-out";
-    ctx.fillStyle = "#000";
-    ctx.beginPath();
-    for (let i = 0; i < count; i++) {
-      const r = holes[i * 3 + 2];
-      if (r <= 0) continue;
-      ctx.moveTo(holes[i * 3] + r, holes[i * 3 + 1]);
-      ctx.arc(holes[i * 3], holes[i * 3 + 1], r, 0, Math.PI * 2);
-    }
-    ctx.fill();
-    ctx.globalCompositeOperation = "source-over";
-  }
-
-  part(name: string, m: Mat = ID, o: DrawOpts = {}) {
-    for (const source of this.sources) {
-      const d = source.parts[name];
-      if (!d || source.weight <= 0.002) continue;
-      this.dots(d, m, {
-        ...o,
-        alpha: (o.alpha ?? 1) * source.weight,
-        target: o.target && source.weight > 0.5,
-      });
-    }
-  }
-
-  dots(d: Dots, m: Mat = ID, o: DrawOpts = {}) {
-    const alpha = o.alpha ?? 1;
-    if (alpha <= 0.003 || !d.n) return;
-    const ctx = this.ctx;
-    const cam = o.screen ? ID : this.m;
-    const M = mul(cam, m);
-    const k = grow(M) * (o.size ?? 1);
-    const halo = o.pass === "ink" ? 0 : (o.halo ?? 0) * grow(M);
-    if (scratch.length < d.n * 3) scratch = new Float32Array(d.n * 3 * 2);
-    const out = scratch;
-    let count = 0;
-    for (let i = 0; i < d.n; i++) {
-      let X: number;
-      let Y: number;
-      let R = d.r[i] * k;
-      if (o.warp) {
-        const x = m[0] * d.x[i] + m[2] * d.y[i] + m[4];
-        const y = m[1] * d.x[i] + m[3] * d.y[i] + m[5];
-        bent[0] = x;
-        bent[1] = y;
-        bent[2] = 1;
-        o.warp(x, y, bent);
-        X = cam[0] * bent[0] + cam[4];
-        Y = cam[3] * bent[1] + cam[5];
-        R *= bent[2];
-      } else {
-        X = M[0] * d.x[i] + M[2] * d.y[i] + M[4];
-        Y = M[1] * d.x[i] + M[3] * d.y[i] + M[5];
-      }
-      const reach = R + halo;
-      if (
-        R < 0.05 ||
-        X < -reach ||
-        Y < -reach ||
-        X > this.w + reach ||
-        Y > this.h + reach
-      )
-        continue;
-      out[count * 3] = X;
-      out[count * 3 + 1] = Y;
-      out[count * 3 + 2] = R;
-      count++;
-    }
-    if (!count) return;
-    const a = Math.min(1, alpha);
-    ctx.globalAlpha = a;
-    if (halo > 0) {
-      ctx.fillStyle = this.colors.paper;
-      ctx.beginPath();
-      const noted: number[] | null = this.ops ? [] : null;
-      for (let i = 0; i < count; i++) {
-        const R = out[i * 3 + 2] + halo;
-        ctx.moveTo(out[i * 3] + R, out[i * 3 + 1]);
-        ctx.arc(out[i * 3], out[i * 3 + 1], R, 0, Math.PI * 2);
-        noted?.push(out[i * 3], out[i * 3 + 1], R);
-      }
-      ctx.fill();
-      if (noted)
-        this.ops!.push({ color: this.colors.paper, alpha: a, xyr: noted });
-    }
-    if (o.pass === "halo") {
-      ctx.globalAlpha = 1;
-      return;
-    }
-    const color = o.color === "red" ? this.colors.red : this.colors.ink;
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    for (let i = 0; i < count; i++) {
-      const R = out[i * 3 + 2];
-      ctx.moveTo(out[i * 3] + R, out[i * 3 + 1]);
-      ctx.arc(out[i * 3], out[i * 3 + 1], R, 0, Math.PI * 2);
-    }
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    if (this.ops)
-      this.ops.push({
-        color,
-        alpha: a,
-        xyr: Array.from(out.subarray(0, count * 3)),
-      });
-    if (o.target && alpha > 0.5) {
-      for (let i = 0; i < count; i++)
-        this.recorded.push(out[i * 3], out[i * 3 + 1], out[i * 3 + 2]);
-    }
-  }
-
-  line(
-    pts: readonly Pt[],
-    o: { width: number; alpha?: number; color?: "ink" | "red"; halo?: number },
-  ) {
-    const alpha = o.alpha ?? 1;
-    if (alpha <= 0.003 || pts.length < 2) return;
-    const ctx = this.ctx;
-    ctx.globalAlpha = Math.min(1, alpha);
-    ctx.lineCap = "square";
-    ctx.lineJoin = "miter";
-    ctx.beginPath();
-    pts.forEach(([x, y], i) => {
-      const [X, Y] = this.screen(x, y);
-      if (i) ctx.lineTo(X, Y);
-      else ctx.moveTo(X, Y);
-    });
-    if (o.halo) {
-      ctx.strokeStyle = this.colors.paper;
-      ctx.lineWidth = o.width + 2 * o.halo;
-      ctx.stroke();
-    }
-    ctx.strokeStyle = o.color === "red" ? this.colors.red : this.colors.ink;
-    ctx.lineWidth = o.width;
-    ctx.stroke();
-    ctx.globalAlpha = 1;
-  }
-
-  label(
-    text: string,
-    x: number,
-    y: number,
-    o: { dx?: number; dy?: number; alpha?: number; color?: "ink" | "red" },
-  ) {
-    const alpha = o.alpha ?? 1;
-    if (alpha <= 0.003) return;
-    const ctx = this.ctx;
-    const [X, Y] = this.screen(x, y);
-    ctx.globalAlpha = Math.min(1, alpha);
-    ctx.font = `600 11px ${this.font}`;
-    if ("letterSpacing" in ctx) ctx.letterSpacing = "1.4px";
-    ctx.textBaseline = "top";
-    ctx.lineJoin = "round";
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = this.colors.paper;
-    ctx.strokeText(text, X + (o.dx ?? 0), Y + (o.dy ?? 0));
-    ctx.fillStyle = o.color === "red" ? this.colors.red : this.colors.ink;
-    ctx.fillText(text, X + (o.dx ?? 0), Y + (o.dy ?? 0));
-    ctx.globalAlpha = 1;
-  }
+  /** The camera's push in right now, about the middle of the screen. */
+  zoom?: () => number;
 }
 
 const round1 = (v: number) => Math.round(v * 10) / 10;
 
 /**
- * Dots as an SVG CSS background layer, `w` × `h` CSS px from the top left,
- * the way the canvas drew them: a zero-length stroke with round caps is a
- * dot, so dots of one size share a path. Paints before any script runs.
+ * Dots drawn, as the next page paints them before anything else
+ * (landing.ts): colour by colour, a tenth of a pixel or so out at most.
  */
-export function svgLayer(ops: readonly Op[], w: number, h: number): string {
-  let body = "";
+export function frameOf(ops: readonly Op[], w: number, h: number): HeldFrame {
+  const out: HeldFrame["ops"] = [];
   for (const op of ops) {
-    const bySize = new Map<number, string[]>();
-    for (let i = 0; i + 2 < op.xyr.length; i += 3) {
-      const r = Math.round(op.xyr[i + 2] * 20) / 20;
-      let list = bySize.get(r);
-      if (!list) bySize.set(r, (list = []));
-      list.push(`M${round1(op.xyr[i])} ${round1(op.xyr[i + 1])}h0`);
+    if (op.xyr.length < 3 || op.alpha < 0.001) continue;
+    const xyr = new Array<number>(op.xyr.length - (op.xyr.length % 3));
+    for (let i = 0; i < xyr.length; i += 3) {
+      xyr[i] = round1(op.xyr[i]);
+      xyr[i + 1] = round1(op.xyr[i + 1]);
+      xyr[i + 2] = Math.round(op.xyr[i + 2] * 20) / 20;
     }
-    let paths = "";
-    for (const [r, list] of bySize)
-      paths += `<path stroke-width='${round1(r * 2 * 10) / 10}' d='${list.join("")}'/>`;
-    const fade = op.alpha < 0.999 ? ` opacity='${op.alpha.toFixed(3)}'` : "";
-    body += `<g stroke='${op.color}'${fade}>${paths}</g>`;
+    out.push([op.color, Math.round(op.alpha * 1000) / 1000, xyr]);
   }
-  const svg =
-    `<svg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${h}' viewBox='0 0 ${w} ${h}'>` +
-    `<g fill='none' stroke-linecap='round'>${body}</g></svg>`;
-  // Only what would end the URL or the data early needs escaping.
-  const data = svg.replace(
-    /[%#"<>]/g,
-    (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`,
-  );
-  return `url("data:image/svg+xml,${data}") 0 0 / ${w}px ${h}px no-repeat`;
+  return { w, h, ops: out };
 }
 
 export interface Show {
@@ -454,21 +250,64 @@ export interface Show {
   leave: number;
   depart: number;
   draw(t: number): void;
-  /** Draw the frame at `t` and return it as an SVG layer (svgLayer). */
-  art(t: number): string;
+  /** Draw the frame at `t` and return it for the next page (frameOf). */
+  held(t: number): HeldFrame;
+  /** The big dots the last frame drawn ended on. */
+  final(): Extract<Final, { kind: "dots" }>;
+  /** The GPU dropped the canvas: the scene can't go on. */
+  readonly lost: boolean;
+  /** Let go of the canvas's GPU resources and listeners. */
+  dispose(): void;
+}
+
+/**
+ * The page's WebGL renderer, where the GPU runs it; scenes draw on a 2D
+ * canvas otherwise. On the dev server `?scene-2d` keeps to the 2D canvas and
+ * `?scene-gl` takes WebGL even in software, to compare them.
+ */
+function gpu(): Renderer | null {
+  const asked = import.meta.env.DEV
+    ? new URLSearchParams(location.search)
+    : null;
+  if (asked?.has("scene-2d")) return null;
+  return renderer(Boolean(asked?.has("scene-gl")));
+}
+
+/** Get the WebGL renderer building its shaders, ahead of any scene. */
+export function warmRenderer(): void {
+  gpu();
+}
+
+/** Wait up to `ms` for the WebGL renderer to be ready; false if it isn't. */
+export function rendererReady(ms: number): Promise<boolean> {
+  return gpu()?.whenReady(ms) ?? Promise.resolve(false);
+}
+
+/** A scene set up to draw any moment of it, on whatever sink it's given. */
+export interface Stage {
+  run: SceneRun;
+  /** When the page changes and when it moves on again; see SceneRun. */
+  leave: number;
+  depart: number;
+  draw(t: number): Look;
+  /** Draw the frame at `t` and return it for the next page (frameOf). */
+  held(t: number): HeldFrame;
   /** The big dots the last frame drawn ended on. */
   final(): Extract<Final, { kind: "dots" }>;
 }
 
-/** Set a scene up on a full-screen canvas, ready to draw any moment of it. */
-export function show(o: ShowOptions, className: string): Show {
-  const root = document.documentElement;
-  const canvas = document.createElement("canvas");
-  canvas.className = className;
-  canvas.setAttribute("aria-hidden", "true");
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("No 2D canvas.");
-  const { w, h } = o;
+export interface StageOptions extends ShowOptions {
+  sink: Sink;
+  /** The canvas's size right now, CSS px, and its pixel ratio. */
+  size(): { w: number; h: number; dpr: number };
+}
+
+/**
+ * Set a scene up to draw on `o.sink`. It touches nothing on the page, so it
+ * runs the same in a worker (worker.ts) as on the page itself (`show`).
+ */
+export function stageScene(o: StageOptions): Stage {
+  const { w, h, sink } = o;
   const [left, top, width, height] = o.rect;
 
   const card: Cam = {
@@ -504,34 +343,13 @@ export function show(o: ShowOptions, className: string): Show {
   );
   const leave = Math.min(run.leave ?? run.duration, run.duration);
   const depart = Math.max(leave, Math.min(run.depart ?? leave, run.duration));
-  const zoom = holdZoom(leave, depart, leave < run.duration);
 
-  const pen = new Pen(ctx, o.colors, o.font);
+  const pen = new Pen(sink, o.colors);
 
-  function draw(t: number) {
-    const vw = root.clientWidth;
-    const vh = root.clientHeight;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    if (canvas.width !== Math.round(vw * dpr))
-      canvas.width = Math.round(vw * dpr);
-    if (canvas.height !== Math.round(vh * dpr))
-      canvas.height = Math.round(vh * dpr);
+  function draw(t: number): Look {
+    const { w: vw, h: vh, dpr } = o.size();
     // The hold's ease in, about the middle of the screen, on everything.
-    const z = zoom(t);
-    const k = dpr * z;
-    ctx!.setTransform(
-      k,
-      0,
-      0,
-      k,
-      (dpr * (1 - z) * vw) / 2,
-      (dpr * (1 - z) * vh) / 2,
-    );
-    ctx!.clearRect(0, 0, vw, vh);
-    ctx!.globalAlpha = smootherstep(t / PAPER_MS);
-    ctx!.fillStyle = o.colors.paper;
-    ctx!.fillRect(0, 0, vw, vh);
-    ctx!.globalAlpha = 1;
+    sink.frame(vw, vh, dpr, o.zoom?.() ?? 1, smootherstep(t / PAPER_MS));
     const swap = o.from ? smootherstep((t - SWAP_FROM) / SWAP_MS) : 1;
     pen.sources = o.from
       ? [
@@ -545,17 +363,17 @@ export function show(o: ShowOptions, className: string): Show {
     pen.opacity = 1;
     pen.blur = 0;
     run.draw(t, pen);
-    const opacity = pen.opacity < 0.999 ? String(Math.max(0, pen.opacity)) : "";
-    if (canvas.style.opacity !== opacity) canvas.style.opacity = opacity;
-    const filter = pen.blur > 0.05 ? `blur(${pen.blur.toFixed(2)}px)` : "";
-    if (canvas.style.filter !== filter) canvas.style.filter = filter;
+    // A blur is softer dots where the sink can do that, and CSS otherwise.
+    sink.soften?.(pen.blur);
+    sink.flush();
+    return { opacity: pen.opacity, blur: sink.soften ? 0 : pen.blur };
   }
 
-  function art(t: number): string {
+  function held(t: number): HeldFrame {
     pen.ops = [];
     try {
       draw(t);
-      return svgLayer(pen.ops, w, h);
+      return frameOf(pen.ops, w, h);
     } finally {
       pen.ops = null;
     }
@@ -583,19 +401,60 @@ export function show(o: ShowOptions, className: string): Show {
     };
   }
 
-  return { run, canvas, leave, depart, draw, art, final };
+  return { run, leave, depart, draw, held, final };
 }
 
-/**
- * The camera's ease in over the hold, from `leave` to `depart`: none for a
- * scene that doesn't change page. The landing CSS plays the same curve.
- */
-export function holdZoom(leave: number, depart: number, handsOver: boolean) {
-  return (t: number) =>
-    handsOver && depart > leave
-      ? 1 +
-        (HOLD_ZOOM - 1) * cssEaseInOut(clamp01((t - leave) / (depart - leave)))
-      : 1;
+/** Set a scene up on a full-screen canvas on this page, ready to draw any moment of it. */
+export function show(o: ShowOptions, className: string): Show {
+  const root = document.documentElement;
+  // The WebGL canvas if it's ready (it's never waited on here), or a 2D one.
+  const gl = gpu();
+  const canvas = gl?.ready ? gl.canvas : document.createElement("canvas");
+  const labels = pageLabels(o.colors, o.font);
+  const sink: Sink = gl?.ready
+    ? gl.sink(o.colors, labels)
+    : canvasSink(canvas, o.colors, labels);
+  canvas.className = className;
+  canvas.setAttribute("aria-hidden", "true");
+  canvas.style.opacity = "";
+  canvas.style.filter = "";
+
+  // The canvas fills the viewport. Its size is read when the window changes
+  // size, never while drawing, so a frame never waits on the page's layout.
+  const size = { w: root.clientWidth || o.w, h: root.clientHeight || o.h };
+  const resized = () => {
+    size.w = root.clientWidth;
+    size.h = root.clientHeight;
+  };
+  window.addEventListener("resize", resized);
+  const staged = stageScene({
+    ...o,
+    sink,
+    size: () => ({
+      ...size,
+      dpr: Math.min(window.devicePixelRatio || 1, 2),
+    }),
+  });
+
+  let disposed = false;
+  return {
+    run: staged.run,
+    canvas,
+    leave: staged.leave,
+    depart: staged.depart,
+    draw: (t) => applyLook(canvas, staged.draw(t)),
+    held: staged.held,
+    final: staged.final,
+    get lost() {
+      return sink.lost;
+    },
+    dispose() {
+      if (disposed) return;
+      disposed = true;
+      window.removeEventListener("resize", resized);
+      sink.dispose();
+    },
+  };
 }
 
 /**
@@ -629,6 +488,8 @@ export interface PlayOptions extends Omit<ShowOptions, "rect" | "w" | "h"> {
   img: HTMLImageElement;
   done(final: Final): void;
   cancelled(): void;
+  /** The scene can't go on (the GPU dropped its canvas): just go to the page. */
+  failed(): void;
 }
 
 interface Debug {
@@ -661,25 +522,38 @@ export function play(options: PlayOptions): {
   ];
   const w = root.clientWidth;
   const h = root.clientHeight;
-  const s = show({ ...options, rect, w, h }, "open-layer");
+  // The camera's push in starts when the page changes.
+  let leftAt = 0;
+  const s = show(
+    {
+      ...options,
+      rect,
+      w,
+      h,
+      zoom: () => (leftAt ? pushZoom(Date.now() - leftAt) : 1),
+    },
+    "open-layer",
+  );
   const { canvas } = s;
 
   const time = clock();
   const handsOver = s.leave < s.run.duration;
-  const finish = (): Final =>
-    handsOver
-      ? {
-          kind: "scene",
-          t: s.leave,
-          art: s.art(s.leave),
-          w,
-          h,
-          rect,
-          speed: time.rate,
-          hold: (s.depart - s.leave) / time.rate,
-          zoom: HOLD_ZOOM,
-        }
-      : s.final();
+  const finish = (): Final => {
+    if (!handsOver) return s.final();
+    leftAt = Date.now();
+    return {
+      kind: "scene",
+      t: s.leave,
+      at: leftAt,
+      frame: s.held(s.leave),
+      w,
+      h,
+      rect,
+      speed: time.rate,
+      hold: PUSH_MS,
+      zoom: HOLD_ZOOM,
+    };
+  };
 
   let stopped = false;
   let raf = 0;
@@ -711,6 +585,7 @@ export function play(options: PlayOptions): {
     cancelAnimationFrame(raf);
     listen(false);
     canvas.remove();
+    s.dispose();
     img.style.visibility = "";
   }
   function cancel() {
@@ -747,6 +622,12 @@ export function play(options: PlayOptions): {
 
   function frame(now: number) {
     if (stopped) return;
+    if (s.lost) {
+      stopped = true;
+      listen(false);
+      options.failed();
+      return;
+    }
     const t = Math.min(s.leave, time.now(now));
     s.draw(t);
     if (t < s.leave) {

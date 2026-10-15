@@ -68,13 +68,13 @@ base-uri 'self';
 form-action 'self'
 ```
 
-(The live policy in [staticwebapp.config.json](../staticwebapp.config.json) names the real storage account, `blobHost` in [site.config.ts](../site.config.ts), and also carries four `sha256` hashes in `script-src`: two for the dark-mode inline scripts, one for the home page's lead photograph chooser and one for the check that opens a page the way the last one left it (a session on the photograph a globe spin or a card grew into, a hobby on the big dots its card's scene ended on); they are omitted above for readability.)
+(The live policy in [staticwebapp.config.json](../staticwebapp.config.json) names the real storage account, `blobHost` in [site.config.ts](../site.config.ts), and also carries four `sha256` hashes in `script-src`: two for the dark-mode inline scripts, one for the home page's lead photograph chooser and one for the check that opens a page the way the last one left it (a session on the photograph a globe spin or a card grew into, a hobby on the frame or big dots its card's scene left it on, starting the scene's worker); they are omitted above for readability.)
 
 Translation:
 - **`default-src 'self'`**: load resources only from the site's own origin unless overridden.
 - **`img-src ... data: blob:`**: also allow images from the site's own storage account (lightbox full-res, hobby photos), the iNaturalist photo CDNs (the tide-pooling observations grid and species photos), `data:` URIs (inlined SVG icons), and `blob:` object URLs (the Birding island's local selfie preview). Naming the one account, rather than `*.blob.core.windows.net`, means injected markup can't load from, or send data to, some other storage account.
 - **`script-src 'self' 'wasm-unsafe-eval'`**: own-origin scripts only. `'wasm-unsafe-eval'` lets the Birding island compile the self-hosted MediaPipe WASM; it permits WebAssembly only, **not** JavaScript `eval`.
-- **`worker-src 'self' blob:`**: the MediaPipe runtime spawns a same-origin worker (and a `blob:` worker) to run the landmark model off the main thread.
+- **`worker-src 'self' blob:`**: the hobby cards' opening scenes draw in a same-origin worker (`/_astro/worker-…js`, see [hobbies.md](hobbies.md#opening-scenes)), and the MediaPipe runtime spawns a same-origin worker (and a `blob:` worker) to run the landmark model off the main thread. The scene worker fetches plates from the storage account, which `connect-src` already allows.
 - **`connect-src 'self' ...`**: own origin (the Birding model + WASM are fetched from `/birding/`, so `'self'` covers them), the site's storage account (lightbox original download), and the public iNaturalist API.
 - **`style-src 'self' 'unsafe-inline'`**: `'unsafe-inline'` is required by Astro's scoped style blocks. Can be tightened later with hashes; modest risk.
 - **`object-src 'none'`**: no `<object>` / `<embed>` / Flash-era nonsense.

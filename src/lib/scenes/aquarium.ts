@@ -123,39 +123,60 @@ export default defineScene<Prep>({
     // Fins beat faster once it goes.
     const beat = (t: number) => mt(t) + 2.4 * Math.max(0, t - DART);
 
+    // What depends on the time alone, worked out once a frame rather than
+    // for each of its thousands of dots.
+    let at = NaN;
+    let atDistance = NaN;
+    const byTime = {
+      swim: 0,
+      tail: 0,
+      sx: 1,
+      sy: 1,
+      wave: 0,
+      bob: 0,
+      phase: 0,
+    };
+    const atTime = (t: number) => {
+      if (t === at && distance === atDistance) return;
+      at = t;
+      atDistance = distance;
+      const lively = life(t);
+      const fast = darting(t);
+      // Squashed as it backs up, stretched as it shoots off.
+      const squash = cock(t) * (1 - fast);
+      byTime.swim = swim(t);
+      // The tail fin beats in and out of the page.
+      byTime.tail = 0.18 * lively * (1 - Math.cos(beat(t) * 0.021));
+      byTime.sx = 1 - 0.07 * squash + 0.09 * fast;
+      byTime.sy = 1 + 0.04 * squash - 0.03 * fast;
+      byTime.wave = 3 * lively + 7 * fast;
+      byTime.bob = 2.5 * lively * Math.sin(mt(t) * 0.007);
+      byTime.phase = beat(t) * 0.012;
+    };
+
     /** Where a dot of the fish is at time t. */
     function place(x: number, y: number, t: number, out: Float64Array) {
+      atTime(t);
       const d = clamp01((x - TAIL) / (HEAD - TAIL));
       const turn = smootherstep((t - TURN_FROM - (1 - d) * TURN_LAG) / TURN_MS);
       const facing = Math.cos(Math.PI * turn);
-      // The tail fin beats in and out of the page.
+      const across = Math.sin(Math.PI * turn);
       const fin =
-        x < TAIL_ROOT
-          ? TAIL_ROOT +
-            (x - TAIL_ROOT) *
-              (1 - 0.18 * life(t) * (1 - Math.cos(beat(t) * 0.021)))
-          : x;
+        x < TAIL_ROOT ? TAIL_ROOT + (x - TAIL_ROOT) * (1 - byTime.tail) : x;
       // Side on, its dots spread through its body's thickness.
       const hash = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
       const side =
         (hash - Math.floor(hash) - 0.5) *
         GIRTH *
         Math.pow(Math.sin(Math.PI * d), 0.6);
-      // Squashed as it backs up, stretched as it shoots off.
-      const squash = cock(t) * (1 - darting(t));
-      const sx = 1 - 0.07 * squash + 0.09 * darting(t);
-      const sy = 1 + 0.04 * squash - 0.03 * darting(t);
-      const wave = 3 * life(t) + 7 * darting(t);
       out[0] =
-        MID +
-        swim(t) +
-        ((fin - MID) * facing + side * Math.sin(Math.PI * turn)) * sx;
+        MID + byTime.swim + ((fin - MID) * facing + side * across) * byTime.sx;
       out[1] =
         330 +
-        (y - 330) * (1 - 0.1 * Math.sin(Math.PI * turn)) * sy +
-        2.5 * life(t) * Math.sin(mt(t) * 0.007) +
-        wave *
-          Math.sin(((x - TAIL) / 300) * Math.PI * 2 - beat(t) * 0.012) *
+        (y - 330) * (1 - 0.1 * across) * byTime.sy +
+        byTime.bob +
+        byTime.wave *
+          Math.sin(((x - TAIL) / 300) * Math.PI * 2 - byTime.phase) *
           Math.pow(1 - d, 1.2);
       out[2] = 1;
     }
@@ -219,7 +240,9 @@ export default defineScene<Prep>({
     }));
     const covered = lastOf(wakeTimes(grid, passing, rippleAge)) + 40;
 
+    const ring = new Float32Array(sources.length * 3);
     const holes = new Float32Array(sources.length * 3);
+    const which = new Int32Array(sources.length);
     const crest = { x: [] as number[], y: [] as number[], r: [] as number[] };
 
     const duration = Math.max(covered, last);
@@ -235,19 +258,41 @@ export default defineScene<Prep>({
         let live = 0;
         for (const s of sources) {
           if (s.t >= t) break;
-          holes[live * 3] = s.x;
-          holes[live * 3 + 1] = s.y;
-          holes[live * 3 + 2] =
+          ring[live * 3] = s.x;
+          ring[live * 3 + 1] = s.y;
+          ring[live * 3 + 2] =
             width * smootherstep((t - s.t) / 60) + ripple(t - s.t);
           live++;
         }
-        if (live) {
-          p.cut(holes, live);
+        // One wholly inside a bigger one opens nothing more, and its crest
+        // is hidden: leaving it out spares the GPU most of the wake, which
+        // ends up as dozens of circles the size of the screen.
+        let open = 0;
+        for (let i = 0; i < live; i++) {
+          const x = ring[i * 3];
+          const y = ring[i * 3 + 1];
+          const r = ring[i * 3 + 2];
+          let inner = false;
+          for (let j = 0; j < live && !inner; j++) {
+            const big = ring[j * 3 + 2];
+            inner =
+              big > r &&
+              Math.hypot(x - ring[j * 3], y - ring[j * 3 + 1]) + r < big - 1;
+          }
+          if (inner) continue;
+          holes[open * 3] = x;
+          holes[open * 3 + 1] = y;
+          holes[open * 3 + 2] = r;
+          which[open++] = i;
+        }
+        if (open) {
+          p.cut(holes, open);
           crest.x.length = crest.y.length = crest.r.length = 0;
-          for (let i = 0; i < live; i++) {
-            const x0 = holes[i * 3];
-            const y0 = holes[i * 3 + 1];
-            const r = holes[i * 3 + 2];
+          for (let o = 0; o < open; o++) {
+            const i = which[o];
+            const x0 = holes[o * 3];
+            const y0 = holes[o * 3 + 1];
+            const r = holes[o * 3 + 2];
             const age = t - sources[i].t;
             const size = CREST_R * (1 - smoothstep(age / 800));
             // Every other ripple's crest is plenty: they overlap.
@@ -259,9 +304,9 @@ export default defineScene<Prep>({
               const y = y0 + Math.sin(a) * r;
               if (x < -4 || y < -4 || x > p.w + 4 || y > p.h + 4) continue;
               let inside = false;
-              for (let j = 0; j < live && !inside; j++)
+              for (let j = 0; j < open && !inside; j++)
                 if (
-                  j !== i &&
+                  j !== o &&
                   Math.hypot(x - holes[j * 3], y - holes[j * 3 + 1]) <
                     holes[j * 3 + 2] - 1
                 )

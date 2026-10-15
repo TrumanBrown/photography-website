@@ -1,6 +1,12 @@
 import { loadBanner } from "./flight";
 import { dotsArt, LANDING_KEY, type LandingNote } from "./landing";
 import { CARRY_KEY, leaveData } from "./scenes/carry";
+import {
+  canPlayInWorker,
+  type Player,
+  scenePlayer,
+  usablePlayer,
+} from "./scenes/player";
 import { prefersReducedMotion } from "./motion";
 import {
   CARD_W,
@@ -309,7 +315,7 @@ function loadScenes(): Promise<Scenes> {
  * How long a click waits for the scenes and its plate's dots, when they
  * aren't ready from pointing at the card already.
  */
-const SCENE_WAIT_MS = 400;
+const SCENE_WAIT_MS = 600;
 
 const wait = (ms: number) =>
   new Promise<undefined>((resolve) => setTimeout(resolve, ms));
@@ -356,14 +362,21 @@ function miniStill(img: HTMLImageElement): string | null {
   }
 }
 
-/** The plate a hobby link is showing right now, if it has loaded. */
+/**
+ * The plate a hobby link is showing. It may be partway through swapping
+ * inkings (the hover boil) or still loading: the scene reads the card plate
+ * it names, not the image itself.
+ */
 function shownPlate(link: HTMLAnchorElement): HTMLImageElement | null {
   return (
     Array.from(link.querySelectorAll<HTMLImageElement>("img[data-ink]")).find(
-      (img) => img.offsetParent !== null && img.complete && img.naturalWidth,
+      (img) => img.offsetParent !== null && (img.dataset.card || img.complete),
     ) ?? null
   );
 }
+
+/** Whether an image has something to read off. */
+const loaded = (img: HTMLImageElement) => img.complete && img.naturalWidth > 0;
 
 const prefetched = new Set<string>();
 
@@ -414,6 +427,14 @@ function warmHobby(link: HTMLAnchorElement): Promise<void> {
   const url = shown?.dataset.card;
   // A home-page card's mini plate too: the scene starts from it.
   const mini = shown && shown.complete ? miniStill(shown) : null;
+  // In the scene worker, where it's running: none of it on the page.
+  const player = usablePlayer();
+  if (player && url) {
+    player.warm(slugOf(link.href), url, mini ?? undefined, dark);
+    const done = Promise.resolve();
+    warmedHobbies.set(link, done);
+    return done;
+  }
   if (mini) void dotsOf(mini);
   const warm = Promise.all([loadScenes(), url ? dotsOf(url) : null])
     .then(
@@ -440,8 +461,13 @@ function openHobby(link: HTMLAnchorElement): boolean {
   const href = link.href;
   const slug = slugOf(href);
   const dark = isDark();
+  // The card keeps still while its scene plays, and lets go if it's put back.
+  link.dispatchEvent(new Event("plate:hold"));
+  const free = () => link.dispatchEvent(new Event("plate:free"));
   // Warm the page while the scene plays.
   prefetchPage(href);
+  const player = usablePlayer();
+  if (player) return playInWorker(link, img, player, free);
   // The scene plays from the card plate, finer than a home-page card's mini
   // one, and the hobby page reads the same image to carry it on. Both are
   // usually read already (warmHobby); if not, they start loading now.
@@ -453,6 +479,7 @@ function openHobby(link: HTMLAnchorElement): boolean {
   const fallback = (field: DotField | null) => {
     if (!diveHobby(img, href, field)) leave(href, null);
   };
+  onReturn(free);
 
   void (async () => {
     const [mod, cardField, miniField] = await Promise.all([
@@ -462,7 +489,8 @@ function openHobby(link: HTMLAnchorElement): boolean {
     ]);
     // Read straight off the card as a last resort: that works wherever the
     // plates are served from the site itself.
-    const shown = () => cardUnits(readDots(img), img.naturalWidth);
+    const shown = () =>
+      loaded(img) ? cardUnits(readDots(img), img.naturalWidth) : null;
     let main = cardField ?? null;
     let plate = url ?? "";
     if (!main) {
@@ -494,12 +522,8 @@ function openHobby(link: HTMLAnchorElement): boolean {
         dark,
         seed,
         done: (final) => {
-          const target = import.meta.env.DEV
-            ? href +
-              (new URLSearchParams(location.search).has("scene-debug")
-                ? "?scene-debug"
-                : "")
-            : href;
+          // On the dev server the scene's own testing switches go along.
+          const target = import.meta.env.DEV ? withSceneFlags(href) : href;
           if (final.kind === "dots")
             requestAnimationFrame(() =>
               leave(target, "dots", {
@@ -514,7 +538,7 @@ function openHobby(link: HTMLAnchorElement): boolean {
           else {
             // The plate's dots and the props go too, so the hobby page can
             // pick the scene up without reading and drawing them again.
-            const at = Date.now();
+            const at = final.at;
             leaveData({
               path: new URL(href).pathname,
               at,
@@ -524,7 +548,7 @@ function openHobby(link: HTMLAnchorElement): boolean {
             leave(target, "dots", {
               at,
               ink,
-              art: final.art,
+              frame: final.frame,
               scene: {
                 t: final.t,
                 seed,
@@ -537,6 +561,7 @@ function openHobby(link: HTMLAnchorElement): boolean {
                 hold: final.hold,
                 zoom: final.zoom,
                 module: mod.moduleUrl,
+                paper: style.getPropertyValue("--paper").trim() || "#fbfaf8",
               },
             });
           }
@@ -544,7 +569,9 @@ function openHobby(link: HTMLAnchorElement): boolean {
         },
         cancelled: () => {
           busy = false;
+          free();
         },
+        failed: () => leave(href, null),
       });
       onReturn(() => {
         playing.dispose();
@@ -555,6 +582,119 @@ function openHobby(link: HTMLAnchorElement): boolean {
     }
   })();
   return true;
+}
+
+/**
+ * A card's scene, played in the scene worker (scenes/player.ts): the page
+ * only puts the canvas up, passes on input and changes page when it's told.
+ */
+function playInWorker(
+  link: HTMLAnchorElement,
+  img: HTMLImageElement,
+  player: Player,
+  free: () => void,
+): boolean {
+  const href = link.href;
+  const dark = isDark();
+  const root = document.documentElement;
+  const style = getComputedStyle(root);
+  const box = img.getBoundingClientRect();
+  const seed = Math.floor(Math.random() * 2 ** 31);
+  const red = style.getPropertyValue("--stamp").trim() || "#b3301c";
+  const paper = style.getPropertyValue("--paper").trim() || "#fbfaf8";
+  const target = import.meta.env.DEV ? withSceneFlags(href) : href;
+  const putBack = () => {
+    img.style.visibility = "";
+    busy = false;
+    free();
+  };
+  const playing = player.play(
+    {
+      slug: slugOf(href),
+      card: img.dataset.card || img.currentSrc || img.src,
+      mini: miniStill(img) ?? undefined,
+      path: new URL(href).pathname,
+      rect: [box.left, box.top, box.width, box.height],
+      w: root.clientWidth,
+      h: root.clientHeight,
+      red,
+      paper,
+      dark,
+      seed,
+      wait: SCENE_WAIT_MS,
+    },
+    {
+      // Its dots are over the card now: the card can go.
+      started: () => {
+        img.style.visibility = "hidden";
+      },
+      leave: (m) => {
+        try {
+          sessionStorage.setItem(CARRY_KEY, m.carry);
+        } catch {
+          // No room: the hobby page reads the plate again.
+        }
+        leave(target, "dots", {
+          at: m.at,
+          ink: m.ink,
+          frame: m.frame,
+          scene: {
+            t: m.t,
+            seed,
+            rect: m.rect,
+            w: m.w,
+            h: m.h,
+            plate: m.plate,
+            dark,
+            speed: m.speed,
+            hold: m.hold,
+            zoom: m.zoom,
+            // The hobby page starts the same worker before anything else.
+            worker: player.workerUrl ?? undefined,
+            red,
+            paper,
+          },
+        });
+        stayPut({
+          dispose: () => {
+            playing.stop();
+            putBack();
+          },
+        });
+      },
+      final: (m) =>
+        requestAnimationFrame(() =>
+          leave(target, "dots", {
+            dots: m.dots,
+            w: m.w,
+            h: m.h,
+            ink: m.ink,
+            art: dotsArt(m.dots, m.w, m.h, m.ink),
+            reveal: m.reveal,
+          }),
+        ),
+      // It couldn't play: just go.
+      failed: () => {
+        img.style.visibility = "";
+        leave(href, null);
+      },
+      cancelled: putBack,
+    },
+  );
+  onReturn(() => {
+    playing.stop();
+    putBack();
+  });
+  return true;
+}
+
+/** `href` with whichever of the dev server's scene switches this page has. */
+function withSceneFlags(href: string): string {
+  const here = new URLSearchParams(location.search);
+  const url = new URL(href, location.href);
+  for (const flag of ["scene-debug", "scene-gl", "scene-2d"])
+    if (here.has(flag)) url.searchParams.set(flag, "");
+  return url.href;
 }
 
 /**
@@ -625,7 +765,26 @@ export function initOpeners(): void {
     'a[data-open="hobby"]',
   );
   if (hobbies.length && !prefersReducedMotion()) {
-    idle(() => void loadScenes().catch(() => undefined));
+    // The scenes are what these cards are for: fetch them as soon as the
+    // page has loaded, rather than when it first goes idle.
+    // In the scene worker where the browser can, set up as the page loads;
+    // otherwise on the page, with the scenes fetched and WebGL warmed up.
+    const onPage = () =>
+      void loadScenes().then(
+        (mod) => idle(() => mod.warmRenderer()),
+        () => undefined,
+      );
+    const fetchScenes = () =>
+      window.setTimeout(() => {
+        const player = canPlayInWorker() ? scenePlayer() : null;
+        if (player)
+          void player.ready.then((ok) => {
+            if (!ok) onPage();
+          });
+        else onPage();
+      }, 0);
+    if (document.readyState === "complete") fetchScenes();
+    else window.addEventListener("load", fetchScenes, { once: true });
     const hobbyLink = (target: EventTarget | null) =>
       (target as Element | null)?.closest?.<HTMLAnchorElement>(
         'a[data-open="hobby"]',
@@ -647,6 +806,11 @@ export function initOpeners(): void {
       const queue: HTMLAnchorElement[] = [];
       let pumping = false;
       const pump = () => {
+        // Not while a scene is playing: it gets the page to itself.
+        if (busy) {
+          window.setTimeout(() => idle(pump), 1000);
+          return;
+        }
         const link = queue.shift();
         if (!link) {
           pumping = false;
@@ -669,7 +833,7 @@ export function initOpeners(): void {
                   pumping = true;
                   idle(pump);
                 }
-              }, 600),
+              }, 300),
             );
           }
         },

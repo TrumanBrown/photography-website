@@ -1,3 +1,4 @@
+import { covered } from "../covered";
 import {
   BIOMES,
   calculateHikeStats,
@@ -860,7 +861,8 @@ export function initHikeBuilder(root: HTMLElement): void {
   });
 
   function frame(now: number): void {
-    if (onscreen && !document.hidden && now - lastFrame >= 40) {
+    // Not under a scene that's still playing (src/lib/covered.ts).
+    if (onscreen && !document.hidden && !covered() && now - lastFrame >= 40) {
       if (walkingSince != null) {
         const progress = Math.min(1, (now - walkingSince) / 6200);
         hikerProgress = progress * progress * (3 - 2 * progress);

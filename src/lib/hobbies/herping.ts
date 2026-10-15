@@ -17,6 +17,7 @@
  *
  * Mounted by src/components/hobbies/HerpingNight.astro via [data-hp-*] hooks.
  */
+import { covered, whenUncovered } from "../covered";
 import {
   SPECIES,
   type HerpSpecies,
@@ -733,7 +734,8 @@ export function initHerping(root: HTMLElement): void {
     raf = requestAnimationFrame(step);
   }
   function start(): void {
-    if (running) return;
+    // Not under a scene that's still playing; it starts once that's gone.
+    if (running || covered()) return;
     running = true;
     last = performance.now();
     raf = requestAnimationFrame(step);
@@ -1023,6 +1025,9 @@ export function initHerping(root: HTMLElement): void {
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) stop();
     else if (onscreen) start();
+  });
+  whenUncovered(() => {
+    if (onscreen && !document.hidden) start();
   });
 
   // --------------------------------------------------------------- init

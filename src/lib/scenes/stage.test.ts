@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { svgLayer } from "./engine";
+import { frameOf } from "./engine";
 import {
   aim,
   apply,
@@ -253,26 +253,37 @@ describe("exitDistance", () => {
   });
 });
 
-describe("svgLayer", () => {
-  it("draws dots as round-capped strokes, safe inside a CSS url()", () => {
-    const art = svgLayer(
+describe("frameOf", () => {
+  it("keeps each colour's dots, in order, to a tenth of a pixel", () => {
+    const frame = frameOf(
       [
-        { color: "#fbfaf8", alpha: 1, xyr: [10, 10, 3, 20, 20, 3] },
-        { color: "rgb(22, 21, 15)", alpha: 0.5, xyr: [30.25, 40, 1.5] },
+        { color: "#fbfaf8", alpha: 1, xyr: [10.04, 10.06, 3.024, 20, 20, 3] },
+        { color: "rgb(22, 21, 15)", alpha: 0.49996, xyr: [30.25, 40, 1.5] },
       ],
       400,
       300,
     );
-    expect(art.endsWith(") 0 0 / 400px 300px no-repeat")).toBe(true);
-    const data = art.slice(5, art.indexOf('")'));
-    expect(data).not.toMatch(/["#<>]/);
-    const svg = decodeURIComponent(data.slice("data:image/svg+xml,".length));
-    expect(svg).toContain("width='400' height='300'");
-    expect(svg).toContain("stroke-linecap='round'");
-    // Same-size dots share one path; the faded group keeps its opacity.
-    expect(svg).toContain("<path stroke-width='6' d='M10 10h0M20 20h0'/>");
-    expect(svg).toContain("opacity='0.500'");
-    expect(svg).toContain("M30.3 40h0");
+    expect(frame).toEqual({
+      w: 400,
+      h: 300,
+      ops: [
+        ["#fbfaf8", 1, [10, 10.1, 3, 20, 20, 3]],
+        ["rgb(22, 21, 15)", 0.5, [30.3, 40, 1.5]],
+      ],
+    });
+  });
+
+  it("leaves out what wouldn't show, and any dot left half written", () => {
+    const frame = frameOf(
+      [
+        { color: "red", alpha: 0, xyr: [1, 2, 3] },
+        { color: "ink", alpha: 1, xyr: [] },
+        { color: "ink", alpha: 1, xyr: [1, 2, 3, 4, 5] },
+      ],
+      10,
+      10,
+    );
+    expect(frame.ops).toEqual([["ink", 1, [1, 2, 3]]]);
   });
 });
 

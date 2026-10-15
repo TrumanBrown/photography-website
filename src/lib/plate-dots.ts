@@ -11,14 +11,28 @@ export const CARD_W = 880;
 /**
  * Load a plate to read its dots. In production the plates are served from
  * the photo storage host, so the image has to come with CORS, or the canvas
- * it's drawn on can't be read back. (The storage sends `Vary: Origin`, so
- * this copy and the one the card shows don't get mixed up in the cache.)
+ * it's drawn on can't be read back. That copy goes by its own address (the
+ * storage ignores the query): the card shows the same file without CORS,
+ * and the storage sends `Vary: Origin`, so sharing one address would have
+ * the browser check each copy with the storage again every time the other
+ * was used, and a card's image could sit half-loaded while it did.
  */
+export function plateUrl(url: string): string {
+  try {
+    const at = new URL(url, location.href);
+    if (at.origin === location.origin) return url;
+    at.searchParams.set("scene", "");
+    return at.href;
+  } catch {
+    return url;
+  }
+}
+
 export async function loadPlate(url: string): Promise<HTMLImageElement> {
   const img = new Image();
   img.crossOrigin = "anonymous";
   img.decoding = "async";
-  img.src = url;
+  img.src = plateUrl(url);
   await img.decode();
   return img;
 }

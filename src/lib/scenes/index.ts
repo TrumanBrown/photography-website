@@ -1,61 +1,16 @@
 import { landed, type LandingNote } from "../landing";
 import { cardUnits, type DotField, loadPlate, readDots } from "../plate-dots";
 import { takeData } from "./carry";
-import aquarium from "./aquarium";
-import birding from "./birding";
-import crab from "./crab";
-import { clock, type Scene, show } from "./engine";
-import fishing from "./fishing";
-import globe from "./globe";
-import herping from "./herping";
-import hiking from "./hiking";
-import { type Dots, median, split } from "./stage";
+import { clock, pushZoom, rendererReady, show, warmRenderer } from "./engine";
+import { ready, SCENES, type Staged } from "./table";
+import { split } from "./stage";
 
 /**
- * Each hobby's opening scene, by slug. Loaded on demand by src/lib/open.ts
+ * The hobby scenes for the page. Loaded on demand by src/lib/open.ts
  * (fetched ahead on pages with hobby cards) and by a hobby page a scene is
- * carrying on into (src/lib/landing.ts), so other pages never pay for it.
+ * carrying on into (src/lib/landing.ts), so other pages never pay for them.
  */
-export const SCENES: Record<string, Scene> = {
-  "narrow-nature": globe,
-  "aquarium-keeping": aquarium,
-  "tide-pooling": crab,
-  fishing,
-  birding,
-  herping,
-  hiking,
-};
-
-export interface Staged {
-  dots: Dots;
-  parts: Record<string, Dots>;
-  prep: unknown;
-}
-
-const staged = new WeakMap<Dots, Map<Scene, Staged>>();
-
-/**
- * A plate's dots split into the scene's parts, and with `props`, the scene's
- * props drawn to match. Done once per plate; a plate's dots are already
- * particular to the theme.
- */
-export function ready(
-  scene: Scene,
-  dots: Dots,
-  dark: boolean,
-  props = true,
-): Staged {
-  let byScene = staged.get(dots);
-  if (!byScene) staged.set(dots, (byScene = new Map()));
-  let entry = byScene.get(scene);
-  if (!entry) {
-    entry = { dots, parts: split(dots, scene.parts ?? []), prep: undefined };
-    byScene.set(scene, entry);
-  }
-  if (props && entry.prep === undefined && scene.prepare)
-    entry.prep = scene.prepare(dots, median(dots.r), dark);
-  return entry;
-}
+export { ready, SCENES, type Staged } from "./table";
 
 interface Debug {
   duration: number;
@@ -68,18 +23,21 @@ interface Debug {
  * On the hobby page a scene changed into: build the scene again from the
  * same plate and seed, and play the rest of it over the page from the frame
  * the last page left on, which the page has been showing since its first
- * paint (the note's `art`). `claim()` says whether it's still wanted; it
+ * paint (the note's `frame`). `claim()` says whether it's still wanted; it
  * isn't if the page gave up waiting and showed itself.
  */
 export async function resume(
   note: LandingNote,
   claim: () => boolean,
+  over: () => void = () => {},
 ): Promise<boolean> {
   const s = note.scene;
   if (!s) return false;
   const slug = location.pathname.split("/").filter(Boolean).pop() ?? "";
   const scene = SCENES[slug];
   if (!scene) throw new Error(`No scene for ${slug}.`);
+  // The WebGL renderer builds its shaders while the scene is set up again.
+  warmRenderer();
   // The plate's dots and the props, as the last page had them; or, if they
   // didn't make it, read and drawn again (the same, from the same plate).
   const carried = takeData(note.path, note.at);
@@ -97,6 +55,10 @@ export async function resume(
     if (!field) throw new Error("The plate couldn't be read.");
     staged = ready(scene, field, s.dark);
   }
+
+  // Give the renderer what's left of the hold, near enough, to be ready.
+  const holdLeft = note.at + s.hold - Date.now();
+  await rendererReady(Math.max(0, Math.min(250, holdLeft - 60)));
 
   const root = document.documentElement;
   const style = getComputedStyle(root);
@@ -116,6 +78,7 @@ export async function resume(
       font: getComputedStyle(document.body).fontFamily,
       dark: s.dark,
       seed: s.seed,
+      zoom: () => pushZoom(Date.now() - note.at),
     },
     "landing-veil",
   );
@@ -127,7 +90,10 @@ export async function resume(
   // Draw once before claiming, so a scene that can't draw falls back to the
   // plain fade.
   shown.draw(sceneNow());
-  if (!claim()) return false;
+  if (!claim()) {
+    shown.dispose();
+    return false;
+  }
 
   if (
     import.meta.env.DEV &&
@@ -151,6 +117,8 @@ export async function resume(
   };
   const done = () => {
     canvas.remove();
+    shown.dispose();
+    over();
     window.removeEventListener("keydown", onKey, true);
     window.removeEventListener("pointerdown", hurry, true);
   };
@@ -177,6 +145,10 @@ export async function resume(
       document.body.append(canvas);
       landed(root);
     } else if (!canvas.isConnected) return;
+    if (shown.lost) {
+      done();
+      return;
+    }
     const t = Math.min(end, t0 + time.now());
     try {
       shown.draw(t);
@@ -194,4 +166,4 @@ export async function resume(
 /** This module's own address, for the next page to fetch it early. */
 export const moduleUrl = import.meta.url;
 
-export { play } from "./engine";
+export { play, warmRenderer } from "./engine";

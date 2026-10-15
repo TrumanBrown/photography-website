@@ -3,9 +3,11 @@ import {
   ACT,
   type DrawOpts,
   HOLD_ZOOM,
-  holdZoom,
   LEAVE,
   type Painter,
+  PUSH_EASE,
+  PUSH_MS,
+  pushZoom,
   type SceneContext,
   type SceneRun,
 } from "./engine";
@@ -23,7 +25,7 @@ import {
   mul,
   seeded,
   smootherstep,
-  cssEaseInOut,
+  cubicBezier,
   toScreen,
 } from "./stage";
 
@@ -225,23 +227,24 @@ function frame(run: SceneRun, p: Recorder, t: number) {
 
 const dots = plate();
 
-describe("the hold", () => {
-  it("eases the camera in on the landing CSS's curve", () => {
-    const zoom = holdZoom(LEAVE, ACT, true);
-    expect(zoom(0)).toBe(1);
-    expect(zoom(LEAVE)).toBe(1);
-    expect(zoom(ACT)).toBeCloseTo(HOLD_ZOOM, 9);
-    expect(zoom(ACT + 500)).toBeCloseTo(HOLD_ZOOM, 9);
+describe("the push in", () => {
+  it("eases out from the moment the page changes, on the landing CSS's curve", () => {
+    expect(pushZoom(-100)).toBe(1);
+    expect(pushZoom(0)).toBe(1);
+    expect(pushZoom(PUSH_MS)).toBeCloseTo(HOLD_ZOOM, 9);
+    expect(pushZoom(PUSH_MS * 3)).toBeCloseTo(HOLD_ZOOM, 9);
+    const ease = cubicBezier(...PUSH_EASE);
     for (const k of [0.1, 0.25, 0.5, 0.8])
-      expect(zoom(LEAVE + k * (ACT - LEAVE))).toBeCloseTo(
-        1 + (HOLD_ZOOM - 1) * cssEaseInOut(k),
+      expect(pushZoom(k * PUSH_MS)).toBeCloseTo(
+        1 + (HOLD_ZOOM - 1) * ease(k),
         9,
       );
   });
 
-  it("doesn't zoom a scene that stays on its page", () => {
-    const zoom = holdZoom(2000, 2000, false);
-    for (const t of [0, 500, 2000, 3000]) expect(zoom(t)).toBe(1);
+  it("is still moving when the action is due, so a slow page never stops it dead", () => {
+    const at = ACT - LEAVE;
+    expect(pushZoom(at + 50) - pushZoom(at)).toBeGreaterThan(0.0005);
+    expect(pushZoom(at + 300)).toBeLessThan(HOLD_ZOOM);
   });
 });
 

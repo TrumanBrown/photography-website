@@ -131,7 +131,47 @@ interface Hit {
   nz: number;
 }
 
+/** Bounding boxes of tubes and lines, to pass most points by quickly. */
+const boxes = new WeakMap<object, readonly [number, number, number, number]>();
+function boxOf(
+  key: object,
+  pts: ReadonlyArray<readonly number[]>,
+  pad: (p: readonly number[]) => number,
+) {
+  let box = boxes.get(key);
+  if (!box) {
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -Infinity;
+    let y1 = -Infinity;
+    for (const p of pts) {
+      const r = pad(p);
+      x0 = Math.min(x0, p[0] - r);
+      y0 = Math.min(y0, p[1] - r);
+      x1 = Math.max(x1, p[0] + r);
+      y1 = Math.max(y1, p[1] + r);
+    }
+    box = [x0, y0, x1, y1];
+    boxes.set(key, box);
+  }
+  return box;
+}
+const outside = (
+  box: readonly [number, number, number, number],
+  x: number,
+  y: number,
+  by = 0,
+) => x < box[0] - by || y < box[1] - by || x > box[2] + by || y > box[3] + by;
+
 function onTube(tube: Tube, x: number, y: number, out: Hit): boolean {
+  if (
+    outside(
+      boxOf(tube, tube.axis, (p) => p[2]),
+      x,
+      y,
+    )
+  )
+    return false;
   let best = -Infinity;
   let bx = 0;
   let by = 0;
@@ -311,7 +351,15 @@ const FOLDS: Pt[][] = [
 ];
 
 const onAny = (lines: Pt[][], x: number, y: number, w: number) =>
-  lines.some((line) => nearLine(line, x, y) < w);
+  lines.some(
+    (line) =>
+      !outside(
+        boxOf(line, line, () => 0),
+        x,
+        y,
+        w,
+      ) && nearLine(line, x, y) < w,
+  );
 
 /**
  * A fingernail under a fingertip, facing down: the curl of the tip turned
@@ -404,9 +452,8 @@ export function makeHand(r0: number, dark = false): HandDots {
         if (nail) return nail;
         if (onAny(FINGER_CREASES, x, y, 1.2)) return CREASE;
         // Shaded where it tucks in under the finger in front of it.
-        const cover = i ? FINGERS[i - 1] : INDEX;
         let shade = 0.03;
-        if (onTube({ ...cover, axis: grown(cover, 6) }, x, y, near))
+        if (onTube(COVERS[i], x, y, near))
           shade += 0.28 * clamp01(near.inside / 6);
         return clamp01(
           Math.min(0.85, skin(hit, dark) + (dark ? -shade : shade)),
@@ -463,7 +510,13 @@ export function makeHand(r0: number, dark = false): HandDots {
   };
 }
 
-/** A tube's axis a little fatter. */
-function grown(tube: Tube, by: number) {
-  return tube.axis.map(([x, y, r]) => [x, y, r + by] as const);
+/** A tube a little fatter. */
+function grown(tube: Tube, by: number): Tube {
+  return {
+    ...tube,
+    axis: tube.axis.map(([x, y, r]) => [x, y, r + by] as const),
+  };
 }
+
+/** What each finger behind tucks in under: the one in front, a little fatter. */
+const COVERS = FINGERS.map((_, i) => grown(i ? FINGERS[i - 1] : INDEX, 6));

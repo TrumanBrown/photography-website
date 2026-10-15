@@ -10,6 +10,7 @@
  *
  * Mounted by src/components/hobbies/Fishing.astro via [data-fish-*] hooks.
  */
+import { covered, whenUncovered } from '../covered';
 import geo from './fishing-geo.json';
 import watersJson from './fishing-waters.json';
 import { FISH_BY_ID, type FishSpecies } from './fishing-species';
@@ -128,13 +129,15 @@ export function initFishing(root: HTMLElement): void {
   // animation loop (shared; pauses offscreen / hidden)
   let raf = 0, running = false, onscreen = true;
   const step = (now: number) => { for (const v of views) v.frame(now); raf = requestAnimationFrame(step); };
-  const start = () => { if (running) return; running = true; raf = requestAnimationFrame(step); };
+  // Not under a scene that's still playing; it starts once that's gone.
+  const start = () => { if (running || covered()) return; running = true; raf = requestAnimationFrame(step); };
   const stop = () => { running = false; cancelAnimationFrame(raf); };
   new IntersectionObserver((es) => {
     onscreen = es.some((e) => e.isIntersecting);
     if (onscreen && !document.hidden && !reduce) start(); else stop();
   }, { threshold: 0.01 }).observe(root);
   document.addEventListener('visibilitychange', () => { if (document.hidden) stop(); else if (onscreen && !reduce) start(); });
+  whenUncovered(() => { if (onscreen && !document.hidden && !reduce) start(); });
 
   for (const v of views) v.frame(0); // initial static paint
   if (!reduce) start();

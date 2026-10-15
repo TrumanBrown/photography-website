@@ -26,6 +26,7 @@
  * functions (look).
  */
 
+import { covered, whenUncovered } from '../covered';
 import { rollTo, setHair } from '../motion';
 import { SPECIES, type Shape, type Species, type Zone } from './aquarium-species';
 import { createJumps, type Sprite } from './aquarium-jump';
@@ -1131,7 +1132,8 @@ export function initAquarium(root: HTMLElement): void {
   }
 
   function start(): void {
-    if (running) return;
+    // Not under a scene that's still playing; it starts once that's gone.
+    if (running || covered()) return;
     running = true;
     last = performance.now();
     raf = requestAnimationFrame(step);
@@ -1228,6 +1230,9 @@ export function initAquarium(root: HTMLElement): void {
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) stop();
     else if (onscreen) start();
+  });
+  whenUncovered(() => {
+    if (onscreen && !document.hidden) start();
   });
 
   // ------------------------------------------------------------- init

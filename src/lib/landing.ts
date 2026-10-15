@@ -1,3 +1,13 @@
+import { uncover } from "./covered";
+import { CARRY_KEY } from "./scenes/carry";
+import {
+  adoptResume,
+  canPlayInWorker,
+  type Playing,
+  type ResumeEvents,
+  scenePlayer,
+} from "./scenes/player";
+
 /**
  * Landing in a page after a transition out of the last one.
  *
@@ -28,6 +38,18 @@ export type Reveal =
   | { from: readonly [number, number] }
   | { wave: readonly [number, number] };
 
+/**
+ * A scene's frame as the page it hands over to paints it first: its dots,
+ * colour by colour in the order they're drawn, over paper, laid out in a
+ * viewport `w` by `h`. Each op is a colour, its opacity, and its dots as x,
+ * y and radius, CSS px, in a flat list (src/lib/scenes/engine.ts).
+ */
+export interface HeldFrame {
+  w: number;
+  h: number;
+  ops: Array<[color: string, alpha: number, xyr: number[]]>;
+}
+
 /** What the old page leaves under LANDING_KEY. */
 export interface LandingNote {
   /** Path of the page it's landing in, with a trailing slash. */
@@ -45,9 +67,11 @@ export interface LandingNote {
   ink?: string;
   /**
    * The frame it left on as a CSS background layer, for the first paint:
-   * the big dots (dotsArt), or a scene's frame (src/lib/scenes/engine.ts).
+   * the big dots (dotsArt). (A scene's frame comes as `frame` instead.)
    */
   art?: string;
+  /** A scene's frame, for the head script to paint before anything else. */
+  frame?: HeldFrame;
   reveal?: Reveal;
   /** A scene that carries on over this page (src/lib/scenes/index.ts). */
   scene?: {
@@ -69,13 +93,30 @@ export interface LandingNote {
     zoom: number;
     /** The scenes module, to fetch it while this page is still loading. */
     module?: string;
+    /**
+     * The scene worker (src/lib/scenes/worker.ts), for this page's head
+     * script to start straight away, and the colours it draws red and paper
+     * in (the paper under the frame too).
+     */
+    worker?: string;
+    red?: string;
+    paper?: string;
   };
+}
+
+/** A scene the head script started in the worker, for carryOn() to take over. */
+export interface EarlyWorker {
+  worker: Worker;
+  canvas: HTMLCanvasElement;
+  /** What the worker said before anything was listening. */
+  inbox: unknown[];
 }
 
 declare global {
   interface Window {
     /** The note this page landed with, kept by the head script. */
     landingNote?: LandingNote;
+    landingWorker?: EarlyWorker;
   }
 }
 
@@ -84,10 +125,19 @@ declare global {
  * (the banner photograph alone, full screen, until settleLanding() takes
  * over) or `landing-dots` (paper and the frame the card's scene left on,
  * until settleDots() picks it up) when this page is the one a transition is
- * landing in. A scene that's carrying on over this page is in its hold: the
- * CSS eases the frame in from the moment it left, timed off the note, while
- * the page loads, and the scenes module is fetched straight away. If nothing
- * takes over, the page shows itself after four seconds anyway.
+ * landing in. A scene that's carrying on over this page is in its hold: its
+ * frame is painted here, once, on a canvas of its own (as a CSS picture, the
+ * GPU would draw its thousands of dots again for every tile, just as the
+ * scene needs the GPU to start up), and the CSS eases it in from the moment
+ * it left, timed off the note, while the page loads. Where the browser can,
+ * the scene worker starts right here on a canvas under that frame and picks
+ * the scene up with the data the last page carried (carryOn() takes it over
+ * once the page's scripts run); otherwise the scenes module is fetched
+ * straight away. While the scene
+ * plays, `landing-scene` on <html> keeps the page's own animations still
+ * (src/lib/covered.ts). If nothing takes over, the page shows itself after
+ * four seconds anyway (and stops a worker the page never took on), and its
+ * animations start after eight at the latest.
  *
  * Keep it free of backslashes and template placeholders: scripts/csp-hash.mjs
  * hashes this source text as written, and the hash has to match the string
@@ -109,19 +159,86 @@ export const landingBootstrap = `
     if (typeof note.art === 'string') root.style.setProperty('--landing-dots', note.art);
     var scene = note.scene;
     if (scene) {
+      root.classList.add('landing-scene');
+      setTimeout(function () {
+        if (!root.classList.contains('landing-scene')) return;
+        root.classList.remove('landing-scene');
+        document.dispatchEvent(new Event('landing:uncovered'));
+      }, 8000);
       root.style.setProperty('--landing-zoom', String(scene.zoom || 1));
       root.style.setProperty('--landing-hold', (scene.hold || 0) + 'ms');
       root.style.setProperty('--landing-delay', (note.at - Date.now()) + 'ms');
-      if (typeof scene.module === 'string') {
+      var flags = location.search;
+      if (typeof scene.worker === 'string' && window.Worker && window.OffscreenCanvas && HTMLCanvasElement.prototype.transferControlToOffscreen && flags.indexOf('scene-main') < 0 && flags.indexOf('scene-debug') < 0) {
+        var canvas = document.createElement('canvas');
+        canvas.className = 'landing-veil';
+        canvas.setAttribute('aria-hidden', 'true');
+        root.appendChild(canvas);
+        var worker = new Worker(scene.worker, { type: 'module' });
+        var inbox = [];
+        worker.onmessage = function (event) { inbox.push(event.data); };
+        worker.onerror = function () { inbox.push({ type: 'failed' }); };
+        var offscreen = canvas.transferControlToOffscreen();
+        worker.postMessage({ type: 'init', canvas: offscreen, software: flags.indexOf('scene-gl') >= 0, gl: flags.indexOf('scene-2d') < 0 }, [offscreen]);
+        worker.postMessage({
+          type: 'resume',
+          slug: here.split('/').filter(Boolean).pop(),
+          note: { path: note.path, at: note.at, kind: note.kind, ink: note.ink, scene: scene },
+          carried: sessionStorage.getItem('globe-landing-data'),
+          view: { w: window.innerWidth, h: window.innerHeight, dpr: Math.min(window.devicePixelRatio || 1, 2) },
+          red: scene.red,
+          paper: scene.paper
+        });
+        window.landingWorker = { worker: worker, canvas: canvas, inbox: inbox };
+      } else if (typeof scene.module === 'string') {
         var link = document.createElement('link');
         link.rel = 'modulepreload';
         link.href = scene.module;
         document.head.appendChild(link);
       }
+      var held = note.frame;
+      if (held && held.ops && held.w > 0 && held.h > 0) {
+        var dpr = Math.min(window.devicePixelRatio || 1, 2);
+        var frame = document.createElement('canvas');
+        frame.width = Math.round(held.w * dpr);
+        frame.height = Math.round(held.h * dpr);
+        var pen = frame.getContext('2d', { alpha: false, willReadFrequently: true });
+        if (pen) {
+          pen.fillStyle = scene.paper || '#fbfaf8';
+          pen.fillRect(0, 0, frame.width, frame.height);
+          pen.scale(dpr, dpr);
+          for (var i = 0; i < held.ops.length; i++) {
+            var op = held.ops[i];
+            var xyr = op[2];
+            pen.globalAlpha = op[1];
+            pen.fillStyle = op[0];
+            pen.beginPath();
+            for (var j = 0; j + 2 < xyr.length; j += 3) {
+              pen.moveTo(xyr[j] + xyr[j + 2], xyr[j + 1]);
+              pen.arc(xyr[j], xyr[j + 1], xyr[j + 2], 0, 2 * Math.PI);
+            }
+            pen.fill();
+          }
+          frame.className = 'landing-frame';
+          frame.setAttribute('aria-hidden', 'true');
+          frame.style.width = held.w + 'px';
+          frame.style.height = held.h + 'px';
+          root.appendChild(frame);
+        }
+      }
     }
     window.landingNote = note;
     root.classList.add(mark);
-    setTimeout(function () { root.classList.remove(mark); }, 4000);
+    setTimeout(function () {
+      root.classList.remove(mark);
+      if (frame) frame.remove();
+      var early = window.landingWorker;
+      if (early) {
+        window.landingWorker = undefined;
+        early.worker.terminate();
+        early.canvas.remove();
+      }
+    }, 4000);
   } catch (_) {}
 })();
 `.trim();
@@ -279,7 +396,9 @@ export function holeRadius(reach: number, ms: number, step: number): number {
  */
 export function settleDots(): void {
   const root = document.documentElement;
-  if (!root.classList.contains("landing-dots")) return;
+  // Not landing here; or the head script's fallback showed the page before
+  // this ran, and its animations can start.
+  if (!root.classList.contains("landing-dots")) return uncover();
   const note = window.landingNote;
   if (note?.scene) {
     carryOn(root, note);
@@ -367,28 +486,105 @@ export function dotsArt(
 const RESUME_WAIT = 2500;
 
 /**
- * Carry a hobby card's scene on over this page. If it can't (the scenes
- * won't load, or take too long), the frame it left on fades away instead.
+ * Carry a hobby card's scene on over this page: in the scene worker where
+ * the browser can (scenes/player.ts), so this page's own loading and
+ * scripts can't make it stutter, or else on the page. If it can't (the
+ * scenes won't load, or take too long), the frame it left on fades away.
  */
 function carryOn(root: HTMLElement, note: LandingNote) {
   let settled = false;
+  let playing: Playing | undefined;
   const giveUp = () => {
     if (settled) return;
     settled = true;
+    window.clearTimeout(timer);
+    // A frame it draws later mustn't come up over the page.
+    playing?.stop();
     fadeVeil(root, note.art);
   };
   const timer = window.setTimeout(giveUp, RESUME_WAIT);
-  import("./scenes")
-    .then((scenes) =>
-      scenes.resume(note, () => {
-        if (settled || !root.classList.contains("landing-dots")) return false;
-        settled = true;
-        window.clearTimeout(timer);
-        return true;
-      }),
-    )
-    .catch(giveUp);
+  // However it ends, the page's own animations start again after.
+  const over = () => uncover();
+  const claim = () => {
+    if (settled) return false;
+    // The head script's fallback showed the page already.
+    if (!root.classList.contains("landing-dots")) {
+      giveUp();
+      return false;
+    }
+    settled = true;
+    window.clearTimeout(timer);
+    return true;
+  };
+  const onPage = () =>
+    import("./scenes")
+      .then((scenes) => scenes.resume(note, claim, over))
+      .catch(giveUp);
+
+  let shown = false;
+  const events: ResumeEvents = {
+    shown() {
+      if (!claim()) return playing?.stop();
+      shown = true;
+      try {
+        sessionStorage.removeItem(CARRY_KEY);
+      } catch {
+        // Nothing to clear.
+      }
+      landed(root);
+    },
+    done: over,
+    // If it couldn't start, the page has a go instead.
+    failed() {
+      if (shown) over();
+      else if (!settled) void onPage();
+    },
+  };
+
+  // The head script may have started the scene in a worker already.
+  const early = window.landingWorker;
+  if (early) {
+    window.landingWorker = undefined;
+    const adopted = adoptResume(early, events);
+    playing = adopted;
+    window.addEventListener("pagehide", () => adopted.stop(), { once: true });
+    return;
+  }
+
+  const player = canPlayInWorker() ? scenePlayer() : null;
+  if (!player) return void onPage();
+  let carried: string | null = null;
+  try {
+    carried = sessionStorage.getItem(CARRY_KEY);
+  } catch {
+    // Then the worker can't carry on, and the page does.
+  }
+  const style = getComputedStyle(root);
+  const resumed = player.resume(
+    {
+      slug: location.pathname.split("/").filter(Boolean).pop() ?? "",
+      note,
+      carried,
+      red: style.getPropertyValue("--stamp").trim() || "#b3301c",
+      paper: style.getPropertyValue("--paper").trim() || "#fbfaf8",
+    },
+    events,
+  );
+  playing = resumed;
+  window.addEventListener(
+    "pageshow",
+    (event) => {
+      if (event.persisted) resumed.stop();
+    },
+    { once: true },
+  );
 }
+
+/** The scene's frame the head script painted, while it's up. */
+const heldFrame = () =>
+  document.querySelector<HTMLCanvasElement>(
+    "canvas.landing-frame:not([data-fading])",
+  );
 
 /**
  * The page is showing whatever it landed on by now: let go of the note and
@@ -396,6 +592,7 @@ function carryOn(root: HTMLElement, note: LandingNote) {
  */
 export function landed(root: HTMLElement): void {
   root.classList.remove("landing-dots");
+  heldFrame()?.remove();
   for (const name of [
     "--landing-dots",
     "--landing-zoom",
@@ -408,23 +605,36 @@ export function landed(root: HTMLElement): void {
 
 /** Fade the frame the page opened on, and show the page. */
 function fadeVeil(root: HTMLElement, art?: string) {
-  if (!root.classList.contains("landing-dots")) return;
-  const veil = document.createElement("div");
-  veil.className = "landing-veil";
-  veil.setAttribute("aria-hidden", "true");
-  if (art) veil.style.background = `${art}, var(--paper)`;
-  document.body.append(veil);
+  // Shown already, by the head script's fallback: just let it move.
+  if (!root.classList.contains("landing-dots")) return uncover();
+  // The frame the head script painted fades itself, still pushing in;
+  // otherwise a sheet of the art the page opened on does.
+  const frame = heldFrame();
+  if (frame) {
+    // Kept where the push-in has got to: its timing goes with landed().
+    frame.style.transform = getComputedStyle(frame).transform;
+    frame.style.animation = "none";
+    frame.dataset.fading = "";
+  }
+  const veil = frame ?? document.createElement("div");
+  if (!frame) {
+    veil.className = "landing-veil";
+    veil.setAttribute("aria-hidden", "true");
+    if (art) veil.style.background = `${art}, var(--paper)`;
+    document.body.append(veil);
+  }
   landed(root);
+  const gone = () => {
+    veil.remove();
+    uncover();
+  };
   veil
     .animate([{ opacity: 1 }, { opacity: 0 }], {
       duration: 320,
       easing: "ease-out",
       fill: "forwards",
     })
-    .finished.then(
-      () => veil.remove(),
-      () => veil.remove(),
-    );
+    .finished.then(gone, gone);
 }
 
 /** How long the wave of opening takes to cross the screen, ms. */

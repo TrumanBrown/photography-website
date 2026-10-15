@@ -462,7 +462,9 @@ export function initHerpMap(root: HTMLElement): void {
     const off = document.createElement("canvas");
     off.width = Math.round(W * dpr);
     off.height = Math.round(H * dpr);
-    const octx = off.getContext("2d");
+    // Read straight back: kept on the CPU, so reading it doesn't wait on
+    // (and hold up) the GPU.
+    const octx = off.getContext("2d", { willReadFrequently: true });
     if (!octx) return;
     octx.setTransform(dpr, 0, 0, dpr, 0, 0);
     octx.globalCompositeOperation = "lighter";

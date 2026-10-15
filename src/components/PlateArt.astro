@@ -80,6 +80,8 @@ const card = size === "card" ? plate : plateFor(slug, "card");
     const host = plate.closest<HTMLElement>("a") ?? plate;
     let running: HTMLImageElement | null = null;
     let timer: number | undefined;
+    // While its opening scene plays, a card holds its first inking.
+    let held = false;
 
     const stop = () => {
       window.clearInterval(timer);
@@ -92,7 +94,7 @@ const card = size === "card" ? plate : plateFor(slug, "card");
     };
 
     const start = async () => {
-      if (reduce.matches || running) return;
+      if (reduce.matches || running || held) return;
       const ink = document.documentElement.classList.contains("dark")
         ? "dark"
         : "light";
@@ -125,6 +127,13 @@ const card = size === "card" ? plate : plateFor(slug, "card");
     host.addEventListener("pointerleave", stop);
     host.addEventListener("focusin", () => void start());
     host.addEventListener("focusout", stop);
+    host.addEventListener("plate:hold", () => {
+      held = true;
+      stop();
+    });
+    host.addEventListener("plate:free", () => {
+      held = false;
+    });
     stops.push(stop);
   }
 
