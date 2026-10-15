@@ -56,23 +56,25 @@ let view: View = { w: 1, h: 1, dpr: 1 };
  * Work for cards that are only being got ready, one piece at a time, each
  * in a task of its own: a click's message always gets in between any two,
  * and none of it runs while a clicked card's scene sets up or plays (it
- * would cost the scene frames).
+ * would cost the scene frames). A card that's pointed at, focused or
+ * pressed goes ahead of the rest, as it's the one likely to be clicked.
  */
+const soon: Array<() => void> = [];
 const queue: Array<() => void> = [];
 let held = false;
 let pending = false;
 function schedule() {
-  if (pending || held || !queue.length) return;
+  if (pending || held || (!soon.length && !queue.length)) return;
   pending = true;
   setTimeout(() => {
     pending = false;
     if (held) return;
-    queue.shift()?.();
+    (soon.shift() ?? queue.shift())?.();
     schedule();
   }, 0);
 }
-const later = (job: () => void) => {
-  queue.push(job);
+const later = (job: () => void, first = false) => {
+  (first ? soon : queue).push(job);
   schedule();
 };
 function hold(on: boolean) {
@@ -85,6 +87,8 @@ function hold(on: boolean) {
 const plates = new Map<string, Promise<DotField | null>>();
 /** Plates a click wants: read the moment they're in, not in their turn. */
 const wanted = new Set<string>();
+/** Plates of cards a click is likely on: read ahead of the rest. */
+const likely = new Set<string>();
 const waiting = new Map<string, () => void>();
 
 /** Until it's this plate's turn to be read: at once, if a click wants it. */
@@ -97,7 +101,7 @@ function turnFor(url: string): Promise<void> {
       resolve();
     };
     waiting.set(url, go);
-    later(go);
+    later(go, likely.has(url));
   });
 }
 
@@ -210,13 +214,24 @@ function stopCurrent() {
 /** Ready a card's plate and props ahead of a click on it, in their turn. */
 async function warm(m: WarmRequest) {
   const scene = SCENES[m.slug];
+  const { rehearse: soonest } = m;
+  if (soonest)
+    for (const url of [m.card, m.mini]) {
+      if (!url) continue;
+      likely.add(url);
+      // Already waiting its turn: it goes ahead now.
+      const go = waiting.get(url);
+      if (go) later(go, true);
+    }
   if (m.mini) void plate(m.mini);
   const dots = await plate(m.card);
   if (!scene || !dots) return;
-  later(() => ready(scene, dots, m.dark));
-  const { rehearse: likely } = m;
-  if (likely)
-    later(() => rehearse(scene, dots, m.dark, likely.rect, likely.view));
+  later(() => ready(scene, dots, m.dark), !!soonest);
+  if (soonest)
+    later(
+      () => rehearse(scene, dots, m.dark, soonest.rect, soonest.view),
+      true,
+    );
 }
 
 const rehearsed = new Set<Scene>();
