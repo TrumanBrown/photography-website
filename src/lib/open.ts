@@ -5,6 +5,7 @@ import {
   CARD_W,
   cardUnits,
   type DotField,
+  loadPlate,
   quietSpot,
   readDots,
 } from "./plate-dots";
@@ -213,13 +214,20 @@ const DIVE_DEPTH = 90;
 /** The dots fade out over the end of the dive, as they rush past. */
 const FADE_FROM = 0.58;
 
-/** The plain dive into a plate, for when its scene isn't available. */
-function diveHobby(plate: HTMLImageElement, href: string): boolean {
-  const field = readDots(plate);
+/**
+ * The plain dive into a plate, for when its scene isn't available: from the
+ * dots already read (card units), or read off the card itself.
+ */
+function diveHobby(
+  plate: HTMLImageElement,
+  href: string,
+  known: DotField | null = null,
+): boolean {
+  const field = known ?? readDots(plate);
   if (!field || field.n < 40) return false;
 
   const box = plate.getBoundingClientRect();
-  const k0 = box.width / plate.naturalWidth;
+  const k0 = box.width / (known ? CARD_W : plate.naturalWidth);
   const spot = quietSpot(field);
   const startX = box.left + spot.x * k0;
   const startY = box.top + spot.y * k0;
@@ -296,10 +304,11 @@ function loadScenes(): Promise<Scenes> {
   return scenes;
 }
 
-/** How long a click waits for the scenes before settling for the plain dive. */
+/**
+ * How long a click waits for the scenes and its plate's dots, when they
+ * aren't ready from pointing at the card already.
+ */
 const SCENE_WAIT_MS = 400;
-/** How long a home-page card waits for its finer card plate. */
-const CARD_WAIT_MS = 150;
 
 const wait = (ms: number) =>
   new Promise<undefined>((resolve) => setTimeout(resolve, ms));
@@ -323,10 +332,8 @@ const plateDotsReady = new Map<string, DotField | null>();
 function dotsOf(url: string): Promise<DotField | null> {
   let known = plateDots.get(url);
   if (!known) {
-    const img = new Image();
-    img.src = url;
-    known = img.decode().then(
-      () => {
+    known = loadPlate(url).then(
+      (img) => {
         const field = cardUnits(readDots(img), img.naturalWidth);
         plateDotsReady.set(url, field);
         return field;
@@ -336,6 +343,16 @@ function dotsOf(url: string): Promise<DotField | null> {
     plateDots.set(url, known);
   }
   return known;
+}
+
+/** The still a mini plate shows when it isn't boiling: the first of its frames. */
+function miniStill(img: HTMLImageElement): string | null {
+  if (img.naturalWidth >= CARD_W * 0.9) return null;
+  try {
+    return (JSON.parse(img.dataset.frames ?? "[]") as string[])[0] ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /** The plate a hobby link is showing right now, if it has loaded. */
@@ -359,9 +376,13 @@ function warmHobby(link: HTMLAnchorElement): Promise<void> {
   const known = warmedHobbies.get(link);
   if (known) return known;
   const dark = isDark();
-  const url = link.querySelector<HTMLImageElement>(
+  const shown = link.querySelector<HTMLImageElement>(
     `img[data-ink="${dark ? "dark" : "light"}"]`,
-  )?.dataset.card;
+  );
+  const url = shown?.dataset.card;
+  // A home-page card's mini plate too: the scene starts from it.
+  const mini = shown && shown.complete ? miniStill(shown) : null;
+  if (mini) void dotsOf(mini);
   const warm = Promise.all([loadScenes(), url ? dotsOf(url) : null])
     .then(
       ([mod, field]) =>
@@ -389,39 +410,37 @@ function openHobby(link: HTMLAnchorElement): boolean {
   const dark = isDark();
   // Warm the page while the scene plays.
   fetch(href).catch(() => undefined);
-  const fallback = () => {
-    if (!diveHobby(img, href)) leave(href, null);
+  // The scene plays from the card plate, finer than a home-page card's mini
+  // one, and the hobby page reads the same image to carry it on. Both are
+  // usually read already (warmHobby); if not, they start loading now.
+  const url = img.dataset.card;
+  const mini = miniStill(img);
+  const cardDots = url ? dotsOf(url) : Promise.resolve(null);
+  const miniDots = mini ? dotsOf(mini) : Promise.resolve(null);
+  const deadline = wait(SCENE_WAIT_MS);
+  const fallback = (field: DotField | null) => {
+    if (!diveHobby(img, href, field)) leave(href, null);
   };
 
   void (async () => {
-    const mod = await Promise.race([loadScenes(), wait(SCENE_WAIT_MS)]).catch(
-      () => undefined,
-    );
-    const scene = mod?.SCENES[slug];
-    if (!mod || !scene) return fallback();
-
-    // The scene plays from the card plate, finer than a home-page card's
-    // mini one, and the hobby page reads the same image to carry it on. If
-    // the card plate isn't to hand in time, it plays from whatever the card
-    // is showing.
-    const url = img.dataset.card;
-    let main: DotField | null = null;
-    let plate = url ?? "";
-    if (url)
-      main =
-        plateDotsReady.get(url) ??
-        (await Promise.race([dotsOf(url), wait(CARD_WAIT_MS)])) ??
-        null;
+    const [mod, cardField, miniField] = await Promise.all([
+      Promise.race([loadScenes(), deadline]).catch(() => undefined),
+      Promise.race([cardDots, deadline]),
+      Promise.race([miniDots, deadline]),
+    ]);
+    // Read straight off the card as a last resort: that works wherever the
+    // plates are served from the site itself.
     const shown = () => cardUnits(readDots(img), img.naturalWidth);
-    let from: DotField | null = null;
+    let main = cardField ?? null;
+    let plate = url ?? "";
     if (!main) {
-      main = shown();
-      plate = img.currentSrc || img.src;
-    } else if (img.naturalWidth < CARD_W * 0.9) {
-      // A home-page card's mini plate fades into the card plate as it lifts.
-      from = shown();
+      main = miniField ?? shown();
+      plate = mini ?? img.currentSrc ?? img.src;
     }
-    if (!main || main.n < 40) return fallback();
+    const scene = mod?.SCENES[slug];
+    if (!mod || !scene || !main || main.n < 40) return fallback(main);
+    // A home-page card's mini plate fades into the card plate as it lifts.
+    const from = cardField && mini ? (miniField ?? shown()) : null;
 
     const style = getComputedStyle(document.documentElement);
     const ink = main.color;
@@ -486,7 +505,7 @@ function openHobby(link: HTMLAnchorElement): boolean {
         busy = false;
       });
     } catch {
-      fallback();
+      fallback(main);
     }
   })();
   return true;

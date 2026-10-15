@@ -1,5 +1,5 @@
 import { landed, type LandingNote } from "../landing";
-import { cardUnits, readDots } from "../plate-dots";
+import { cardUnits, loadPlate, readDots } from "../plate-dots";
 import aquarium from "./aquarium";
 import birding from "./birding";
 import crab from "./crab";
@@ -79,9 +79,7 @@ export async function resume(
   const slug = location.pathname.split("/").filter(Boolean).pop() ?? "";
   const scene = SCENES[slug];
   if (!scene) throw new Error(`No scene for ${slug}.`);
-  const img = new Image();
-  img.src = s.plate;
-  await img.decode();
+  const img = await loadPlate(s.plate);
   const field = cardUnits(readDots(img), img.naturalWidth);
   if (!field) throw new Error("The plate couldn't be read.");
   const stagedScene = ready(scene, field, s.dark);

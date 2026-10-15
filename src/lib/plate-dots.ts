@@ -8,6 +8,21 @@
 /** A card plate is 880 wide, a mini 360; scenes work in card units. */
 export const CARD_W = 880;
 
+/**
+ * Load a plate to read its dots. In production the plates are served from
+ * the photo storage host, so the image has to come with CORS, or the canvas
+ * it's drawn on can't be read back. (The storage sends `Vary: Origin`, so
+ * this copy and the one the card shows don't get mixed up in the cache.)
+ */
+export async function loadPlate(url: string): Promise<HTMLImageElement> {
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.decoding = "async";
+  img.src = url;
+  await img.decode();
+  return img;
+}
+
 /** The dots of a stipple plate: centres and radii in image pixels. */
 export interface DotField {
   x: Float32Array;
