@@ -18,6 +18,7 @@ This doc covers how the section is wired, how to add a hobby, the conventions ev
 | Landing grid            | [src/pages/hobbies/index.astro](../src/pages/hobbies/index.astro)                                                                            |
 | Per-hobby page          | [src/pages/hobbies/[slug].astro](../src/pages/hobbies/%5Bslug%5D.astro)                                                                      |
 | Card                    | [src/components/HobbyCard.astro](../src/components/HobbyCard.astro)                                                                          |
+| Card opening scenes     | [src/lib/scenes/](../src/lib/scenes/), see [Opening scenes](#opening-scenes)                                                                 |
 | Slug + sort helpers     | [src/lib/hobbies.ts](../src/lib/hobbies.ts)                                                                                                  |
 | Facts line under titles | [src/lib/hobby-facts.ts](../src/lib/hobby-facts.ts)                                                                                          |
 | Shared UI parts         | [src/styles/global.css](../src/styles/global.css), [src/lib/motion.ts](../src/lib/motion.ts), see [Shared parts](#shared-parts-and-the-look) |
@@ -59,6 +60,8 @@ The `sections.hobbies` flag only controls the **header nav link** (discoverabili
    ```astro
    {interactive === "pixel-hike" && <PixelHike />}
    ```
+
+4. **(Optional) give the card an opening scene** in `src/lib/scenes/`, keyed by the slug in [index.ts](../src/lib/scenes/index.ts). See [Opening scenes](#opening-scenes). Without one, clicking the card plays the plain dive into its plate.
 
 That's it for a dependency-free hobby without a photo gallery. Optional media, third-party data, or a new package may also require the documented Blob, CSP, dependency, or CI updates.
 
@@ -106,6 +109,35 @@ The other shared pieces:
 - `.u-label` (the archive's tracked caps label), `.btn` / `.btn-ink` (square, a rule for a border; ink for the one primary action), `.linkbtn` (a text button, 32px tall), and `.shead` / `.shead-blurb` / `.shead-link` (a light section heading with a plain count or link on the right). All in `global.css`.
 - [FieldJournal.astro](../src/components/hobbies/FieldJournal.astro) and [SpecimenCard.astro](../src/components/hobbies/SpecimenCard.astro): the journal row and the reveal card shared by tide pooling and herping, driven through `data-tp-*` / `data-hp-*` hooks. The card is a modal: focus moves to its button, Escape or the scrim closes it, and focus returns.
 - The page header in [src/pages/hobbies/[slug].astro](../src/pages/hobbies/%5Bslug%5D.astro): "← Things to try", a light sentence-case title, one tracked line of facts from [hobby-facts.ts](../src/lib/hobby-facts.ts) (counts are computed from each toy's data, so adding a species updates it), then the intro.
+
+---
+
+## Opening scenes
+
+Clicking a hobby card, on `/hobbies/` or in the home page's band, plays a short scene made from the card's own stipple plate, about two and a half seconds long. The plate's dots lift off the card onto a sheet of paper, act something out, and the camera ends zoomed into a few dozen big ink dots. The hobby page then opens on those same dots: each hollows into a ring and then a window onto the page, until the windows meet.
+
+| Hobby            | Scene                                                                                                                        | Module                                       |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| Narrow nature    | The globe spins and stops on a random inland spot; a red finder box closes in and locks on with its coordinates; dive in.    | [globe.ts](../src/lib/scenes/globe.ts)       |
+| Aquarium keeping | Bubbles rise, the gourami swims right, turns around head first and swims off left; the camera closes in the whole time.      | [aquarium.ts](../src/lib/scenes/aquarium.ts) |
+| Tide pooling     | The crab rears up bigger, reaches its right claw out with the pincer open and snaps it on the screen, which swells under it. | [crab.ts](../src/lib/scenes/crab.ts)         |
+| Fishing          | A rod swings in and casts, the lure lands off the trout's nose, the trout takes it and is hauled up at you.                  | [fishing.ts](../src/lib/scenes/fishing.ts)   |
+| Birding          | The oystercatcher looks about in quick snaps, crouches and takes off; its last wingbeat sweeps over the screen.              | [birding.ts](../src/lib/scenes/birding.ts)   |
+| Herping          | A hand slides in along the ground, scoops up the salamander and lifts it up close.                                           | [herping.ts](../src/lib/scenes/herping.ts)   |
+| Hiking           | A little hiker walks the ridge to the summit (the mountain's real skyline, read off its dots) and throws both arms up.       | [hiking.ts](../src/lib/scenes/hiking.ts)     |
+
+How it fits together:
+
+- [stage.ts](../src/lib/scenes/stage.ts) has everything that doesn't touch the page: dot sets, affine moves, the camera (`dive` eases the zoom in log scale and comes to a stop on the big dots), easing, splitting a plate into named parts, and `stipple()`, which draws props (the rod, the wing, the hand, the hiker) as blue-noise dots in the plates' own pen size and spacing.
+- [engine.ts](../src/lib/scenes/engine.ts) plays a scene on a full-screen canvas over the page: the lift off the card, the paper, the draw calls, input, and the last frame. Each scene draws through a small painter (`part`, `dots`, `line`, `label`); dots marked `target` are the ones the scene dives into, and the last frame of those is what the next page opens through.
+- [open.ts](../src/lib/open.ts) loads the scenes on demand (fetched when the page is idle), gets a card ready when it's pointed at, focused or pressed, or has been in view a moment, and falls back to the plain dive if the scenes can't load. A home-page card shows the small mini plate; its scene plays from the finer card plate, the mini handing over to it during the lift.
+- [landing.ts](../src/lib/landing.ts) carries the last frame across: the old page leaves the dots in the landing note, the head script paints them before the new page's first paint (an SVG in `--landing-dots`), and `settleDots()` opens them (`planReveal`, `windowAt`). Changing the head script means a new CSP hash.
+
+Plate parts are outlines in card units (880 × 660; a mini plate's dots are scaled up to match), and the first part that claims a dot gets it. Every scene has to end on its target dots alone, big enough to open the page through: [scenes.test.ts](../src/lib/scenes/scenes.test.ts) plays each one through a stand-in painter at desktop and phone sizes and checks that.
+
+A second click, tap, Enter or Space plays the rest of a scene about three times faster; Escape puts the page back. Under reduced motion a card just opens its page.
+
+To look at a scene frame by frame, open `/hobbies/?scene-debug` on `npm run dev`, click a card, and call `__scene.seek(ms)` from the console (`__scene.duration` is its length). It's left out of production builds.
 
 ---
 

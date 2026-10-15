@@ -68,7 +68,7 @@ base-uri 'self';
 form-action 'self'
 ```
 
-(The live policy in [staticwebapp.config.json](../staticwebapp.config.json) names the real storage account, `blobHost` in [site.config.ts](../site.config.ts), and also carries four `sha256` hashes in `script-src`: two for the dark-mode inline scripts, one for the home page's lead photograph chooser and one for the check that opens a page the way the last one left it (a session on the photograph a globe spin or a card grew into, a hobby on the paper its plate dived into); they are omitted above for readability.)
+(The live policy in [staticwebapp.config.json](../staticwebapp.config.json) names the real storage account, `blobHost` in [site.config.ts](../site.config.ts), and also carries four `sha256` hashes in `script-src`: two for the dark-mode inline scripts, one for the home page's lead photograph chooser and one for the check that opens a page the way the last one left it (a session on the photograph a globe spin or a card grew into, a hobby on the big dots its card's scene ended on); they are omitted above for readability.)
 
 Translation:
 - **`default-src 'self'`**: load resources only from the site's own origin unless overridden.

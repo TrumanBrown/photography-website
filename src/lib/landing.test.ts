@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { LANDING_KEY, landingBootstrap, settleBox } from "./landing";
+import {
+  dotsArt,
+  LANDING_KEY,
+  landingBootstrap,
+  planReveal,
+  REVEAL_MS,
+  settleBox,
+  windowAt,
+} from "./landing";
 
 /** Run the inline <head> script against a fake page and report what it did. */
 function boot(options: { note?: unknown; path: string; reduced?: boolean }) {
@@ -7,6 +15,10 @@ function boot(options: { note?: unknown; path: string; reduced?: boolean }) {
   if (options.note !== undefined)
     store.set(LANDING_KEY, JSON.stringify(options.note));
   const classes = new Set<string>();
+  const props = new Map<string, string>();
+  const win: Record<string, unknown> = {
+    matchMedia: () => ({ matches: Boolean(options.reduced) }),
+  };
   const timers: number[] = [];
   const run = new Function(
     "sessionStorage",
@@ -28,9 +40,12 @@ function boot(options: { note?: unknown; path: string; reduced?: boolean }) {
           add: (c: string) => classes.add(c),
           remove: (c: string) => classes.delete(c),
         },
+        style: {
+          setProperty: (name: string, value: string) => props.set(name, value),
+        },
       },
     },
-    { matchMedia: () => ({ matches: Boolean(options.reduced) }) },
+    win,
     (_: () => void, ms: number) => timers.push(ms),
   );
   return {
@@ -38,6 +53,8 @@ function boot(options: { note?: unknown; path: string; reduced?: boolean }) {
     dots: classes.has("landing-dots"),
     left: store.has(LANDING_KEY),
     timers,
+    art: props.get("--landing-dots"),
+    note: win.landingNote,
   };
 }
 
@@ -70,6 +87,22 @@ describe("landingBootstrap", () => {
     });
     expect(result).toMatchObject({ dots: true, landing: false, left: false });
     expect(result.timers).toEqual([4000]);
+  });
+
+  it("paints a scene's last dots before the first paint, and keeps the note", () => {
+    const note = {
+      path: "/hobbies/fishing/",
+      at: Date.now(),
+      kind: "dots",
+      dots: [10, 20, 30],
+      w: 400,
+      h: 300,
+      art: dotsArt([10, 20, 30], 400, 300, "rgb(22, 21, 15)"),
+    };
+    const result = boot({ note, path: "/hobbies/fishing/" });
+    expect(result.dots).toBe(true);
+    expect(result.art).toBe(note.art);
+    expect(result.note).toEqual(note);
   });
 
   it("matches with or without the trailing slash", () => {
@@ -127,5 +160,75 @@ describe("settleBox", () => {
     }
     const early = settleBox(screen, banner, 0.02);
     expect(screen.width - early.width).toBeLessThan(1);
+  });
+});
+
+describe("dotsArt", () => {
+  it("is a CSS image of the dots, safe to drop into a custom property", () => {
+    const art = dotsArt([10, 20, 30, 50.5, 60, 7], 400, 300, "rgb(22, 21, 15)");
+    expect(art.startsWith('url("data:image/svg+xml,')).toBe(true);
+    expect(art.endsWith('")')).toBe(true);
+    const svg = decodeURIComponent(art.slice(26, -2));
+    expect(svg).toContain("viewBox='0 0 400 300'");
+    expect(svg.match(/<circle /g)).toHaveLength(2);
+    expect(svg).toContain("cx='50.5' cy='60' r='7'");
+    // Nothing in the URL that could end it early.
+    expect(art.slice(5, -2)).not.toMatch(/["#\s]/);
+  });
+});
+
+describe("planReveal", () => {
+  const w = 1440;
+  const h = 900;
+  // A scene's last frame: big dots over part of the screen, bare paper elsewhere.
+  const dots: number[] = [];
+  for (let y = 60; y < 700; y += 110)
+    for (let x = 80; x < 900; x += 120) dots.push(x + (y % 3) * 9, y, 44);
+
+  for (const reveal of [
+    { from: [0.5, 0.5] as const },
+    { wave: [-1, 0] as const },
+    { wave: [0.35, 1] as const },
+  ]) {
+    it(`opens the whole screen in the end (${JSON.stringify(reveal)})`, () => {
+      const wins = planReveal(dots, w, h, reveal);
+      for (let y = 0; y <= h; y += 15)
+        for (let x = 0; x <= w; x += 15) {
+          const open = wins.some(
+            (v) => Math.hypot(x - v.x, y - v.y) <= windowAt(v, REVEAL_MS).hole,
+          );
+          expect(open, `paper left at ${x}, ${y}`).toBe(true);
+        }
+    });
+  }
+
+  it("starts as exactly the dots the scene ended on", () => {
+    const wins = planReveal(dots, w, h);
+    const inked = wins.filter((v) => v.r > 0);
+    expect(inked).toHaveLength(dots.length / 3);
+    for (const v of inked)
+      expect(windowAt(v, 0)).toEqual({ hole: 0, ring: v.r });
+  });
+
+  it("opens from the point it's given, in order", () => {
+    const wins = planReveal(dots, w, h, { from: [0, 0] });
+    const nearest = wins.reduce((a, b) =>
+      Math.hypot(a.x, a.y) < Math.hypot(b.x, b.y) ? a : b,
+    );
+    expect(nearest.delay).toBe(0);
+    for (const v of wins) expect(v.delay).toBeLessThanOrEqual(REVEAL_MS);
+  });
+
+  it("turns each dot into a ring that thins away as its window opens", () => {
+    const [v] = planReveal(dots, w, h);
+    let gone = false;
+    for (let ms = 0; ms <= REVEAL_MS; ms += 10) {
+      const { hole, ring } = windowAt(v, ms);
+      if (ring) {
+        expect(gone).toBe(false);
+        expect(ring).toBeGreaterThan(hole);
+      } else if (hole > 0) gone = true;
+    }
+    expect(gone).toBe(true);
   });
 });

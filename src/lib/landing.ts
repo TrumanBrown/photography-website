@@ -6,9 +6,11 @@
  *   (src/lib/open.ts) ends with the session's banner photograph filling the
  *   screen. The session page opens on that same full-screen photograph, then
  *   settles it into the banner while the rest of the page appears around it.
- * - `dots`: a hobby card dives into its stipple plate until the screen is
- *   bare paper. The hobby page opens on bare paper too, then shows through a
- *   halftone of holes that open from the middle out.
+ * - `dots`: a hobby card plays its scene (src/lib/scenes/) and ends zoomed
+ *   into a few big ink dots. The hobby page opens on those same dots, and
+ *   each one hollows into a ring and then a window onto the page, until the
+ *   windows meet. (Without dots, from the plain plate dive, the page opens on
+ *   bare paper through a halftone of holes instead.)
  *
  * Just before it navigates, the old page leaves a note in sessionStorage; the
  * new page reads it before its first paint. A page reached any other way
@@ -18,6 +20,14 @@
 /** sessionStorage key the old page leaves for the page it lands on. */
 export const LANDING_KEY = "globe-landing";
 
+/**
+ * Where a page opens from through its dots: a point on screen (fractions of
+ * its width and height), or the direction a wave runs in.
+ */
+export type Reveal =
+  | { from: readonly [number, number] }
+  | { wave: readonly [number, number] };
+
 /** What the old page leaves under LANDING_KEY. */
 export interface LandingNote {
   /** Path of the page it's landing in, with a trailing slash. */
@@ -26,14 +36,32 @@ export interface LandingNote {
   at: number;
   /** How it arrives; a photograph unless it says otherwise. */
   kind?: "photo" | "dots";
+  /** The big dots the scene ended on: x, y, radius, CSS px, in a flat list. */
+  dots?: number[];
+  /** The viewport those were measured in. */
+  w?: number;
+  h?: number;
+  /** Their ink. */
+  ink?: string;
+  /** The same dots as a CSS image, for the first paint (see dotsArt). */
+  art?: string;
+  reveal?: Reveal;
+}
+
+declare global {
+  interface Window {
+    /** The note this page landed with, kept by the head script. */
+    landingNote?: LandingNote;
+  }
 }
 
 /**
  * Inline <head> script. Before the first paint, marks <html> with `landing`
  * (the banner photograph alone, full screen, until settleLanding() takes
- * over) or `landing-dots` (bare paper until settleDots() opens it) when this
- * page is the one a transition is landing in. If neither runs, the page shows
- * itself after four seconds anyway.
+ * over) or `landing-dots` (paper, and the scene's last dots if it sent them,
+ * until settleDots() opens it) when this page is the one a transition is
+ * landing in. If neither runs, the page shows itself after four seconds
+ * anyway.
  *
  * Keep it free of backslashes and template placeholders: scripts/csp-hash.mjs
  * hashes this source text as written, and the hash has to match the string
@@ -52,6 +80,8 @@ export const landingBootstrap = `
     if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     var root = document.documentElement;
     var mark = note.kind === 'dots' ? 'landing-dots' : 'landing';
+    if (typeof note.art === 'string') root.style.setProperty('--landing-dots', note.art);
+    window.landingNote = note;
     root.classList.add(mark);
     setTimeout(function () { root.classList.remove(mark); }, 4000);
   } catch (_) {}
@@ -204,12 +234,18 @@ export function holeRadius(reach: number, ms: number, step: number): number {
 }
 
 /**
- * On a page a hobby card dived into, open the bare paper it starts on as a
- * halftone, from the middle out. Does nothing on any other visit.
+ * On a page a hobby card opened into, open what it landed on: the scene's
+ * big dots if it sent them, otherwise bare paper as a halftone from the
+ * middle out. Does nothing on any other visit.
  */
 export function settleDots(): void {
   const root = document.documentElement;
   if (!root.classList.contains("landing-dots")) return;
+  const note = window.landingNote;
+  if (note?.dots?.length && note.w && note.h) {
+    revealDots(root, note);
+    return;
+  }
   const veil = document.createElement("canvas");
   veil.className = "landing-veil";
   veil.setAttribute("aria-hidden", "true");
@@ -263,4 +299,208 @@ export function settleDots(): void {
     }
     requestAnimationFrame(frame);
   });
+}
+
+/* ------------------------------------------------------------ big dots */
+
+/** The scene's last dots as a CSS image: what the page paints first. */
+export function dotsArt(
+  dots: readonly number[],
+  w: number,
+  h: number,
+  ink: string,
+): string {
+  let svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ${w} ${h}' preserveAspectRatio='none'><g fill='${ink}'>`;
+  for (let i = 0; i + 2 < dots.length; i += 3)
+    svg += `<circle cx='${dots[i]}' cy='${dots[i + 1]}' r='${dots[i + 2]}'/>`;
+  svg += "</g></svg>";
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+}
+
+/** How long the wave of opening takes to cross the screen, ms. */
+const WAVE_MS = 260;
+/** How long each window takes to open, ms. */
+const OPEN_MS = 540;
+/** The whole reveal. */
+export const REVEAL_MS = WAVE_MS + OPEN_MS;
+
+/** One window the page shows through: an ink dot, or bare paper between them. */
+export interface Opening {
+  x: number;
+  y: number;
+  /** The ink dot's radius; 0 for a window in bare paper. */
+  r: number;
+  /** How wide it opens: enough to meet its neighbours. */
+  cover: number;
+  /** When it starts opening, ms. */
+  delay: number;
+}
+
+/**
+ * Plan the reveal: a window at every ink dot, more in any bare paper between
+ * them, each opening wide enough that together they cover the screen, timed
+ * by how far along the reveal reaches it.
+ */
+export function planReveal(
+  dots: readonly number[],
+  w: number,
+  h: number,
+  reveal: Reveal = { from: [0.5, 0.5] },
+): Opening[] {
+  const wins: Opening[] = [];
+  for (let i = 0; i + 2 < dots.length; i += 3)
+    wins.push({
+      x: dots[i],
+      y: dots[i + 1],
+      r: dots[i + 2],
+      cover: 0,
+      delay: 0,
+    });
+  const radii = wins.map((v) => v.r).sort((a, b) => a - b);
+  const typical = radii[Math.floor(radii.length / 2)] || Math.min(w, h) / 20;
+
+  // Sample the screen; wherever it's far from every window, add one.
+  const step = Math.max(6, typical * 0.6);
+  const sx: number[] = [];
+  const sy: number[] = [];
+  for (let y = step / 2; y < h + step / 2; y += step)
+    for (let x = step / 2; x < w + step / 2; x += step) {
+      sx.push(Math.min(x, w));
+      sy.push(Math.min(y, h));
+    }
+  const near = new Float64Array(sx.length).fill(Infinity);
+  const owner = new Int32Array(sx.length).fill(-1);
+  const claim = (j: number) => {
+    const v = wins[j];
+    for (let i = 0; i < sx.length; i++) {
+      const d = Math.hypot(sx[i] - v.x, sy[i] - v.y);
+      if (d < near[i]) {
+        near[i] = d;
+        owner[i] = j;
+      }
+    }
+  };
+  wins.forEach((_, j) => claim(j));
+  const far = 2.2 * typical;
+  for (let i = 0; i < sx.length; i++) {
+    if (near[i] <= far) continue;
+    wins.push({ x: sx[i], y: sy[i], r: 0, cover: 0, delay: 0 });
+    claim(wins.length - 1);
+  }
+  for (let i = 0; i < sx.length; i++) {
+    const v = wins[owner[i]];
+    if (v) v.cover = Math.max(v.cover, near[i] + step * 0.75);
+  }
+
+  // Order: out from a point, or across the screen as a wave with a wobble.
+  const order = wins.map((v) => {
+    if ("wave" in reveal) {
+      const [dx, dy] = reveal.wave;
+      const len = Math.hypot(dx, dy) || 1;
+      const ux = dx / len;
+      const uy = dy / len;
+      const span = Math.abs(ux) * w + Math.abs(uy) * h;
+      const start = Math.min(0, ux * w) + Math.min(0, uy * h);
+      const along = (v.x * ux + v.y * uy - start) / span;
+      const across = v.x * -uy + v.y * ux;
+      return (
+        along +
+        0.08 * Math.sin((across / (0.55 * Math.max(w, h))) * Math.PI * 2)
+      );
+    }
+    const [fx, fy] = reveal.from;
+    return Math.hypot(v.x - fx * w, v.y - fy * h);
+  });
+  const lo = Math.min(...order);
+  const hi = Math.max(...order);
+  wins.forEach((v, j) => {
+    v.cover = Math.max(v.cover, v.r);
+    v.delay = WAVE_MS * ((order[j] - lo) / (hi - lo || 1));
+  });
+  return wins;
+}
+
+/**
+ * A window `ms` into the reveal: the hole the page shows through, and the
+ * ink ring left of its dot (none once the hole has passed it).
+ */
+export function windowAt(
+  v: Opening,
+  ms: number,
+): { hole: number; ring: number } {
+  const k = clamp01((ms - v.delay) / OPEN_MS);
+  const hole = v.cover * smootherstep(k);
+  const ring = v.r ? v.r * (1 + 0.3 * smootherstep(k / 0.7)) : 0;
+  return { hole, ring: ring > hole ? ring : 0 };
+}
+
+function revealDots(root: HTMLElement, note: LandingNote) {
+  const veil = document.createElement("canvas");
+  veil.className = "landing-veil";
+  veil.setAttribute("aria-hidden", "true");
+  const ctx = veil.getContext("2d");
+  if (!ctx) {
+    root.classList.remove("landing-dots");
+    return;
+  }
+  const style = getComputedStyle(root);
+  const paper = style.getPropertyValue("--paper").trim() || "#fbfaf8";
+  const ink = note.ink || style.getPropertyValue("--ink").trim() || "#16150f";
+  const w = root.clientWidth;
+  const h = root.clientHeight;
+  // Same stretch the first paint gave the picture, if the window changed.
+  const kx = w / note.w!;
+  const ky = h / note.h!;
+  const kr = Math.sqrt(kx * ky);
+  const dots = note.dots!.map((v, i) =>
+    i % 3 === 0 ? v * kx : i % 3 === 1 ? v * ky : v * kr,
+  );
+  const wins = planReveal(dots, w, h, note.reveal);
+
+  document.body.append(veil);
+  const start = performance.now();
+  let first = true;
+  function frame(now: number) {
+    const ms = first ? 0 : now - start;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    if (veil.width !== Math.round(w * dpr)) veil.width = Math.round(w * dpr);
+    if (veil.height !== Math.round(h * dpr)) veil.height = Math.round(h * dpr);
+    ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx!.globalCompositeOperation = "source-over";
+    ctx!.clearRect(0, 0, w, h);
+    ctx!.fillStyle = paper;
+    ctx!.fillRect(0, 0, w, h);
+    ctx!.globalCompositeOperation = "destination-out";
+    ctx!.beginPath();
+    const rings: Array<[number, number, number, number]> = [];
+    for (const v of wins) {
+      const { hole, ring } = windowAt(v, ms);
+      if (hole > 0.2) {
+        ctx!.moveTo(v.x + hole, v.y);
+        ctx!.arc(v.x, v.y, hole, 0, Math.PI * 2);
+      }
+      if (ring) rings.push([v.x, v.y, ring, hole]);
+    }
+    ctx!.fill();
+    ctx!.globalCompositeOperation = "source-over";
+    ctx!.fillStyle = ink;
+    ctx!.beginPath();
+    for (const [x, y, outer, inner] of rings) {
+      ctx!.moveTo(x + outer, y);
+      ctx!.arc(x, y, outer, 0, Math.PI * 2);
+      if (inner > 0.2) {
+        ctx!.moveTo(x + inner, y);
+        ctx!.arc(x, y, inner, 0, Math.PI * 2, true);
+      }
+    }
+    ctx!.fill();
+    // The canvas now shows what the first paint did: the class can go.
+    if (first) {
+      first = false;
+      root.classList.remove("landing-dots");
+    }
+    if (ms < REVEAL_MS) requestAnimationFrame(frame);
+    else veil.remove();
+  }
+  requestAnimationFrame(frame);
 }

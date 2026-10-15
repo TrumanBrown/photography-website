@@ -8,6 +8,9 @@ interface Props {
 
 const { slug, size } = Astro.props;
 const plate = plateFor(slug, size);
+// The card plate, finer, is what a hobby's opening scene is drawn from, even
+// from the home page's mini plates (src/lib/scenes/).
+const card = size === "card" ? plate : plateFor(slug, "card");
 ---
 
 {
@@ -16,6 +19,7 @@ const plate = plateFor(slug, size);
       <img
         data-ink="light"
         data-frames={JSON.stringify(plate.light)}
+        data-card={card?.light[0]}
         src={plate.light[0]}
         alt=""
         width={plate.width}
@@ -26,6 +30,7 @@ const plate = plateFor(slug, size);
       <img
         data-ink="dark"
         data-frames={JSON.stringify(plate.dark)}
+        data-card={card?.dark[0]}
         src={plate.dark[0]}
         alt=""
         width={plate.width}

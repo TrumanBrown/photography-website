@@ -1,5 +1,5 @@
 import { loadBanner } from "./flight";
-import { LANDING_KEY, type LandingNote } from "./landing";
+import { dotsArt, LANDING_KEY, type LandingNote } from "./landing";
 import { prefersReducedMotion } from "./motion";
 
 /**
@@ -9,9 +9,11 @@ import { prefersReducedMotion } from "./motion";
  *   grows its cover until it fills the screen while the session's banner
  *   photograph loads; then the session page opens on that photograph and
  *   settles it into its banner (src/lib/landing.ts).
- * - A hobby card dives into its stipple plate. The plate's own dots are read
- *   off the image and drawn as circles, so they stay crisp as they grow and
- *   stream past, until the screen is bare paper; the hobby page then opens
+ * - A hobby card plays its hobby's scene (src/lib/scenes/): the plate's own
+ *   dots, read off the image and drawn as circles, lift off the card and act
+ *   out a little story, ending zoomed into a few big dots that the hobby page
+ *   opens through. If the scenes can't load in time, the card just dives
+ *   into its plate until the screen is bare paper, and the page opens
  *   through a halftone.
  *
  * Only plain clicks: a modified or middle click still opens a tab, and under
@@ -26,9 +28,14 @@ const smootherstep = (x: number) => {
 const lerp = (a: number, b: number, k: number) => a + (b - a) * k;
 
 /** Leave for `href`, telling the page there how we're arriving. */
-function leave(href: string, kind: LandingNote["kind"] | null): void {
+function leave(
+  href: string,
+  kind: LandingNote["kind"] | null,
+  more: Partial<LandingNote> = {},
+): void {
   if (kind) {
     const note: LandingNote = {
+      ...more,
       path: new URL(href, window.location.href).pathname,
       at: Date.now(),
       kind,
@@ -373,16 +380,10 @@ const DIVE_DEPTH = 90;
 /** The dots fade out over the end of the dive, as they rush past. */
 const FADE_FROM = 0.58;
 
-function openHobby(link: HTMLAnchorElement): boolean {
-  const plate = Array.from(
-    link.querySelectorAll<HTMLImageElement>("img[data-ink]"),
-  ).find((img) => img.offsetParent !== null && img.complete);
-  if (!plate) return false;
+/** The plain dive into a plate, for when its scene isn't available. */
+function diveHobby(plate: HTMLImageElement, href: string): boolean {
   const field = readDots(plate);
   if (!field || field.n < 40) return false;
-  const href = link.href;
-  // Warm the page while the dive runs.
-  fetch(href).catch(() => undefined);
 
   const box = plate.getBoundingClientRect();
   const k0 = box.width / plate.naturalWidth;
@@ -448,6 +449,199 @@ function openHobby(link: HTMLAnchorElement): boolean {
   return true;
 }
 
+/* --------------------------------------------------------------- scenes */
+
+type Scenes = typeof import("./scenes");
+let scenes: Promise<Scenes> | null = null;
+
+/** The hobby scenes, fetched once, the first time anything wants them. */
+function loadScenes(): Promise<Scenes> {
+  scenes ??= import("./scenes").catch((error: unknown) => {
+    scenes = null;
+    throw error;
+  });
+  return scenes;
+}
+
+/** How long a click waits for the scenes before settling for the plain dive. */
+const SCENE_WAIT_MS = 400;
+/** How long a home-page card waits for its finer card plate. */
+const CARD_WAIT_MS = 150;
+/** A card plate is 880 wide, a mini 360; scenes work in card units. */
+const CARD_W = 880;
+
+const wait = (ms: number) =>
+  new Promise<undefined>((resolve) => setTimeout(resolve, ms));
+/** Safari has no requestIdleCallback. */
+const idle = (fn: () => void) => {
+  if (typeof window.requestIdleCallback === "function")
+    window.requestIdleCallback(() => fn(), { timeout: 1500 });
+  else setTimeout(fn, 600);
+};
+const isDark = () => document.documentElement.classList.contains("dark");
+const slugOf = (href: string) =>
+  new URL(href, window.location.href).pathname
+    .split("/")
+    .filter(Boolean)
+    .pop() ?? "";
+
+function cardUnits(field: DotField | null, width: number): DotField | null {
+  if (!field) return null;
+  const k = CARD_W / width;
+  return {
+    ...field,
+    x: field.x.map((v) => v * k),
+    y: field.y.map((v) => v * k),
+    r: field.r.map((v) => v * k),
+  };
+}
+
+/** Card plates' dots by URL, in card units, read once each. */
+const plateDots = new Map<string, Promise<DotField | null>>();
+const plateDotsReady = new Map<string, DotField | null>();
+
+function dotsOf(url: string): Promise<DotField | null> {
+  let known = plateDots.get(url);
+  if (!known) {
+    const img = new Image();
+    img.src = url;
+    known = img.decode().then(
+      () => {
+        const field = cardUnits(readDots(img), img.naturalWidth);
+        plateDotsReady.set(url, field);
+        return field;
+      },
+      () => null,
+    );
+    plateDots.set(url, known);
+  }
+  return known;
+}
+
+/** The plate a hobby link is showing right now, if it has loaded. */
+function shownPlate(link: HTMLAnchorElement): HTMLImageElement | null {
+  return (
+    Array.from(link.querySelectorAll<HTMLImageElement>("img[data-ink]")).find(
+      (img) => img.offsetParent !== null && img.complete && img.naturalWidth,
+    ) ?? null
+  );
+}
+
+const warmedHobbies = new WeakMap<HTMLAnchorElement, Promise<void>>();
+
+/**
+ * Get a hobby's scene ready before it's clicked: the scenes, the card plate's
+ * dots in this theme, and the scene's props. Pointing at a card, focusing it
+ * or pressing it starts this at once; cards in view get it in turn when the
+ * page is idle (see initOpeners).
+ */
+function warmHobby(link: HTMLAnchorElement): Promise<void> {
+  const known = warmedHobbies.get(link);
+  if (known) return known;
+  const dark = isDark();
+  const url = link.querySelector<HTMLImageElement>(
+    `img[data-ink="${dark ? "dark" : "light"}"]`,
+  )?.dataset.card;
+  const warm = Promise.all([loadScenes(), url ? dotsOf(url) : null])
+    .then(
+      ([mod, field]) =>
+        new Promise<void>((resolve) => {
+          const scene = mod.SCENES[slugOf(link.href)];
+          if (!scene || !field) return resolve();
+          idle(() => {
+            mod.ready(scene, field, dark);
+            resolve();
+          });
+        }),
+    )
+    .catch(() => {
+      warmedHobbies.delete(link);
+    });
+  warmedHobbies.set(link, warm);
+  return warm;
+}
+
+function openHobby(link: HTMLAnchorElement): boolean {
+  const img = shownPlate(link);
+  if (!img) return false;
+  const href = link.href;
+  const slug = slugOf(href);
+  const dark = isDark();
+  // Warm the page while the scene plays.
+  fetch(href).catch(() => undefined);
+  const fallback = () => {
+    if (!diveHobby(img, href)) leave(href, null);
+  };
+
+  void (async () => {
+    const mod = await Promise.race([loadScenes(), wait(SCENE_WAIT_MS)]).catch(
+      () => undefined,
+    );
+    const scene = mod?.SCENES[slug];
+    if (!mod || !scene) return fallback();
+
+    const shown = () => cardUnits(readDots(img), img.naturalWidth);
+    const url = img.dataset.card;
+    let main: DotField | null;
+    let from: DotField | null = null;
+    if (img.naturalWidth >= CARD_W * 0.9) {
+      main = (url && plateDotsReady.get(url)) || shown();
+    } else {
+      // A home-page card shows the mini plate. The scene plays from the card
+      // plate if it's at hand, the mini fading into it as it lifts.
+      const card = url
+        ? (plateDotsReady.get(url) ??
+          (await Promise.race([dotsOf(url), wait(CARD_WAIT_MS)])))
+        : null;
+      main = card || shown();
+      if (card) from = shown();
+    }
+    if (!main || main.n < 40) return fallback();
+
+    const style = getComputedStyle(document.documentElement);
+    const ink = main.color;
+    try {
+      const staged = mod.ready(scene, main, dark);
+      const playing = mod.play({
+        scene,
+        prep: staged.prep,
+        img,
+        main: staged,
+        from: from ? mod.ready(scene, from, dark, false) : undefined,
+        colors: {
+          ink,
+          red: style.getPropertyValue("--stamp").trim() || "#b3301c",
+          paper: style.getPropertyValue("--paper").trim() || "#fbfaf8",
+        },
+        font: getComputedStyle(document.body).fontFamily,
+        dark,
+        seed: Math.floor(Math.random() * 2 ** 31),
+        done: (final) =>
+          requestAnimationFrame(() =>
+            leave(href, "dots", {
+              dots: final.dots,
+              w: final.w,
+              h: final.h,
+              ink,
+              art: dotsArt(final.dots, final.w, final.h, ink),
+              reveal: final.reveal,
+            }),
+          ),
+        cancelled: () => {
+          busy = false;
+        },
+      });
+      onReturn(() => {
+        playing.dispose();
+        busy = false;
+      });
+    } catch {
+      fallback();
+    }
+  })();
+  return true;
+}
+
 /* --------------------------------------------------------------- wiring */
 
 /** Take over plain clicks on `[data-open]` links. Call once per page. */
@@ -473,6 +667,69 @@ export function initOpeners(): void {
     if (link && event.button === 0 && !prefersReducedMotion())
       warmSession(link.href);
   });
+
+  // Hobby cards: the scenes come down when the page is idle, and a card's
+  // plate and props get ready when it's pointed at, focused or pressed, or
+  // once it's been in view a moment.
+  const hobbies = document.querySelectorAll<HTMLAnchorElement>(
+    'a[data-open="hobby"]',
+  );
+  if (hobbies.length && !prefersReducedMotion()) {
+    idle(() => void loadScenes().catch(() => undefined));
+    const hobbyLink = (target: EventTarget | null) =>
+      (target as Element | null)?.closest?.<HTMLAnchorElement>(
+        'a[data-open="hobby"]',
+      ) ?? null;
+    for (const type of ["pointerover", "pointerdown", "focusin"] as const)
+      document.addEventListener(type, (event) => {
+        const link = hobbyLink(event.target);
+        if (link) void warmHobby(link);
+      });
+    // Cards that stay in view get ready one at a time, when the page is idle.
+    // A home-page card fetches its card plate for this (unless the visitor
+    // is saving data); a card on /hobbies/ already shows it.
+    const saving = (
+      navigator as Navigator & { connection?: { saveData?: boolean } }
+    ).connection?.saveData;
+    if ("IntersectionObserver" in window) {
+      const queue: HTMLAnchorElement[] = [];
+      let pumping = false;
+      const pump = () => {
+        const link = queue.shift();
+        if (!link) {
+          pumping = false;
+          return;
+        }
+        void warmHobby(link).then(() => idle(pump));
+      };
+      const timers = new Map<Element, number>();
+      const seen = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            window.clearTimeout(timers.get(entry.target));
+            if (!entry.isIntersecting) continue;
+            timers.set(
+              entry.target,
+              window.setTimeout(() => {
+                seen.unobserve(entry.target);
+                queue.push(entry.target as HTMLAnchorElement);
+                if (!pumping) {
+                  pumping = true;
+                  idle(pump);
+                }
+              }, 600),
+            );
+          }
+        },
+        { threshold: 0.5 },
+      );
+      for (const link of hobbies) {
+        const card =
+          link.querySelector(".plate img")?.getAttribute("width") === "880";
+        if (card || !saving) seen.observe(link);
+      }
+    }
+  }
 
   document.addEventListener("click", (event) => {
     if (
