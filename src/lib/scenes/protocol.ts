@@ -29,8 +29,12 @@ export interface PlayRequest {
   paper: string;
   dark: boolean;
   seed: number;
-  /** How long to wait for the plates before giving up. */
-  wait: number;
+  /**
+   * Date.now() by which the plates have to be in. It runs from the click,
+   * not from when the worker gets to it, so a worker that's still starting
+   * up never makes the click wait longer than the page will.
+   */
+  until: number;
 }
 
 export interface ResumeRequest {

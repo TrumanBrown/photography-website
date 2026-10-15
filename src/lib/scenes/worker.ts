@@ -159,9 +159,12 @@ async function play(m: PlayRequest, mine: number) {
   if (mine !== generation) return;
   stopCurrent();
   const scene = SCENES[m.slug];
+  // Whatever time the click has left: a plate that's in already wins even
+  // when there's none.
+  const due = Math.max(0, m.until - Date.now());
   const [card, mini] = await Promise.all([
-    within(plate(m.card), m.wait),
-    m.mini ? within(plate(m.mini), m.wait) : null,
+    within(plate(m.card), due),
+    m.mini ? within(plate(m.mini), due) : null,
   ]);
   if (mine !== generation) return;
   const main = card ?? mini;

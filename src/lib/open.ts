@@ -29,9 +29,11 @@ export { findDots, quietSpot, type DotField } from "./plate-dots";
  * - A hobby card plays its hobby's scene (src/lib/scenes/): the plate's own
  *   dots, read off the image and drawn as circles, lift off the card and act
  *   out a little story, ending zoomed into a few big dots that the hobby page
- *   opens through. If the scenes can't load in time, the card just dives
- *   into its plate until the screen is bare paper, and the page opens
- *   through a halftone.
+ *   opens through. If the scene can't start within a moment of the click
+ *   (its plate or the scene worker still on the way), the card dives into
+ *   its plate until the screen is bare paper, or, where its dots can't be
+ *   read on the page, the plate itself sinks into the paper; either way the
+ *   page opens through a halftone.
  *
  * Only plain clicks: a modified or middle click still opens a tab, and under
  * reduced motion a click just follows the link.
@@ -297,6 +299,83 @@ function diveHobby(
   return true;
 }
 
+/** How long a plate takes to sink into the paper when it can't dive. */
+const SINK_MS = 480;
+
+/**
+ * For when a card's scene can't start in time and its dots can't be read
+ * here (a plate from another origin, read only by the scene worker): the
+ * plate itself drifts toward the middle of the screen, growing as it sinks
+ * into paper, and the page opens through a halftone. All it needs is the
+ * picture on the card, so it always runs.
+ */
+function sinkHobby(plate: HTMLImageElement, href: string): void {
+  const box = plate.getBoundingClientRect();
+  const look = getComputedStyle(plate);
+  const w = document.documentElement.clientWidth;
+  const h = document.documentElement.clientHeight;
+  const layer = document.createElement("div");
+  layer.className = "open-layer";
+  layer.setAttribute("aria-hidden", "true");
+  const paper = document.createElement("div");
+  paper.className = "open-paper";
+  const copy = document.createElement("img");
+  copy.className = "open-photo";
+  copy.alt = "";
+  copy.src = plate.currentSrc || plate.src;
+  Object.assign(copy.style, {
+    left: `${box.left}px`,
+    top: `${box.top}px`,
+    width: `${box.width}px`,
+    height: `${box.height}px`,
+    objectFit: look.objectFit,
+    objectPosition: look.objectPosition,
+  });
+  layer.append(paper, copy);
+  document.body.append(layer);
+  plate.style.visibility = "hidden";
+
+  const dx = 0.35 * (w / 2 - (box.left + box.width / 2));
+  const dy = 0.35 * (h / 2 - (box.top + box.height / 2));
+  const gone = `translate(${dx}px, ${dy}px) scale(1.6)`;
+  paper.animate([{ opacity: 0 }, { opacity: 1 }], {
+    duration: SINK_MS * 0.6,
+    easing: "ease-out",
+    fill: "forwards",
+  });
+  const go = () => requestAnimationFrame(() => leave(href, "dots"));
+  copy
+    .animate(
+      [
+        { transform: "none", opacity: 1 },
+        { opacity: 1, offset: 0.3 },
+        { transform: gone, opacity: 0 },
+      ],
+      {
+        duration: SINK_MS,
+        // Speeding up as it goes, like the dive.
+        easing: "cubic-bezier(0.5, 0, 0.75, 0)",
+        fill: "forwards",
+      },
+    )
+    .finished.then(go, go);
+
+  onReturn(() => {
+    layer.remove();
+    plate.style.visibility = "";
+    busy = false;
+  });
+}
+
+/** The dive into a plate if its dots can be had here, or else its sinking. */
+function plainHobby(
+  plate: HTMLImageElement,
+  href: string,
+  field: DotField | null = null,
+): void {
+  if (!diveHobby(plate, href, field)) sinkHobby(plate, href);
+}
+
 /* --------------------------------------------------------------- scenes */
 
 type Scenes = typeof import("./scenes");
@@ -316,6 +395,8 @@ function loadScenes(): Promise<Scenes> {
  * aren't ready from pointing at the card already.
  */
 const SCENE_WAIT_MS = 600;
+/** Leeway for a busy worker's word to come back, past SCENE_WAIT_MS. */
+const WORD_MS = 150;
 
 const wait = (ms: number) =>
   new Promise<undefined>((resolve) => setTimeout(resolve, ms));
@@ -476,9 +557,7 @@ function openHobby(link: HTMLAnchorElement): boolean {
   const cardDots = url ? dotsOf(url) : Promise.resolve(null);
   const miniDots = mini ? dotsOf(mini) : Promise.resolve(null);
   const deadline = wait(SCENE_WAIT_MS);
-  const fallback = (field: DotField | null) => {
-    if (!diveHobby(img, href, field)) leave(href, null);
-  };
+  const fallback = (field: DotField | null) => plainHobby(img, href, field);
   onReturn(free);
 
   void (async () => {
@@ -571,7 +650,11 @@ function openHobby(link: HTMLAnchorElement): boolean {
           busy = false;
           free();
         },
-        failed: () => leave(href, null),
+        // The GPU dropped its canvas before the page changed: dive instead.
+        failed: () => {
+          playing.dispose();
+          plainHobby(img, href, main);
+        },
       });
       onReturn(() => {
         playing.dispose();
@@ -604,9 +687,19 @@ function playInWorker(
   const paper = style.getPropertyValue("--paper").trim() || "#fbfaf8";
   const target = import.meta.env.DEV ? withSceneFlags(href) : href;
   const putBack = () => {
+    window.clearTimeout(late);
     img.style.visibility = "";
     busy = false;
     free();
+  };
+  // Without its scene, the card dives or sinks into the page instead; but
+  // once it has handed over, the page is changing anyway.
+  let handed = false;
+  const instead = () => {
+    window.clearTimeout(late);
+    if (handed) return;
+    img.style.visibility = "";
+    plainHobby(img, href, plateDotsReady.get(img.dataset.card ?? "") ?? null);
   };
   const playing = player.play(
     {
@@ -621,14 +714,16 @@ function playInWorker(
       paper,
       dark,
       seed,
-      wait: SCENE_WAIT_MS,
+      until: Date.now() + SCENE_WAIT_MS,
     },
     {
       // Its dots are over the card now: the card can go.
       started: () => {
+        window.clearTimeout(late);
         img.style.visibility = "hidden";
       },
       leave: (m) => {
+        handed = true;
         try {
           sessionStorage.setItem(CARRY_KEY, m.carry);
         } catch {
@@ -662,7 +757,8 @@ function playInWorker(
           },
         });
       },
-      final: (m) =>
+      final: (m) => {
+        handed = true;
         requestAnimationFrame(() =>
           leave(target, "dots", {
             dots: m.dots,
@@ -672,15 +768,21 @@ function playInWorker(
             art: dotsArt(m.dots, m.w, m.h, m.ink),
             reveal: m.reveal,
           }),
-        ),
-      // It couldn't play: just go.
-      failed: () => {
-        img.style.visibility = "";
-        leave(href, null);
+        );
       },
+      // It couldn't play (no plate in time, say).
+      failed: instead,
       cancelled: putBack,
     },
   );
+  // Nor does the click wait on a worker that's still starting up, or busy:
+  // without the scene's first frame up by the time the plates were due (and
+  // a moment for word of it), it goes on without it. The stop reaches the
+  // worker ahead of the play it's still holding, which then never starts.
+  const late = window.setTimeout(() => {
+    playing.stop();
+    instead();
+  }, SCENE_WAIT_MS + WORD_MS);
   onReturn(() => {
     playing.stop();
     putBack();
