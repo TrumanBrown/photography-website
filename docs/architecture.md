@@ -248,7 +248,7 @@ which is why a Logic App starts the posting workflow on time.
 | Photo captions + session descriptions | `.github/workflows/photos.yml`, `scripts/photos/`, optional Azure OpenAI (`infra/modules/ai.bicep`) | [photos.md](photos.md) |
 | Instagram posting | `.github/workflows/social-post.yml`, `scripts/social/`, optional timer (`infra/modules/scheduler.bicep`) | [social.md](social.md) |
 | Photo location privacy | `scripts/location.mjs`, used by the upload scripts and prebuild | [security.md](security.md#photo-locations) |
-| Globe, places pages, image sitemap | `src/lib/globe.ts`, `src/lib/geo.ts`, `src/pages/places/`, `src/pages/image-sitemap.xml.ts` | this doc |
+| Globe, places pages, image sitemap | `src/lib/globe.ts`, `src/lib/flight.ts`, `src/lib/landing.ts`, `src/lib/geo.ts`, `src/pages/places/`, `src/pages/image-sitemap.xml.ts` | [product-experience.md](product-experience.md#motion-that-answers-what-you-do) |
 | Hobby card stipple plates | `src/components/PlateArt.astro`, drawn by the `.github/skills/stipple-plates/` agent skill | [hobbies.md](hobbies.md) |
 | Optional storage diagnostics | Log Analytics, `infra/modules/monitoring.bicep` | [azure.md](azure.md) |
 | Domain + DNS | App Service Domain + Azure DNS, `infra/modules/domain.bicep` | [azure.md](azure.md) |

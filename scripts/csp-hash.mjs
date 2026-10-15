@@ -21,6 +21,14 @@ if (!themeMatch) {
   throw new Error('Could not find themeBootstrap in src/lib/theme.ts.');
 }
 
+// A session page reached by spinning the globe opens on the photograph the
+// spin landed on, so that has to be decided before the first paint too.
+const landingSource = read('src/lib/landing.ts');
+const landingMatch = landingSource.match(/export const landingBootstrap = `([\s\S]*?)`\.trim\(\);/);
+if (!landingMatch) {
+  throw new Error('Could not find landingBootstrap in src/lib/landing.ts.');
+}
+
 const toggleSource = read('src/components/ThemeToggle.astro');
 const toggleMatches = [...toggleSource.matchAll(/<script\s+is:inline>([\s\S]*?)<\/script>/g)];
 if (toggleMatches.length !== 1) {
@@ -39,6 +47,7 @@ const expected = [
   cspToken(themeMatch[1].trim()),
   cspToken(toggleMatches[0][1]),
   cspToken(leadMatches[0][1]),
+  cspToken(landingMatch[1].trim()),
 ];
 const config = JSON.parse(read('staticwebapp.config.json'));
 const policy = config.globalHeaders?.['Content-Security-Policy'];

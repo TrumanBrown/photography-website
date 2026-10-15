@@ -68,7 +68,7 @@ base-uri 'self';
 form-action 'self'
 ```
 
-(The live policy in [staticwebapp.config.json](../staticwebapp.config.json) names the real storage account, `blobHost` in [site.config.ts](../site.config.ts), and also carries three `sha256` hashes in `script-src`, two for the dark-mode inline scripts and one for the home page's lead photograph chooser; they are omitted above for readability.)
+(The live policy in [staticwebapp.config.json](../staticwebapp.config.json) names the real storage account, `blobHost` in [site.config.ts](../site.config.ts), and also carries four `sha256` hashes in `script-src`: two for the dark-mode inline scripts, one for the home page's lead photograph chooser and one for the check that opens a session page on the photograph a globe spin landed on; they are omitted above for readability.)
 
 Translation:
 - **`default-src 'self'`**: load resources only from the site's own origin unless overridden.
@@ -82,8 +82,8 @@ Translation:
 - **`base-uri 'self'`**: attackers can't inject a `<base>` tag pointing relative URLs elsewhere.
 - **`form-action 'self'`**: forms can only submit to the site's own origin (contact form, admin).
 
-`npm run check:csp` verifies every inline script (the two dark-mode ones and
-the lead photograph chooser) against the configured hashes, and that the
+`npm run check:csp` verifies every inline script (the two dark-mode ones,
+the lead photograph chooser and the globe landing) against the configured hashes, and that the
 policy's storage host is exactly `blobHost` from `site.config.ts`. It runs as
 part of `npm run check` and `npm run build`, so changing an inline script or the
 storage account without updating the policy fails before deployment. If you add

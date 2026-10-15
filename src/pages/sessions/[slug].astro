@@ -571,3 +571,43 @@ const structuredData = {
     }
   }
 </style>
+
+<style is:global>
+  /* Arriving from a spin on the globe (src/lib/landing.ts). Until the
+     photograph has settled into the banner it's the only thing on screen,
+     full size, exactly where the flight left it. */
+  html.landing body > * {
+    visibility: hidden;
+  }
+  html.landing .banner .banner-img {
+    visibility: visible;
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1000;
+  }
+  .landing-veil {
+    position: fixed;
+    inset: 0;
+    z-index: 999;
+    background: var(--paper);
+    pointer-events: none;
+  }
+  /* The title and the shade under it wait for the photograph to settle. */
+  .banner .banner-text,
+  .banner::after {
+    transition: opacity 0.45s var(--ease);
+  }
+  html.landed .banner .banner-text,
+  html.landed .banner::after {
+    opacity: 0;
+    transition: none;
+  }
+</style>
+
+<script>
+  import { settleLanding } from "@/lib/landing";
+
+  settleLanding();
+</script>

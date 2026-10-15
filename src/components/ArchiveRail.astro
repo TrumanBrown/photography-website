@@ -446,10 +446,64 @@ await Promise.all(
       transition: none;
     }
   }
+
+  /* The flight a spin takes into its session (src/lib/flight.ts). It's built
+     by script, so none of this can be scoped. */
+  :global(.flight) {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    overflow: hidden;
+    visibility: hidden;
+  }
+  :global(.flight.is-up) {
+    visibility: visible;
+  }
+  :global(.flight canvas) {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+  /* Laid out exactly like the banner photograph while the session page is
+     landing, so the last frame here and the first one there are the same. */
+  :global(.flight-photo) {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    object-fit: cover;
+    opacity: 0;
+    transform-origin: 50% 50%;
+    will-change: transform, clip-path;
+  }
+  :global(.flight-edge) {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    box-sizing: border-box;
+    border: 1px solid var(--globe-ink);
+    opacity: 0;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+  }
+  :global(.flight-label) {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    margin: 0;
+    text-align: center;
+    color: var(--ink);
+    opacity: 0;
+    pointer-events: none;
+  }
 </style>
 
 <script>
   import { createGlobe, type GlobePlace } from "@/lib/globe";
+  import { fly, type Flight } from "@/lib/flight";
 
   const list = document.getElementById("rail-list");
   const search = document.getElementById(
@@ -564,26 +618,58 @@ await Promise.all(
       }
     }
 
-    const globe = createGlobe({
-      canvas,
-      places,
-      onArrive(place) {
-        const slug =
-          place.slugs[Math.floor(Math.random() * place.slugs.length)];
-        describe(place);
-        if (slug) window.location.href = `/sessions/${slug}/`;
-      },
-    });
-
-    /* On a session page the globe starts pointed at that session. */
+    /* On a session page the globe faces that session from the first frame,
+       exactly where the spin that led here came to rest. */
     const here = places.find((place) =>
       place.slugs.some((slug) =>
         activeHref.replace(/\/$/, "").endsWith(`/sessions/${slug}`),
       ),
     );
+
+    const reduced =
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let flight: Flight | null = null;
+    /** The session the current spin or throw opens; cleared if it's called off. */
+    let heading: string | null = null;
+
+    const globe = createGlobe({
+      canvas,
+      places,
+      start: here?.name,
+      onDepart({ place, plan, begun }) {
+        flight?.cancel();
+        // Chosen at take-off, so its photograph loads while the globe spins.
+        const slug =
+          place.slugs[Math.floor(Math.random() * place.slugs.length)];
+        heading = slug ? `/sessions/${slug}/` : null;
+        flight =
+          heading && !reduced
+            ? fly({
+                from: canvas,
+                plan,
+                begun,
+                places,
+                href: heading,
+                onCancel() {
+                  heading = null;
+                  flight = null;
+                },
+              })
+            : null;
+      },
+      onArrive(place) {
+        describe(place);
+        // A flight lands by itself; without one, go straight there.
+        if (heading && !flight) window.location.href = heading;
+      },
+    });
+
+    // Grabbing the globe mid-spin calls off the flight it was on.
+    canvas.addEventListener("pointerdown", () => flight?.cancel());
+
     if (here) {
       globe.mark(here.name);
-      globe.goTo(here.name, { silent: true });
       describe(here);
     } else if (places.length) {
       globe.mark(null);
@@ -591,9 +677,9 @@ await Promise.all(
       if (subEl) subEl.textContent = `${places.length} places`;
     }
 
-    document
-      .getElementById("orb-spin")
-      ?.addEventListener("click", () => globe.spin());
+    document.getElementById("orb-spin")?.addEventListener("click", () => {
+      if (!flight?.busy) globe.spin();
+    });
 
     /* The overview marks whatever card you're pointing at. */
     document.addEventListener("archive:highlight", (event) => {

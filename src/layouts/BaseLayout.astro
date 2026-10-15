@@ -2,6 +2,7 @@
 import "@/styles/global.css";
 import { siteConfig } from "../../site.config";
 import { themeBootstrap } from "@/lib/theme";
+import { landingBootstrap } from "@/lib/landing";
 import Header from "@/components/Header.astro";
 import Footer from "@/components/Footer.astro";
 import ArchiveRail from "@/components/ArchiveRail.astro";
@@ -96,6 +97,7 @@ const ogImageAbsolute = ogImage
 
     <title>{pageTitle}</title>
     <script is:inline set:html={themeBootstrap} />
+    <script is:inline set:html={landingBootstrap} />
   </head>
   <body class="min-h-screen">
     <a class="skip-link" href="#main">Skip to content</a>
