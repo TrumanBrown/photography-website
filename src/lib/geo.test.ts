@@ -18,6 +18,17 @@ describe("coordsFor", () => {
       lat: 29.1,
       lon: 89.7,
     });
+    // These four sessions had no pin, so the globe was missing places.
+    expect(coordsFor("Minnesota")).toEqual({ lat: 46.73, lon: -94.69 });
+    expect(coordsFor("Scottish Highlands, Scotland")).toEqual({
+      lat: 57.12,
+      lon: -4.71,
+    });
+    expect(coordsFor("Scotland, United Kingdom")).toEqual({
+      lat: 56.49,
+      lon: -4.2,
+    });
+    expect(coordsFor("Stockholm, Sweden")).toEqual({ lat: 59.33, lon: 18.07 });
   });
 
   it("ignores case and accents", () => {

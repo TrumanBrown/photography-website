@@ -63,6 +63,10 @@ const GAZETTEER: Record<string, Coords> = {
   "xi'an": { lat: 34.34, lon: 108.94 },
   chengdu: { lat: 30.66, lon: 104.07 },
 
+  // Europe
+  "scottish highlands, scotland": { lat: 57.12, lon: -4.71 },
+  "stockholm, sweden": { lat: 59.33, lon: 18.07 },
+
   // Broad fallbacks, so somewhere new still lands on the right continent.
   california: { lat: 36.78, lon: -119.42 },
   "oregon coast, oregon": { lat: 44.6, lon: -124.05 },
@@ -70,11 +74,14 @@ const GAZETTEER: Record<string, Coords> = {
   "kauai, hawaii": { lat: 22.07, lon: -159.5 },
   hawaii: { lat: 20.8, lon: -156.33 },
   alaska: { lat: 64.2, lon: -149.5 },
+  minnesota: { lat: 46.73, lon: -94.69 },
   "british columbia": { lat: 53.73, lon: -127.65 },
   mexico: { lat: 23.63, lon: -102.55 },
   japan: { lat: 36.2, lon: 138.25 },
   nepal: { lat: 28.39, lon: 84.12 },
   norway: { lat: 60.47, lon: 8.47 },
+  sweden: { lat: 60.13, lon: 18.64 },
+  scotland: { lat: 56.49, lon: -4.2 },
   iceland: { lat: 64.96, lon: -19.02 },
   ecuador: { lat: -1.83, lon: -78.18 },
   peru: { lat: -9.19, lon: -75.02 },
