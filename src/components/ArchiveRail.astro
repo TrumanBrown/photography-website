@@ -23,6 +23,8 @@ const { activeSlug, section = "photography" } = Astro.props;
 
 const sessions = sortSessions(await getCollection("sessions"));
 const places = buildPlaces(sessions);
+/** Every session with a pin, for the globe's caption when it isn't on one place. */
+const pinned = places.reduce((count, place) => count + place.slugs.length, 0);
 
 const MONTHS = [
   "January",
@@ -179,9 +181,11 @@ await Promise.all(
           aria-label="Spin the globe to jump somewhere I've photographed"
         />
         <p class="orb-place" id="orb-place">
-          {places.length} places
+          Everywhere I've photographed
         </p>
-        <p class="u-label" id="orb-sub" />
+        <p class="u-label" id="orb-sub">
+          {pinned} sessions
+        </p>
         <div class="orb-row">
           <button class="orb-spin" type="button" id="orb-spin">
             Spin it
@@ -606,6 +610,12 @@ await Promise.all(
 
     const placeEl = document.getElementById("orb-place");
     const subEl = document.getElementById("orb-sub");
+    /* The page arrives captioned with every session; it comes back whenever
+       the globe isn't on one place. */
+    const everywhere = {
+      place: placeEl?.textContent?.trim() ?? "",
+      sub: subEl?.textContent?.trim() ?? "",
+    };
     const active = document.querySelector<HTMLElement>(".rail-item.on");
     const activeHref = active?.getAttribute("href") ?? "";
 
@@ -617,6 +627,11 @@ await Promise.all(
             ? "1 session here"
             : `${place.slugs.length} sessions here`;
       }
+    }
+
+    function describeEverywhere() {
+      if (placeEl) placeEl.textContent = everywhere.place;
+      if (subEl) subEl.textContent = everywhere.sub;
     }
 
     /* On a session page the globe faces that session from the first frame,
@@ -674,8 +689,6 @@ await Promise.all(
       describe(here);
     } else if (places.length) {
       globe.mark(null);
-      if (placeEl) placeEl.textContent = "Everywhere, this year";
-      if (subEl) subEl.textContent = `${places.length} places`;
     }
 
     document.getElementById("orb-spin")?.addEventListener("click", () => {
@@ -700,8 +713,7 @@ await Promise.all(
       if (!detail) return;
       if (!detail.location) {
         globe.mark(null);
-        if (placeEl) placeEl.textContent = "Everywhere, this year";
-        if (subEl) subEl.textContent = `${places.length} places`;
+        describeEverywhere();
         return;
       }
       const match = places.find((place) => place.name === detail.location);
