@@ -482,6 +482,8 @@ export function initDayList(root: HTMLElement): void {
   let generation = 0;
   // True from "Lock it in" until the answer has landed on the map.
   let revealing = false;
+  // The verdict stamped on the map once the answer is down.
+  let verdictStamp: HTMLElement | null = null;
   let extraPool: Round[] | null = null;
   let extra = readExtra(readStore(EXTRA_KEY), day);
 
@@ -1045,6 +1047,19 @@ export function initDayList(root: HTMLElement): void {
         : `<span class="dl-num" data-daylist-km>${
             motion ? "0" : count(kmShown)
           }</span> km off`;
+    // The verdict lands on the map as the boundary closes, and stays.
+    const stampVerdict = (slam: boolean) => {
+      verdictStamp?.remove();
+      const box = surface!.parentElement;
+      if (!box) return;
+      verdictStamp = stamp(box, verdict, {
+        unit: km === 0 ? "inside the boundary" : `${count(kmShown)} km off`,
+        className: "stamp-ink dl-verdict-stamp",
+        stay: true,
+        animate: slam,
+        tilt: -6,
+      });
+    };
     const monthWhy =
       off === 0
         ? "Right month"
@@ -1159,6 +1174,7 @@ export function initDayList(root: HTMLElement): void {
       lineT = 1;
       boxT = 1;
       fillIn();
+      stampVerdict(false);
       await map!.fit(answerBox(), { animate: false });
       return;
     }
@@ -1190,6 +1206,7 @@ export function initDayList(root: HTMLElement): void {
     playReveal(lineMs, mine, () => {
       revealing = false;
       fillIn();
+      stampVerdict(true);
       map!.redraw();
       syncMapControls(map!);
     });
@@ -1216,6 +1233,8 @@ export function initDayList(root: HTMLElement): void {
   function loadRound(next: Round, progress: Progress | null): void {
     generation++;
     revealing = false;
+    verdictStamp?.remove();
+    verdictStamp = null;
     round = next;
     lines = clamp(progress?.lines ?? 1, 1, next.clues.length);
     shown = lines;

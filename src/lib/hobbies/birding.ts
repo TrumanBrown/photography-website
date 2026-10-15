@@ -26,6 +26,7 @@ import {
   type FaceFeatures,
   type FacePalette,
 } from './birding-bird';
+import { inkIn, type Inking } from './bird-ink';
 
 /** Longest side we downscale the selfie to before detection (speed vs accuracy). */
 const MAX_SOURCE = 768;
@@ -206,6 +207,9 @@ export function initBirding(root: HTMLElement): void {
   // Last successful detection, kept so "Shuffle" can re-roll without a new selfie.
   let last: { lm: NormalizedLandmark[]; features: FaceFeatures; palette: FacePalette } | null = null;
   let variant = 0;
+  // The bird being inked in, so a download or a shuffle can finish it first.
+  let inking: Inking | null = null;
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   function show(view: keyof typeof views): void {
     for (const [k, el] of Object.entries(views)) {
@@ -247,7 +251,14 @@ export function initBirding(root: HTMLElement): void {
     const bird = featuresToBird(last.features, last.palette);
     const style = makeHybridStyle(last.features, last.palette, variant);
     if (birdCanvas) {
+      inking?.finish();
+      inking = null;
       renderHybrid(birdCanvas, { source, landmarks: last.lm, palette: last.palette, params: bird, style }, BIRD_PX);
+      // Put back dot by dot, like the stipple plates on the hobby cards.
+      if (!reduceMotion) {
+        const paper = getComputedStyle(document.documentElement).getPropertyValue('--paper').trim() || '#fbfaf8';
+        inking = inkIn(birdCanvas, paper);
+      }
     }
     if (tagsEl) {
       const nameSpan = document.createElement('span');
@@ -376,6 +387,8 @@ export function initBirding(root: HTMLElement): void {
   });
   btnDownload?.addEventListener('click', () => {
     if (!birdCanvas) return;
+    inking?.finish();
+    inking = null;
     const a = document.createElement('a');
     a.href = birdCanvas.toDataURL('image/png');
     a.download = 'my-bird.png';

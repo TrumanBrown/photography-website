@@ -17,6 +17,7 @@ import { SPECIES, type TidepoolSpecies, type TidepoolCategory } from './tidepool
 import photoData from './tidepool-photos.json';
 import { rollTo, setHair } from '@/lib/motion';
 import { revealFromPixels, stopPixelReveal } from './pixel-reveal';
+import { stampFind } from './specimen';
 
 /** Optional real photos per species id (CC-licensed). See tidepool-photos.json. */
 const PHOTOS = (photoData.species ?? {}) as Record<string, { photo?: string; credit?: string }>;
@@ -769,6 +770,7 @@ export function initTidepool(root: HTMLElement): void {
     sciEl!.textContent = sp.scientific;
     factEl!.textContent = sp.facts[Math.floor(Math.random() * sp.facts.length)];
     badgeEl!.textContent = isNew ? 'New to your journal' : 'Found again';
+    if (revealCanvas!.parentElement) stampFind(revealCanvas!.parentElement, badgeEl!, isNew);
     openCard();
   }
 

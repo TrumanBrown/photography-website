@@ -17,12 +17,18 @@ import {
   type WeatherId,
 } from "./hiking-model";
 import {
+  POSTMARK,
+  darkUnderPostmark,
+  makePostmark,
   pointOnTrail,
+  postmarkCentre,
   renderHikePostcard,
   renderHikeScene,
+  stampPostcard,
   terrainElevationFromCanvasY,
   terrainAnchorPoint,
 } from "./hiking-renderer";
+import { stampLandFrames } from "@/lib/motion";
 
 const STORAGE_KEY = "trail-studio-v2";
 const LEGACY_STORAGE_KEY = "trail-studio-v1";
@@ -705,6 +711,50 @@ export function initHikeBuilder(root: HTMLElement): void {
   // builder still works without it.
   const print = root.querySelector<HTMLElement>("[data-hike-print]");
 
+  /**
+   * Once the print is up, a postmark with the trail's name and today's date
+   * slams onto its top right corner. It's painted into the postcard canvas
+   * as it lands, so the PNG keeps it. A copy does the slam over the print.
+   */
+  let landing: HTMLCanvasElement | null = null;
+  function postmark(animate: boolean): void {
+    landing?.remove();
+    landing = null;
+    const mark = makePostmark(
+      state.routeName,
+      new Date(),
+      darkUnderPostmark(postcard),
+      state.seed,
+    );
+    if (!animate || !print || typeof mark.animate !== "function") {
+      stampPostcard(postcard, mark);
+      return;
+    }
+    // The copy, placed over the print exactly where the canvas will get it.
+    const centre = postmarkCentre(mark);
+    const tilt = (POSTMARK.tilt * 180) / Math.PI;
+    mark.className = "hike-postmark";
+    mark.setAttribute("aria-hidden", "true");
+    mark.style.left = `${((POSTMARK.x - centre.x) / postcard.width) * 100}%`;
+    mark.style.top = `${((POSTMARK.y - centre.y) / postcard.height) * 100}%`;
+    mark.style.width = `${(mark.width / postcard.width) * 100}%`;
+    mark.style.transformOrigin = `${(centre.x / mark.width) * 100}% 50%`;
+    mark.style.transform = `rotate(${tilt}deg)`;
+    print.append(mark);
+    landing = mark;
+    mark
+      .animate(stampLandFrames(tilt), { duration: 300, fill: "backwards" })
+      .finished.then(
+        () => {
+          if (landing !== mark) return;
+          stampPostcard(postcard, mark);
+          mark.remove();
+          landing = null;
+        },
+        () => mark.remove(),
+      );
+  }
+
   function createPostcard(): void {
     const developing = "Developing at 2,400 × 1,600...";
     exportStatus.textContent = developing;
@@ -718,14 +768,24 @@ export function initHikeBuilder(root: HTMLElement): void {
         exportStatus.textContent = "Rendered on your device at 2,400 × 1,600.";
       };
       if (!print || reduceMotion) {
+        postmark(false);
         done();
         return;
       }
       // Restart the develop even when the dialog is already open.
+      landing?.remove();
+      landing = null;
       print.classList.remove("developing");
       void print.offsetWidth;
       print.classList.add("developing");
-      postcard.addEventListener("animationend", done, { once: true });
+      postcard.addEventListener(
+        "animationend",
+        () => {
+          postmark(true);
+          done();
+        },
+        { once: true },
+      );
     });
   }
 

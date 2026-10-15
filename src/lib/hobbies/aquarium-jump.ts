@@ -139,9 +139,21 @@ interface Drop {
 const MORPH = 0.2;
 const GRAVITY = 1400;
 const DRIP_EVERY = 0.035;
+/** How long a poured-out fish is seen falling, s. */
+const FALL_LIFE = 0.9;
 
 export interface Jumps {
   launch(launch: Launch): void;
+  /** A fish carried out of the tank, falling free from `at` (page pixels)
+   *  at velocity `v`, turned `turn` radians. */
+  fall(
+    fish: { species: Species; size: number; dir: 1 | -1 },
+    at: Point,
+    v: Point,
+    turn: number,
+  ): void;
+  /** Water pouring over the rim at `at` (page pixels), toward `side`. */
+  pour(at: Point, side: 1 | -1, count: number): void;
   /** Drop everything in the air: the tank was emptied. */
   clear(): void;
   /** Fish in the air, so the tank can count them against its limit. */
@@ -151,6 +163,19 @@ export interface Jumps {
 export function createJumps(options: JumpsOptions): Jumps {
   const { tank, pix, sprite, onSplash } = options;
   const jumps: Jump[] = [];
+  /** Fish poured out of a tipped tank, falling away. */
+  const fallers: Array<{
+    species: Species;
+    size: number;
+    dir: 1 | -1;
+    x: number;
+    y: number;
+    vx: number;
+    vy: number;
+    turn: number;
+    spin: number;
+    born: number;
+  }> = [];
   const drops: Drop[] = [];
   let layer: HTMLCanvasElement | null = null;
   let ctx: CanvasRenderingContext2D | null = null;
@@ -332,6 +357,33 @@ export function createJumps(options: JumpsOptions): Jumps {
     }
 
     const box = tank.getBoundingClientRect();
+    for (let i = fallers.length - 1; i >= 0; i--) {
+      const f = fallers[i];
+      f.vy += GRAVITY * dt;
+      f.x += f.vx * dt;
+      f.y += f.vy * dt;
+      f.turn += f.spin * dt;
+      const age = (now - f.born) / 1000;
+      if (age > FALL_LIFE) {
+        fallers.splice(i, 1);
+        continue;
+      }
+      const art = sprite(f.species, f.size);
+      c.save();
+      c.globalAlpha =
+        1 - clamp((age - FALL_LIFE * 0.55) / (FALL_LIFE * 0.45), 0, 1);
+      c.translate(f.x - window.scrollX, f.y - window.scrollY);
+      c.rotate(f.turn);
+      c.scale(f.dir, 1);
+      c.drawImage(
+        art.image,
+        -art.width / 2,
+        -art.height / 2,
+        art.width,
+        art.height,
+      );
+      c.restore();
+    }
     for (let i = drops.length - 1; i >= 0; i--) {
       const d = drops[i];
       d.vy += GRAVITY * dt;
@@ -351,15 +403,54 @@ export function createJumps(options: JumpsOptions): Jumps {
     }
     c.globalAlpha = 1;
 
-    if (jumps.length || drops.length) raf = requestAnimationFrame(frame);
+    if (jumps.length || drops.length || fallers.length)
+      raf = requestAnimationFrame(frame);
     else teardown();
+  }
+
+  function wake(): void {
+    if (raf) return;
+    last = performance.now();
+    raf = requestAnimationFrame(frame);
   }
 
   return {
     launch,
+    fall(fish, at, v, turn) {
+      fallers.push({
+        ...fish,
+        x: at.x,
+        y: at.y,
+        vx: v.x,
+        vy: v.y,
+        turn,
+        spin: fish.dir * (2 + Math.random() * 4),
+        born: performance.now(),
+      });
+      wake();
+    },
+    pour(at, side, count) {
+      const now = performance.now();
+      const colors = waterColors();
+      for (let i = 0; i < count; i++) {
+        drops.push({
+          x: at.x,
+          y: at.y + Math.random() * pix * 2,
+          vx: side * (60 + Math.random() * 160),
+          vy: -60 + Math.random() * 90,
+          born: now,
+          life: 0.7 + Math.random() * 0.3,
+          size: Math.random() < 0.7 ? pix : pix / 2,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          surface: null,
+        });
+      }
+      wake();
+    },
     clear() {
       jumps.length = 0;
       drops.length = 0;
+      fallers.length = 0;
       teardown();
     },
     get pending() {

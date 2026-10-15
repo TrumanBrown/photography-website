@@ -122,10 +122,40 @@ export interface StampOptions {
   /** Degrees; left out, it's a slightly different angle each time, the way
    *  a hand stamp never lands square. */
   tilt?: number;
+  /** Extra classes, for where it sits and what ink it's in (`stamp-ink`). */
+  className?: string;
+  /** Slam down and stay, as the record of a result, rather than drifting
+   *  away. The caller removes it. */
+  stay?: boolean;
+  /** False puts it straight down without the slam, e.g. on a restored page. */
+  animate?: boolean;
 }
 
 /** How long a stamp is on screen, ms. */
 export const STAMP_MS = 1700;
+/** How long a stamp that stays takes to land, ms. */
+export const STAMP_LAND_MS = 260;
+
+/** The keyframes for a stamp that comes down and stays: the slam alone. */
+export function stampLandFrames(tilt: number): Keyframe[] {
+  const at = (y: number, scale: number, turn: number) =>
+    `translateY(${y}px) scale(${scale}) rotate(${turn}deg)`;
+  return [
+    {
+      offset: 0,
+      opacity: 0,
+      transform: at(-10, 1.9, tilt - 10),
+      easing: "cubic-bezier(0.55, 0, 1, 0.45)",
+    },
+    {
+      offset: 0.5,
+      opacity: 1,
+      transform: at(0, 0.94, tilt),
+      easing: "cubic-bezier(0.2, 0, 0.2, 1)",
+    },
+    { offset: 1, opacity: 1, transform: at(0, 1, tilt) },
+  ];
+}
 
 /**
  * The keyframes for a stamp at `tilt` degrees. It comes down fast and lands a
@@ -179,7 +209,7 @@ export function stamp(
   options: StampOptions = {},
 ): HTMLElement {
   const mark = document.createElement("span");
-  mark.className = "stamp";
+  mark.className = options.className ? `stamp ${options.className}` : "stamp";
   mark.setAttribute("aria-hidden", "true");
   const figure = document.createElement("b");
   figure.textContent = text;
@@ -193,6 +223,20 @@ export function stamp(
 
   const tilt = options.tilt ?? -9 + Math.random() * 6;
   const reduced = prefersReducedMotion();
+  if (options.stay) {
+    mark.style.transform = `rotate(${tilt}deg)`;
+    if (
+      options.animate !== false &&
+      !reduced &&
+      typeof mark.animate === "function"
+    ) {
+      mark.animate(stampLandFrames(tilt), {
+        duration: STAMP_LAND_MS,
+        fill: "backwards",
+      });
+    }
+    return mark;
+  }
   if (typeof mark.animate !== "function") {
     setTimeout(() => mark.remove(), STAMP_MS);
     return mark;

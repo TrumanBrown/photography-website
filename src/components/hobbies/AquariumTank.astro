@@ -125,6 +125,12 @@ const groups = ZONES.map(({ zone, label }) => ({
     border: 1px solid var(--rule);
     background: var(--band);
   }
+  /* Start over tips the tank to pour everything out (aquarium.ts sets the
+     angle each frame), over whatever sits under it. */
+  .aq-frame.is-tipping {
+    position: relative;
+    z-index: 2;
+  }
 
   /* Phones and tablets stack the tank panel first, right under the canvas, so
      the bioload stays next to the tank. Desktop puts the list on the left. */

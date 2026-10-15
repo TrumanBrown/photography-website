@@ -26,7 +26,7 @@
  * functions (look).
  */
 
-import { rollTo, setHair } from '@/lib/motion';
+import { rollTo, setHair } from '../motion';
 import { SPECIES, type Shape, type Species, type Zone } from './aquarium-species';
 import { createJumps, type Sprite } from './aquarium-jump';
 import { stockingStatus } from './stocking';
@@ -66,6 +66,74 @@ interface Dive {
   dur: number;
   /** Nose angle it went in at; it levels out as it slows. */
   tilt: number;
+}
+
+/**
+ * A pixel net coming down for one fish: in from above the surface, a quick
+ * scoop round the fish, then up and out with it. The fish has already left
+ * the stock list; it's only drawn here until the net has it out of sight.
+ */
+interface Net {
+  fish: Fish;
+  t: number;
+  /** Where the fish was when the net was sent. */
+  x: number;
+  y: number;
+  /** Handle leans the way the net comes in from. */
+  side: 1 | -1;
+}
+
+/** Seconds: the net coming down, the scoop, and the lift out. */
+const NET_IN = 0.38;
+const NET_SCOOP = 0.16;
+const NET_OUT = 0.42;
+
+/**
+ * Where a net is `t` seconds after it's sent, and whether it has the fish.
+ * `x`/`y` is the middle of the net's rim; it comes down from `top` (above the
+ * tank) to `y`, scoops a little sideways, then lifts back past `top`.
+ */
+export function netPath(
+  t: number,
+  fishX: number,
+  fishY: number,
+  top: number,
+  side: 1 | -1,
+): { x: number; y: number; holding: boolean; done: boolean } {
+  const ease = (k: number) => k * k * (3 - 2 * k);
+  if (t < NET_IN) {
+    const k = ease(t / NET_IN);
+    return { x: fishX - side * 10 * (1 - k), y: top + (fishY - top) * k, holding: false, done: false };
+  }
+  if (t < NET_IN + NET_SCOOP) {
+    const k = ease((t - NET_IN) / NET_SCOOP);
+    return { x: fishX + side * 8 * k, y: fishY + 4 * Math.sin(k * Math.PI), holding: k > 0.5, done: false };
+  }
+  const k = Math.min(1, (t - NET_IN - NET_SCOOP) / NET_OUT);
+  // Lifting out speeds up, the way you'd pull a net.
+  const lift = k * k;
+  return {
+    x: fishX + side * 8 + side * 14 * lift,
+    y: fishY + (top - 20 - fishY) * lift,
+    holding: true,
+    done: k >= 1,
+  };
+}
+
+/**
+ * The tank tipping over to empty it. It leans one way, holds while everything
+ * pours out, and rocks back level. `lean` is the angle in radians.
+ */
+export const TIP_MS = 1500;
+export function tipLean(ms: number, side: 1 | -1): number {
+  const ease = (k: number) => k * k * (3 - 2 * k);
+  const max = (side * 16 * Math.PI) / 180;
+  if (ms <= 0 || ms >= TIP_MS) return 0;
+  if (ms < 320) return max * ease(ms / 320);
+  if (ms < 900) return max;
+  // Back level with a little overshoot, like setting a heavy tank down.
+  const k = (ms - 900) / (TIP_MS - 900);
+  return max * (1 - ease(k)) - max * 0.08 * Math.sin(Math.PI * k);
 }
 
 /** How a fish came in through the surface (from ./aquarium-jump). */
@@ -450,6 +518,11 @@ export function initAquarium(root: HTMLElement): void {
   let floaters: Floater[] = [];
   const fizz: Fizz[] = [];
   const ripples: Ripple[] = [];
+  const nets: Net[] = [];
+  /** Everything poured out when the tank was tipped, still falling. */
+  const spilled: Array<{ fish: Fish; x: number; y: number; vx: number; vy: number; spin: number; turn: number }> = [];
+  let tip: { start: number; side: 1 | -1; left: number; top: number } | null = null;
+  const tank: HTMLElement = canvas.parentElement ?? canvas;
   const sprites = new Map<string, Sprite>();
 
   /** A species drawn once on its own canvas, for drawing turned. */
@@ -667,7 +740,11 @@ export function initAquarium(root: HTMLElement): void {
   function removeOne(speciesId: string): void {
     for (let i = fish.length - 1; i >= 0; i--) {
       if (fish[i].species.id === speciesId) {
-        fish.splice(i, 1);
+        const [caught] = fish.splice(i, 1);
+        // The net comes for the one it took off the list.
+        if (!reduceMotion && running) {
+          nets.push({ fish: caught, t: 0, x: caught.x, y: caught.y, side: caught.x < W / 2 ? 1 : -1 });
+        }
         break;
       }
     }
@@ -675,10 +752,30 @@ export function initAquarium(root: HTMLElement): void {
   }
 
   function reset(): void {
+    jumps.clear();
+    nets.length = 0;
+    if (!reduceMotion && running && fish.length) {
+      // Tip the tank out: everything in it pours over the low side.
+      const side: 1 | -1 = Math.random() < 0.5 ? -1 : 1;
+      const box = canvas!.getBoundingClientRect();
+      tip = { start: performance.now(), side, left: box.left + window.scrollX, top: box.top + window.scrollY };
+      for (const f of fish) {
+        spilled.push({
+          fish: f,
+          x: f.x,
+          y: f.y,
+          vx: side * (40 + Math.random() * 80),
+          vy: -20 - Math.random() * 40,
+          spin: (Math.random() - 0.5) * 6,
+          turn: 0,
+        });
+      }
+      tank.classList.add('is-tipping');
+      tank.style.transformOrigin = side > 0 ? '100% 100%' : '0% 100%';
+    }
     fish.length = 0;
     fizz.length = 0;
     ripples.length = 0;
-    jumps.clear();
     syncUI();
   }
 
@@ -895,6 +992,58 @@ export function initAquarium(root: HTMLElement): void {
       ripples[i].t += dt;
       if (ripples[i].t > 0.6) ripples.splice(i, 1);
     }
+    for (let i = nets.length - 1; i >= 0; i--) {
+      nets[i].t += dt;
+      if (nets[i].t > NET_IN + NET_SCOOP + NET_OUT) nets.splice(i, 1);
+    }
+    if (tip) {
+      const ms = now - tip.start;
+      const lean = tipLean(ms, tip.side);
+      tank.style.transform = lean ? `rotate(${lean}rad)` : '';
+      const tilt = Math.abs(lean) / ((16 * Math.PI) / 180);
+      const cos = Math.cos(lean);
+      const sin = Math.sin(lean);
+      // Tank pixels to page pixels, turned about the low bottom corner.
+      const ox = tip.side < 0 ? 0 : W;
+      const toPage = (x: number, y: number) => ({
+        x: tip!.left + ox + (x - ox) * cos - (y - H) * sin,
+        y: tip!.top + H + (x - ox) * sin + (y - H) * cos,
+      });
+      // Everything rushes for the low corner of the rim and pours out.
+      const rimX = tip.side < 0 ? 0 : W;
+      const rimY = PIX * 2;
+      for (let i = spilled.length - 1; i >= 0; i--) {
+        const s = spilled[i];
+        const dx = rimX - s.x;
+        const dy = rimY - s.y;
+        const d = Math.hypot(dx, dy) || 1;
+        const pull = 3600 * tilt;
+        s.vx += (dx / d) * pull * dt;
+        s.vy += (dy / d) * pull * dt;
+        s.vx *= 1 - Math.min(1, 1.2 * dt);
+        s.vy *= 1 - Math.min(1, 1.2 * dt);
+        s.x += s.vx * dt;
+        s.y += s.vy * dt;
+        s.turn += s.spin * dt;
+        const over = tip.side < 0 ? s.x <= s.fish.size * 0.2 : s.x >= W - s.fish.size * 0.2;
+        if (d < s.fish.size * 0.6 || (over && s.y < H * 0.3)) {
+          jumps.fall(
+            { species: s.fish.species, size: s.fish.size, dir: s.fish.dir },
+            toPage(s.x, s.y),
+            { x: s.vx * cos - s.vy * sin, y: s.vx * sin + s.vy * cos },
+            s.turn + lean,
+          );
+          spilled.splice(i, 1);
+        }
+      }
+      if (tilt > 0.6 && Math.random() < dt * 30) jumps.pour(toPage(rimX, rimY), tip.side, 3);
+      if (ms >= TIP_MS) {
+        tip = null;
+        spilled.length = 0;
+        tank.style.transform = '';
+        tank.classList.remove('is-tipping');
+      }
+    }
     if (!reduceMotion) {
       const sub = substrateY();
       for (const b of bubbles) {
@@ -915,6 +1064,40 @@ export function initAquarium(root: HTMLElement): void {
     }
   }
 
+  /** A pixel net: a hoop of mesh on a handle, carrying its fish once caught. */
+  function drawNet(n: Net): void {
+    const top = -PIX * 6;
+    const at = netPath(n.t, n.x, n.y, top, n.side);
+    const reach = Math.max(PIX * 5, n.fish.size * 0.75);
+    const rimY = snap(at.y - reach * 0.55);
+    if (at.holding) {
+      const art = spriteFor(n.fish.species, n.fish.size);
+      ctx!.save();
+      ctx!.translate(snap(at.x), snap(at.y));
+      ctx!.rotate(0.35 * n.side);
+      ctx!.scale(n.fish.dir, 1);
+      ctx!.drawImage(art.image, -art.width / 2, -art.height / 2, art.width, art.height);
+      ctx!.restore();
+    }
+    // Handle, from the rim's far edge up out of the tank, leaning away.
+    ctx!.fillStyle = '#8a6a43';
+    for (let y = rimY; y > -PIX; y -= PIX) {
+      const x = at.x + n.side * reach + n.side * (rimY - y) * 0.45;
+      ctx!.fillRect(snap(x), snap(y), PIX, PIX);
+    }
+    // Rim and mesh bag.
+    ctx!.fillStyle = 'rgba(232,238,232,0.9)';
+    for (let x = -reach; x <= reach; x += PIX) ctx!.fillRect(snap(at.x + x), rimY, PIX, PIX);
+    ctx!.fillStyle = 'rgba(232,238,232,0.42)';
+    const depth = reach * 1.15;
+    for (let y = PIX; y <= depth; y += PIX) {
+      const half = reach * Math.sqrt(Math.max(0, 1 - (y / depth) * (y / depth)));
+      for (let x = -half; x <= half; x += PIX * 2) {
+        ctx!.fillRect(snap(at.x + x + ((y / PIX) % 2) * PIX), rimY + snap(y), PIX, PIX);
+      }
+    }
+  }
+
   function render(now: number): void {
     ctx!.drawImage(bgCanvas, 0, 0, W, H);
     drawCaustics(now);
@@ -922,6 +1105,16 @@ export function initAquarium(root: HTMLElement): void {
     for (const z of ['bottom', 'mid', 'top'] as Zone[]) {
       for (const f of fish) if (f.species.zone === z) drawFish(f);
     }
+    for (const s of spilled) {
+      const art = spriteFor(s.fish.species, s.fish.size);
+      ctx!.save();
+      ctx!.translate(snap(s.x), snap(s.y));
+      ctx!.rotate(s.turn);
+      ctx!.scale(s.fish.dir, 1);
+      ctx!.drawImage(art.image, -art.width / 2, -art.height / 2, art.width, art.height);
+      ctx!.restore();
+    }
+    for (const n of nets) drawNet(n);
     for (const f of floaters) drawFloater(f, now);
     drawBubbles();
     ctx!.fillStyle = 'rgba(220,240,255,0.6)';

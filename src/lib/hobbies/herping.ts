@@ -25,6 +25,7 @@ import {
 import photoData from "./herping-photos.json";
 import { rollTo, setHair } from "@/lib/motion";
 import { revealFromPixels, stopPixelReveal } from "./pixel-reveal";
+import { stampFind } from "./specimen";
 
 /** Optional real photos per species id (CC-licensed). See herping-photos.json. */
 const PHOTOS = (photoData.species ?? {}) as Record<
@@ -879,6 +880,9 @@ export function initHerping(root: HTMLElement): void {
         ? "New to your journal"
         : "Found again";
     badgeEl!.classList.toggle("is-warn", !!sp.nonNative);
+    if (revealCanvas!.parentElement) {
+      stampFind(revealCanvas!.parentElement, badgeEl!, isNew && !sp.nonNative);
+    }
     openCard();
   }
 

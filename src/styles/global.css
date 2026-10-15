@@ -365,6 +365,10 @@
     letter-spacing: 0.2em;
     text-transform: uppercase;
   }
+  /* The same stamp in plain ink, for a result rather than a cost. */
+  .stamp.stamp-ink {
+    --stamp: var(--ink);
+  }
 }
 
 /* Landing after a transition out of the last page (src/lib/landing.ts). The

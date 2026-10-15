@@ -998,6 +998,15 @@ const MONTHS = [
     }
   }
 
+  /* The verdict, stamped on the map once the answer is down. The top left
+     is the one corner the map's own controls leave free. */
+  .dl-mapbox > .dl-verdict-stamp {
+    top: 12px;
+    right: auto;
+    left: 12px;
+    z-index: 3;
+  }
+
   /* On a phone a square is a third of the screen wide, so the stamp a reveal
      puts down on it (stamp() in src/lib/motion.ts) is smaller too. */
   @media (max-width: 520px) {
@@ -1014,6 +1023,13 @@ const MONTHS = [
       margin-top: 2px;
       font-size: 7px;
       letter-spacing: 0.14em;
+    }
+    .dl-mapbox > .dl-verdict-stamp {
+      top: 8px;
+      left: 8px;
+    }
+    .dl-mapbox > .dl-verdict-stamp > b {
+      font-size: 14px;
     }
   }
 </style>

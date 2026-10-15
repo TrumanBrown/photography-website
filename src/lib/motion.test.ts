@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { STAMP_MS, stampFrames } from "./motion";
+import { STAMP_MS, stampFrames, stampLandFrames } from "./motion";
 
 describe("stampFrames", () => {
   for (const reduced of [false, true]) {
@@ -46,5 +46,16 @@ describe("stampFrames", () => {
       stampFrames(-6, true).map((frame) => frame.transform),
     );
     expect(transforms.size).toBe(1);
+  });
+});
+
+describe("stampLandFrames", () => {
+  it("comes down hard and stays where it lands", () => {
+    const frames = stampLandFrames(-6);
+    expect(frames[0].opacity).toBe(0);
+    expect(frames.at(-1)!.opacity).toBe(1);
+    expect(frames.at(-1)!.transform).toBe(
+      "translateY(0px) scale(1) rotate(-6deg)",
+    );
   });
 });

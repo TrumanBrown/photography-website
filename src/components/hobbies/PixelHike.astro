@@ -713,6 +713,13 @@ const hikerColors = ["#d5523f", "#e1a13a", "#247d72", "#355f9b", "#7d4f8f"];
   .hike-print {
     position: relative;
   }
+  /* The postmark slamming onto the print once it's up (hiking.ts); then it's
+     painted into the canvas and this copy goes. */
+  .hike-print :global(.hike-postmark) {
+    position: absolute;
+    height: auto;
+    pointer-events: none;
+  }
   .hike-grain {
     position: absolute;
     inset: 0;

@@ -97,6 +97,7 @@ A few interaction details come from React component libraries (Cult UI, Watermel
 | `revealFromPixels()`: a photo resolves out of coarse blocks (6, 12, 24, then 48 across) into the full image in about 360ms | [pixel-reveal.ts](../src/lib/hobbies/pixel-reveal.ts)        | Magic UI `pixel-image`                                        | The tide pooling and herping reveal cards, so a real photo arrives in the sprites' own pixel language |
 | `.hike-print.developing`: the finished canvas comes up pale and soft under a dot grain, reaching full contrast in 1.7s     | [PixelHike.astro](../src/components/hobbies/PixelHike.astro) | Cult UI `dither-image`, Magic UI `pixel-image`                | The hiking postcard                                                                                   |
 | `stamp(host, text)`: a cost stamped in red ink on the thing it bought; it slams down, sits, then drifts down and fades     | `motion.ts`, `global.css`                                    | Games' floating score text (Krillion's point pops)            | Narrow nature, on each species you pay to see                                                         |
+| `stamp(host, text, { stay: true })`: the same slam in ink, staying put as the record of a result                           | `motion.ts`, `global.css`                                    | A rubber stamp                                                | Narrow nature's verdict, first finds in tide pooling and herping                                      |
 
 `.utabs` groups pick one value, so they're `role="radiogroup"` with `<button role="radio" aria-checked>` options. The bar follows `aria-checked` however it changes, so an engine that restores state (undo, start over) only has to set the attribute. Everything above settles instantly under `prefers-reduced-motion`.
 
@@ -130,7 +131,7 @@ The controls are plain HTML (radio groups, buttons, a text field, native selects
 
 **Persistence and sharing.** The normalized scene is saved under `trail-studio-v2` in `localStorage`; a saved v1 five-point route is migrated and blended into the new distance-scaled profile on first load. Export uses `canvas.toBlob()` rather than a base64 data URL. Browsers supporting file sharing receive a real PNG through `navigator.share`; other browsers always retain the download action.
 
-**The postcard develops.** When the dialog opens, the finished canvas comes up like a print in the tray: pale, warm and soft under a dot grain, reaching full contrast in about 1.7 seconds while the status reads "Developing at 2,400 × 1,600...". It's only CSS on top of the finished canvas, so the downloaded PNG is identical either way, and under reduced motion the print is simply there.
+**The postcard develops.** When the dialog opens, the finished canvas comes up like a print in the tray: pale, warm and soft under a dot grain, reaching full contrast in about 1.7 seconds while the status reads "Developing at 2,400 × 1,600...". It's only CSS on top of the finished canvas, so the downloaded PNG is identical either way, and under reduced motion the print is simply there. Once it's up, a round postmark with the trail's name and the day slams onto the top right corner (`makePostmark` in the renderer); it's painted into the canvas as it lands, so the PNG does keep that, in dark ink on a pale sky and pale ink on a dark one.
 
 **Input parity.** Every generated terrain point has a visible canvas handle and a dynamically generated native range control under “Fine-tune the terrain”; points support direct pointer dragging and arrow-key editing on the focusable canvas. Moment buttons are immediate commands; moment handles support pointer dragging and the itinerary tags remove a moment. Landscape and light are underline-tab radio groups (arrow keys move between them), and every other option is a real button, select, or slider. Reduced-motion users get an immediate completed walk instead of a forced animation.
 
@@ -197,7 +198,9 @@ Everything you see in the tank (fish, plants, rocks, driftwood, bubbles, light) 
 - The loop pauses when the canvas scrolls offscreen (`IntersectionObserver`) or the tab is hidden (`visibilitychange`), so it costs nothing when not in view.
 - Touch friendly: native range slider, a species list with 32px rows, and tap-to-add (after picking a species, tapping in the tank drops one at that point).
 - **Adding a fish is a jump.** It leaps from the swatch you tapped, growing from the two-colour swatch into its sprite and flicking water off its tail, comes down through the surface with a splash, and sinks to its depth nose-first, levelling out and trailing bubbles. A tap in the tank drops one in over that spot the same way. The leap is drawn on a fixed canvas that only exists while something's in the air, snapped to the tank's pixel grid so the fish lands on the pixels it flew on; the tank takes over at the surface. Each tap is its own jump, so tapping fast sends a run of fish in, and the stocking list counts each one as it lands. See [aquarium-jump.ts](../src/lib/hobbies/aquarium-jump.ts).
-- `prefers-reduced-motion` slows everything, stops the plant sway, and adds fish straight into the tank without the jump.
+- **Taking a fish out is a net.** The "−" beside a species takes one off the list at once and sends a pixel net down for it: in from above the surface, a quick scoop, then up and out with the fish (`netPath`). Several can be in the water at once.
+- **Start over tips the tank.** The frame leans over on its low bottom corner (`tipLean`); everything in it rushes for the low corner of the rim and pours out with the water, falling clear on the same layer the jumps use, and the tank rocks back level, empty.
+- `prefers-reduced-motion` slows everything, stops the plant sway, and adds and removes fish straight away, without the jump, the net or the tip.
 - A hard cap of 55 fish keeps the loop smooth on phones.
 - It all runs in the visitor's browser, so frame rate depends on their device, not on the hosting tier.
 
@@ -244,6 +247,8 @@ Like the aquarium, the whole beach is **drawn in code** with canvas `fillRect`, 
 ### Real photos in the reveal card
 
 The reveal card shows the **pixel sprite by default and a real photo when one is available**: the sprite still appears under the rock on the beach either way.
+
+A first find gets "New to your journal" stamped in ink across the corner of the picture as the card opens, the way a new specimen gets its accession stamp; a find you already have just says "Found again". The herping card is the same card and does the same ([specimen.ts](../src/lib/hobbies/specimen.ts)).
 
 - **Where photos come from.** Optional per-species photos live in [src/lib/hobbies/tidepool-photos.json](../src/lib/hobbies/tidepool-photos.json) as `id → { photo, credit }`. The engine merges that in when it builds the card: if a photo is present it's shown with its attribution line; otherwise, or if the image fails to load (an `onerror` fallback), the card draws the pixel sprite. So partial coverage is fine and a dead link never breaks the card.
 - **Licensing is the whole point.** Photos are **Creative Commons only**, with attribution shown in the card. The helper [scripts/fetch-tidepool-photos.mjs](../scripts/fetch-tidepool-photos.mjs) (`npm run fetch:tidepool-photos`) queries the iNaturalist API for each species' scientific name, restricted to `cc0,cc-by,cc-by-nc`, prefers research-grade and most-faved observations, downloads the photo to `staging/tide-pooling/` (gitignored), and writes a manifest recording the photographer, license, and source observation URL for review.
@@ -298,6 +303,7 @@ Take or upload a selfie and the page turns you into a **bird-person hybrid**: it
 - [src/components/hobbies/Birding.astro](../src/components/hobbies/Birding.astro), the markup (choose / camera / busy / error / result states + privacy note) and the mounting `<script>`.
 - [src/lib/hobbies/birding.ts](../src/lib/hobbies/birding.ts), the engine: camera and file input, lazy-loading the landmark model, turning landmarks into normalized features, and sampling the palette (hair, accent, skin, and iris colours). This is the only file that touches MediaPipe or the DOM.
 - [src/lib/hobbies/birding-bird.ts](../src/lib/hobbies/birding-bird.ts), the **pure** feature mapping + style picker (`makeHybridStyle`, unit-tested) and the browser-only compositing renderer (`renderHybrid`) that draws the bill + feathers onto the selfie. Split out the same way `stocking.ts` is split from the aquarium.
+- [src/lib/hobbies/bird-ink.ts](../src/lib/hobbies/bird-ink.ts), the ink-in: once the bird is drawn it's rebuilt as stipple, dot by dot and darkest first in its own colours (`stippleDots`, unit-tested), then the finished picture comes up through the dots. The canvas ends identical to the finished bird, and Download finishes the ink-in first.
 - [src/lib/hobbies/birding-bird.test.ts](../src/lib/hobbies/birding-bird.test.ts), unit tests for the mapping and the style picker (determinism, valid colours, iris passthrough, beak-colour variety).
 
 ### Honest notes on the look
@@ -410,7 +416,9 @@ with the rules and uses one set of words throughout:
   guess can still score (`bestPossible`). It rolls down with each species you ask for (`rollTo`).
   The panel is under the map, usually off screen when you ask, so the price is also stamped in red
   on the corner of the species it bought (`stamp()` in [motion.ts](../src/lib/motion.ts)). It slams
-  down, sits for half a second, then drifts down toward the points and fades.
+  down, sits for half a second, then drifts down toward the points and fades. Once the answer is down,
+  the verdict ("Spot on", "Not quite"...) is stamped in ink on the map's top left corner with the
+  distance under it, and stays there with the result.
 - **The result is a receipt.** "Lock it in" swaps the panel for the verdict, the place and where the
   points came from: Place (distance, and how many species were showing), Month, Total. The full list
   with facts follows under the board. Wikipedia's bracketed Latin name and IPA pronunciation are

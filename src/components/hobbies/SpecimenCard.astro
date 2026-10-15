@@ -102,6 +102,25 @@ const nameId = `${prefix}-specimen-name`;
   .specimen-status.is-warn {
     color: var(--ink);
   }
+  /* A first find is stamped across the picture's corner (src/lib/hobbies/
+     specimen.ts); the plain label stays for screen readers. */
+  .specimen-status.is-stamped {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .specimen-pic :global(.specimen-stamp) {
+    top: auto;
+    right: -22px;
+    bottom: 10px;
+    z-index: 2;
+  }
+  .specimen-pic :global(.specimen-stamp > i) {
+    letter-spacing: 0.14em;
+  }
   .specimen-names h3 {
     margin: 0;
     font-size: 17px;
