@@ -12,6 +12,19 @@ export interface View {
   dpr: number;
 }
 
+/** A card to get ready ahead of a click on it. */
+export interface WarmRequest {
+  slug: string;
+  card: string;
+  mini?: string;
+  dark: boolean;
+  /**
+   * Where the card is and the viewport, when a click on it is likely (it's
+   * pointed at, focused or pressed): its scene is set up once beforehand.
+   */
+  rehearse?: { rect: [number, number, number, number]; view: View };
+}
+
 export interface PlayRequest {
   slug: string;
   /** The card plate to draw the scene from, and a home-page card's mini plate. */
@@ -49,13 +62,7 @@ export interface ResumeRequest {
 
 export type ToWorker =
   | { type: "init"; canvas: OffscreenCanvas; software: boolean; gl: boolean }
-  | {
-      type: "warm";
-      slug: string;
-      card: string;
-      mini?: string;
-      dark: boolean;
-    }
+  | ({ type: "warm" } & WarmRequest)
   | ({ type: "play" } & PlayRequest)
   | ({ type: "resume" } & ResumeRequest)
   | { type: "hurry" }

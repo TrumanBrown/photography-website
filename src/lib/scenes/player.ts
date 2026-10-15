@@ -51,11 +51,13 @@ export interface Player {
   readonly ready: Promise<boolean>;
   /** The worker's script, once it's ready: the next page starts its own from it. */
   readonly workerUrl: string | null;
+  /** Get a card ready; with its place on screen, a click on it is likely. */
   warm(
     slug: string,
     card: string,
     mini: string | undefined,
     dark: boolean,
+    rect?: [number, number, number, number],
   ): void;
   play(request: Omit<PlayRequest, "view">, events: PlayEvents): Playing;
   resume(request: Omit<ResumeRequest, "view">, events: ResumeEvents): Playing;
@@ -195,8 +197,15 @@ function makePlayer(): Player | null {
     get workerUrl() {
       return workerUrl;
     },
-    warm(slug, card, mini, dark) {
-      send({ type: "warm", slug, card, mini, dark });
+    warm(slug, card, mini, dark, rect) {
+      send({
+        type: "warm",
+        slug,
+        card,
+        mini,
+        dark,
+        rehearse: rect ? { rect, view: viewNow() } : undefined,
+      });
     },
 
     play(request, events) {

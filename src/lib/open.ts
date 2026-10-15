@@ -494,15 +494,20 @@ function prefetchPage(href: string, early = false): void {
 
 const warmedHobbies = new WeakMap<HTMLAnchorElement, Promise<void>>();
 
+/** Cards whose scene the worker has been asked to set up beforehand. */
+const rehearsed = new WeakSet<HTMLAnchorElement>();
+
 /**
  * Get a hobby's scene ready before it's clicked: the scenes, the card plate's
  * dots in this theme, and the scene's props. Pointing at a card, focusing it
- * or pressing it starts this at once; cards in view get it in turn when the
- * page is idle (see initOpeners).
+ * or pressing it starts this at once, and as a click is `likely` then, the
+ * scene worker sets the scene up once beforehand too; cards in view get the
+ * rest in turn when the page is idle (see initOpeners).
  */
-function warmHobby(link: HTMLAnchorElement): Promise<void> {
+function warmHobby(link: HTMLAnchorElement, likely = false): Promise<void> {
   const known = warmedHobbies.get(link);
-  if (known) return known;
+  if (known && !(likely && !rehearsed.has(link) && usablePlayer()))
+    return known;
   const dark = isDark();
   const shown = link.querySelector<HTMLImageElement>(
     `img[data-ink="${dark ? "dark" : "light"}"]`,
@@ -513,7 +518,13 @@ function warmHobby(link: HTMLAnchorElement): Promise<void> {
   // In the scene worker, where it's running: none of it on the page.
   const player = usablePlayer();
   if (player && url) {
-    player.warm(slugOf(link.href), url, mini ?? undefined, dark);
+    let rect: [number, number, number, number] | undefined;
+    if (likely && shown && !rehearsed.has(link)) {
+      rehearsed.add(link);
+      const box = shown.getBoundingClientRect();
+      rect = [box.left, box.top, box.width, box.height];
+    }
+    player.warm(slugOf(link.href), url, mini ?? undefined, dark, rect);
     const done = Promise.resolve();
     warmedHobbies.set(link, done);
     return done;
@@ -904,7 +915,7 @@ export function initOpeners(): void {
       document.addEventListener(type, (event) => {
         const link = hobbyLink(event.target);
         if (!link) return;
-        void warmHobby(link);
+        void warmHobby(link, true);
         prefetchPage(link.href, true);
       });
     // Cards that stay in view get ready one at a time, when the page is idle.

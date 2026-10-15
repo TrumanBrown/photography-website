@@ -8,6 +8,7 @@ import {
   type Look,
   PUSH_MS,
   pushZoom,
+  type Scene,
   type Stage,
   stageScene,
 } from "./engine";
@@ -20,6 +21,7 @@ import type {
   ResumeRequest,
   ToWorker,
   View,
+  WarmRequest,
 } from "./protocol";
 import { split } from "./stage";
 import { ready, SCENES } from "./table";
@@ -206,16 +208,66 @@ function stopCurrent() {
 /* ------------------------------------------------------------------ play */
 
 /** Ready a card's plate and props ahead of a click on it, in their turn. */
-async function warm(
-  slug: string,
-  card: string,
-  mini: string | undefined,
+async function warm(m: WarmRequest) {
+  const scene = SCENES[m.slug];
+  if (m.mini) void plate(m.mini);
+  const dots = await plate(m.card);
+  if (!scene || !dots) return;
+  later(() => ready(scene, dots, m.dark));
+  const { rehearse: likely } = m;
+  if (likely)
+    later(() => rehearse(scene, dots, m.dark, likely.rect, likely.view));
+}
+
+const rehearsed = new Set<Scene>();
+
+/**
+ * Set a scene up once where nobody sees it, draw a few moments of it on the
+ * canvas while that's off the page, and clear it again. The browser readies
+ * its code the first time it runs, which is slow: this way that happens
+ * before a click on the card, not while it waits.
+ */
+function rehearse(
+  scene: Scene,
+  dots: DotField,
   dark: boolean,
+  rect: [number, number, number, number],
+  seen: View,
 ) {
-  const scene = SCENES[slug];
-  if (mini) void plate(mini);
-  const dots = await plate(card);
-  if (scene && dots) later(() => ready(scene, dots, dark));
+  if (rehearsed.has(scene)) return;
+  rehearsed.add(scene);
+  const colors = {
+    ink: dots.color || "#16150f",
+    red: "#b3301c",
+    paper: "#fbfaf8",
+  };
+  const sink = sinkFor(colors);
+  if (!sink) return;
+  view = seen;
+  try {
+    const staged = ready(scene, dots, dark);
+    const stage = stageScene({
+      scene,
+      prep: staged.prep,
+      main: staged,
+      rect,
+      w: seen.w,
+      h: seen.h,
+      colors,
+      font: "",
+      dark,
+      seed: 1,
+      sink,
+      size: () => seen,
+      zoom: () => 1,
+    });
+    const end = stage.run.duration;
+    for (const t of [0, stage.leave, (stage.depart + end) / 2, end - 1])
+      stage.draw(t);
+  } catch {
+    // A click on it plays it all the same.
+  }
+  blank();
 }
 
 async function play(m: PlayRequest, mine: number) {
@@ -498,7 +550,7 @@ scope.onmessage = ({ data }: MessageEvent<ToWorker>) => {
   initialized = initialized.then(() => {
     switch (data.type) {
       case "warm":
-        void warm(data.slug, data.card, data.mini, data.dark);
+        void warm(data);
         return;
       case "play":
         view = data.view;
