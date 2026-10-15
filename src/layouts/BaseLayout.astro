@@ -280,6 +280,12 @@ const ogImageAbsolute = ogImage
   </style>
 
   <script>
+    import { initOpeners } from "@/lib/open";
+
+    initOpeners();
+  </script>
+
+  <script>
     const open = document.getElementById("rail-open");
     const scrim = document.getElementById("archive-scrim");
     function setOpen(next: boolean) {

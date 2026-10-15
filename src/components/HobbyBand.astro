@@ -29,7 +29,7 @@ const VERBS: Record<string, string> = {
           {hobbies.map((entry) => {
             const slug = hobbySlug(entry);
             return (
-              <a class="tcard" href={`/hobbies/${slug}/`}>
+              <a class="tcard" href={`/hobbies/${slug}/`} data-open="hobby">
                 <PlateArt slug={slug} size="mini" />
                 <span class="tn">{entry.data.title}</span>
                 <span class="tv">{VERBS[slug] ?? "Have a go"} →</span>

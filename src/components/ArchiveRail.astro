@@ -149,6 +149,7 @@ await Promise.all(
               ]}
               href={`/sessions/${sessionSlug(row.entry)}/`}
               data-rail-item
+              data-open="session"
               data-peek={peekCovers.get(sessionSlug(row.entry))}
               data-search={`${row.entry.data.title} ${row.entry.data.location ?? ""} ${row.entry.data.date}`.toLowerCase()}
             >
@@ -679,6 +680,16 @@ await Promise.all(
 
     document.getElementById("orb-spin")?.addEventListener("click", () => {
       if (!flight?.busy) globe.spin();
+    });
+
+    /* Opening a session from a card or the rail turns the globe to its place
+       on the way (src/lib/open.ts). */
+    document.addEventListener("session:open", (event) => {
+      const slug = (event as CustomEvent<{ slug?: string }>).detail?.slug;
+      const place = places.find((p) => slug && p.slugs.includes(slug));
+      if (!place || flight?.busy) return;
+      globe.goTo(place.name, { silent: true });
+      describe(place);
     });
 
     /* The overview marks whatever card you're pointing at. */

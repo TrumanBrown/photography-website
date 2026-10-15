@@ -367,6 +367,51 @@
   }
 }
 
+/* Landing after a transition out of the last page (src/lib/landing.ts). The
+   veil is the paper the new page appears out of: a plain sheet while a
+   session's photograph settles, or a canvas with holes in it for the
+   halftone a hobby page opens through. landing-dots starts the hobby page on
+   bare paper, before the first paint. */
+.landing-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+div.landing-veil {
+  background: var(--paper);
+}
+html.landing-dots body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  background: var(--paper);
+}
+
+/* Leaving from a card (src/lib/open.ts): a session's cover growing to fill
+   the screen over paper, or a hobby plate's dots on a canvas. */
+.open-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  width: 100%;
+  height: 100%;
+}
+.open-paper {
+  position: absolute;
+  inset: 0;
+  background: var(--paper);
+  opacity: 0;
+}
+.open-photo {
+  position: fixed;
+  max-width: none;
+  object-fit: cover;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .btn,
   .draw::after,

@@ -12,7 +12,7 @@ const slug = hobbySlug(entry);
 const { title, summary, plateNote } = entry.data;
 ---
 
-<a href={`/hobbies/${slug}/`} class="hcard">
+<a href={`/hobbies/${slug}/`} class="hcard" data-open="hobby">
   <PlateArt slug={slug} size="card" />
   <h2 class="t"><span class="draw">{title}</span></h2>
   {plateNote && <span class="m">{plateNote}</span>}

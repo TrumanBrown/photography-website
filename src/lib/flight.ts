@@ -186,10 +186,10 @@ export function openingAt(
  * Same srcset and sizes as the real one, so the browser picks the same file,
  * and the session page finds it already cached. Resolves once it's decoded.
  */
-async function loadBanner(
+export async function loadBanner(
   href: string,
   into: HTMLElement,
-  before: Node,
+  before: Node | null,
   signal: AbortSignal,
 ): Promise<HTMLImageElement | null> {
   const response = await fetch(href, { signal });

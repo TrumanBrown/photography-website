@@ -1,30 +1,39 @@
 /**
- * Landing in a session from the globe.
+ * Landing in a page after a transition out of the last one.
  *
- * A spin ends with the session's banner photograph filling the screen (see
- * src/lib/flight.ts). Just before it navigates it leaves a note in
- * sessionStorage; the session page reads the note before its first paint and
- * opens on that same full-screen photograph, then settles it into the banner
- * while the rest of the page appears around it. Nothing else changes: a page
- * reached any other way never sees the note.
+ * Two kinds, both started on the page you leave:
+ * - `photo`: the globe's flight (src/lib/flight.ts) or a session card
+ *   (src/lib/open.ts) ends with the session's banner photograph filling the
+ *   screen. The session page opens on that same full-screen photograph, then
+ *   settles it into the banner while the rest of the page appears around it.
+ * - `dots`: a hobby card dives into its stipple plate until the screen is
+ *   bare paper. The hobby page opens on bare paper too, then shows through a
+ *   halftone of holes that open from the middle out.
+ *
+ * Just before it navigates, the old page leaves a note in sessionStorage; the
+ * new page reads it before its first paint. A page reached any other way
+ * never sees the note.
  */
 
-/** sessionStorage key the flight leaves for the page it lands on. */
+/** sessionStorage key the old page leaves for the page it lands on. */
 export const LANDING_KEY = "globe-landing";
 
-/** What the flight leaves under LANDING_KEY. */
+/** What the old page leaves under LANDING_KEY. */
 export interface LandingNote {
-  /** Path of the session it's landing in, with a trailing slash. */
+  /** Path of the page it's landing in, with a trailing slash. */
   path: string;
   /** Date.now() when it left. A stale note is ignored. */
   at: number;
+  /** How it arrives; a photograph unless it says otherwise. */
+  kind?: "photo" | "dots";
 }
 
 /**
- * Inline <head> script. Marks <html> with `landing` before the first paint
- * when this page is the one a spin is landing in. The page CSS then shows the
- * banner photograph alone, full screen, until settleLanding() takes over. If
- * that never runs, the page shows itself after four seconds anyway.
+ * Inline <head> script. Before the first paint, marks <html> with `landing`
+ * (the banner photograph alone, full screen, until settleLanding() takes
+ * over) or `landing-dots` (bare paper until settleDots() opens it) when this
+ * page is the one a transition is landing in. If neither runs, the page shows
+ * itself after four seconds anyway.
  *
  * Keep it free of backslashes and template placeholders: scripts/csp-hash.mjs
  * hashes this source text as written, and the hash has to match the string
@@ -42,8 +51,9 @@ export const landingBootstrap = `
     if (!note || note.path !== here || Math.abs(Date.now() - note.at) > 10000) return;
     if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     var root = document.documentElement;
-    root.classList.add('landing');
-    setTimeout(function () { root.classList.remove('landing'); }, 4000);
+    var mark = note.kind === 'dots' ? 'landing-dots' : 'landing';
+    root.classList.add(mark);
+    setTimeout(function () { root.classList.remove(mark); }, 4000);
   } catch (_) {}
 })();
 `.trim();
@@ -173,4 +183,84 @@ function settle(root: HTMLElement, img: HTMLImageElement, banner: HTMLElement) {
     root.classList.remove("landed");
   }
   requestAnimationFrame(step);
+}
+
+/* ------------------------------------------------------------ dots */
+
+/** How long the halftone takes to open, ms. */
+export const DOTS_MS = 640;
+
+/**
+ * Radius of one hole in the halftone, `ms` into the reveal. Holes sit on a
+ * square grid `step` apart; `reach` is how far the hole is from the middle of
+ * the screen, 0 to 1. The middle opens first and the wave runs outward; each
+ * hole grows until it overlaps its neighbours, so the paper is gone.
+ */
+export function holeRadius(reach: number, ms: number, step: number): number {
+  const wave = 0.42 * DOTS_MS;
+  const grow = DOTS_MS - wave;
+  const k = clamp01((ms - reach * wave) / grow);
+  return smootherstep(k) * step * 0.75;
+}
+
+/**
+ * On a page a hobby card dived into, open the bare paper it starts on as a
+ * halftone, from the middle out. Does nothing on any other visit.
+ */
+export function settleDots(): void {
+  const root = document.documentElement;
+  if (!root.classList.contains("landing-dots")) return;
+  const veil = document.createElement("canvas");
+  veil.className = "landing-veil";
+  veil.setAttribute("aria-hidden", "true");
+  const ctx = veil.getContext("2d");
+  if (!ctx) {
+    root.classList.remove("landing-dots");
+    return;
+  }
+  const paper =
+    getComputedStyle(root).getPropertyValue("--paper").trim() || "#fbfaf8";
+
+  requestAnimationFrame(() => {
+    document.body.append(veil);
+    const start = performance.now();
+    let first = true;
+    function frame(now: number) {
+      const w = root.clientWidth;
+      const h = root.clientHeight;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      if (veil.width !== Math.round(w * dpr)) veil.width = Math.round(w * dpr);
+      if (veil.height !== Math.round(h * dpr))
+        veil.height = Math.round(h * dpr);
+      ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const ms = now - start;
+      const step = Math.max(14, Math.min(26, Math.min(w, h) / 34));
+      const cx = w / 2;
+      const cy = h / 2;
+      const far = Math.hypot(cx, cy);
+      ctx!.globalCompositeOperation = "source-over";
+      ctx!.clearRect(0, 0, w, h);
+      ctx!.fillStyle = paper;
+      ctx!.fillRect(0, 0, w, h);
+      ctx!.globalCompositeOperation = "destination-out";
+      ctx!.beginPath();
+      for (let y = step / 2; y < h + step; y += step) {
+        for (let x = step / 2; x < w + step; x += step) {
+          const r = holeRadius(Math.hypot(x - cx, y - cy) / far, ms, step);
+          if (r <= 0.2) continue;
+          ctx!.moveTo(x + r, y);
+          ctx!.arc(x, y, r, 0, Math.PI * 2);
+        }
+      }
+      ctx!.fill();
+      // The canvas is up and still solid paper: the class can go.
+      if (first) {
+        first = false;
+        root.classList.remove("landing-dots");
+      }
+      if (ms < DOTS_MS) requestAnimationFrame(frame);
+      else veil.remove();
+    }
+    requestAnimationFrame(frame);
+  });
 }

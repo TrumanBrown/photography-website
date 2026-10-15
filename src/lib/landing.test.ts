@@ -35,6 +35,7 @@ function boot(options: { note?: unknown; path: string; reduced?: boolean }) {
   );
   return {
     landing: classes.has("landing"),
+    dots: classes.has("landing-dots"),
     left: store.has(LANDING_KEY),
     timers,
   };
@@ -55,6 +56,19 @@ describe("landingBootstrap", () => {
     expect(result.landing).toBe(true);
     expect(result.left).toBe(false);
     // and never leaves the page hidden for good
+    expect(result.timers).toEqual([4000]);
+  });
+
+  it("opens a hobby page on bare paper when a card dived into it", () => {
+    const result = boot({
+      note: {
+        path: "/hobbies/aquarium-keeping/",
+        at: Date.now(),
+        kind: "dots",
+      },
+      path: "/hobbies/aquarium-keeping/",
+    });
+    expect(result).toMatchObject({ dots: true, landing: false, left: false });
     expect(result.timers).toEqual([4000]);
   });
 

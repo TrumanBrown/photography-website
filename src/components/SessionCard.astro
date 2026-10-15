@@ -52,6 +52,7 @@ const skim = (
   class="card"
   href={`/sessions/${slug}/`}
   data-session-card
+  data-open="session"
   data-location={location ?? ""}
   data-note={`${count} photograph${count === 1 ? "" : "s"}`}
   data-skim={skim.length > 1 ? JSON.stringify(skim) : undefined}
