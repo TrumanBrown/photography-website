@@ -397,6 +397,8 @@ function loadScenes(): Promise<Scenes> {
 const SCENE_WAIT_MS = 600;
 /** Leeway for a busy worker's word to come back, past SCENE_WAIT_MS. */
 const WORD_MS = 150;
+/** How long a scene that has its plate gets to set itself up. */
+const SETUP_MS = 1500;
 
 const wait = (ms: number) =>
   new Promise<undefined>((resolve) => setTimeout(resolve, ms));
@@ -717,6 +719,10 @@ function playInWorker(
       until: Date.now() + SCENE_WAIT_MS,
     },
     {
+      setting: () => {
+        window.clearTimeout(late);
+        late = window.setTimeout(giveUp, SETUP_MS);
+      },
       // Its dots are over the card now: the card can go.
       started: () => {
         window.clearTimeout(late);
@@ -775,14 +781,17 @@ function playInWorker(
       cancelled: putBack,
     },
   );
-  // Nor does the click wait on a worker that's still starting up, or busy:
-  // without the scene's first frame up by the time the plates were due (and
-  // a moment for word of it), it goes on without it. The stop reaches the
-  // worker ahead of the play it's still holding, which then never starts.
-  const late = window.setTimeout(() => {
+  // Nor does the click wait on a worker that's still starting up: without
+  // word that it has the plate by the time the plates were due (and a moment
+  // for the word to come), it goes on without the scene. The stop reaches
+  // the worker ahead of the play it's still holding, which then never
+  // starts. Once it has the plate, setting the scene up gets longer, in case
+  // the worker stops answering altogether.
+  const giveUp = () => {
     playing.stop();
     instead();
-  }, SCENE_WAIT_MS + WORD_MS);
+  };
+  let late = window.setTimeout(giveUp, SCENE_WAIT_MS + WORD_MS);
   onReturn(() => {
     playing.stop();
     putBack();

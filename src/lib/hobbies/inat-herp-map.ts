@@ -24,6 +24,7 @@
  *
  * Mounted by src/components/hobbies/INatHerpMap.astro via [data-herpmap] hooks.
  */
+import { covered, whenUncovered } from "../covered";
 import geoData from "./herp-geo.json";
 import { coarseCoord, coarsePlace } from "./inat-place";
 
@@ -670,7 +671,21 @@ export function initHerpMap(root: HTMLElement): void {
     drawLegend();
   }
 
+  let deferred = false;
   function render(): void {
+    // Under a card's opening scene, the map waits until the scene's gone:
+    // none of it shows yet, and drawing it (again with every change of
+    // layout while the page loads) takes the GPU from the scene.
+    if (covered()) {
+      if (!deferred) {
+        deferred = true;
+        whenUncovered(() => {
+          deferred = false;
+          render();
+        });
+      }
+      return;
+    }
     if (view === "world") renderWorld();
     else if (view === "us") renderUS();
     else if (view === "state" && selState)

@@ -48,32 +48,95 @@ let canvas: OffscreenCanvas | null = null;
 let gl: Renderer<OffscreenCanvas> | null = null;
 let view: View = { w: 1, h: 1, dpr: 1 };
 
+/* ---------------------------------------------------------------- turns */
+
+/**
+ * Work for cards that are only being got ready, one piece at a time, each
+ * in a task of its own: a click's message always gets in between any two,
+ * and none of it runs while a clicked card's scene sets up or plays (it
+ * would cost the scene frames).
+ */
+const queue: Array<() => void> = [];
+let held = false;
+let pending = false;
+function schedule() {
+  if (pending || held || !queue.length) return;
+  pending = true;
+  setTimeout(() => {
+    pending = false;
+    if (held) return;
+    queue.shift()?.();
+    schedule();
+  }, 0);
+}
+const later = (job: () => void) => {
+  queue.push(job);
+  schedule();
+};
+function hold(on: boolean) {
+  held = on;
+  schedule();
+}
+
 /* --------------------------------------------------------------- plates */
 
 const plates = new Map<string, Promise<DotField | null>>();
+/** Plates a click wants: read the moment they're in, not in their turn. */
+const wanted = new Set<string>();
+const waiting = new Map<string, () => void>();
 
-/** A plate's dots, in card units, read once each. */
-function plate(url: string): Promise<DotField | null> {
+/** Until it's this plate's turn to be read: at once, if a click wants it. */
+function turnFor(url: string): Promise<void> {
+  if (wanted.has(url)) return Promise.resolve();
+  return new Promise((resolve) => {
+    const go = () => {
+      if (waiting.get(url) !== go) return;
+      waiting.delete(url);
+      resolve();
+    };
+    waiting.set(url, go);
+    later(go);
+  });
+}
+
+function readPlate(bitmap: ImageBitmap): DotField | null {
+  const { width, height } = bitmap;
+  const ctx = new OffscreenCanvas(width, height).getContext("2d", {
+    willReadFrequently: true,
+  });
+  if (!ctx) throw new Error("No 2D canvas.");
+  ctx.drawImage(bitmap, 0, 0);
+  const data = ctx.getImageData(0, 0, width, height).data;
+  return cardUnits(findDots(data, width, height), width);
+}
+
+/**
+ * A plate's dots, in card units, read once each. Fetching and decoding it
+ * go on in the background; reading its dots waits its turn behind a click,
+ * unless it's `now` for the card that was clicked.
+ */
+function plate(url: string, now = false): Promise<DotField | null> {
   let known = plates.get(url);
   if (!known) {
     known = (async () => {
       const response = await fetch(plateUrl(url), { mode: "cors" });
       if (!response.ok) throw new Error(`${response.status} for ${url}`);
       const bitmap = await createImageBitmap(await response.blob());
-      const { width, height } = bitmap;
-      const ctx = new OffscreenCanvas(width, height).getContext("2d", {
-        willReadFrequently: true,
-      });
-      if (!ctx) throw new Error("No 2D canvas.");
-      ctx.drawImage(bitmap, 0, 0);
-      bitmap.close();
-      const data = ctx.getImageData(0, 0, width, height).data;
-      return cardUnits(findDots(data, width, height), width);
+      try {
+        await turnFor(url);
+        return readPlate(bitmap);
+      } finally {
+        bitmap.close();
+      }
     })().catch(() => {
       plates.delete(url);
       return null;
     });
     plates.set(url, known);
+  }
+  if (now) {
+    wanted.add(url);
+    waiting.get(url)?.();
   }
   return known;
 }
@@ -142,7 +205,7 @@ function stopCurrent() {
 
 /* ------------------------------------------------------------------ play */
 
-/** Ready a card's plate and props ahead of a click on it. */
+/** Ready a card's plate and props ahead of a click on it, in their turn. */
 async function warm(
   slug: string,
   card: string,
@@ -152,27 +215,35 @@ async function warm(
   const scene = SCENES[slug];
   if (mini) void plate(mini);
   const dots = await plate(card);
-  if (scene && dots) ready(scene, dots, dark);
+  if (scene && dots) later(() => ready(scene, dots, dark));
 }
 
 async function play(m: PlayRequest, mine: number) {
   if (mine !== generation) return;
   stopCurrent();
+  // Nothing for other cards until this one's scene is up, or called off.
+  hold(true);
+  const fail = () => {
+    hold(false);
+    post({ type: "failed" });
+  };
   const scene = SCENES[m.slug];
   // Whatever time the click has left: a plate that's in already wins even
   // when there's none.
   const due = Math.max(0, m.until - Date.now());
   const [card, mini] = await Promise.all([
-    within(plate(m.card), due),
-    m.mini ? within(plate(m.mini), due) : null,
+    within(plate(m.card, true), due),
+    m.mini ? within(plate(m.mini, true), due) : null,
   ]);
   if (mine !== generation) return;
   const main = card ?? mini;
-  if (!scene || !main || main.n < 40) return post({ type: "failed" });
+  if (!scene || !main || main.n < 40) return fail();
+  // It has its plate: the page lets it finish setting up.
+  post({ type: "setting" });
   const ink = main.color;
   const colors = { ink, red: m.red, paper: m.paper };
   const sink = sinkFor(colors);
-  if (!sink) return post({ type: "failed" });
+  if (!sink) return fail();
   let stage: Stage;
   let staged: ReturnType<typeof ready>;
   // The camera's push in starts when the page changes.
@@ -197,7 +268,7 @@ async function play(m: PlayRequest, mine: number) {
       zoom: () => (leftAt ? pushZoom(Date.now() - leftAt) : 1),
     });
   } catch {
-    return post({ type: "failed" });
+    return fail();
   }
   const handsOver = stage.leave < stage.run.duration;
   const drawnFrom = card ? m.card : (m.mini ?? m.card);
@@ -210,7 +281,7 @@ async function play(m: PlayRequest, mine: number) {
     if (stopped) return;
     if (sink.lost) {
       stopped = true;
-      return post({ type: "failed" });
+      return fail();
     }
     // The scene's clock starts on its first frame, so it never jumps ahead.
     const first = !time;
@@ -257,7 +328,7 @@ async function play(m: PlayRequest, mine: number) {
       }
     } catch {
       stopped = true;
-      return post({ type: "failed" });
+      return fail();
     }
     id = frame(tick);
   };
@@ -411,6 +482,8 @@ scope.onmessage = ({ data }: MessageEvent<ToWorker>) => {
     case "stop":
       generation++;
       stopCurrent();
+      // Called off: other cards can be got ready again.
+      hold(false);
       return;
     case "hurry":
       current?.hurry();

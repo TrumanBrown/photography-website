@@ -19,6 +19,8 @@ import type {
  */
 
 export interface PlayEvents {
+  /** It has the card's plate and is setting the scene up. */
+  setting(): void;
   /** Its first frame is up, over the card. */
   started(): void;
   leave(message: LeaveMessage): void;
@@ -237,7 +239,8 @@ function makePlayer(): Player | null {
       };
       listen(true);
       listener = (message) => {
-        if (message.type === "started") events.started();
+        if (message.type === "setting") events.setting();
+        else if (message.type === "started") events.started();
         else if (message.type === "look") applyLook(canvas, message);
         else if (message.type === "leave") {
           // Escape still calls it off now, through stop(); input otherwise ends.

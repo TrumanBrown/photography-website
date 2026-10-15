@@ -690,6 +690,9 @@ export interface Passing {
   discs: ArrayLike<number>;
 }
 
+/** Leeway for rounding when a box stands in for the discs inside it, px. */
+const EDGE = 1e-6;
+
 /**
  * When a moving figure's wake reaches each point of `grid`: it spreads out
  * from wherever the figure has been, taking `reach(d)` ms to get `d` px past
@@ -705,21 +708,67 @@ export function wakeTimes(
 ): Float32Array {
   const { cols, rows, step } = grid;
   const out = new Float32Array(cols * rows);
+  // In time order, each moment with a box round all of its discs. `reach`
+  // never falls as the distance grows, so a point no nearer a moment's box
+  // than it would need to be to open any sooner can skip that moment's
+  // discs, and once a moment comes after the point's best time, so does
+  // every later one.
+  const order = passing
+    .map((p) => {
+      let x0 = Infinity;
+      let y0 = Infinity;
+      let x1 = -Infinity;
+      let y1 = -Infinity;
+      const { discs } = p;
+      for (let k = 0; k + 2 < discs.length; k += 3) {
+        const r = discs[k + 2];
+        x0 = Math.min(x0, discs[k] - r);
+        x1 = Math.max(x1, discs[k] + r);
+        y0 = Math.min(y0, discs[k + 1] - r);
+        y1 = Math.max(y1, discs[k + 1] + r);
+      }
+      return { t: p.t, discs, x0, y0, x1, y1 };
+    })
+    .sort((a, b) => a.t - b.t);
   for (let j = 0; j < rows; j++)
     for (let i = 0; i < cols; i++) {
       const x = i * step;
       const y = j * step;
       let best = Infinity;
-      let covered = -Infinity;
-      for (const { t, discs } of passing)
+      for (const { t, discs, x0, y0, x1, y1 } of order) {
+        if (t >= best) break;
+        const gx = Math.max(x0 - x, 0, x - x1);
+        const gy = Math.max(y0 - y, 0, y - y1);
+        // A hair under the distance to the box, so rounding never skips a
+        // disc that would have won.
+        if (
+          (gx > 0 || gy > 0) &&
+          t + reach(Math.max(0, Math.hypot(gx, gy) - EDGE)) >= best
+        )
+          continue;
         for (let k = 0; k + 2 < discs.length; k += 3) {
           const d = Math.hypot(x - discs[k], y - discs[k + 1]) - discs[k + 2];
           const at = t + (d > 0 ? reach(d) : 0);
           if (at < best) best = at;
-          if (d <= 0 && t > covered) covered = t;
         }
-      out[j * cols + i] =
-        after === undefined ? best : Math.max(best, covered + after);
+      }
+      if (after === undefined) {
+        out[j * cols + i] = best;
+        continue;
+      }
+      // The last moment the figure covers the point, looking back from the end.
+      let covered = -Infinity;
+      for (let m = order.length - 1; m >= 0 && covered === -Infinity; m--) {
+        const { t, discs, x0, y0, x1, y1 } = order[m];
+        if (x < x0 - EDGE || x > x1 + EDGE || y < y0 - EDGE || y > y1 + EDGE)
+          continue;
+        for (let k = 0; k + 2 < discs.length; k += 3)
+          if (Math.hypot(x - discs[k], y - discs[k + 1]) - discs[k + 2] <= 0) {
+            covered = t;
+            break;
+          }
+      }
+      out[j * cols + i] = Math.max(best, covered + after);
     }
   return out;
 }

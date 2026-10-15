@@ -101,6 +101,8 @@ export interface FinalMessage {
 export type FromWorker =
   | { type: "ready"; ok: boolean; gl: boolean; url: string }
   | { type: "started" }
+  /** It has the clicked card's plate and is setting the scene up. */
+  | { type: "setting" }
   | LeaveMessage
   | FinalMessage
   | { type: "shown" }

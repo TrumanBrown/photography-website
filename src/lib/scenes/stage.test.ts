@@ -238,6 +238,62 @@ describe("wakes", () => {
         expect(open, `${x}, ${y}`).toBe(true);
       }
   });
+
+  it("skips only work that can't change a point's time", () => {
+    // Every disc at every moment, as it was worked out before the shortcuts.
+    const everyDisc = (
+      g: typeof grid,
+      passing: { t: number; discs: number[] }[],
+      reach: (d: number) => number,
+      after?: number,
+    ) => {
+      const out = new Float32Array(g.cols * g.rows);
+      for (let j = 0; j < g.rows; j++)
+        for (let i = 0; i < g.cols; i++) {
+          const x = i * g.step;
+          const y = j * g.step;
+          let best = Infinity;
+          let covered = -Infinity;
+          for (const { t, discs } of passing)
+            for (let k = 0; k + 2 < discs.length; k += 3) {
+              const d =
+                Math.hypot(x - discs[k], y - discs[k + 1]) - discs[k + 2];
+              const at = t + (d > 0 ? reach(d) : 0);
+              if (at < best) best = at;
+              if (d <= 0 && t > covered) covered = t;
+            }
+          out[j * g.cols + i] =
+            after === undefined ? best : Math.max(best, covered + after);
+        }
+      return out;
+    };
+    let seed = 7;
+    const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const wide = screenGrid(640, 400, 12);
+    const reaches = [
+      (d: number) => 40 + d / 0.9,
+      () => 0,
+      // A ripple's age at a size, as the aquarium has it: growing faster.
+      (d: number) => (-0.8 + Math.sqrt(0.64 + 0.0044 * d)) / 0.0022,
+    ];
+    for (let run = 0; run < 12; run++) {
+      // A figure crossing the screen, a few discs a moment, out of order.
+      const passing = Array.from({ length: 24 }, (_, m) => {
+        const t = 900 + m * 25;
+        const cx = -100 + m * 35 + rand() * 20;
+        const cy = 80 + rand() * 240;
+        const discs: number[] = [];
+        for (let k = 0; k < 2 + Math.floor(rand() * 5); k++)
+          discs.push(cx + rand() * 140, cy + rand() * 90, 10 + rand() * 80);
+        return { t, discs };
+      }).sort(() => rand() - 0.5);
+      const reach = reaches[run % reaches.length];
+      for (const after of [undefined, 50])
+        expect(wakeTimes(wide, passing, reach, after)).toEqual(
+          everyDisc(wide, passing, reach, after),
+        );
+    }
+  });
 });
 
 describe("exitDistance", () => {
