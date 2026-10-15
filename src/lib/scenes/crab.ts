@@ -1,28 +1,31 @@
 import { defineScene } from "./engine";
 import {
-  aim,
   apply,
   backOut,
   type Cam,
   camLerp,
   chain,
-  dive,
-  grow,
+  easeOut,
   lerp,
   type Mat,
-  radiusNear,
   scale,
   seg,
+  seeded,
   smootherstep,
   spring,
+  toScreen,
   turn,
 } from "./stage";
 
 /**
- * Tide pooling: the crab rears up bigger, reaches its right claw out with
- * the pincer wide open, and jabs it down to pinch the screen. The pinch pulls
- * the screen up toward you like a fold of cloth, swelling the dots under it
- * until they're big enough to open the page through.
+ * Tide pooling: the crab rears up bigger and raises its right claw with the
+ * pincer wide open. Poised, it jabs and snaps it shut on the screen, which
+ * shakes and puckers toward the pinch, then a shockwave rings out from it:
+ * the crab's own dots are swept outward on its front, and the hobby page
+ * shows behind it.
+ *
+ * The page changes while the claw is poised, and the jab plays over the
+ * hobby page (see engine.ts).
  */
 
 const DEG = Math.PI / 180;
@@ -38,14 +41,22 @@ const REAR_FROM = 240;
 const REAR_MS = 560;
 const REACH_FROM = 620;
 const REACH_MS = 480;
-const JAB_FROM = REACH_FROM + REACH_MS;
+const LEAVE = REACH_FROM + REACH_MS + 20;
+const HOLD = 200;
+const JAB_FROM = LEAVE + HOLD;
 const JAB_MS = 150;
 const SNAP = JAB_FROM + JAB_MS - 30;
 const SNAP_MS = 80;
-const DIVE_FROM = SNAP + 60;
-const DIVE_MS = 760;
-/** How far the pinch swells the screen under it, at the end. */
-const SWELL = 1.6;
+/** The pinch pulls the screen in toward it, briefly. */
+const PUCKER = 0.2;
+const PUCKER_MS = 170;
+/** Then the shockwave: from the pinch to past the corners. */
+const SHOCK_FROM = SNAP + 70;
+const SHOCK_MS = 560;
+/** A dot the front has passed rides along just behind it, shrinking away. */
+const RIDE = 0.955;
+/** Dots on the shockwave's front, CSS px apart. */
+const RING_GAP = 8;
 
 export default defineScene({
   parts: [
@@ -111,7 +122,6 @@ export default defineScene({
 
   start(ctx) {
     const { w, h } = ctx;
-    const claw = ctx.parts.claw;
 
     // The crab rears up a little bigger, claws raised.
     const rear = (t: number) =>
@@ -141,80 +151,134 @@ export default defineScene({
     const dactylAt = (t: number): Mat =>
       chain(clawAt(t), turn(open(t), HINGE[0], HINGE[1]));
 
-    // Where it pinches, and the spot among the tips the camera dives into.
-    const pinch = apply(clawAt(DIVE_FROM), TIPS[0], TIPS[1]);
-    const [ax, ay] = aim(claw, TIPS, 30, 12, 34);
-    const [tx, ty] = apply(clawAt(DIVE_FROM), ax, ay);
-    const rTip = radiusNear(claw, ax, ay, 14) * grow(clawAt(DIVE_FROM));
+    // Where it pinches, once the jab is home.
+    const struck = JAB_FROM + JAB_MS;
+    const pinch = apply(clawAt(struck), TIPS[0], TIPS[1]);
 
-    // The camera leans in toward the claw as it reaches.
-    const look = (t: number): Cam => {
-      const base = ctx.lift(t);
-      const near: Cam = {
-        ax: w / 2,
-        ay: h / 2,
-        fx: pinch[0] - 60,
-        fy: pinch[1] + 30,
-        s: base.s * 1.55,
-      };
-      return camLerp(base, near, smootherstep(seg(t, REACH_FROM, SNAP + 40)));
+    // The camera leans in toward the claw as it reaches, and holds there.
+    const near: Cam = {
+      ax: w / 2,
+      ay: h / 2,
+      fx: pinch[0] - 60,
+      fy: pinch[1] + 30,
+      s: ctx.stage.s * 1.55,
     };
-    const from = look(DIVE_FROM);
-    const end = ctx.big(rTip * (1 + SWELL));
+    const look = (t: number): Cam =>
+      camLerp(ctx.lift(t), near, smootherstep(seg(t, REACH_FROM, LEAVE)));
+    const held = look(LEAVE);
 
     // The snap shakes the screen.
     const shake = (t: number): [number, number] => {
-      const k = seg(t, SNAP, SNAP + 240);
+      const k = seg(t, SNAP, SNAP + 260);
       if (k <= 0 || k >= 1) return [0, 0];
-      const a = 8 * (1 - k) * (1 - k);
+      const a = 9 * (1 - k) * (1 - k);
       return [a * Math.sin(t * 0.09), a * Math.cos(t * 0.11)];
     };
 
-    // The swell: everything near the pinch grows, as if pulled up off the page.
-    let swell = 0;
-    let spread = 1;
-    const pulled = (x: number, y: number, out: Float64Array) => {
+    // The shockwave, in CSS px from the pinch: out past the farthest corner.
+    const [px, py] = toScreen(held, pinch[0], pinch[1]);
+    const farthest = Math.max(
+      Math.hypot(px, py),
+      Math.hypot(w - px, py),
+      Math.hypot(px, h - py),
+      Math.hypot(w - px, h - py),
+    );
+    const most = (farthest + 90) / RIDE;
+    const front = (t: number) =>
+      most * easeOut(seg(t, SHOCK_FROM, SHOCK_FROM + SHOCK_MS), 2.4);
+
+    // Every dot: pulled in by the pucker, then swept out by the front.
+    let pull = 0;
+    let shock = 0;
+    let sigma = 1;
+    const blast = (x: number, y: number, out: Float64Array) => {
       const dx = x - pinch[0];
       const dy = y - pinch[1];
-      const m =
-        1 + swell * Math.exp(-(dx * dx + dy * dy) / (2 * spread * spread));
-      out[0] = pinch[0] + dx * m;
-      out[1] = pinch[1] + dy * m;
-      out[2] = m;
+      const d = Math.hypot(dx, dy) || 1e-6;
+      let r = d * (1 - pull * Math.exp(-(d * d) / (2 * sigma * sigma)));
+      let size = 1;
+      if (shock > r) {
+        const behind = shock - r;
+        r += behind * RIDE;
+        size = Math.max(0, 1 - behind / (0.6 * shock + 1e-6));
+      } else if (shock > 0) {
+        // A little bow wave just ahead of it.
+        r += (14 / held.s) * Math.exp(-(r - shock) / (40 / held.s));
+      }
+      out[0] = pinch[0] + (dx / d) * r;
+      out[1] = pinch[1] + (dy / d) * r;
+      out[2] = size;
     };
 
+    const hole = new Float32Array(3);
+    // The front's dots: as many as fit RING_GAP apart, each nudged a little
+    // off the circle, the same way every frame.
+    const ringMost = Math.ceil((2 * Math.PI * most) / RING_GAP) + 1;
+    const ringDots = {
+      x: new Float32Array(ringMost),
+      y: new Float32Array(ringMost),
+      r: new Float32Array(ringMost),
+      n: 0,
+    };
+    const rand = seeded(17);
+    const jitter = Float32Array.from({ length: ringMost }, () => rand() - 0.5);
+
     return {
-      duration: DIVE_FROM + DIVE_MS,
-      reveal: { from: [0.5, 0.5] },
+      duration: SHOCK_FROM + SHOCK_MS,
+      leave: LEAVE,
+      depart: JAB_FROM,
       draw(t, p) {
-        const u = seg(t, DIVE_FROM, DIVE_FROM + DIVE_MS);
-        const c =
-          t < DIVE_FROM ? look(t) : dive(from, tx, ty, end, u, w / 2, h / 2);
+        const c = t < LEAVE ? look(t) : held;
         const [sx, sy] = shake(t);
         p.cam({ ...c, ax: c.ax + sx, ay: c.ay + sy });
 
-        swell = SWELL * smootherstep(seg(t, SNAP, DIVE_FROM + DIVE_MS * 0.7));
-        // The swell spans about a third of the screen, whatever the zoom.
-        spread = (0.3 * Math.min(w, h)) / c.s;
-        const fade =
-          1 - smootherstep(seg(t, DIVE_FROM + 60, DIVE_FROM + DIVE_MS * 0.6));
-        const behind = { warp: pulled, alpha: fade };
-        p.part("rest", undefined, behind);
+        pull = PUCKER * Math.sin(Math.PI * seg(t, SNAP, SNAP + PUCKER_MS));
+        sigma = (0.3 * Math.min(w, h)) / held.s;
+        const R = front(t);
+        shock = R / held.s;
+        if (R > 0) {
+          // The page shows inside the shockwave.
+          const [cx, cy] = p.screen(pinch[0], pinch[1]);
+          hole[0] = cx;
+          hole[1] = cy;
+          hole[2] = R;
+          p.cut(hole);
+          // Its front, a ring of dots thinning as it goes.
+          const u = seg(t, SHOCK_FROM, SHOCK_FROM + SHOCK_MS);
+          const size = lerp(2.4, 0.8, u);
+          const n = Math.min(ringMost, Math.ceil((2 * Math.PI * R) / RING_GAP));
+          for (let i = 0; i < n; i++) {
+            const a = ((i + 0.3 * jitter[i]) / n) * Math.PI * 2;
+            const r = R + 2.5 * jitter[(i * 7) % ringMost];
+            ringDots.x[i] = cx + Math.cos(a) * r;
+            ringDots.y[i] = cy + Math.sin(a) * r;
+            ringDots.r[i] = size;
+          }
+          ringDots.n = n;
+          p.dots(ringDots, undefined, {
+            screen: true,
+            alpha: 1 - smootherstep(u / 0.9),
+          });
+        }
+
+        const bits = { warp: blast };
+        p.part("rest", undefined, bits);
         p.part(
           "left",
           chain(
             crab(t),
             turn(10 * DEG * rear(t), LEFT_SHOULDER[0], LEFT_SHOULDER[1]),
           ),
-          behind,
+          bits,
         );
-        p.part("body", crab(t), behind);
-        const held = Math.min(t, DIVE_FROM);
-        // Both halves of the claw lay their paper down before their ink.
+        p.part("body", crab(t), bits);
+        // Both halves of the claw lay their paper down before their ink,
+        // until the shockwave takes them.
+        const halo = 1.4 * (1 - seg(t, SHOCK_FROM, SHOCK_FROM + 80));
         for (const pass of ["halo", "ink"] as const) {
-          const front = { warp: pulled, target: true, halo: 1.4, pass };
-          p.part("claw", clawAt(held), front);
-          p.part("dactyl", dactylAt(held), front);
+          const front = { warp: blast, halo, pass };
+          p.part("claw", clawAt(t), front);
+          p.part("dactyl", dactylAt(t), front);
         }
       },
     };

@@ -375,8 +375,8 @@
    veil is the paper the new page appears out of: a plain sheet while a
    session's photograph settles, or a canvas with holes in it for the dots a
    hobby page opens through. landing-dots starts the hobby page on paper and
-   the scene's last dots (--landing-dots, set by the head script), before the
-   first paint. */
+   the frame the scene left on (--landing-dots, a whole background layer set
+   by the head script), before the first paint. */
 .landing-veil {
   position: fixed;
   inset: 0;
@@ -393,9 +393,7 @@ html.landing-dots body::after {
   position: fixed;
   inset: 0;
   z-index: 999;
-  background:
-    var(--landing-dots, none) 0 0 / 100% 100% no-repeat,
-    var(--paper);
+  background: var(--landing-dots, none), var(--paper);
 }
 
 /* Leaving from a card (src/lib/open.ts): a session's cover growing to fill

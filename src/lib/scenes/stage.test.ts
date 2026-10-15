@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { svgLayer } from "./engine";
 import {
   aim,
   apply,
@@ -8,16 +9,20 @@ import {
   dive,
   dotLine,
   dotRing,
+  exitDistance,
   grow,
   makeDots,
   move,
   scale,
+  screenGrid,
   seeded,
   split,
   spring,
   stipple,
   toScreen,
   turn,
+  wakeHoles,
+  wakeTimes,
 } from "./stage";
 
 const close = (a: number, b: number, eps = 1e-6) =>
@@ -190,5 +195,81 @@ describe("aim", () => {
     expect(x).toBeGreaterThan(100);
     const [sparse] = aim(d, [100, 50], 90, 10, 15);
     expect(sparse).toBeLessThan(100);
+  });
+});
+
+describe("wakes", () => {
+  const grid = screenGrid(200, 100, 10);
+
+  it("reaches the points a figure passes at once, and the rest as it spreads", () => {
+    const times = wakeTimes(
+      grid,
+      [{ t: 100, discs: [0, 50, 15] }],
+      (d) => d * 2,
+    );
+    const at = (x: number, y: number) => times[(y / 10) * grid.cols + x / 10];
+    expect(at(0, 50)).toBe(100);
+    expect(at(100, 50)).toBeCloseTo(100 + 85 * 2, 3);
+  });
+
+  it("waits for the figure to go by, when asked", () => {
+    const passing = [
+      { t: 100, discs: [100, 50, 20] },
+      { t: 300, discs: [100, 50, 20] },
+    ];
+    const times = wakeTimes(grid, passing, () => 0, 50);
+    expect(times[5 * grid.cols + 10]).toBe(350);
+  });
+
+  it("opens every point fully in the end, leaving no paper", () => {
+    const times = new Float32Array(grid.cols * grid.rows).fill(0);
+    const holes = new Float32Array(grid.cols * grid.rows * 3);
+    const n = wakeHoles(times, grid, 1000, 100, holes);
+    expect(n).toBe(grid.cols * grid.rows);
+    for (let y = 0; y <= 100; y += 3)
+      for (let x = 0; x <= 200; x += 3) {
+        let open = false;
+        for (let i = 0; i < n && !open; i++)
+          open =
+            Math.hypot(x - holes[i * 3], y - holes[i * 3 + 1]) <=
+            holes[i * 3 + 2];
+        expect(open, `${x}, ${y}`).toBe(true);
+      }
+  });
+});
+
+describe("exitDistance", () => {
+  it("finds how far a figure goes before all of it is off the screen", () => {
+    const pts = [100, 100, 300, 120];
+    const d = exitDistance(
+      (k) => [pts[0] - k, pts[1], pts[2] - k, pts[3]],
+      400,
+      300,
+      10,
+    );
+    expect(d).toBeCloseTo(310, 0);
+  });
+});
+
+describe("svgLayer", () => {
+  it("draws dots as round-capped strokes, safe inside a CSS url()", () => {
+    const art = svgLayer(
+      [
+        { color: "#fbfaf8", alpha: 1, xyr: [10, 10, 3, 20, 20, 3] },
+        { color: "rgb(22, 21, 15)", alpha: 0.5, xyr: [30.25, 40, 1.5] },
+      ],
+      400,
+      300,
+    );
+    expect(art.endsWith(") 0 0 / 400px 300px no-repeat")).toBe(true);
+    const data = art.slice(5, art.indexOf('")'));
+    expect(data).not.toMatch(/["#<>]/);
+    const svg = decodeURIComponent(data.slice("data:image/svg+xml,".length));
+    expect(svg).toContain("width='400' height='300'");
+    expect(svg).toContain("stroke-linecap='round'");
+    // Same-size dots share one path; the faded group keeps its opacity.
+    expect(svg).toContain("<path stroke-width='6' d='M10 10h0M20 20h0'/>");
+    expect(svg).toContain("opacity='0.500'");
+    expect(svg).toContain("M30.3 40h0");
   });
 });

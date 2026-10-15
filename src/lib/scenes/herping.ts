@@ -1,36 +1,46 @@
 import { defineScene } from "./engine";
 import {
-  aim,
   apply,
   backOut,
   type Cam,
   camLerp,
   chain,
   clamp01,
-  dive,
   dotLine,
   type Dots,
+  easeIn,
   easeOut,
+  exitDistance,
   grow,
+  lastOf,
   lerp,
   type Mat,
   merge,
   move,
   outline,
+  type Passing,
   type Pt,
-  radiusNear,
   scale,
+  screenGrid,
   seg,
   seeded,
   smootherstep,
   stipple,
+  toScreen,
   turn,
+  wakeHoles,
+  wakeStep,
+  wakeTimes,
 } from "./stage";
 
 /**
- * Herping: a hand slides in along the ground, scoops up the salamander, and
- * lifts it up close to the screen, thumb over it; the camera dives into its
- * spots. The hand is stippled in the plate's own pen.
+ * Herping: a hand slides in along the ground, scoops up the salamander and
+ * lifts it up close, holds it there a moment, then pulls it away off the
+ * side of the screen. The hobby page opens in dots along the way it went.
+ * The hand is stippled in the plate's own pen.
+ *
+ * The page changes while it's held up close; the pull plays over the hobby
+ * page (see engine.ts).
  */
 
 const DEG = Math.PI / 180;
@@ -45,8 +55,31 @@ const LIFT_FROM = SLIDE_FROM + SLIDE_MS + 90;
 const LIFT_UP_MS = 380;
 const CLOSE_FROM = LIFT_FROM + LIFT_UP_MS - 60;
 const CLOSE_MS = 420;
-const DIVE_FROM = CLOSE_FROM + CLOSE_MS - 80;
-const DIVE_MS = 760;
+const HELD = CLOSE_FROM + CLOSE_MS;
+const LEAVE = HELD + 100;
+const HOLD = 300;
+const PULL = LEAVE + HOLD;
+const PULL_MS = 460;
+/** How long a dot of the page takes to open, and how fast the opening spreads, px/ms. */
+const GROW = 140;
+const SPREAD = 2.4;
+/** The salamander and the hand, as discs, card units and hand units. */
+const BODY: ReadonlyArray<readonly [number, number, number]> = [
+  [45, 200, 35],
+  [120, 210, 40],
+  [260, 220, 45],
+  [400, 250, 60],
+  [540, 260, 70],
+  [680, 220, 65],
+  [790, 190, 45],
+];
+const PALM: ReadonlyArray<readonly [number, number, number]> = [
+  [-440, 30, 45],
+  [-300, 40, 55],
+  [-150, 50, 60],
+  [0, 60, 60],
+  [150, 50, 60],
+];
 
 /**
  * A right hand, palm up, from the side: wrist at the origin, the palm's top
@@ -246,20 +279,26 @@ export default defineScene<Prep>({
 
   start(ctx, prep) {
     const { w, h } = ctx;
-    const body = ctx.parts.body;
-    const [ax, ay] = aim(body, [430, 268], 110);
 
     // The hand slides in under it, lifts, and brings it close.
     const lifted = (t: number) =>
       backOut(seg(t, LIFT_FROM, LIFT_FROM + LIFT_UP_MS), 1.1);
     const close = (t: number) =>
       smootherstep(seg(t, CLOSE_FROM, CLOSE_FROM + CLOSE_MS));
+    // Then away off the right, the way the arm came in, faster and faster.
+    const pull = (t: number) => easeIn(seg(t, PULL, PULL + PULL_MS), 2);
+    let distance = 0;
     /** Hand and salamander together, once it's scooped. */
     const carry = (t: number): Mat => {
       const up = lifted(t);
       const k = lerp(1, 1.55, close(t));
+      const away = pull(t);
       return chain(
-        move(-30 * close(t), -120 * up - 40 * close(t)),
+        move(
+          -30 * close(t) + distance * away,
+          -120 * up - 40 * close(t) - 30 * away,
+        ),
+        turn(5 * DEG * away, WRIST[0], WRIST[1]),
         scale(k, k, 470, 300),
         turn(-5 * up * DEG, WRIST[0], WRIST[1]),
       );
@@ -292,39 +331,71 @@ export default defineScene<Prep>({
     const look = (t: number): Cam => {
       const base = ctx.lift(t);
       const near = { ...base, fy: base.fy - 70, s: base.s * 1.12 };
-      return camLerp(base, near, smootherstep(seg(t, LIFT_FROM, DIVE_FROM)));
+      return camLerp(base, near, smootherstep(seg(t, LIFT_FROM, HELD)));
     };
-    const from = look(DIVE_FROM);
-    const end = ctx.big(
-      radiusNear(body, ax, ay, 20) * grow(carry(DIVE_FROM + DIVE_MS)),
-    );
+    const still = look(LEAVE);
+    const onScreen = (m: Mat, x: number, y: number) => {
+      const [X, Y] = apply(m, x, y);
+      return toScreen(still, X, Y);
+    };
+    const discsAt = (t: number) => {
+      const m = carry(t);
+      const hand = handAt(t);
+      const k = grow(m) * still.s;
+      const out: number[] = [];
+      for (const [x, y, r] of BODY) out.push(...onScreen(m, x, y), r * k);
+      for (const [x, y, r] of PALM) out.push(...onScreen(hand, x, y), r * k);
+      return out;
+    };
+
+    // How far it's pulled: until all of it is off the right of the screen.
+    const end = PULL + PULL_MS;
+    distance =
+      exitDistance(
+        (k) => {
+          distance = k;
+          const d = discsAt(end);
+          const pts: number[] = [];
+          // The discs' left edges are the last of it to go.
+          for (let i = 0; i < d.length; i += 3)
+            pts.push(d[i] - d[i + 2], d[i + 1]);
+          return pts;
+        },
+        w,
+        h,
+        30,
+      ) + 40;
+
+    // The page opens where it's been, spreading out from there.
+    const grid = screenGrid(w, h, wakeStep(w, h));
+    const passing: Passing[] = [];
+    for (let at = PULL + 40; at <= end; at += 25)
+      passing.push({ t: at, discs: discsAt(at) });
+    const times = wakeTimes(grid, passing, (d) => 40 + d / SPREAD, 50);
+    const holes = new Float32Array(grid.cols * grid.rows * 3);
+    const duration = Math.max(end, lastOf(times) + GROW);
 
     return {
-      duration: DIVE_FROM + DIVE_MS,
-      reveal: { from: [0.5, 0.5] },
+      duration,
+      leave: LEAVE,
+      depart: PULL,
       draw(t, p) {
-        const u = seg(t, DIVE_FROM, DIVE_FROM + DIVE_MS);
-        if (t < DIVE_FROM) p.cam(look(t));
-        else {
-          const [tx, ty] = apply(carry(t), ax, ay);
-          p.cam(dive(from, tx, ty, end, u, w / 2, h / 2));
-        }
+        p.cam(t < LEAVE ? look(t) : still);
+        if (t > PULL) p.cut(holes, wakeHoles(times, grid, t, GROW, holes));
         const ground =
           1 - smootherstep(seg(t, LIFT_FROM + 60, CLOSE_FROM + 200));
-        const hand =
-          smootherstep(seg(t, SLIDE_FROM, SLIDE_FROM + 120)) *
-          (1 - smootherstep(seg(t, DIVE_FROM + 40, DIVE_FROM + DIVE_MS * 0.5)));
-        const tail =
-          1 - smootherstep(seg(t, DIVE_FROM, DIVE_FROM + DIVE_MS * 0.5));
+        const hand = smootherstep(seg(t, SLIDE_FROM, SLIDE_FROM + 120));
+        // No paper round them once the page shows through behind.
+        const paper = 1 - seg(t, PULL + 40, PULL + 140);
 
         p.part("rest", undefined, { alpha: ground });
-        p.dots(prep.hand, handAt(t), { alpha: hand, halo: 1.6 });
+        p.dots(prep.hand, handAt(t), { alpha: hand, halo: 1.6 * paper });
         droop = -24 * lifted(t) * DEG;
         held = carry(t);
         heldGrow = grow(held);
-        p.part("tail", undefined, { alpha: tail, halo: 1.2, warp: bend });
-        p.part("body", carry(t), { target: true, halo: 1.2 });
-        p.dots(prep.thumb, handAt(t), { alpha: hand, halo: 1.6 });
+        p.part("tail", undefined, { halo: 1.2 * paper, warp: bend });
+        p.part("body", carry(t), { halo: 1.2 * paper });
+        p.dots(prep.thumb, handAt(t), { alpha: hand, halo: 1.6 * paper });
       },
     };
   },

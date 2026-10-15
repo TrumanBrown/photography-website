@@ -164,16 +164,17 @@ describe("settleBox", () => {
 });
 
 describe("dotsArt", () => {
-  it("is a CSS image of the dots, safe to drop into a custom property", () => {
+  it("is a CSS background layer of the dots, stretched to the screen", () => {
     const art = dotsArt([10, 20, 30, 50.5, 60, 7], 400, 300, "rgb(22, 21, 15)");
     expect(art.startsWith('url("data:image/svg+xml,')).toBe(true);
-    expect(art.endsWith('")')).toBe(true);
-    const svg = decodeURIComponent(art.slice(26, -2));
+    expect(art.endsWith('") 0 0 / 100% 100% no-repeat')).toBe(true);
+    const data = art.slice(5, art.indexOf('")'));
+    const svg = decodeURIComponent(data.slice("data:image/svg+xml,".length));
     expect(svg).toContain("viewBox='0 0 400 300'");
     expect(svg.match(/<circle /g)).toHaveLength(2);
     expect(svg).toContain("cx='50.5' cy='60' r='7'");
     // Nothing in the URL that could end it early.
-    expect(art.slice(5, -2)).not.toMatch(/["#\s]/);
+    expect(data).not.toMatch(/["#\s]/);
   });
 });
 

@@ -43,9 +43,28 @@ export interface LandingNote {
   h?: number;
   /** Their ink. */
   ink?: string;
-  /** The same dots as a CSS image, for the first paint (see dotsArt). */
+  /**
+   * The frame it left on as a CSS background layer, for the first paint:
+   * the big dots (dotsArt), or a scene's frame (src/lib/scenes/engine.ts).
+   */
   art?: string;
   reveal?: Reveal;
+  /** A scene that carries on over this page (src/lib/scenes/index.ts). */
+  scene?: {
+    /** Where it left off, ms into the scene. */
+    t: number;
+    seed: number;
+    /** Where the card's plate was: left, top, width, height, CSS px. */
+    rect: [number, number, number, number];
+    /** The viewport it was laid out in. */
+    w: number;
+    h: number;
+    /** The plate image it was drawn from. */
+    plate: string;
+    dark: boolean;
+    /** 1, or faster if it was hurried along. */
+    speed: number;
+  };
 }
 
 declare global {
@@ -234,14 +253,19 @@ export function holeRadius(reach: number, ms: number, step: number): number {
 }
 
 /**
- * On a page a hobby card opened into, open what it landed on: the scene's
- * big dots if it sent them, otherwise bare paper as a halftone from the
- * middle out. Does nothing on any other visit.
+ * On a page a hobby card opened into, finish what the card started: play
+ * the rest of its scene over the page, or open the page through the scene's
+ * big dots, or, from the plain dive, through a halftone from the middle out.
+ * Does nothing on any other visit.
  */
 export function settleDots(): void {
   const root = document.documentElement;
   if (!root.classList.contains("landing-dots")) return;
   const note = window.landingNote;
+  if (note?.scene) {
+    carryOn(root, note);
+    return;
+  }
   if (note?.dots?.length && note.w && note.h) {
     revealDots(root, note);
     return;
@@ -303,7 +327,10 @@ export function settleDots(): void {
 
 /* ------------------------------------------------------------ big dots */
 
-/** The scene's last dots as a CSS image: what the page paints first. */
+/**
+ * The scene's last dots as a CSS background layer, stretched to the screen:
+ * what the page paints first.
+ */
 export function dotsArt(
   dots: readonly number[],
   w: number,
@@ -314,7 +341,65 @@ export function dotsArt(
   for (let i = 0; i + 2 < dots.length; i += 3)
     svg += `<circle cx='${dots[i]}' cy='${dots[i + 1]}' r='${dots[i + 2]}'/>`;
   svg += "</g></svg>";
-  return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}") 0 0 / 100% 100% no-repeat`;
+}
+
+/** How long a scene gets to pick up on this page before it just fades. */
+const RESUME_WAIT = 2500;
+
+/**
+ * Carry a hobby card's scene on over this page. If it can't (the scenes
+ * won't load, or take too long), the frame it left on fades away instead.
+ */
+function carryOn(root: HTMLElement, note: LandingNote) {
+  let settled = false;
+  const giveUp = () => {
+    if (settled) return;
+    settled = true;
+    fadeVeil(root, note.art);
+  };
+  const timer = window.setTimeout(giveUp, RESUME_WAIT);
+  import("./scenes")
+    .then((scenes) =>
+      scenes.resume(note, () => {
+        if (settled || !root.classList.contains("landing-dots")) return false;
+        settled = true;
+        window.clearTimeout(timer);
+        return true;
+      }),
+    )
+    .catch(giveUp);
+}
+
+/**
+ * The page is showing whatever it landed on by now: let go of the note and
+ * the picture of it, which can be a couple of hundred KB.
+ */
+export function landed(root: HTMLElement): void {
+  root.classList.remove("landing-dots");
+  root.style.removeProperty("--landing-dots");
+  window.landingNote = undefined;
+}
+
+/** Fade the frame the page opened on, and show the page. */
+function fadeVeil(root: HTMLElement, art?: string) {
+  if (!root.classList.contains("landing-dots")) return;
+  const veil = document.createElement("div");
+  veil.className = "landing-veil";
+  veil.setAttribute("aria-hidden", "true");
+  if (art) veil.style.background = `${art}, var(--paper)`;
+  document.body.append(veil);
+  landed(root);
+  veil
+    .animate([{ opacity: 1 }, { opacity: 0 }], {
+      duration: 320,
+      easing: "ease-out",
+      fill: "forwards",
+    })
+    .finished.then(
+      () => veil.remove(),
+      () => veil.remove(),
+    );
 }
 
 /** How long the wave of opening takes to cross the screen, ms. */
@@ -497,7 +582,7 @@ function revealDots(root: HTMLElement, note: LandingNote) {
     // The canvas now shows what the first paint did: the class can go.
     if (first) {
       first = false;
-      root.classList.remove("landing-dots");
+      landed(root);
     }
     if (ms < REVEAL_MS) requestAnimationFrame(frame);
     else veil.remove();

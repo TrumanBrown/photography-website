@@ -623,3 +623,140 @@ export function radiusNear(d: Dots, x: number, y: number, size: number) {
       near.push(d.r[i]);
   return near.length ? median(near) : median(d.r);
 }
+
+/* ----------------------------------------------------------------- wakes */
+
+/**
+ * A grid of points over the screen, `step` CSS px apart, from the top left
+ * corner to just past the bottom right one. Holes of 0.75 steps around
+ * every point cover the screen between them.
+ */
+export interface Grid {
+  cols: number;
+  rows: number;
+  step: number;
+}
+
+export function screenGrid(w: number, h: number, step: number): Grid {
+  return {
+    cols: Math.ceil(w / step) + 1,
+    rows: Math.ceil(h / step) + 1,
+    step,
+  };
+}
+
+/** The hole size, as a share of the grid step, that leaves no paper. */
+export const COVER = 0.75;
+
+/** A figure on screen at a moment: discs as x, y, radius in CSS px. */
+export interface Passing {
+  t: number;
+  discs: ArrayLike<number>;
+}
+
+/**
+ * When a moving figure's wake reaches each point of `grid`: it spreads out
+ * from wherever the figure has been, taking `reach(d)` ms to get `d` px past
+ * its edge. With `after`, a point the figure covers doesn't open until it
+ * has gone by, plus `after` ms, so the page never shows through the gaps in
+ * its dots; otherwise points it passes over open at once.
+ */
+export function wakeTimes(
+  grid: Grid,
+  passing: readonly Passing[],
+  reach: (d: number) => number,
+  after?: number,
+): Float32Array {
+  const { cols, rows, step } = grid;
+  const out = new Float32Array(cols * rows);
+  for (let j = 0; j < rows; j++)
+    for (let i = 0; i < cols; i++) {
+      const x = i * step;
+      const y = j * step;
+      let best = Infinity;
+      let covered = -Infinity;
+      for (const { t, discs } of passing)
+        for (let k = 0; k + 2 < discs.length; k += 3) {
+          const d = Math.hypot(x - discs[k], y - discs[k + 1]) - discs[k + 2];
+          const at = t + (d > 0 ? reach(d) : 0);
+          if (at < best) best = at;
+          if (d <= 0 && t > covered) covered = t;
+        }
+      out[j * cols + i] =
+        after === undefined ? best : Math.max(best, covered + after);
+    }
+  return out;
+}
+
+/** The latest a point of the grid starts to open. */
+export function lastOf(times: Float32Array): number {
+  let last = -Infinity;
+  for (const v of times) if (v > last) last = v;
+  return last;
+}
+
+/**
+ * The holes open at `t`: each grid point opens over `grow` ms from when the
+ * wake reaches it, from a pinprick to a hole that meets its neighbours, so
+ * the edge of the wake is a halftone. Writes x, y, r into `out`; returns how
+ * many.
+ */
+export function wakeHoles(
+  times: Float32Array,
+  grid: Grid,
+  t: number,
+  grow: number,
+  out: Float32Array,
+): number {
+  const { cols, rows, step } = grid;
+  let n = 0;
+  for (let j = 0; j < rows; j++)
+    for (let i = 0; i < cols; i++) {
+      const k = (t - times[j * cols + i]) / grow;
+      if (k <= 0) continue;
+      const r = step * COVER * smootherstep(k);
+      if (r < 0.4) continue;
+      out[n * 3] = i * step;
+      out[n * 3 + 1] = j * step;
+      out[n * 3 + 2] = r;
+      n++;
+    }
+  return n;
+}
+
+/** A grid step that suits the screen: finer on a phone. */
+export const wakeStep = (w: number, h: number) =>
+  Math.max(13, Math.min(22, Math.min(w, h) / 40));
+
+/**
+ * How far a figure has to travel along (dx, dy) until every one of its
+ * points is off the screen, by `margin` px; `at(k)` gives its points (x, y
+ * pairs, CSS px) having gone `k` of the way along a unit move.
+ */
+export function exitDistance(
+  at: (k: number) => ArrayLike<number>,
+  w: number,
+  h: number,
+  margin = 40,
+  most = 6000,
+): number {
+  const gone = (k: number) => {
+    const pts = at(k);
+    for (let i = 0; i + 1 < pts.length; i += 2) {
+      const x = pts[i];
+      const y = pts[i + 1];
+      if (x > -margin && x < w + margin && y > -margin && y < h + margin)
+        return false;
+    }
+    return true;
+  };
+  let lo = 0;
+  let hi = 1;
+  while (!gone(hi) && hi < most) hi *= 2;
+  for (let i = 0; i < 24; i++) {
+    const mid = (lo + hi) / 2;
+    if (gone(mid)) hi = mid;
+    else lo = mid;
+  }
+  return hi;
+}

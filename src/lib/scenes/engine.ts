@@ -19,13 +19,20 @@ import {
 } from "./stage";
 
 /**
- * Plays a hobby scene over the page: the card's plate lifts off its card onto
- * a sheet of paper, acts out its little story (src/lib/scenes/*.ts), and ends
- * zoomed into a handful of big ink dots, which the hobby page then opens
- * through (src/lib/landing.ts).
+ * Plays a hobby scene: the card's plate lifts off its card onto a sheet of
+ * paper and acts out its little story in its own dots (src/lib/scenes/*.ts).
  *
- * A second click, tap, Enter or Space hurries the rest of the scene along;
- * Escape puts the page back.
+ * Most scenes end by opening the hobby page themselves: the fish swims off
+ * and its ripples wash the paper away, the crab's pinch sends a shockwave
+ * through it, and so on. That has to happen over the hobby page, so those
+ * scenes change page during a held pose (`leave` to `depart`). The hobby
+ * page paints that same frame before anything else, builds the scene again
+ * from the same plate and seed, and plays the rest over itself (resume.ts).
+ * The globe instead ends zoomed into a few big dots, and the hobby page
+ * opens through those (src/lib/landing.ts).
+ *
+ * A second click, tap, Enter or Space hurries the rest along; Escape puts
+ * the page back.
  */
 
 /** How long the plate takes to rise from its card to the middle of the screen. */
@@ -33,11 +40,11 @@ export const LIFT_MS = 450;
 /** How long the paper takes to cover the page behind. */
 const PAPER_MS = 320;
 /** How much faster the rest of a scene plays once you click again. */
-const HURRY = 2.8;
+export const HURRY = 2.8;
 /** The mini plate a home-page card shows hands over to the finer card plate. */
 const SWAP_FROM = 60;
 const SWAP_MS = 300;
-/** At most this many dots are handed to the next page. */
+/** At most this many big dots are handed to the next page. */
 const KEEP = 900;
 
 export type { Reveal };
@@ -58,6 +65,8 @@ export interface DrawOpts {
    * lays all its halos down first, so its own pieces don't cut into each other.
    */
   pass?: "halo" | "ink";
+  /** The dots are in CSS px on the screen, not on the plate: no camera. */
+  screen?: boolean;
 }
 
 export interface Painter {
@@ -81,6 +90,13 @@ export interface Painter {
     y: number,
     o: { dx?: number; dy?: number; alpha?: number; color?: "ink" | "red" },
   ): void;
+  /**
+   * Open holes through the paper, and anything drawn so far, onto the page
+   * underneath: circles in CSS px, as x, y, r. Draw what moves on top after.
+   */
+  cut(holes: ArrayLike<number>, count?: number): void;
+  /** The whole sheet's opacity and blur (CSS px), for a scene that fades away. */
+  look(o: { opacity?: number; blur?: number }): void;
   screen(x: number, y: number): [number, number];
 }
 
@@ -103,9 +119,17 @@ export interface SceneContext {
 }
 
 export interface SceneRun {
-  /** Length of the whole scene, ms; it ends on the big dots. */
+  /** Length of the whole scene, ms. */
   duration: number;
-  reveal: Reveal;
+  /**
+   * When the page changes, ms: the start of a still pose that lasts until
+   * `depart`, so the next page can pick the scene up without a jump. Left
+   * out, the page changes at the end, on the big dots (`reveal`).
+   */
+  leave?: number;
+  depart?: number;
+  /** For a scene that ends on big dots: where the next page opens from. */
+  reveal?: Reveal;
   draw(t: number, p: Painter): void;
 }
 
@@ -121,28 +145,56 @@ export interface Scene<P = unknown> {
 export const defineScene = <P>(scene: Scene<P>) =>
   scene as unknown as Scene<unknown>;
 
-export interface Final {
-  /** x, y, radius of each big dot, CSS px, in a flat list. */
-  dots: number[];
-  w: number;
-  h: number;
-  reveal: Reveal;
+/** How the scene hands over to the next page. */
+export type Final =
+  | {
+      kind: "dots";
+      /** x, y, radius of each big dot, CSS px, in a flat list. */
+      dots: number[];
+      w: number;
+      h: number;
+      reveal: Reveal;
+    }
+  | {
+      kind: "scene";
+      /** Where it left off, ms into the scene. */
+      t: number;
+      /** That frame, as a CSS background layer, for the next page's first paint. */
+      art: string;
+      w: number;
+      h: number;
+      rect: [number, number, number, number];
+      /** 1, or faster if it was hurried along. */
+      speed: number;
+    };
+
+export interface Colors {
+  ink: string;
+  red: string;
+  paper: string;
 }
 
-export interface PlayOptions {
+export interface ShowOptions {
   scene: Scene<unknown>;
   prep: unknown;
-  /** The plate on the card, hidden while its dots are on stage. */
-  img: HTMLImageElement;
   main: { dots: Dots; parts: Record<string, Dots> };
   /** The coarser mini plate a home-page card shows, handing over to `main`. */
   from?: { dots: Dots; parts: Record<string, Dots> };
-  colors: { ink: string; red: string; paper: string };
+  /** Where the card's plate was on screen: left, top, width, height, CSS px. */
+  rect: readonly [number, number, number, number];
+  /** The viewport the scene is laid out in, CSS px. */
+  w: number;
+  h: number;
+  colors: Colors;
   font: string;
   dark: boolean;
   seed: number;
-  done(final: Final): void;
-  cancelled(): void;
+}
+
+interface Op {
+  color: string;
+  alpha: number;
+  xyr: number[];
 }
 
 let scratch = new Float32Array(3 * 4096);
@@ -152,13 +204,17 @@ class Pen implements Painter {
   w = 0;
   h = 0;
   recorded: number[] = [];
+  /** While set, every dot drawn is noted here too, for the next page's first paint. */
+  ops: Op[] | null = null;
+  opacity = 1;
+  blur = 0;
   sources: Array<{ parts: Record<string, Dots>; weight: number }> = [];
   private m: Mat = ID;
   private c: Cam = { ax: 0, ay: 0, fx: 0, fy: 0, s: 1 };
 
   constructor(
     private ctx: CanvasRenderingContext2D,
-    private colors: PlayOptions["colors"],
+    private colors: Colors,
     private font: string,
   ) {}
 
@@ -169,6 +225,27 @@ class Pen implements Painter {
 
   screen(x: number, y: number) {
     return toScreen(this.c, x, y);
+  }
+
+  look(o: { opacity?: number; blur?: number }) {
+    if (o.opacity !== undefined) this.opacity = o.opacity;
+    if (o.blur !== undefined) this.blur = o.blur;
+  }
+
+  cut(holes: ArrayLike<number>, count = Math.floor(holes.length / 3)) {
+    if (!count) return;
+    const ctx = this.ctx;
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.fillStyle = "#000";
+    ctx.beginPath();
+    for (let i = 0; i < count; i++) {
+      const r = holes[i * 3 + 2];
+      if (r <= 0) continue;
+      ctx.moveTo(holes[i * 3] + r, holes[i * 3 + 1]);
+      ctx.arc(holes[i * 3], holes[i * 3 + 1], r, 0, Math.PI * 2);
+    }
+    ctx.fill();
+    ctx.globalCompositeOperation = "source-over";
   }
 
   part(name: string, m: Mat = ID, o: DrawOpts = {}) {
@@ -187,7 +264,7 @@ class Pen implements Painter {
     const alpha = o.alpha ?? 1;
     if (alpha <= 0.003 || !d.n) return;
     const ctx = this.ctx;
-    const cam = this.m;
+    const cam = o.screen ? ID : this.m;
     const M = mul(cam, m);
     const k = grow(M) * (o.size ?? 1);
     const halo = o.pass === "ink" ? 0 : (o.halo ?? 0) * grow(M);
@@ -227,22 +304,28 @@ class Pen implements Painter {
       count++;
     }
     if (!count) return;
-    ctx.globalAlpha = Math.min(1, alpha);
+    const a = Math.min(1, alpha);
+    ctx.globalAlpha = a;
     if (halo > 0) {
       ctx.fillStyle = this.colors.paper;
       ctx.beginPath();
+      const noted: number[] | null = this.ops ? [] : null;
       for (let i = 0; i < count; i++) {
         const R = out[i * 3 + 2] + halo;
         ctx.moveTo(out[i * 3] + R, out[i * 3 + 1]);
         ctx.arc(out[i * 3], out[i * 3 + 1], R, 0, Math.PI * 2);
+        noted?.push(out[i * 3], out[i * 3 + 1], R);
       }
       ctx.fill();
+      if (noted)
+        this.ops!.push({ color: this.colors.paper, alpha: a, xyr: noted });
     }
     if (o.pass === "halo") {
       ctx.globalAlpha = 1;
       return;
     }
-    ctx.fillStyle = o.color === "red" ? this.colors.red : this.colors.ink;
+    const color = o.color === "red" ? this.colors.red : this.colors.ink;
+    ctx.fillStyle = color;
     ctx.beginPath();
     for (let i = 0; i < count; i++) {
       const R = out[i * 3 + 2];
@@ -251,6 +334,12 @@ class Pen implements Painter {
     }
     ctx.fill();
     ctx.globalAlpha = 1;
+    if (this.ops)
+      this.ops.push({
+        color,
+        alpha: a,
+        xyr: Array.from(out.subarray(0, count * 3)),
+      });
     if (o.target && alpha > 0.5) {
       for (let i = 0; i < count; i++)
         this.recorded.push(out[i * 3], out[i * 3 + 1], out[i * 3 + 2]);
@@ -308,37 +397,70 @@ class Pen implements Painter {
   }
 }
 
-interface Debug {
-  duration: number;
-  seek(t: number): void;
-  final(): Final;
-}
+const round1 = (v: number) => Math.round(v * 10) / 10;
 
 /**
- * Play a scene from the card plate `img`. `dispose` takes it down without a
- * word (when the page comes back from the back/forward cache).
+ * Dots as an SVG CSS background layer, `w` × `h` CSS px from the top left,
+ * the way the canvas drew them: a zero-length stroke with round caps is a
+ * dot, so dots of one size share a path. Paints before any script runs.
  */
-export function play(options: PlayOptions): {
-  cancel(): void;
-  dispose(): void;
-} {
-  const { scene, img, main, from } = options;
+export function svgLayer(ops: readonly Op[], w: number, h: number): string {
+  let body = "";
+  for (const op of ops) {
+    const bySize = new Map<number, string[]>();
+    for (let i = 0; i + 2 < op.xyr.length; i += 3) {
+      const r = Math.round(op.xyr[i + 2] * 20) / 20;
+      let list = bySize.get(r);
+      if (!list) bySize.set(r, (list = []));
+      list.push(`M${round1(op.xyr[i])} ${round1(op.xyr[i + 1])}h0`);
+    }
+    let paths = "";
+    for (const [r, list] of bySize)
+      paths += `<path stroke-width='${round1(r * 2 * 10) / 10}' d='${list.join("")}'/>`;
+    const fade = op.alpha < 0.999 ? ` opacity='${op.alpha.toFixed(3)}'` : "";
+    body += `<g stroke='${op.color}'${fade}>${paths}</g>`;
+  }
+  const svg =
+    `<svg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${h}' viewBox='0 0 ${w} ${h}'>` +
+    `<g fill='none' stroke-linecap='round'>${body}</g></svg>`;
+  // Only what would end the URL or the data early needs escaping.
+  const data = svg.replace(
+    /[%#"<>]/g,
+    (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
+  return `url("data:image/svg+xml,${data}") 0 0 / ${w}px ${h}px no-repeat`;
+}
+
+export interface Show {
+  run: SceneRun;
+  canvas: HTMLCanvasElement;
+  /** When the page changes and when it moves on again; see SceneRun. */
+  leave: number;
+  depart: number;
+  draw(t: number): void;
+  /** Draw the frame at `t` and return it as an SVG layer (svgLayer). */
+  art(t: number): string;
+  /** The big dots the last frame drawn ended on. */
+  final(): Extract<Final, { kind: "dots" }>;
+}
+
+/** Set a scene up on a full-screen canvas, ready to draw any moment of it. */
+export function show(o: ShowOptions, className: string): Show {
   const root = document.documentElement;
   const canvas = document.createElement("canvas");
-  canvas.className = "open-layer";
+  canvas.className = className;
   canvas.setAttribute("aria-hidden", "true");
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("No 2D canvas.");
-  const w = root.clientWidth;
-  const h = root.clientHeight;
-  const rect = img.getBoundingClientRect();
+  const { w, h } = o;
+  const [left, top, width, height] = o.rect;
 
   const card: Cam = {
-    ax: rect.left + rect.width / 2,
-    ay: rect.top + rect.height / 2,
+    ax: left + width / 2,
+    ay: top + height / 2,
     fx: PLATE_W / 2,
     fy: PLATE_H / 2,
-    s: rect.width / PLATE_W,
+    s: width / PLATE_W,
   };
   const stageW = Math.min(0.86 * w, ((0.78 * h) / 3) * 4, 1180);
   const stage: Cam = {
@@ -349,25 +471,25 @@ export function play(options: PlayOptions): {
     s: stageW / PLATE_W,
   };
   const bigDot = Math.max(22, Math.min(56, 0.05 * Math.min(w, h)));
-  const run = scene.start(
+  const run = o.scene.start(
     {
-      dots: main.dots,
-      parts: main.parts,
-      r0: median(main.dots.r),
-      rand: seeded(options.seed),
-      dark: options.dark,
+      dots: o.main.dots,
+      parts: o.main.parts,
+      r0: median(o.main.dots.r),
+      rand: seeded(o.seed),
+      dark: o.dark,
       w,
       h,
       lift: (t) => camLerp(card, stage, smootherstep(t / LIFT_MS)),
       stage,
       big: (r) => bigDot / r,
     },
-    options.prep,
+    o.prep,
   );
+  const leave = Math.min(run.leave ?? run.duration, run.duration);
+  const depart = Math.max(leave, Math.min(run.depart ?? leave, run.duration));
 
-  const pen = new Pen(ctx, options.colors, options.font);
-  pen.w = w;
-  pen.h = h;
+  const pen = new Pen(ctx, o.colors, o.font);
 
   function draw(t: number) {
     const vw = root.clientWidth;
@@ -380,21 +502,39 @@ export function play(options: PlayOptions): {
     ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx!.clearRect(0, 0, vw, vh);
     ctx!.globalAlpha = smootherstep(t / PAPER_MS);
-    ctx!.fillStyle = options.colors.paper;
+    ctx!.fillStyle = o.colors.paper;
     ctx!.fillRect(0, 0, vw, vh);
     ctx!.globalAlpha = 1;
-    const swap = from ? smootherstep((t - SWAP_FROM) / SWAP_MS) : 1;
-    pen.sources = from
+    const swap = o.from ? smootherstep((t - SWAP_FROM) / SWAP_MS) : 1;
+    pen.sources = o.from
       ? [
-          { parts: from.parts, weight: 1 - swap },
-          { parts: main.parts, weight: swap },
+          { parts: o.from.parts, weight: 1 - swap },
+          { parts: o.main.parts, weight: swap },
         ]
-      : [{ parts: main.parts, weight: 1 }];
+      : [{ parts: o.main.parts, weight: 1 }];
+    pen.w = vw;
+    pen.h = vh;
     pen.recorded = [];
+    pen.opacity = 1;
+    pen.blur = 0;
     run.draw(t, pen);
+    const opacity = pen.opacity < 0.999 ? String(Math.max(0, pen.opacity)) : "";
+    if (canvas.style.opacity !== opacity) canvas.style.opacity = opacity;
+    const filter = pen.blur > 0.05 ? `blur(${pen.blur.toFixed(2)}px)` : "";
+    if (canvas.style.filter !== filter) canvas.style.filter = filter;
   }
 
-  function final(): Final {
+  function art(t: number): string {
+    pen.ops = [];
+    try {
+      draw(t);
+      return svgLayer(pen.ops, w, h);
+    } finally {
+      pen.ops = null;
+    }
+  }
+
+  function final(): Extract<Final, { kind: "dots" }> {
     let dots = pen.recorded;
     if (dots.length > KEEP * 3) {
       // Keep the dots nearest the middle; the rest are at the edges.
@@ -408,36 +548,110 @@ export function play(options: PlayOptions): {
         .flatMap((i) => [dots[i * 3], dots[i * 3 + 1], dots[i * 3 + 2]]);
     }
     return {
+      kind: "dots",
       dots: dots.map((v) => Math.round(v * 10) / 10),
       w,
       h,
-      reveal: run.reveal,
+      reveal: run.reveal ?? { from: [0.5, 0.5] },
     };
   }
 
+  return { run, canvas, leave, depart, draw, art, final };
+}
+
+/**
+ * A clock that can be hurried: ms since it started, running `HURRY` times
+ * faster from whenever `hurry()` was called.
+ */
+export function clock(speed = 1) {
+  const start = performance.now();
+  let at = -1;
+  let from = 0;
+  let rate = speed;
+  const now = (when = performance.now()) =>
+    at < 0 ? (when - start) * rate : from + (when - at) * rate;
+  return {
+    now,
+    get rate() {
+      return rate;
+    },
+    hurry() {
+      if (rate >= HURRY) return;
+      const when = performance.now();
+      from = now(when);
+      at = when;
+      rate = HURRY;
+    },
+  };
+}
+
+export interface PlayOptions extends Omit<ShowOptions, "rect" | "w" | "h"> {
+  /** The plate on the card, hidden while its dots are on stage. */
+  img: HTMLImageElement;
+  done(final: Final): void;
+  cancelled(): void;
+}
+
+interface Debug {
+  duration: number;
+  leave: number;
+  depart: number;
+  seek(t: number): void;
+  final(): Final;
+  /** Change page as the scene would at `leave`. */
+  hand(): void;
+}
+
+/**
+ * Play a scene from the card plate `img`, up to where the page changes.
+ * `dispose` takes it down without a word (when the page comes back from the
+ * back/forward cache).
+ */
+export function play(options: PlayOptions): {
+  cancel(): void;
+  dispose(): void;
+} {
+  const { img } = options;
+  const root = document.documentElement;
+  const box = img.getBoundingClientRect();
+  const rect: [number, number, number, number] = [
+    box.left,
+    box.top,
+    box.width,
+    box.height,
+  ];
+  const w = root.clientWidth;
+  const h = root.clientHeight;
+  const s = show({ ...options, rect, w, h }, "open-layer");
+  const { canvas } = s;
+
+  const time = clock();
+  const finish = (): Final =>
+    s.leave < s.run.duration
+      ? {
+          kind: "scene",
+          t: s.leave,
+          art: s.art(s.leave),
+          w,
+          h,
+          rect,
+          speed: time.rate,
+        }
+      : s.final();
+
   let stopped = false;
   let raf = 0;
-  const start = performance.now();
-  let hurriedAt = -1;
-  let hurriedFrom = 0;
-  const clock = (now: number) =>
-    hurriedAt < 0 ? now - start : hurriedFrom + (now - hurriedAt) * HURRY;
-  const hurry = () => {
-    if (hurriedAt >= 0) return;
-    const now = performance.now();
-    hurriedFrom = clock(now);
-    hurriedAt = now;
-  };
   const onKey = (event: KeyboardEvent) => {
     if (event.key === "Escape") {
       event.preventDefault();
       cancel();
     } else if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
-      hurry();
+      time.hurry();
     }
   };
   const hold = (event: Event) => event.preventDefault();
+  const hurry = () => time.hurry();
   const listen = (on: boolean) => {
     const method = on ? "addEventListener" : "removeEventListener";
     window[method]("keydown", onKey as EventListener, true);
@@ -472,23 +686,34 @@ export function play(options: PlayOptions): {
     new URLSearchParams(location.search).has("scene-debug")
   ) {
     // Frame by frame from the console or a test: __scene.seek(ms).
-    const debug: Debug = { duration: run.duration, seek: draw, final };
+    const debug: Debug = {
+      duration: s.run.duration,
+      leave: s.leave,
+      depart: s.depart,
+      seek: s.draw,
+      final: () => (s.leave < s.run.duration ? finish() : s.final()),
+      hand: () => {
+        stopped = true;
+        listen(false);
+        options.done(finish());
+      },
+    };
     (window as unknown as { __scene?: Debug }).__scene = debug;
-    draw(0);
+    s.draw(0);
     return { cancel, dispose };
   }
 
   function frame(now: number) {
     if (stopped) return;
-    const t = Math.min(run.duration, clock(now));
-    draw(t);
-    if (t < run.duration) {
+    const t = Math.min(s.leave, time.now(now));
+    s.draw(t);
+    if (t < s.leave) {
       raf = requestAnimationFrame(frame);
       return;
     }
     stopped = true;
     listen(false);
-    options.done(final());
+    options.done(finish());
   }
   raf = requestAnimationFrame(frame);
   return { cancel, dispose };
