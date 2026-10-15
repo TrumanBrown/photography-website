@@ -368,10 +368,11 @@ There are two modes on one board. **Today's list** is the same round for everyon
   the busiest month and the size of the boundary. Run it by hand when adding a location (`--extra`
   for More lists candidates).
 
-**Where it lives.** Narrow nature is its own hobby at `/hobbies/day-list/`, with its own card on
-the hobbies index. It started out as Day list, and the code still uses that name: the slug and
-URL, the files, the `dayList` block, the `data-daylist-*` hooks and the saved-progress keys, so
-bookmarks and saved rounds carry over. Only the title and the share text say Narrow nature.
+**Where it lives.** Narrow nature is its own hobby at `/hobbies/narrow-nature/`, with its own card
+on the hobbies index. It started out as Day list at `/hobbies/day-list/`, which now 301s to the new
+address ([staticwebapp.config.json](../staticwebapp.config.json)), so old bookmarks still work. The
+code keeps the old name: the files, the `dayList` block, the `data-daylist-*` hooks and the
+saved-progress keys, so saved rounds carry over. The title and the share text say Narrow nature.
 `order: 0` puts it first in Things to try, since it's the one people come back to every day. The
 block is still opt-in per hobby, so it can be dropped onto any other hobby page by adding:
 
@@ -532,7 +533,7 @@ still read as finished.
 (`initUnderlineTabs`, the Cult UI direction-aware-tabs port). The daily result offers "Play more
 lists", and each extra result offers "Next list" until the tenth, which shows the day's total
 instead. Extras have no share button, because the share string is about the daily list. A link to
-`/hobbies/day-list/#more-lists` opens straight onto More lists.
+`/hobbies/narrow-nature/#more-lists` opens straight onto More lists.
 
 ### Accuracy rules
 

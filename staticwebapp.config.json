@@ -16,6 +16,16 @@
   },
   "routes": [
     {
+      "route": "/hobbies/day-list",
+      "redirect": "/hobbies/narrow-nature/",
+      "statusCode": 301
+    },
+    {
+      "route": "/hobbies/day-list/*",
+      "redirect": "/hobbies/narrow-nature/",
+      "statusCode": 301
+    },
+    {
       "route": "/admin",
       "allowedRoles": ["anonymous", "authenticated"]
     },

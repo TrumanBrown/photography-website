@@ -150,7 +150,7 @@ const hobbies = defineCollection({
      * Optional daily puzzle: six species recorded at one real place in one
      * month, revealed commonest-first, with a world map to guess where. Data is
      * built by scripts/build-day-list.mjs. Opt-in per hobby; it has its own
-     * page (day-list.json, shown as "Narrow nature"), first in Things to try.
+     * page (narrow-nature.json), first in Things to try.
      */
     dayList: z
       .object({
