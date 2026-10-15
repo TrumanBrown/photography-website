@@ -6,7 +6,9 @@
  * representative sample was grounded with live web research. They favor
  * well-established, interesting tidbits over obscure claims, but a quick review
  * pass by someone who knows these animals is recommended before treating any of
- * it as authoritative — it's a learning game, not a textbook.
+ * it as authoritative — it's a learning game, not a textbook. The doubtful ones
+ * were checked again in October 2026, and species-facts.test.ts holds every
+ * fact to the site's copy rules (.github/instructions/site-copy.instructions.md).
  *
  * Each species maps to a CATEGORY, which is what the pixel sprite renderer in
  * tidepool.ts draws (parameterized by color/size). That keeps the art bounded
@@ -63,15 +65,15 @@ export const SPECIES: TidepoolSpecies[] = [
     category: 'crab', color: '#6b4a7a', accent: '#e8dcc8', size: 0.95, rarity: 'common',
     facts: [
       'Check the claws: white tips speckled with purple-red dots set it apart from other shore crabs.',
-      'A slow mover that often plays dead, it can sit out of water for up to 8 hours while the tide is out.',
+      'A slow mover, it can sit out of water for hours while the tide is out.',
     ],
   },
   {
     id: 'green-shore-crab', common: 'Green shore crab', scientific: 'Hemigrapsus oregonensis',
     category: 'crab', color: '#6f7d4a', accent: '#c9b079', size: 0.85, rarity: 'common',
     facts: [
-      'Despite the name it can be green, yellow, or grey — but its legs are hairy and its claws lack purple spots.',
-      'A mudflat champion, it digs burrows and shrugs off brackish water far less salty than most crabs tolerate.',
+      'It can be yellow or grey as well as green, so check for hairy legs and claws with no purple spots.',
+      'At home on mudflats, it digs burrows and copes with brackish water far less salty than most crabs can stand.',
     ],
   },
   {
@@ -79,7 +81,7 @@ export const SPECIES: TidepoolSpecies[] = [
     category: 'crab', color: '#5a6b3a', accent: '#c46a2a', size: 1.05, rarity: 'uncommon',
     facts: [
       'This spider crab climbs bull kelp on long hooked legs, eating algae in summer and hunting mussels in winter.',
-      'Small but feisty — it has a surprisingly strong, aggressive pinch.',
+      "Its pinch is surprisingly strong, and it's quick to use it.",
     ],
   },
   {
@@ -94,8 +96,8 @@ export const SPECIES: TidepoolSpecies[] = [
     id: 'porcelain-crab', common: 'Flat porcelain crab', scientific: 'Petrolisthes cinctipes',
     category: 'crab', color: '#4a5566', accent: '#cfd6dd', size: 0.7, rarity: 'common',
     facts: [
-      "It doesn't hunt with its claws — it filter-feeds, sweeping plankton from the water with feathery mouthparts.",
-      'Famous for hair-trigger escape: it pops off a claw to flee a predator, then regrows it over several molts.',
+      'It filter-feeds instead of hunting, sweeping plankton from the water with feathery mouthparts.',
+      'Grabbed by a predator, it drops a claw to get away, then regrows it over several molts.',
     ],
   },
   // ---- hermit crabs ----
@@ -104,7 +106,7 @@ export const SPECIES: TidepoolSpecies[] = [
     category: 'hermit', color: '#5c5240', accent: '#6aa0c0', size: 0.8, rarity: 'common',
     facts: [
       'Its legs wear white and blue bands, and its whole body looks faintly hairy up close.',
-      'Unlike most hermit crabs, it will boldly abandon its borrowed shell and dash away when threatened.',
+      'Unlike most hermit crabs, it will leave its borrowed shell behind and run when threatened.',
     ],
   },
   {
@@ -120,24 +122,24 @@ export const SPECIES: TidepoolSpecies[] = [
     id: 'ochre-star', common: 'Ochre sea star', scientific: 'Pisaster ochraceus',
     category: 'star', color: '#6a4a86', accent: '#e0a040', size: 1.15, arms: 5, rarity: 'common',
     facts: [
-      'A keystone species: famous experiments showed that removing it lets mussels take over and crash tide-pool diversity.',
-      'It digests a mussel by pushing its stomach out through its mouth into the shell — about 80 mussels a year.',
+      'A keystone species: in experiments that removed it, mussels took over and crowded out most other life on the rocks.',
+      'It eats about 80 mussels a year, pushing its stomach out through its mouth and into each shell.',
     ],
   },
   {
     id: 'sunflower-star', common: 'Sunflower star', scientific: 'Pycnopodia helianthoides',
     category: 'star', color: '#c85a2a', accent: '#f0c040', size: 1.3, arms: 18, rarity: 'rare',
     facts: [
-      'One of the largest sea stars on Earth — up to 24 arms and a 3-foot span — gliding on about 15,000 tube feet.',
-      'Sea star wasting disease has killed over 90% since 2013, and it is now listed as critically endangered.',
+      'One of the largest sea stars in the world, with up to 24 arms, a 3-foot span, and about 15,000 tube feet.',
+      "Sea star wasting disease has killed over 90% of them since 2013, and it's now listed as critically endangered.",
     ],
   },
   {
     id: 'six-rayed-star', common: 'Six-rayed star', scientific: 'Leptasterias hexactis',
     category: 'star', color: '#4a5d3a', accent: '#8a9a6a', size: 0.8, arms: 6, rarity: 'common',
     facts: [
-      'A small star with six arms — unusual in a group that mostly sticks to five.',
-      'Rather than scatter eggs to sea, the mother broods her young beneath her body until they can fend for themselves.',
+      'Count the arms: this small star has six, where most sea stars have five.',
+      'Most sea stars scatter their eggs into the sea, but this mother keeps hers under her body until the young can fend for themselves.',
     ],
   },
   {
@@ -145,7 +147,7 @@ export const SPECIES: TidepoolSpecies[] = [
     category: 'star', color: '#c0392b', accent: '#e8857a', size: 0.9, arms: 5, rarity: 'uncommon',
     facts: [
       'Slender bright red-orange arms make it look delicate next to the stout ochre star.',
-      'It sips tiny particles and grazes sponges instead of prying open mussels — a gentle tide-pool neighbor.',
+      'It grazes sponges and sips up tiny particles instead of prying open mussels.',
     ],
   },
   {
@@ -153,7 +155,7 @@ export const SPECIES: TidepoolSpecies[] = [
     category: 'star', color: '#6a6a8a', accent: '#b04a4a', size: 1.0, arms: 5, rarity: 'uncommon',
     facts: [
       'Smooth and slippery to the touch, it gives off a faint smell of garlic or sulfur.',
-      'It preys on the giant green anemone, which will detach and slowly "walk" away to escape it.',
+      'It hunts sea anemones, and the swimming anemone escapes one by letting go of the rock and swimming off.',
     ],
   },
   // ---- anemones ----
@@ -161,7 +163,7 @@ export const SPECIES: TidepoolSpecies[] = [
     id: 'giant-green-anemone', common: 'Giant green anemone', scientific: 'Anthopleura xanthogrammica',
     category: 'anemone', color: '#2f8f4a', accent: '#6fd08a', size: 1.15, rarity: 'common',
     facts: [
-      'Its brilliant green comes from algae living inside it — the sunnier the pool, the greener it glows.',
+      'Its green comes from its own pigment plus algae living in its tissues, so ones in the shade are paler.',
       'These anemones are thought to live for decades, and possibly more than a century.',
     ],
   },
@@ -178,7 +180,7 @@ export const SPECIES: TidepoolSpecies[] = [
     category: 'anemone', color: '#b0432f', accent: '#4a9a5a', size: 1.05, rarity: 'uncommon',
     facts: [
       'Also called the Christmas anemone for its bold bands of red and green.',
-      'Unlike its algae-fed cousins it is a hunter, able to swallow small fish, crabs, and even other anemones.',
+      'Unlike its algae-fed cousins it relies on hunting, catching and swallowing small fish and crabs.',
     ],
   },
   // ---- nudibranchs ----
@@ -186,7 +188,7 @@ export const SPECIES: TidepoolSpecies[] = [
     id: 'opalescent-nudibranch', common: 'Opalescent nudibranch', scientific: 'Hermissenda crassicornis',
     category: 'nudibranch', color: '#e0853a', accent: '#3a7bd5', size: 0.8, rarity: 'uncommon',
     facts: [
-      'A living jewel: translucent with electric-blue lines and orange-tipped frills called cerata.',
+      'Look for a translucent body with electric-blue lines and orange-tipped frills called cerata.',
       'It eats stinging hydroids and recycles their sting cells into its own frills for defense.',
     ],
   },
@@ -202,8 +204,8 @@ export const SPECIES: TidepoolSpecies[] = [
     id: 'clown-nudibranch', common: 'Clown nudibranch', scientific: 'Triopha catalinae',
     category: 'nudibranch', color: '#ece6dc', accent: '#e8731f', size: 0.8, rarity: 'rare',
     facts: [
-      'White-bodied with brilliant orange tips on its frills and head — a true tide-pool showstopper.',
-      'Like all nudibranchs it is a hermaphrodite: every individual is both male and female.',
+      'A white body with bright orange tips on its frills and head makes it easy to spot.',
+      "Like all nudibranchs it's a hermaphrodite: every individual is both male and female.",
     ],
   },
   {
@@ -211,7 +213,7 @@ export const SPECIES: TidepoolSpecies[] = [
     category: 'nudibranch', color: '#d8cdbb', accent: '#3a3a3a', size: 0.85, rarity: 'uncommon',
     facts: [
       'Pale with dark leopard rings, this sea slug grazes on sponges.',
-      "'Nudibranch' means 'naked gills' — the feathery tuft on its back is how it breathes.",
+      "'Nudibranch' means 'naked gills,' after the feathery tuft on its back that it breathes through.",
     ],
   },
   // ---- chitons ----
@@ -219,8 +221,8 @@ export const SPECIES: TidepoolSpecies[] = [
     id: 'gumboot-chiton', common: 'Gumboot chiton', scientific: 'Cryptochiton stelleri',
     category: 'chiton', color: '#8a3a2a', accent: '#5a241a', size: 1.2, rarity: 'uncommon',
     facts: [
-      "The world's largest chiton — up to a foot long — nicknamed the 'wandering meatloaf' for its leathery red-brown back.",
-      'Its teeth are capped with magnetite, real iron, making them some of the hardest material any animal builds.',
+      "The world's largest chiton grows up to a foot long and is nicknamed the 'wandering meatloaf' for its leathery red-brown back.",
+      'Its teeth are capped with magnetite, an iron mineral, which makes them some of the hardest material any animal builds.',
     ],
   },
   {
@@ -244,7 +246,7 @@ export const SPECIES: TidepoolSpecies[] = [
     id: 'black-turban-snail', common: 'Black turban snail', scientific: 'Tegula funebralis',
     category: 'snail', color: '#3a3036', accent: '#cfa86a', size: 0.85, rarity: 'common',
     facts: [
-      'Its dark turban shell is often worn pearly-white at the tip from years of grazing.',
+      'Older shells are often worn pearly-white at the tip, rubbed down by years on the rocks.',
       'When a sea star looms it can "gallop" away surprisingly fast for a snail.',
     ],
   },
@@ -278,15 +280,15 @@ export const SPECIES: TidepoolSpecies[] = [
     category: 'limpet', color: '#8a7a5a', accent: '#5a4a32', size: 0.7, rarity: 'common',
     facts: [
       'A little volcano-shaped shell that clamps down like a vise when waves hit.',
-      "Many have a 'home scar' — a spot they grind to fit their shell and return to after each grazing trip.",
+      "Many have a 'home scar,' a spot they grind to fit their shell and return to after each grazing trip.",
     ],
   },
   {
     id: 'plate-limpet', common: 'Plate limpet', scientific: 'Lottia scutum',
     category: 'limpet', color: '#9a8a6a', accent: '#4a5a3a', size: 0.75, rarity: 'common',
     facts: [
-      'A low, flat limpet that mows algae with an astonishingly tough tongue.',
-      'Limpet teeth are reinforced with goethite fibers — ranked among the strongest natural materials ever tested.',
+      'A low, flat limpet that mows algae with an extremely tough tongue.',
+      'Limpet teeth are reinforced with goethite fibers and rank among the strongest natural materials ever tested.',
     ],
   },
   // ---- urchins ----
@@ -294,7 +296,7 @@ export const SPECIES: TidepoolSpecies[] = [
     id: 'purple-sea-urchin', common: 'Purple sea urchin', scientific: 'Strongylocentrotus purpuratus',
     category: 'urchin', color: '#6a4a86', accent: '#4a2a66', size: 0.95, rarity: 'common',
     facts: [
-      "It grinds cup-shaped pits into solid rock with five teeth called Aristotle's lantern.",
+      "It grinds cup-shaped pits into solid rock with the five teeth of its jaw, called Aristotle's lantern.",
       "When the sea stars that eat them vanish, urchins multiply and mow kelp down into bare 'urchin barrens.'",
     ],
   },
@@ -311,7 +313,7 @@ export const SPECIES: TidepoolSpecies[] = [
     category: 'urchin', color: '#9c2f2a', accent: '#5a1a16', size: 1.1, rarity: 'rare',
     facts: [
       'The biggest urchin on the coast, with long spines and a deep red color.',
-      'Red urchins are among the longest-lived animals known — some are estimated at over 100 years old.',
+      'Red urchins are among the longest-lived animals known, and some are estimated to be over 100 years old.',
     ],
   },
   // ---- barnacles ----
@@ -320,7 +322,7 @@ export const SPECIES: TidepoolSpecies[] = [
     category: 'barnacle', color: '#d8d2c4', accent: '#8a8276', size: 0.6, rarity: 'common',
     facts: [
       'Cemented head-down to the rock, it kicks feathery legs out of its shell to comb plankton from the water.',
-      'Barnacles are crustaceans — relatives of crabs — that gave up walking to glue themselves in place for life.',
+      'Barnacles are crustaceans like crabs, but they glue themselves to one spot for life.',
     ],
   },
   {
@@ -328,7 +330,7 @@ export const SPECIES: TidepoolSpecies[] = [
     category: 'barnacle', color: '#c0b8a8', accent: '#b03a2a', size: 0.85, rarity: 'uncommon',
     facts: [
       'It clusters on wave-blasted rock atop a tough rubbery stalk, feeding in the crashing surf.',
-      "Medieval folklore claimed geese hatched from these — which is how the 'goose' barnacle got its name.",
+      "Medieval folklore claimed geese hatched from these, which is how the 'goose' barnacle got its name.",
     ],
   },
   // ---- mussels ----
@@ -337,7 +339,7 @@ export const SPECIES: TidepoolSpecies[] = [
     category: 'mussel', color: '#4a4452', accent: '#2a2630', size: 0.9, rarity: 'common',
     facts: [
       'It anchors to rock with super-strong protein threads (byssus) that have inspired waterproof glues.',
-      'A mussel bed is a whole neighborhood — hundreds of small creatures shelter among the shells.',
+      'A mussel bed is a whole neighborhood, with hundreds of small creatures sheltering among the shells.',
     ],
   },
   // ---- fishes ----
@@ -362,7 +364,7 @@ export const SPECIES: TidepoolSpecies[] = [
     category: 'eel', color: '#5a4a5a', accent: '#c87a4a', size: 0.9, rarity: 'common',
     facts: [
       'A slim prickleback named for the fleshy crest running along the top of its head.',
-      'A guarding mother coils around her egg cluster under a rock until the young hatch.',
+      'The mother coils around her eggs under a rock and guards them until they hatch.',
     ],
   },
   // ---- other ----
@@ -379,7 +381,7 @@ export const SPECIES: TidepoolSpecies[] = [
     category: 'cucumber', color: '#b0432f', accent: '#6a2a1a', size: 1.1, rarity: 'uncommon',
     facts: [
       'A relative of sea stars and urchins, this warty orange tube creeps along on rows of tube feet.',
-      'Cornered, it can spill its sticky guts to distract a predator — then simply grow a new set.',
+      'Cornered, it can spill its sticky guts to distract a predator, then grow a new set.',
     ],
   },
   {
@@ -387,7 +389,7 @@ export const SPECIES: TidepoolSpecies[] = [
     category: 'octopus', color: '#9a4a5a', accent: '#d88a9a', size: 1.25, rarity: 'rare',
     facts: [
       'The largest octopus in the world, changing color and texture in an instant and squeezing through any gap bigger than its beak.',
-      'Famously clever, it can open jars, use tools, and even recognize individual people.',
+      'Clever enough to open jars, it can also recognize individual people.',
     ],
   },
 ];

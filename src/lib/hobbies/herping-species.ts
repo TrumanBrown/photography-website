@@ -13,7 +13,9 @@
  * representative sample was grounded with live research. They favor
  * well-established, interesting tidbits over obscure claims, but a review pass by
  * someone who knows these animals is recommended before treating any of it as
- * authoritative — it's a learning game, not a field guide.
+ * authoritative — it's a learning game, not a field guide. The doubtful ones were
+ * checked again in October 2026, and species-facts.test.ts holds every fact to
+ * the site's copy rules (.github/instructions/site-copy.instructions.md).
  *
  * Each species maps to a CATEGORY, which is what the pixel sprite renderer in
  * herping.ts draws (parameterized by color/size). `rarity` weights how often a
@@ -68,9 +70,9 @@ export const SPECIES: HerpSpecies[] = [
     rarity: "common",
     eyeshine: "#e6eef0",
     facts: [
-      "Lungless — it breathes entirely through its moist skin and mouth, so it can only be out on wet nights.",
+      "Lungless, it breathes entirely through its moist skin and mouth, so it can only be out on wet nights.",
       "Threatened, it rears up stiff-legged and waves its tail, which can drop off and wriggle to distract a predator.",
-      "The tail base has a distinctive constriction, a quick way to tell an Ensatina from other woodland salamanders.",
+      "Look for a tail pinched in at the base, a quick way to tell an Ensatina from other woodland salamanders.",
     ],
   },
   {
@@ -84,9 +86,9 @@ export const SPECIES: HerpSpecies[] = [
     rarity: "common",
     eyeshine: "#dfe8ea",
     facts: [
-      "A fully terrestrial, lungless salamander — it lays eggs on land and skips the water-dwelling larval stage entirely.",
-      "The reddish-to-tan dorsal stripe is variable; some individuals show almost no stripe at all.",
-      "You find them by rolling logs and bark in damp forest — always roll it back the way it was.",
+      "A lungless salamander that lives entirely on land, laying its eggs there and skipping the water-dwelling larval stage.",
+      "The reddish-to-tan stripe down its back varies a lot, and some have almost no stripe at all.",
+      "You find them by rolling logs and bark in damp forest; always roll it back the way it was.",
     ],
   },
   {
@@ -100,7 +102,7 @@ export const SPECIES: HerpSpecies[] = [
     rarity: "uncommon",
     eyeshine: "#dfe8ea",
     facts: [
-      "A splash-zone specialist — it hugs the wet, mossy rocks along shaded streams and seeps.",
+      "It sticks to wet, mossy rocks in the splash zone of shaded streams and seeps.",
       "Its greenish-yellow back stripe stops short of the tail tip, unlike the Western Red-backed it lives beside.",
       "Lungless like its Plethodon cousins, it never strays far from moisture.",
     ],
@@ -117,7 +119,7 @@ export const SPECIES: HerpSpecies[] = [
     eyeshine: "#e6d8b0",
     facts: [
       "A stocky mole salamander with poison glands packed into swollen ridges behind its eyes and along its tail.",
-      "Some never fully grow up — gilled, aquatic adults (neotenes) breed while still looking like giant larvae.",
+      "Some never fully grow up: gilled, aquatic adults called neotenes breed while still looking like giant larvae.",
       "Squeeze one and it oozes a sticky white toxin; handle gently and wash up, then let it go.",
     ],
   },
@@ -132,9 +134,9 @@ export const SPECIES: HerpSpecies[] = [
     rarity: "common",
     eyeshine: "#f0d68a",
     facts: [
-      "One of the most toxic animals in the Northwest — its skin carries tetrodotoxin, the same poison as a pufferfish.",
-      'Alarmed, it arches into the "unken reflex," flashing its brilliant orange belly as a warning.',
-      "Common garter snakes have evolved resistance to its toxin — a textbook predator-prey arms race.",
+      "Its skin carries tetrodotoxin, the same poison as a pufferfish, which makes it one of the most toxic animals in the Northwest.",
+      'Alarmed, it arches into the "unken reflex," flashing its bright orange belly as a warning.',
+      "Common garter snakes have evolved resistance to its toxin, in an arms race between predator and prey.",
     ],
   },
   {
@@ -148,8 +150,8 @@ export const SPECIES: HerpSpecies[] = [
     rarity: "rare",
     eyeshine: "#e6e0c8",
     facts: [
-      "One of the largest land salamanders on Earth — big adults push a foot long and can bark when alarmed.",
-      "A formidable predator that eats mice, snakes, and other salamanders, with a bite to match.",
+      "Big adults push a foot long, making it one of the largest land salamanders on Earth.",
+      "It can bark when alarmed, and it's big enough to eat mice, snakes, and other salamanders.",
       "Larvae live for years in cold, clear streams; some stay aquatic and breed without ever leaving the water.",
     ],
   },
@@ -165,8 +167,8 @@ export const SPECIES: HerpSpecies[] = [
     eyeshine: "#dfe8ea",
     facts: [
       "Named for its extra-long fourth toe on each hind foot.",
-      "One of the first amphibians to breed each year — it migrates to ponds while snow still rings the edges.",
-      "A yellow-to-green dorsal stripe runs from head to tail over a dark, mole-salamander body.",
+      "One of the first amphibians to breed each year, it migrates to ponds while snow still rings the edges.",
+      "A yellow-to-green stripe runs from head to tail down the dark back of this mole salamander.",
     ],
   },
   {
@@ -180,9 +182,8 @@ export const SPECIES: HerpSpecies[] = [
     rarity: "rare",
     eyeshine: "#e6e0c8",
     facts: [
-      "Almost always stays a gilled, aquatic 'larva' its whole life — it rarely transforms, breeding in its youthful form.",
-      "A cold-stream specialist of the Olympics and Cascades, mottled brown with a paddle-like tail.",
-      "One of the few salamanders that can make a faint sound, a low click or bark, when handled.",
+      "It rarely transforms, staying a gilled, aquatic 'larva' its whole life and breeding in that form.",
+      "Mottled brown with a paddle-like tail, it lives in cold streams in the Olympics and Cascades.",
     ],
   },
   {
@@ -196,9 +197,9 @@ export const SPECIES: HerpSpecies[] = [
     rarity: "rare",
     eyeshine: "#dfe8ea",
     facts: [
-      "A tiny salamander tied to ice-cold, splashing seeps — it dries out fast, so it never leaves the spray zone.",
+      "This tiny salamander dries out so fast that it never leaves the spray of ice-cold, splashing seeps.",
       "Bright yellow below with big eyes; males have squared-off glands behind the vent.",
-      "So sensitive to warmth and silt that its presence is a sign of a clean, undisturbed stream.",
+      "It's so sensitive to warmth and silt that finding one is a sign of a clean, undisturbed stream.",
     ],
   },
   {
@@ -212,9 +213,8 @@ export const SPECIES: HerpSpecies[] = [
     rarity: "rare",
     eyeshine: "#dfe8ea",
     facts: [
-      "A Washington endemic — it lives nowhere else on Earth — usually near seeps, streambanks, and mossy talus.",
+      "Found nowhere but Washington, usually near seeps, streambanks, and mossy talus.",
       "Its yellow-to-rose dorsal band and pale throat set it apart from the red-backed salamanders it lives among.",
-      "Lungless and secretive; it can secrete a sticky, gluey slime to gum up a predator's jaws.",
     ],
   },
   {
@@ -228,7 +228,7 @@ export const SPECIES: HerpSpecies[] = [
     rarity: "uncommon",
     eyeshine: "#dfe8ea",
     facts: [
-      "An agile climber — square-toed and prehensile-tailed, it scales rotting logs and standing snags.",
+      "Square toes and a grasping tail make it a good climber on rotting logs and standing snags.",
       "Its greenish, cloud-like mottling breaks up its outline against lichen and bark.",
       "It nests inside decaying Douglas-fir logs, where a female may guard her eggs.",
     ],
@@ -244,9 +244,9 @@ export const SPECIES: HerpSpecies[] = [
     rarity: "uncommon",
     eyeshine: "#e6d8b0",
     facts: [
-      "The big, bold-blotched salamander of dry eastern Washington — a classic wet-night road-crossing find.",
+      "The big, bold-blotched salamander of dry eastern Washington, often found crossing roads on wet nights.",
       "Larvae in fishless ponds sometimes become cannibal 'morphs' with wider heads and bigger teeth.",
-      "One of the largest land salamanders in North America, occasionally topping eight inches.",
+      "One of North America's largest land salamanders, it can reach 13 or 14 inches long.",
     ],
   },
 
@@ -262,8 +262,8 @@ export const SPECIES: HerpSpecies[] = [
     rarity: "common",
     eyeshine: "#cde86a",
     facts: [
-      "The classic 'ribbit' of Hollywood soundtracks is this tiny frog — most other frogs don't sound like that at all.",
-      "It can switch between green and brown over a few minutes to match its surroundings.",
+      "The classic 'ribbit' of Hollywood soundtracks is this tiny frog, and most other frogs don't sound like that at all.",
+      "It can turn from green to brown, or back, to match its surroundings, though a full change takes weeks.",
       "Sticky toe pads let this thumb-sized treefrog climb reeds and leaves.",
     ],
   },
@@ -279,7 +279,7 @@ export const SPECIES: HerpSpecies[] = [
     eyeshine: "#d8c06a",
     facts: [
       "A translucent red wash under the hind legs gives it its name.",
-      "A powerful jumper that bolts for water in long, zig-zag leaps when startled.",
+      "Startle one and it bolts for the water in long, zigzag leaps.",
       "It has declined where introduced bullfrogs move in and eat the young.",
     ],
   },
@@ -296,7 +296,7 @@ export const SPECIES: HerpSpecies[] = [
     facts: [
       "It usually walks instead of hopping, plodding along on stubby legs.",
       "The pale stripe down its warty back is a giveaway, along with big parotoid glands behind the eyes.",
-      "Those glands ooze a bitter toxin — safe to admire, but wash your hands and leave it be.",
+      "The big glands behind its eyes ooze a bitter toxin, so it's safe to admire but best not handled.",
     ],
   },
   {
@@ -311,7 +311,7 @@ export const SPECIES: HerpSpecies[] = [
     nonNative: true,
     eyeshine: "#e8d060",
     facts: [
-      "Not native here — introduced bullfrogs eat native frogs, salamanders, and even snakes and ducklings.",
+      "Introduced to the Northwest, bullfrogs eat native frogs, salamanders, and even snakes and ducklings.",
       "Its deep 'jug-o-rum' call carries across a pond on summer nights.",
       "The biggest frog in North America; a large female can top a pound.",
     ],
@@ -329,7 +329,7 @@ export const SPECIES: HerpSpecies[] = [
     rarity: "common",
     eyeshine: "#c99a3a",
     facts: [
-      "Wildly variable — its back stripe can be yellow, red, orange, blue, or nearly absent.",
+      "The stripe down its back can be yellow, red, orange, blue, or barely there.",
       "A small, harmless snake that hunts slugs and earthworms in gardens and forest edges.",
       "The most terrestrial of our garter snakes, it rarely takes to the water.",
     ],
@@ -345,7 +345,7 @@ export const SPECIES: HerpSpecies[] = [
     rarity: "common",
     eyeshine: "#c99a3a",
     facts: [
-      "It can eat toxic rough-skinned newts — the two are locked in a famous evolutionary arms race over the newt toxin.",
+      "It can eat toxic rough-skinned newts, the result of an evolutionary arms race between the two over the newt's poison.",
       "Its mild saliva helps subdue prey but is harmless to people; it may musk you if grabbed.",
       "Three pale stripes on a dark body, often with red flecks between them.",
     ],
@@ -361,9 +361,9 @@ export const SPECIES: HerpSpecies[] = [
     rarity: "uncommon",
     eyeshine: "#b8862a",
     facts: [
-      "It gives birth to live young instead of laying eggs — an adaptation to cool northern summers.",
+      "It gives birth to live young instead of laying eggs, an adaptation to cool northern summers.",
       "Grab it and the tail snaps off, thrashing on its own while the lizard escapes; it regrows a stubbier one.",
-      "For its size it has a surprisingly strong, tenacious bite.",
+      "For its size it bites surprisingly hard, and it hangs on.",
     ],
   },
   {
@@ -377,9 +377,9 @@ export const SPECIES: HerpSpecies[] = [
     rarity: "rare",
     eyeshine: "#c99a3a",
     facts: [
-      "One of the gentlest snakes in the world — it almost never bites and feels loose and rubbery in hand.",
+      "One of the gentlest snakes around, it almost never bites and feels loose and rubbery in the hand.",
       "Its blunt tail mimics its head, a decoy it raises to take blows while raiding a nest of baby mice.",
-      "A cold-tolerant boa that can live 50 years or more, active on cool, damp nights that send other snakes to cover.",
+      "A cold-tolerant boa, it stays active on cool, damp nights that send other snakes to cover.",
     ],
   },
 ];

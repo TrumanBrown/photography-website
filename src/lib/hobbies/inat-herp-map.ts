@@ -652,7 +652,7 @@ export function initHerpMap(root: HTMLElement): void {
       ctx!.font = "600 10px system-ui, sans-serif";
       ctx!.fillText("HI", ix + 6, iy + 14);
     }
-    label("United States — tap a state to zoom in");
+    label("United States: tap a state to zoom in");
   }
 
   // --------------------------------------------------- state / country detail
@@ -744,12 +744,12 @@ export function initHerpMap(root: HTMLElement): void {
   function detailItems(): { title: string; items: Obs[] } | null {
     if (view === "state" && selState)
       return {
-        title: `${STATE_NAME[selState] ?? selState} — `,
+        title: `${STATE_NAME[selState] ?? selState} · `,
         items: pool().filter((o) => o.state === selState),
       };
     if (view === "country" && selCountry)
       return {
-        title: `${GEO_COUNTRIES[selCountry]?.name ?? selCountry} — `,
+        title: `${GEO_COUNTRIES[selCountry]?.name ?? selCountry} · `,
         items: pool().filter((o) => o.country === selCountry),
       };
     return null;
@@ -763,7 +763,7 @@ export function initHerpMap(root: HTMLElement): void {
         statusEl.textContent = "";
       } else if (view === "us") {
         const states = countBy((o) => o.state).size;
-        statusEl.textContent = `United States — ${pool().filter((o) => o.state).length} observations across ${states} state${states === 1 ? "" : "s"}. Tap a state to zoom in.`;
+        statusEl.textContent = `${pool().filter((o) => o.state).length} observations across ${states} US state${states === 1 ? "" : "s"}. Tap a state to zoom in.`;
       } else {
         const cc = countBy((o) => o.country);
         const mapped = pool().filter((o) => o.lng != null).length;

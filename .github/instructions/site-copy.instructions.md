@@ -79,8 +79,8 @@ rather than only writing it down here.
   desktop-only affordance (`Click to remove.`).
 - Prefer concrete nouns from the hobby — rocks, driftwood, headlight beam, eyeshine, bull kelp —
   over abstractions like "experience", "content", "elements".
-- Spaced em dash ` — ` is banned in new copy (see the top of this file). Existing
-  hand-written strings that use it can stay; don't add more. Use a comma, a colon,
+- Spaced em dash ` — ` is banned (see the top of this file). Older strings that still
+  have one lose it the next time their component gets a pass. Use a comma, a colon,
   or a new sentence.
 - `·` separates metadata (`3 sessions · 41 photographs`, `Coho salmon · Sammamish River`).
 - `&` is fine in short pairings (`trout & salmon`, `My reptiles & amphibians, mapped`).
@@ -132,11 +132,14 @@ it ([website.mjs](../../scripts/photos/website.mjs) `descriptionPrompt`).
   behavior or story fact.
 - One sentence each, roughly 12–25 words, leading with the hook.
   - `Check the claws: white tips speckled with purple-red dots set it apart from other shore crabs.`
-  - `Lungless — it breathes entirely through its moist skin and mouth, so it can only be out on wet nights.`
+  - `Lungless, it breathes entirely through its moist skin and mouth, so it can only be out on wet nights.`
   - `Nicknamed the 'Pearl of the Pacific Northwest,' it's a favorite meal of the giant Pacific octopus.`
 - Facts must be real and checkable against field guides or Wikipedia. Never invent numbers, ranges,
   or conservation status.
 - Never open with `Did you know`, `Fun fact:`, `Interestingly`, or `Believe it or not`.
+- [species-facts.test.ts](../../src/lib/hobbies/species-facts.test.ts) checks the mechanical
+  parts for the tide pool and herping cards: two or three facts, one sentence each, no dashes,
+  no stock openers and none of the words under "Do not write".
 
 ## Do not write
 
