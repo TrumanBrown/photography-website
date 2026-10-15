@@ -45,6 +45,7 @@ const nameId = `${prefix}-specimen-name`;
       <h3 id={nameId} {...hook("name")}></h3>
       <p class="specimen-sci" {...hook("sci")}></p>
     </div>
+    <div class="specimen-mark" {...hook("mark")}></div>
     <p class="specimen-fact" {...hook("fact")}></p>
     <p class="specimen-credit is-hidden" {...hook("credit")}></p>
     <div class="specimen-act">
@@ -67,10 +68,12 @@ const nameId = `${prefix}-specimen-name`;
   .specimen-scrim.is-open {
     display: flex;
   }
+  /* The picture spans the status, names and stamp rows; the stamp's row takes
+     what's left of its height, so the stamp lines up with its bottom edge. */
   .specimen {
     display: grid;
     grid-template-columns: 132px minmax(0, 1fr);
-    grid-template-rows: auto 1fr;
+    grid-template-rows: auto auto 1fr;
     column-gap: 18px;
     width: 100%;
     max-width: 440px;
@@ -81,7 +84,8 @@ const nameId = `${prefix}-specimen-name`;
   }
   .specimen-pic {
     position: relative;
-    grid-row: span 2;
+    grid-column: 1;
+    grid-row: 1 / span 3;
     width: 132px;
     height: 132px;
     background: var(--band);
@@ -97,13 +101,16 @@ const nameId = `${prefix}-specimen-name`;
     object-fit: cover;
   }
   .specimen-status {
+    grid-column: 2;
+    grid-row: 1;
     margin: 0 0 6px;
   }
   .specimen-status.is-warn {
     color: var(--ink);
   }
-  /* A first find is stamped across the picture's corner (src/lib/hobbies/
-     specimen.ts); the plain label stays for screen readers. */
+  /* A first find is stamped on the blank card under the names, beside the
+     picture so it never covers the animal (src/lib/hobbies/specimen.ts); the
+     plain label stays for screen readers. */
   .specimen-status.is-stamped {
     position: absolute;
     width: 1px;
@@ -112,13 +119,27 @@ const nameId = `${prefix}-specimen-name`;
     clip-path: inset(50%);
     white-space: nowrap;
   }
-  .specimen-pic :global(.specimen-stamp) {
-    top: auto;
-    right: -22px;
-    bottom: 10px;
-    z-index: 2;
+  .specimen-names {
+    grid-column: 2;
+    grid-row: 2;
   }
-  .specimen-pic :global(.specimen-stamp > i) {
+  .specimen-mark {
+    grid-column: 2;
+    grid-row: 3;
+    align-self: end;
+    display: flex;
+  }
+  /* In the flow, so a long name pushes it down rather than under it. Turned
+     on its left end, it slams down away from the picture and its low corner
+     stays level with the picture's bottom edge. */
+  .specimen-mark :global(.specimen-stamp) {
+    position: relative;
+    top: auto;
+    right: auto;
+    margin-top: 22px;
+    transform-origin: 0 50%;
+  }
+  .specimen-mark :global(.specimen-stamp > i) {
     letter-spacing: 0.14em;
   }
   .specimen-names h3 {

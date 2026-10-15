@@ -356,6 +356,7 @@ export function initTidepool(root: HTMLElement): void {
   const sciEl = root.querySelector<HTMLElement>('[data-tp-sci]');
   const factEl = root.querySelector<HTMLElement>('[data-tp-fact]');
   const badgeEl = root.querySelector<HTMLElement>('[data-tp-badge]');
+  const markEl = root.querySelector<HTMLElement>('[data-tp-mark]');
   const closeBtn = root.querySelector<HTMLButtonElement>('[data-tp-close]');
   const countEl = root.querySelector<HTMLElement>('[data-tp-count]');
   const lastEl = root.querySelector<HTMLElement>('[data-tp-last]');
@@ -772,7 +773,7 @@ export function initTidepool(root: HTMLElement): void {
     sciEl!.textContent = sp.scientific;
     factEl!.textContent = sp.facts[Math.floor(Math.random() * sp.facts.length)];
     badgeEl!.textContent = isNew ? 'New to your journal' : 'Found again';
-    if (revealCanvas!.parentElement) stampFind(revealCanvas!.parentElement, badgeEl!, isNew);
+    if (markEl) stampFind(markEl, badgeEl!, isNew);
     openCard();
   }
 

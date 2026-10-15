@@ -267,6 +267,7 @@ export function initHerping(root: HTMLElement): void {
   const sciEl = root.querySelector<HTMLElement>("[data-hp-sci]");
   const factEl = root.querySelector<HTMLElement>("[data-hp-fact]");
   const badgeEl = root.querySelector<HTMLElement>("[data-hp-badge]");
+  const markEl = root.querySelector<HTMLElement>("[data-hp-mark]");
   const closeBtn = root.querySelector<HTMLButtonElement>("[data-hp-close]");
   const countEl = root.querySelector<HTMLElement>("[data-hp-count]");
   const lastEl = root.querySelector<HTMLElement>("[data-hp-last]");
@@ -882,9 +883,7 @@ export function initHerping(root: HTMLElement): void {
         ? "New to your journal"
         : "Found again";
     badgeEl!.classList.toggle("is-warn", !!sp.nonNative);
-    if (revealCanvas!.parentElement) {
-      stampFind(revealCanvas!.parentElement, badgeEl!, isNew && !sp.nonNative);
-    }
+    if (markEl) stampFind(markEl, badgeEl!, isNew && !sp.nonNative);
     openCard();
   }
 
