@@ -46,6 +46,9 @@
     --globe-rule: #ddd8cd;
     --globe-grid: #eeebe3;
     --globe-coast: #bab4a6;
+
+    /* Stamp ink: the one red, for a cost in a game (src/lib/motion.ts). */
+    --stamp: #b3301c;
   }
 
   html.dark {
@@ -66,6 +69,8 @@
     --globe-rule: #37342d;
     --globe-grid: #242320;
     --globe-coast: #5d584d;
+
+    --stamp: #f0705a;
   }
 
   html {
@@ -325,6 +330,40 @@
   .shead-link:hover {
     color: var(--ink);
     text-decoration: none;
+  }
+
+  /* A rubber stamp for what something cost, put down by stamp() in
+     src/lib/motion.ts: red ink on a paper tag, so it reads on a photograph.
+     Its host needs position: relative. */
+  .stamp {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 2;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 5px 8px 4px;
+    border: 2px solid var(--stamp);
+    background: color-mix(in srgb, var(--paper) 86%, transparent);
+    color: var(--stamp);
+    line-height: 1;
+    white-space: nowrap;
+    pointer-events: none;
+    transform-origin: 50% 50%;
+  }
+  .stamp > b {
+    font-size: 17px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+  .stamp > i {
+    margin-top: 3px;
+    font-size: 8px;
+    font-style: normal;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
   }
 }
 

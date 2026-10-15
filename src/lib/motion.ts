@@ -11,6 +11,9 @@
  *   "labeled-progress-indicator").
  * - initUnderlineTabs: Cult UI "direction-aware-tabs" and Watermelon UI
  *   "discrete-tabs". One bar slides to the checked option.
+ * - stamp: the floating score popup games use for points won or lost, kept
+ *   by the thing it's about and drawn as a rubber stamp. It slams down at an
+ *   angle, sits for a beat, then drifts down and fades.
  *
  * Everything settles instantly under prefers-reduced-motion.
  */
@@ -111,6 +114,97 @@ export function setHair(fill: HTMLElement, fraction: number): void {
     ? Math.min(1, Math.max(0, fraction))
     : 0;
   fill.style.transform = `scaleX(${clamped})`;
+}
+
+export interface StampOptions {
+  /** A small tracked line under the figure, like "points". */
+  unit?: string;
+  /** Degrees; left out, it's a slightly different angle each time, the way
+   *  a hand stamp never lands square. */
+  tilt?: number;
+}
+
+/** How long a stamp is on screen, ms. */
+export const STAMP_MS = 1700;
+
+/**
+ * The keyframes for a stamp at `tilt` degrees. It comes down fast and lands a
+ * touch small, as if pressed into the paper, then settles; sits still for
+ * about half a second; then drifts down and away while it fades.
+ */
+export function stampFrames(tilt: number, reduced = false): Keyframe[] {
+  const at = (y: number, scale: number, turn: number) =>
+    `translateY(${y}px) scale(${scale}) rotate(${turn}deg)`;
+  if (reduced) {
+    return [
+      { offset: 0, opacity: 0, transform: at(0, 1, tilt) },
+      { offset: 0.02, opacity: 1, transform: at(0, 1, tilt) },
+      { offset: 0.8, opacity: 1, transform: at(0, 1, tilt) },
+      { offset: 1, opacity: 0, transform: at(0, 1, tilt) },
+    ];
+  }
+  return [
+    {
+      offset: 0,
+      opacity: 0,
+      transform: at(-10, 1.9, tilt - 10),
+      easing: "cubic-bezier(0.55, 0, 1, 0.45)",
+    },
+    {
+      offset: 0.07,
+      opacity: 1,
+      transform: at(0, 0.94, tilt),
+      easing: "cubic-bezier(0.2, 0, 0.2, 1)",
+    },
+    { offset: 0.14, opacity: 1, transform: at(0, 1, tilt), easing: "linear" },
+    {
+      offset: 0.5,
+      opacity: 1,
+      transform: at(0, 1, tilt),
+      easing: "cubic-bezier(0.4, 0, 1, 1)",
+    },
+    { offset: 1, opacity: 0, transform: at(28, 0.98, tilt + 4) },
+  ];
+}
+
+/**
+ * Stamp `text` onto `host` (which needs position: relative; the stamp sits in
+ * its top right corner). Each call puts down its own stamp, so quick presses
+ * never cut each other off, and it takes itself away when it's done. It's
+ * decorative: say what changed in words somewhere a screen reader hears it.
+ */
+export function stamp(
+  host: HTMLElement,
+  text: string,
+  options: StampOptions = {},
+): HTMLElement {
+  const mark = document.createElement("span");
+  mark.className = "stamp";
+  mark.setAttribute("aria-hidden", "true");
+  const figure = document.createElement("b");
+  figure.textContent = text;
+  mark.append(figure);
+  if (options.unit) {
+    const unit = document.createElement("i");
+    unit.textContent = options.unit;
+    mark.append(unit);
+  }
+  host.append(mark);
+
+  const tilt = options.tilt ?? -9 + Math.random() * 6;
+  const reduced = prefersReducedMotion();
+  if (typeof mark.animate !== "function") {
+    setTimeout(() => mark.remove(), STAMP_MS);
+    return mark;
+  }
+  const run = mark.animate(stampFrames(tilt, reduced), {
+    duration: reduced ? 1400 : STAMP_MS,
+    fill: "both",
+  });
+  const done = () => mark.remove();
+  run.onfinish = done;
+  run.oncancel = done;
+  return mark;
 }
 
 /**

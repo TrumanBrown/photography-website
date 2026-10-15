@@ -326,6 +326,7 @@ const MONTHS = [
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
   .dl-slot {
+    position: relative;
     min-width: 0;
   }
   .dl-slot__fig {
@@ -994,6 +995,25 @@ const MONTHS = [
     }
     .dl-slot.is-new .dl-slot__body {
       animation: none;
+    }
+  }
+
+  /* On a phone a square is a third of the screen wide, so the stamp a reveal
+     puts down on it (stamp() in src/lib/motion.ts) is smaller too. */
+  @media (max-width: 520px) {
+    .dl-slot .stamp {
+      top: 5px;
+      right: 5px;
+      padding: 3px 5px;
+      border-width: 1.5px;
+    }
+    .dl-slot .stamp > b {
+      font-size: 12px;
+    }
+    .dl-slot .stamp > i {
+      margin-top: 2px;
+      font-size: 7px;
+      letter-spacing: 0.14em;
     }
   }
 </style>

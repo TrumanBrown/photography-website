@@ -96,6 +96,7 @@ A few interaction details come from React component libraries (Cult UI, Watermel
 | Hover frames on a still                                                                                                    | [PlateArt.astro](../src/components/PlateArt.astro)           | Cult UI `hover-video-player`                                  | The stipple plates' hover "boil"                                                                      |
 | `revealFromPixels()`: a photo resolves out of coarse blocks (6, 12, 24, then 48 across) into the full image in about 360ms | [pixel-reveal.ts](../src/lib/hobbies/pixel-reveal.ts)        | Magic UI `pixel-image`                                        | The tide pooling and herping reveal cards, so a real photo arrives in the sprites' own pixel language |
 | `.hike-print.developing`: the finished canvas comes up pale and soft under a dot grain, reaching full contrast in 1.7s     | [PixelHike.astro](../src/components/hobbies/PixelHike.astro) | Cult UI `dither-image`, Magic UI `pixel-image`                | The hiking postcard                                                                                   |
+| `stamp(host, text)`: a cost stamped in red ink on the thing it bought; it slams down, sits, then drifts down and fades     | `motion.ts`, `global.css`                                    | Games' floating score text (Krillion's point pops)            | Narrow nature, on each species you pay to see                                                         |
 
 `.utabs` groups pick one value, so they're `role="radiogroup"` with `<button role="radio" aria-checked>` options. The bar follows `aria-checked` however it changes, so an engine that restores state (undo, start over) only has to set the attribute. Everything above settles instantly under `prefers-reduced-motion`.
 
@@ -195,7 +196,8 @@ Everything you see in the tank (fish, plants, rocks, driftwood, bubbles, light) 
 - Because the static background is baked and blitted, only fish, foreground plants, floaters, and bubbles are recomputed per frame.
 - The loop pauses when the canvas scrolls offscreen (`IntersectionObserver`) or the tab is hidden (`visibilitychange`), so it costs nothing when not in view.
 - Touch friendly: native range slider, a species list with 32px rows, and tap-to-add (after picking a species, tapping in the tank drops one at that point).
-- `prefers-reduced-motion` slows everything and stops the plant sway.
+- **Adding a fish is a jump.** It leaps from the swatch you tapped, growing from the two-colour swatch into its sprite and flicking water off its tail, comes down through the surface with a splash, and sinks to its depth nose-first, levelling out and trailing bubbles. A tap in the tank drops one in over that spot the same way. The leap is drawn on a fixed canvas that only exists while something's in the air, snapped to the tank's pixel grid so the fish lands on the pixels it flew on; the tank takes over at the surface. Each tap is its own jump, so tapping fast sends a run of fish in, and the stocking list counts each one as it lands. See [aquarium-jump.ts](../src/lib/hobbies/aquarium-jump.ts).
+- `prefers-reduced-motion` slows everything, stops the plant sway, and adds fish straight into the tank without the jump.
 - A hard cap of 55 fish keeps the loop smooth on phones.
 - It all runs in the visitor's browser, so frame rate depends on their device, not on the hosting tier.
 
@@ -406,6 +408,9 @@ with the rules and uses one set of words throughout:
   round loads. CC BY and CC BY-NC are still met, since the credit is on the same page as the photo.
 - **The stakes stay on screen.** The guess panel opens with "Up to 6,000 points", the most a perfect
   guess can still score (`bestPossible`). It rolls down with each species you ask for (`rollTo`).
+  The panel is under the map, usually off screen when you ask, so the price is also stamped in red
+  on the corner of the species it bought (`stamp()` in [motion.ts](../src/lib/motion.ts)). It slams
+  down, sits for half a second, then drifts down toward the points and fades.
 - **The result is a receipt.** "Lock it in" swaps the panel for the verdict, the place and where the
   points came from: Place (distance, and how many species were showing), Month, Total. The full list
   with facts follows under the board. Wikipedia's bracketed Latin name and IPA pronunciation are

@@ -22,7 +22,12 @@
  *
  * Mounted by src/components/hobbies/DayList.astro via [data-daylist] hooks.
  */
-import { initUnderlineTabs, prefersReducedMotion, rollTo } from "../motion";
+import {
+  initUnderlineTabs,
+  prefersReducedMotion,
+  rollTo,
+  stamp,
+} from "../motion";
 import {
   MAX_ZOOM,
   answerView,
@@ -786,9 +791,13 @@ export function initDayList(root: HTMLElement): void {
 
   function reveal(fromKeyboard: boolean): void {
     if (done || lines >= round.clues.length) return;
+    const cost = bestPossible(lines) - bestPossible(lines + 1);
     lines += 1;
     shown = lines;
     paintSlot(lines - 1, true);
+    // The price lands on the species it bought: that's where the eye is, and
+    // the points total is usually down the page under the map.
+    stamp(slots[lines - 1], `\u2212${count(cost)}`, { unit: "points" });
     if (lines < round.clues.length) paintSlot(lines);
     paintCredits();
     syncWorth();

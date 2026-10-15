@@ -28,6 +28,7 @@
 
 import { rollTo, setHair } from '@/lib/motion';
 import { SPECIES, type Shape, type Species, type Zone } from './aquarium-species';
+import { createJumps, type Sprite } from './aquarium-jump';
 import { stockingStatus } from './stocking';
 
 export { SPECIES, type Shape, type Species, type Zone };
@@ -55,6 +56,38 @@ interface Fish {
   size: number;
   phase: number;
   wobble: number;
+  /** Set while it's still sinking to its depth after jumping in. */
+  dive?: Dive;
+}
+
+interface Dive {
+  /** Seconds in, and how long the sink takes. */
+  t: number;
+  dur: number;
+  /** Nose angle it went in at; it levels out as it slows. */
+  tilt: number;
+}
+
+/** How a fish came in through the surface (from ./aquarium-jump). */
+interface Entry {
+  dir: 1 | -1;
+  angle: number;
+  /** Downward speed as it hit the water, px/s. */
+  speed: number;
+}
+
+/** A bubble knocked off a fish on its way down; it rises and pops. */
+interface Fizz {
+  x: number;
+  y: number;
+  vy: number;
+  life: number;
+}
+
+/** Rings on the surface where something went in. */
+interface Ripple {
+  x: number;
+  t: number;
 }
 
 interface Plant {
@@ -303,6 +336,21 @@ function drawSnailSprite(c: CanvasRenderingContext2D, size: number, color: strin
   c.fillRect(snap(r * 0.6), snap(-r * 0.2), PIX, PIX * 2);
 }
 
+/** Draw a species `size` px long, centred on the origin and facing +x. */
+function drawSpecies(c: CanvasRenderingContext2D, species: Species, size: number): void {
+  const sh = species.shape;
+  const ht = size * SHAPE_RATIO[sh];
+  const col = species.color, acc = species.accent;
+  if (sh === 'shrimp') drawShrimpSprite(c, size, col, acc);
+  else if (sh === 'snail') drawSnailSprite(c, size, col, acc);
+  else if (sh === 'gourami') drawGourami(c, size, ht, col, acc);
+  else if (sh === 'betta') drawBetta(c, size, ht, col, acc);
+  else if (sh === 'angelfish') drawAngelfish(c, size, ht, col, acc);
+  else if (sh === 'tall') drawCichlid(c, size, ht, col, acc);
+  else if (sh === 'long') drawLongFish(c, size, ht, col, acc);
+  else drawSwimmer(c, size, ht, col, acc);
+}
+
 // --------------------------------------------------- baked hardscape/plants
 function bakeBlade(c: CanvasRenderingContext2D, x: number, baseY: number, height: number, color: string): void {
   const segs = Math.floor(height / PIX);
@@ -400,6 +448,32 @@ export function initAquarium(root: HTMLElement): void {
   let frontPlants: Plant[] = [];
   let bubbles: Bubble[] = [];
   let floaters: Floater[] = [];
+  const fizz: Fizz[] = [];
+  const ripples: Ripple[] = [];
+  const sprites = new Map<string, Sprite>();
+
+  /** A species drawn once on its own canvas, for drawing turned. */
+  function spriteFor(s: Species, size: number): Sprite {
+    const key = `${s.id}:${size.toFixed(1)}:${dpr}`;
+    const cached = sprites.get(key);
+    if (cached) return cached;
+    const ht = size * SHAPE_RATIO[s.shape];
+    // Even, and roomy enough for the longest tails and tallest fins.
+    const width = 2 * snap(size * 1.3) + PIX * 4;
+    const height = 2 * snap(Math.max(ht * 1.4, size * 0.65)) + PIX * 8;
+    const image = document.createElement('canvas');
+    image.width = Math.round(width * dpr);
+    image.height = Math.round(height * dpr);
+    const c = image.getContext('2d');
+    if (c) {
+      c.setTransform(dpr, 0, 0, dpr, (width / 2) * dpr, (height / 2) * dpr);
+      c.imageSmoothingEnabled = false;
+      drawSpecies(c, s, size);
+    }
+    const art = { image, width, height };
+    sprites.set(key, art);
+    return art;
+  }
 
   function byId(id: string): Species {
     const s = SPECIES.find((x) => x.id === id);
@@ -423,6 +497,7 @@ export function initAquarium(root: HTMLElement): void {
     ctx!.imageSmoothingEnabled = false;
     W = cssW;
     H = cssH;
+    sprites.clear();
     buildScene();
     bake();
   }
@@ -553,13 +628,13 @@ export function initAquarium(root: HTMLElement): void {
   }
 
   // ----------------------------------------------------------- stock model
-  function addFish(species: Species, atX?: number, atY?: number): void {
+  function addFish(species: Species, atX?: number, atY?: number, entry?: Entry): void {
     if (fish.length >= MAX_FISH) return;
     const [yLo, yHi] = zoneBand(species.zone);
     const size = pxSize(species);
     const swim = species.shape !== 'shrimp' && species.shape !== 'snail';
     const baseY = atY != null ? Math.max(yLo, Math.min(yHi, atY)) : yLo + Math.random() * (yHi - yLo);
-    fish.push({
+    const f: Fish = {
       species,
       x: atX != null ? Math.max(size, Math.min(W - size, atX)) : Math.random() * W,
       y: baseY,
@@ -571,7 +646,20 @@ export function initAquarium(root: HTMLElement): void {
       size,
       phase: Math.random() * Math.PI * 2,
       wobble: swim ? 4 + Math.random() * 4 : 1.5,
-    });
+    };
+    if (entry) {
+      // In through the surface: it sinks to its depth, as fast as it hit the
+      // water at first and slowing, nose levelling out as it goes.
+      f.dir = entry.dir;
+      f.y = 0;
+      f.dive = {
+        t: 0,
+        dur: Math.max(0.35, Math.min(1.2, (3 * baseY) / Math.max(60, entry.speed))),
+        tilt: entry.angle,
+      };
+      ripples.push({ x: f.x, t: 0 });
+    }
+    fish.push(f);
     lastSpecies = species;
     syncUI();
   }
@@ -588,6 +676,9 @@ export function initAquarium(root: HTMLElement): void {
 
   function reset(): void {
     fish.length = 0;
+    fizz.length = 0;
+    ripples.length = 0;
+    jumps.clear();
     syncUI();
   }
 
@@ -740,21 +831,25 @@ export function initAquarium(root: HTMLElement): void {
   }
 
   function drawFish(f: Fish): void {
-    const sh = f.species.shape;
-    const len = f.size;
-    const ht = len * SHAPE_RATIO[sh];
-    const col = f.species.color, acc = f.species.accent;
+    // Still coming in nose-first: the same pixels, turned.
+    if (f.dive) {
+      const k = Math.min(1, f.dive.t / f.dive.dur);
+      const turn = f.dive.tilt * Math.pow(1 - k, 2);
+      if (Math.abs(turn) > 0.02) {
+        const art = spriteFor(f.species, f.size);
+        ctx!.save();
+        ctx!.translate(snap(f.x), snap(f.y));
+        ctx!.rotate(turn);
+        ctx!.scale(f.dir, 1);
+        ctx!.drawImage(art.image, -art.width / 2, -art.height / 2, art.width, art.height);
+        ctx!.restore();
+        return;
+      }
+    }
     ctx!.save();
     ctx!.translate(snap(f.x), snap(f.y));
     ctx!.scale(f.dir, 1);
-    if (sh === 'shrimp') drawShrimpSprite(ctx!, f.size, col, acc);
-    else if (sh === 'snail') drawSnailSprite(ctx!, f.size, col, acc);
-    else if (sh === 'gourami') drawGourami(ctx!, len, ht, col, acc);
-    else if (sh === 'betta') drawBetta(ctx!, len, ht, col, acc);
-    else if (sh === 'angelfish') drawAngelfish(ctx!, len, ht, col, acc);
-    else if (sh === 'tall') drawCichlid(ctx!, len, ht, col, acc);
-    else if (sh === 'long') drawLongFish(ctx!, len, ht, col, acc);
-    else drawSwimmer(ctx!, len, ht, col, acc);
+    drawSpecies(ctx!, f.species, f.size);
     ctx!.restore();
   }
 
@@ -770,9 +865,35 @@ export function initAquarium(root: HTMLElement): void {
         f.x = W - margin;
         f.dir = -1;
       }
+      if (f.dive) {
+        const d = f.dive;
+        d.t += dt;
+        const k = Math.min(1, d.t / d.dur);
+        f.y = f.baseY * (1 - Math.pow(1 - k, 3));
+        // Bubbles knocked off it on the way down.
+        if (Math.random() < dt * 16) {
+          fizz.push({ x: f.x - f.dir * f.size * 0.3, y: f.y, vy: -(40 + Math.random() * 40), life: 1.2 });
+        }
+        if (k >= 1) {
+          f.dive = undefined;
+          // Start the bob from the middle of its swing, so it doesn't jump.
+          f.phase = -now / (f.species.shape === 'shrimp' ? 300 : 700);
+        }
+        continue;
+      }
       const swim = f.species.shape !== 'shrimp' && f.species.shape !== 'snail';
       if (swim) f.y = f.baseY + Math.sin(now / 700 + f.phase) * f.wobble;
       else if (f.species.shape === 'shrimp') f.y = f.baseY + Math.sin(now / 300 + f.phase) * 1.5;
+    }
+    for (let i = fizz.length - 1; i >= 0; i--) {
+      const b = fizz[i];
+      b.y += b.vy * dt;
+      b.life -= dt;
+      if (b.life <= 0 || b.y < PIX) fizz.splice(i, 1);
+    }
+    for (let i = ripples.length - 1; i >= 0; i--) {
+      ripples[i].t += dt;
+      if (ripples[i].t > 0.6) ripples.splice(i, 1);
     }
     if (!reduceMotion) {
       const sub = substrateY();
@@ -780,6 +901,17 @@ export function initAquarium(root: HTMLElement): void {
         b.y -= b.speed * dt;
         if (b.y < -8) b.y = sub - 4;
       }
+    }
+  }
+
+  /** Two dashes running out along the surface from where a fish went in. */
+  function drawRipples(): void {
+    for (const r of ripples) {
+      const k = r.t / 0.6;
+      const spread = 6 + 70 * (1 - Math.pow(1 - k, 3));
+      ctx!.fillStyle = `rgba(210,240,250,${0.6 * (1 - k)})`;
+      ctx!.fillRect(snap(r.x - spread) - PIX * 2, 0, PIX * 2, PIX);
+      ctx!.fillRect(snap(r.x + spread), 0, PIX * 2, PIX);
     }
   }
 
@@ -792,6 +924,9 @@ export function initAquarium(root: HTMLElement): void {
     }
     for (const f of floaters) drawFloater(f, now);
     drawBubbles();
+    ctx!.fillStyle = 'rgba(220,240,255,0.6)';
+    for (const b of fizz) ctx!.fillRect(snap(b.x), snap(b.y), PIX, PIX);
+    drawRipples();
   }
 
   function step(now: number): void {
@@ -815,9 +950,39 @@ export function initAquarium(root: HTMLElement): void {
   }
 
   // ------------------------------------------------------------- wiring
+  const jumps = createJumps({
+    tank: canvas,
+    pix: PIX,
+    sprite: spriteFor,
+    onSplash(splash) {
+      addFish(splash.species, splash.x, splash.y, splash);
+    },
+  });
+
+  /**
+   * Add a fish the way the visitor asked for it: leaping from the swatch they
+   * tapped, or dropping in over the spot they tapped in the tank. Under
+   * reduced motion it's just there.
+   */
+  function sendIn(species: Species, swatch?: Element | null, atX?: number, atY?: number): void {
+    if (fish.length + jumps.pending >= MAX_FISH) return;
+    lastSpecies = species;
+    if (reduceMotion) {
+      addFish(species, atX, atY);
+      return;
+    }
+    const size = pxSize(species);
+    const [yLo, yHi] = zoneBand(species.zone);
+    const x = atX != null ? Math.max(size, Math.min(W - size, atX)) : size + Math.random() * Math.max(0, W - 2 * size);
+    const depth = atY != null ? Math.max(yLo, Math.min(yHi, atY)) : yLo + Math.random() * (yHi - yLo);
+    const from = swatch?.getBoundingClientRect();
+    const across = from ? canvas!.getBoundingClientRect().left + x - (from.left + from.width / 2) : Math.random() - 0.5;
+    jumps.launch({ species, size, dir: across < 0 ? -1 : 1, swatch: from, entryX: x, depth });
+  }
+
   for (const btn of addButtons) {
     const s = SPECIES.find((x) => x.id === btn.dataset.aquariumAdd);
-    if (s) btn.addEventListener('click', () => addFish(s));
+    if (s) btn.addEventListener('click', () => sendIn(s, btn.querySelector('.aq-sw')));
   }
 
   let rebuildT = 0;
@@ -843,7 +1008,7 @@ export function initAquarium(root: HTMLElement): void {
   canvas.addEventListener('pointerdown', (e: PointerEvent) => {
     if (!lastSpecies) return;
     const rect = canvas.getBoundingClientRect();
-    addFish(lastSpecies, e.clientX - rect.left, e.clientY - rect.top);
+    sendIn(lastSpecies, null, e.clientX - rect.left, e.clientY - rect.top);
   });
 
   const ro = new ResizeObserver(() => {
