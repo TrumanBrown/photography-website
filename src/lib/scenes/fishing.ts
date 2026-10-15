@@ -1,7 +1,8 @@
-import { defineScene, LIFT_MS } from "./engine";
+import { ACT, defineScene, LEAVE } from "./engine";
 import {
   apply,
   backOut,
+  type Cam,
   chain,
   clamp01,
   dotLine,
@@ -32,36 +33,41 @@ import {
 } from "./stage";
 
 /**
- * Fishing: a rod swings in and casts, and the lure lands just off the
- * trout's nose. The trout takes it, the hook is set, and it's hauled up out
- * of the top right of the screen; the hobby page opens in dots behind it,
- * along the way it went. Rod, line and lure are stippled in the plate's pen.
+ * Fishing: the trout holds in the current, tail working, while a rod swings
+ * in and casts, and the lure lands a little way off its nose. It notices,
+ * draws back and strikes, the hook is set, and it's hauled up out of the
+ * top right of the screen; the hobby page opens in dots behind it, along
+ * the way it went. Rod, line and lure are stippled in the plate's pen.
  *
- * The page changes while the lure sits there and the trout eyes it; the bite
- * plays over the hobby page (see engine.ts).
+ * It all plays over the hobby page, after the hold (see engine.ts).
  */
 
 const DEG = Math.PI / 180;
 /** The trout on the plate faces right; its mouth is here. */
 const MOUTH = [812, 338] as const;
-/** Where the lure lands, just off its nose. */
-const LANDING = [874, 330] as const;
+/** Where its tail fin starts, and its pectoral fin's root. */
+const TAIL_ROOT = 195;
+const PECTORAL = [618, 372] as const;
 /** The rod's length; its butt is off the top right of the screen. */
 const ROD = 540;
 
-const ENTER_FROM = 260;
-const ENTER_MS = 440;
-const CAST_FROM = 760;
+/** It starts to swim as the scene starts... */
+const LIFE_MS = 320;
+/** ...and the rod swings in a beat later. */
+const ENTER_FROM = ACT + 110;
+const ENTER_MS = 380;
+const CAST_FROM = ENTER_FROM + 280;
 const CAST_MS = 200;
 const RELEASE = CAST_FROM + 90;
 const FLY_MS = 300;
 const LANDED = RELEASE + FLY_MS;
 const SETTLE_MS = 260;
-const LEAVE = LANDED + SETTLE_MS + 10;
-const HOLD = 240;
-const BITE = LEAVE + HOLD;
-const BITE_MS = 120;
-const SET_FROM = BITE + 90;
+/** The trout notices and draws back... */
+const NOTICE = LANDED + 40;
+const BITE = NOTICE + 130;
+/** ...then strikes. */
+const BITE_MS = 190;
+const SET_FROM = BITE + BITE_MS + 20;
 const YANK_FROM = SET_FROM + 50;
 const YANK_MS = 430;
 /** How long a dot of the page takes to open, and how fast the opening spreads, px/ms. */
@@ -196,12 +202,12 @@ export default defineScene<Prep>({
   start(ctx, prep) {
     const { w, h } = ctx;
     const fish = ctx.parts.rest;
-    // On a tall screen there's more room above the trout than beside it.
+    // On a tall screen there's less room in front of it.
     const tall = h > w;
+    const LANDING = [MOUTH[0] + (tall ? 100 : 150), 334] as const;
+    // The rod reaches in from off the top right, its tip over the trout.
     const BUTT = tall ? [1000, -300] : [1160, -130];
     const REST = (tall ? 125 : 146) * DEG;
-    // Its idle bob runs on a clock that stops through the hold.
-    const mt = (t: number) => (t < LEAVE ? t : t < BITE ? LEAVE : t - HOLD);
     const yank = (t: number) =>
       easeIn(seg(t, YANK_FROM, YANK_FROM + YANK_MS), 2.2);
     let haul = 0;
@@ -230,14 +236,20 @@ export default defineScene<Prep>({
     };
     const tipAt = (t: number) => apply(rodAt(t), ROD, 0);
 
-    // The trout lunges for the lure, then is hauled up and away, nose first.
+    // It holds in the current, tail working, until the lure lands; then it
+    // draws back a touch, strikes, and is hauled up and away, nose first.
+    const gap = LANDING[0] - 4 - MOUTH[0];
     const toward = Math.atan2(BUTT[1] - MOUTH[1], BUTT[0] - MOUTH[0]);
+    const strike = (t: number) => easeOut(seg(t, BITE, BITE + BITE_MS), 2.2);
     const fishAt = (t: number): Mat => {
-      const lunge = easeOut(seg(t, BITE, BITE + BITE_MS), 2);
+      const back =
+        smootherstep(seg(t, NOTICE, BITE)) *
+        (1 - smootherstep(seg(t, BITE, BITE + 70)));
+      const lunge = strike(t);
       const tug = backOut(seg(t, SET_FROM, SET_FROM + 120), 2);
       const k = yank(t);
-      const tilt = (-4 * lunge - 6 * tug) * DEG + (toward * 0.6 - 0) * k;
-      const along = 54 * lunge + 18 * tug + haul * k;
+      const tilt = (-4 * lunge - 6 * tug) * DEG + toward * 0.6 * k;
+      const along = -12 * back + gap * lunge + 18 * tug + haul * k;
       return chain(
         move(along * Math.cos(toward * k), along * Math.sin(toward * k)),
         turn(tilt, MOUTH[0], MOUTH[1]),
@@ -245,11 +257,60 @@ export default defineScene<Prep>({
     };
     const mouthAt = (t: number) => apply(fishAt(t), MOUTH[0], MOUTH[1]);
 
+    // Swimming in place: its tail fin sweeps (so looks shorter and longer),
+    // a gentle wave runs down its body, its pectoral fin sculls and it
+    // drifts a little. It beats harder as it strikes.
+    const life = (t: number) => smootherstep((t - ACT) / LIFE_MS);
+    const phase = (t: number) =>
+      0.0135 * Math.max(0, t - ACT) + 0.02 * Math.max(0, t - NOTICE);
+    const swimIn = (x: number, y: number, t: number, out: Float64Array) => {
+      const amp = life(t) * (1 + 0.6 * smootherstep(seg(t, NOTICE, BITE)));
+      if (amp <= 0) {
+        out[0] = x;
+        out[1] = y;
+        return;
+      }
+      const ph = phase(t);
+      const a = t - ACT;
+      let X = x;
+      let Y = y;
+      if (x < TAIL_ROOT)
+        X = TAIL_ROOT + (x - TAIL_ROOT) * (1 - 0.13 * amp * (1 - Math.cos(ph)));
+      const back = clamp01((MOUTH[0] - x) / (MOUTH[0] - 60));
+      Y +=
+        amp *
+        2.6 *
+        Math.pow(back, 1.6) *
+        Math.sin(((MOUTH[0] - x) / 700) * Math.PI * 2 - ph);
+      // The pectoral fin, turning a little about its root.
+      const fin =
+        clamp01((y - PECTORAL[1]) / 16) * clamp01(1 - Math.abs(x - 642) / 58);
+      if (fin > 0) {
+        const r = 7 * DEG * amp * fin * Math.sin(1.7 * ph + 1);
+        const dx = X - PECTORAL[0];
+        const dy = Y - PECTORAL[1];
+        X = PECTORAL[0] + dx * Math.cos(r) - dy * Math.sin(r);
+        Y = PECTORAL[1] + dx * Math.sin(r) + dy * Math.cos(r);
+      }
+      out[0] = X + 3 * amp * Math.sin(a * 0.0029);
+      out[1] = Y + 2.5 * amp * Math.sin(a * 0.0041 + 0.6);
+    };
+    const swimmer = (t: number) => {
+      const m = fishAt(t);
+      return (x: number, y: number, out: Float64Array) => {
+        swimIn(x, y, t, out);
+        const X = out[0];
+        const Y = out[1];
+        out[0] = m[0] * X + m[2] * Y + m[4];
+        out[1] = m[1] * X + m[3] * Y + m[5];
+      };
+    };
+
     // The lure: hanging off the tip, cast in an arc, landing, then taken.
     const lureAt = (t: number): [number, number] => {
       if (t < RELEASE) {
         const [x, y] = tipAt(t);
-        return [x + 6 * Math.sin(t * 0.008), y + 34];
+        return [x + 6 * Math.sin((t - ENTER_FROM) * 0.008), y + 34];
       }
       if (t < LANDED) {
         const [x0, y0] = (() => {
@@ -262,22 +323,35 @@ export default defineScene<Prep>({
           lerp(y0, LANDING[1], u) - 150 * 4 * u * (1 - u),
         ];
       }
-      if (t < BITE + BITE_MS * 0.6) {
-        const settle = spring(seg(t, LANDED, LANDED + SETTLE_MS), 1.5, 0.3);
-        return [
-          LANDING[0],
-          LANDING[1] - 8 + 8 * settle + 2 * Math.sin(mt(t) * 0.012),
-        ];
-      }
-      return mouthAt(t);
+      const settle = spring(seg(t, LANDED, LANDED + SETTLE_MS), 1.5, 0.3);
+      const bob: [number, number] = [
+        LANDING[0],
+        LANDING[1] - 8 + 8 * settle + 2 * Math.sin((t - LANDED) * 0.012),
+      ];
+      // Taken as the trout's mouth gets to it.
+      const taken = smootherstep(seg(strike(t), 0.72, 1));
+      if (taken <= 0) return bob;
+      const [mx, my] = mouthAt(t);
+      return [lerp(bob[0], mx, taken), lerp(bob[1], my, taken)];
     };
 
-    const cam = (t: number) => {
-      const base = ctx.lift(Math.min(t, LEAVE));
-      const k = lerp(1, 1.08, smootherstep(seg(t, LIFT_MS, LEAVE)));
-      return { ...base, s: base.s * k };
+    // The camera eases in, and over a touch on a narrow screen, so the lure
+    // lands in the picture.
+    const zoomed = ctx.stage.s * 1.08;
+    const fit = Math.max(
+      ctx.stage.fx + 40,
+      LANDING[0] + 30 - (0.94 * w - ctx.stage.ax) / zoomed,
+    );
+    const cam = (t: number): Cam => {
+      const base = ctx.lift(t);
+      const k = smootherstep(seg(t, ACT, LANDED));
+      return {
+        ...base,
+        fx: lerp(base.fx, fit, k),
+        s: base.s * lerp(1, 1.08, k),
+      };
     };
-    const held = cam(LEAVE);
+    const held = cam(LANDED);
 
     // How far it's hauled: until every dot of it is off the screen.
     const end = YANK_FROM + YANK_MS;
@@ -320,9 +394,9 @@ export default defineScene<Prep>({
     return {
       duration,
       leave: LEAVE,
-      depart: BITE,
+      depart: ACT,
       draw(t, p) {
-        p.cam(t < LEAVE ? cam(t) : held);
+        p.cam(t < LANDED ? cam(t) : held);
         if (t > YANK_FROM) p.cut(holes, wakeHoles(times, grid, t, GROW, holes));
 
         // Props come in once the paper is down.
@@ -360,7 +434,9 @@ export default defineScene<Prep>({
         const swallowed =
           1 - smootherstep(seg(t, BITE + BITE_MS * 0.4, BITE + BITE_MS * 1.4));
         const lureAngle =
-          t < LANDED ? Math.PI / 2 : Math.PI / 2 + 0.2 * Math.sin(mt(t) * 0.01);
+          t < LANDED
+            ? Math.PI / 2
+            : Math.PI / 2 + 0.2 * Math.sin((t - LANDED) * 0.01);
         p.dots(prep.lure, chain(move(x1, y1), turn(lureAngle)), {
           alpha: props * swallowed * lineAlpha,
         });
@@ -372,11 +448,14 @@ export default defineScene<Prep>({
             [36, 0.14],
             [18, 0.3],
           ] as const)
-            p.part("rest", fishAt(t - lag), { alpha: alpha * fade });
+            p.part("rest", undefined, {
+              alpha: alpha * fade,
+              warp: swimmer(t - lag),
+            });
         }
         // No paper round it once the page shows through behind it.
         const halo = 1.6 * (1 - seg(t, YANK_FROM, YANK_FROM + 60));
-        p.part("rest", fishAt(t), { halo });
+        p.part("rest", undefined, { halo, warp: swimmer(t) });
         p.dots(prep.rod, rodAt(t), {
           alpha: props,
           halo: 1.2 * (1 - seg(t, YANK_FROM, YANK_FROM + 60)),

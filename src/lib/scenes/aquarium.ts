@@ -1,4 +1,4 @@
-import { defineScene, LIFT_MS } from "./engine";
+import { ACT, defineScene, LEAVE } from "./engine";
 import {
   type Cam,
   clamp01,
@@ -23,11 +23,10 @@ import {
 /**
  * Aquarium keeping: bubbles rise off the gourami, it noses a little way
  * right, turns around head first with its tail following, backs up a touch
- * and darts off the left of the screen. Ripples spread from its wake, and
- * the hobby page shows inside them.
+ * as it comes round and darts off the left of the screen. Ripples spread
+ * from its wake, and the hobby page shows inside them.
  *
- * The page changes while it holds still before the dart, and the dart plays
- * over the hobby page (see engine.ts).
+ * It all plays over the hobby page, after the hold (see engine.ts).
  */
 
 /** The gourami on the plate, card units: it faces right. */
@@ -37,19 +36,21 @@ const TAIL_ROOT = 252;
 const MID = 440;
 const MOUTH = [712, 246] as const;
 
-const SWIM_FROM = LIFT_MS;
-const TURN_FROM = 1020;
+const SWIM_FROM = ACT;
+const SWIM_MS = 560;
+const TURN_FROM = ACT + 400;
 const TURN_MS = 280;
 /** How long the tail takes to come round after the head. */
 const TURN_LAG = 110;
 /** How thick the fish is, side to side, at its thickest: it shows as it turns. */
 const GIRTH = 46;
-/** After the turn it backs up a touch, squashed like a spring. */
-const COCK_FROM = 1330;
-const LEAVE = 1500;
-const HOLD = 220;
-const DART = LEAVE + HOLD;
+/** As its tail comes round it backs up a touch, squashed like a spring... */
+const COCK_FROM = ACT + 600;
+/** ...and lets go. */
+const DART = ACT + 800;
 const DART_MS = 520;
+/** Its fins and body start to move as it sets off. */
+const LIFE_MS = 300;
 /**
  * Ripples leave its tail this often as it goes, each as wide as the tail to
  * start with, so together they make one wake that widens behind it.
@@ -67,10 +68,10 @@ const CREST_GAP = 8;
 const CREST_R = 2;
 /** When new bubbles leave its mouth, and how big each is. */
 const BUBBLES = [
-  [330, 7],
-  [520, 10],
-  [720, 6],
-  [930, 12],
+  [ACT + 40, 7],
+  [ACT + 230, 10],
+  [ACT + 430, 6],
+  [ACT + 640, 12],
 ] as const;
 const BUBBLE_MS = 560;
 
@@ -106,16 +107,17 @@ export default defineScene<Prep>({
     const { w, h } = ctx;
     const fish = ctx.parts.rest;
 
-    // Its idle wiggle runs on a clock that stops through the hold, so the
-    // held frame is still and the wiggle carries on where it left off.
-    const mt = (t: number) => (t < LEAVE ? t : t < DART ? LEAVE : t - HOLD);
-    const cock = (t: number) => smootherstep(seg(t, COCK_FROM, LEAVE));
+    // It's the drawing on the plate until it sets off, then its wiggle,
+    // fins and tail fade in.
+    const mt = (t: number) => Math.max(0, t - SWIM_FROM);
+    const life = (t: number) => smootherstep(mt(t) / LIFE_MS);
+    const cock = (t: number) => smootherstep(seg(t, COCK_FROM, DART));
     const darting = (t: number) => smootherstep(seg(t, DART, DART + 90));
     const dart = (t: number) => easeIn(seg(t, DART, DART + DART_MS), 2.1);
     let distance = 0;
     // A little way right, back a touch, then off left, faster and faster.
     const swim = (t: number) =>
-      110 * smootherstep(seg(t, SWIM_FROM, 1150)) +
+      110 * smootherstep(seg(t, SWIM_FROM, SWIM_FROM + SWIM_MS)) +
       16 * cock(t) -
       distance * dart(t);
     // Fins beat faster once it goes.
@@ -130,7 +132,8 @@ export default defineScene<Prep>({
       const fin =
         x < TAIL_ROOT
           ? TAIL_ROOT +
-            (x - TAIL_ROOT) * (0.82 + 0.18 * Math.cos(beat(t) * 0.021))
+            (x - TAIL_ROOT) *
+              (1 - 0.18 * life(t) * (1 - Math.cos(beat(t) * 0.021)))
           : x;
       // Side on, its dots spread through its body's thickness.
       const hash = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
@@ -142,7 +145,7 @@ export default defineScene<Prep>({
       const squash = cock(t) * (1 - darting(t));
       const sx = 1 - 0.07 * squash + 0.09 * darting(t);
       const sy = 1 + 0.04 * squash - 0.03 * darting(t);
-      const wave = 3 + 7 * darting(t);
+      const wave = 3 * life(t) + 7 * darting(t);
       out[0] =
         MID +
         swim(t) +
@@ -150,7 +153,7 @@ export default defineScene<Prep>({
       out[1] =
         330 +
         (y - 330) * (1 - 0.1 * Math.sin(Math.PI * turn)) * sy +
-        2.5 * Math.sin(mt(t) * 0.007) +
+        2.5 * life(t) * Math.sin(mt(t) * 0.007) +
         wave *
           Math.sin(((x - TAIL) / 300) * Math.PI * 2 - beat(t) * 0.012) *
           Math.pow(1 - d, 1.2);
@@ -163,12 +166,12 @@ export default defineScene<Prep>({
 
     const follow = (t: number): Cam => {
       const base = ctx.lift(t);
-      const k = lerp(1, 1.35, smootherstep(seg(t, SWIM_FROM, LEAVE)));
+      const k = lerp(1, 1.35, smootherstep(seg(t, SWIM_FROM, DART)));
       return { ...base, fx: base.fx + 0.35 * swim(t), s: base.s * k };
     };
-    // Still from the hold on: the fish swims out of the picture.
-    const held = follow(LEAVE);
-    const cam = (t: number) => (t < LEAVE ? follow(t) : held);
+    // Still once it darts: the fish swims out of the picture.
+    const held = follow(DART);
+    const cam = (t: number) => (t < DART ? follow(t) : held);
 
     const spot = new Float64Array(3);
     const onScreen = (x: number, y: number, t: number): [number, number] => {
@@ -223,7 +226,7 @@ export default defineScene<Prep>({
     return {
       duration,
       leave: LEAVE,
-      depart: DART,
+      depart: ACT,
       draw(t, p) {
         now = t;
         p.cam(cam(t));
@@ -276,10 +279,11 @@ export default defineScene<Prep>({
             });
         }
 
-        // The plate's bubbles drift up and away.
-        const up = Math.max(0, t - 120);
-        p.part("bubbles", move(4 * Math.sin(up * 0.006), -0.12 * up), {
-          alpha: 1 - smootherstep(seg(t, 450, 1250)),
+        // The plate's bubbles drift up and away, getting going gently.
+        const up = Math.max(0, t - ACT);
+        const rise = 0.12 * (up - 160 * (1 - Math.exp(-up / 160)));
+        p.part("bubbles", move(4 * Math.sin(up * 0.006), -rise), {
+          alpha: 1 - smootherstep(seg(t, ACT + 250, ACT + 1000)),
         });
         // New ones leave its mouth, wherever it's got to.
         BUBBLES.forEach(([at], i) => {

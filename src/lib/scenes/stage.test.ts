@@ -5,6 +5,8 @@ import {
   apply,
   backOut,
   camLerp,
+  cssEaseInOut,
+  cubicBezier,
   chain,
   dive,
   dotLine,
@@ -271,5 +273,32 @@ describe("svgLayer", () => {
     expect(svg).toContain("<path stroke-width='6' d='M10 10h0M20 20h0'/>");
     expect(svg).toContain("opacity='0.500'");
     expect(svg).toContain("M30.3 40h0");
+  });
+});
+
+describe("cubicBezier", () => {
+  it("matches CSS's ease-in-out", () => {
+    for (const [x, y] of [
+      [0, 0],
+      [0.1, 0.019722],
+      [0.25, 0.129162],
+      [0.5, 0.5],
+      [0.75, 0.870838],
+      [0.9, 0.980278],
+      [1, 1],
+    ])
+      close(cssEaseInOut(x), y, 1e-5);
+  });
+
+  it("matches CSS's ease, which isn't symmetric", () => {
+    const ease = cubicBezier(0.25, 0.1, 0.25, 1);
+    close(ease(0.25), 0.408511, 1e-5);
+    close(ease(0.5), 0.802403, 1e-5);
+    close(ease(0.9), 0.994316, 1e-5);
+  });
+
+  it("holds its ends outside 0 to 1", () => {
+    expect(cssEaseInOut(-1)).toBe(0);
+    expect(cssEaseInOut(2)).toBe(1);
   });
 });

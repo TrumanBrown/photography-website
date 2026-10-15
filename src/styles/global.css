@@ -394,6 +394,16 @@ html.landing-dots body::after {
   inset: 0;
   z-index: 999;
   background: var(--landing-dots, none), var(--paper);
+  /* A scene carrying on over this page is in its hold: the frame eases in
+     a touch from the moment it left, as the canvas did and will again. */
+  transform-origin: 50% 50%;
+  animation: landing-hold var(--landing-hold, 0ms) ease-in-out
+    var(--landing-delay, 0ms) both;
+}
+@keyframes landing-hold {
+  to {
+    transform: scale(var(--landing-zoom, 1));
+  }
 }
 
 /* Leaving from a card (src/lib/open.ts): a session's cover growing to fill

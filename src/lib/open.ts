@@ -1,5 +1,6 @@
 import { loadBanner } from "./flight";
 import { dotsArt, LANDING_KEY, type LandingNote } from "./landing";
+import { CARRY_KEY, leaveData } from "./scenes/carry";
 import { prefersReducedMotion } from "./motion";
 import {
   CARD_W,
@@ -47,7 +48,7 @@ function leave(
     const note: LandingNote = {
       ...more,
       path: new URL(href, window.location.href).pathname,
-      at: Date.now(),
+      at: more.at ?? Date.now(),
       kind,
     };
     try {
@@ -364,6 +365,37 @@ function shownPlate(link: HTMLAnchorElement): HTMLImageElement | null {
   );
 }
 
+const prefetched = new Set<string>();
+
+/** Whether the visitor has asked to save data: then nothing's fetched ahead of a click. */
+const savingData = () =>
+  Boolean(
+    (navigator as Navigator & { connection?: { saveData?: boolean } })
+      .connection?.saveData,
+  );
+
+/**
+ * Fetch a hobby page and the scripts and styles it uses, so that when a
+ * scene changes to it, it comes up as fast as it can: the scene waits in its
+ * hold until the page is ready to carry it on. Ahead of a click (`early`),
+ * not when the visitor is saving data.
+ */
+function prefetchPage(href: string, early = false): void {
+  if (prefetched.has(href) || (early && savingData())) return;
+  prefetched.add(href);
+  fetch(href)
+    .then((response) => (response.ok ? response.text() : ""))
+    .then((html) => {
+      const assets = [
+        ...html.matchAll(/<script type="module" src="([^"]+)"/g),
+        ...html.matchAll(/<link rel="stylesheet" href="([^"]+)"/g),
+      ].map((match) => match[1]);
+      for (const url of new Set(assets))
+        fetch(url, { priority: "low" } as RequestInit).catch(() => undefined);
+    })
+    .catch(() => prefetched.delete(href));
+}
+
 const warmedHobbies = new WeakMap<HTMLAnchorElement, Promise<void>>();
 
 /**
@@ -409,7 +441,7 @@ function openHobby(link: HTMLAnchorElement): boolean {
   const slug = slugOf(href);
   const dark = isDark();
   // Warm the page while the scene plays.
-  fetch(href).catch(() => undefined);
+  prefetchPage(href);
   // The scene plays from the card plate, finer than a home-page card's mini
   // one, and the hobby page reads the same image to carry it on. Both are
   // usually read already (warmHobby); if not, they start loading now.
@@ -479,8 +511,18 @@ function openHobby(link: HTMLAnchorElement): boolean {
                 reveal: final.reveal,
               }),
             );
-          else
+          else {
+            // The plate's dots and the props go too, so the hobby page can
+            // pick the scene up without reading and drawing them again.
+            const at = Date.now();
+            leaveData({
+              path: new URL(href).pathname,
+              at,
+              dots: main,
+              prep: staged.prep,
+            });
             leave(target, "dots", {
+              at,
               ink,
               art: final.art,
               scene: {
@@ -492,8 +534,12 @@ function openHobby(link: HTMLAnchorElement): boolean {
                 plate,
                 dark,
                 speed: final.speed,
+                hold: final.hold,
+                zoom: final.zoom,
+                module: mod.moduleUrl,
               },
             });
+          }
           stayPut(playing);
         },
         cancelled: () => {
@@ -522,6 +568,7 @@ function stayPut(playing: { dispose(): void }) {
     window.clearTimeout(timer);
     try {
       sessionStorage.removeItem(LANDING_KEY);
+      sessionStorage.removeItem(CARRY_KEY);
     } catch {
       // Nothing to clear.
     }
@@ -586,7 +633,9 @@ export function initOpeners(): void {
     for (const type of ["pointerover", "pointerdown", "focusin"] as const)
       document.addEventListener(type, (event) => {
         const link = hobbyLink(event.target);
-        if (link) void warmHobby(link);
+        if (!link) return;
+        void warmHobby(link);
+        prefetchPage(link.href, true);
       });
     // Cards that stay in view get ready one at a time, when the page is idle.
     // A home-page card fetches its card plate for this (unless the visitor

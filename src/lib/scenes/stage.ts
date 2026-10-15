@@ -760,3 +760,36 @@ export function exitDistance(
   }
   return hi;
 }
+
+/**
+ * CSS's cubic-bezier(x1, y1, x2, y2) timing function, so a motion drawn on a
+ * canvas can match one CSS plays exactly.
+ */
+export function cubicBezier(x1: number, y1: number, x2: number, y2: number) {
+  const cx = 3 * x1;
+  const bx = 3 * (x2 - x1) - cx;
+  const ax = 1 - cx - bx;
+  const cy = 3 * y1;
+  const by = 3 * (y2 - y1) - cy;
+  const ay = 1 - cy - by;
+  const sx = (u: number) => ((ax * u + bx) * u + cx) * u;
+  const sy = (u: number) => ((ay * u + by) * u + cy) * u;
+  return (x: number) => {
+    if (x <= 0) return 0;
+    if (x >= 1) return 1;
+    let lo = 0;
+    let hi = 1;
+    let u = x;
+    for (let i = 0; i < 40; i++) {
+      const v = sx(u);
+      if (Math.abs(v - x) < 1e-7) break;
+      if (v < x) lo = u;
+      else hi = u;
+      u = (lo + hi) / 2;
+    }
+    return sy(u);
+  };
+}
+
+/** CSS's `ease-in-out`. */
+export const cssEaseInOut = cubicBezier(0.42, 0, 0.58, 1);

@@ -1,5 +1,6 @@
 import { landed, type LandingNote } from "../landing";
-import { cardUnits, loadPlate, readDots } from "../plate-dots";
+import { cardUnits, type DotField, loadPlate, readDots } from "../plate-dots";
+import { takeData } from "./carry";
 import aquarium from "./aquarium";
 import birding from "./birding";
 import crab from "./crab";
@@ -79,23 +80,36 @@ export async function resume(
   const slug = location.pathname.split("/").filter(Boolean).pop() ?? "";
   const scene = SCENES[slug];
   if (!scene) throw new Error(`No scene for ${slug}.`);
-  const img = await loadPlate(s.plate);
-  const field = cardUnits(readDots(img), img.naturalWidth);
-  if (!field) throw new Error("The plate couldn't be read.");
-  const stagedScene = ready(scene, field, s.dark);
+  // The plate's dots and the props, as the last page had them; or, if they
+  // didn't make it, read and drawn again (the same, from the same plate).
+  const carried = takeData(note.path, note.at);
+  let staged: Staged;
+  if (carried) {
+    const dots = carried.dots as DotField;
+    staged = {
+      dots,
+      parts: split(dots, scene.parts ?? []),
+      prep: carried.prep,
+    };
+  } else {
+    const img = await loadPlate(s.plate);
+    const field = cardUnits(readDots(img), img.naturalWidth);
+    if (!field) throw new Error("The plate couldn't be read.");
+    staged = ready(scene, field, s.dark);
+  }
 
   const root = document.documentElement;
   const style = getComputedStyle(root);
   const shown = show(
     {
       scene,
-      prep: stagedScene.prep,
-      main: stagedScene,
+      prep: staged.prep,
+      main: staged,
       rect: s.rect,
       w: s.w,
       h: s.h,
       colors: {
-        ink: note.ink || field.color,
+        ink: note.ink || (staged.dots as DotField).color || "#16150f",
         red: style.getPropertyValue("--stamp").trim() || "#b3301c",
         paper: style.getPropertyValue("--paper").trim() || "#fbfaf8",
       },
@@ -105,22 +119,22 @@ export async function resume(
     },
     "landing-veil",
   );
-  // Draw the first frame before claiming, so a scene that can't draw falls
-  // back to the plain fade.
   const { canvas, depart } = shown;
   const end = shown.run.duration;
-  const elapsed = Math.max(0, Date.now() - note.at) * s.speed;
-  const t0 = Math.min(depart, s.t + elapsed);
-  shown.draw(t0);
+  /** Where the scene is now: on from where it left, but not past the hold. */
+  const sceneNow = () =>
+    Math.min(depart, s.t + Math.max(0, Date.now() - note.at) * s.speed);
+  // Draw once before claiming, so a scene that can't draw falls back to the
+  // plain fade.
+  shown.draw(sceneNow());
   if (!claim()) return false;
-  document.body.append(canvas);
-  // The canvas now shows what the first paint did: the class can go.
-  landed(root);
 
   if (
     import.meta.env.DEV &&
     new URLSearchParams(location.search).has("scene-debug")
   ) {
+    document.body.append(canvas);
+    landed(root);
     const debug: Debug = {
       duration: end,
       leave: shown.leave,
@@ -131,8 +145,7 @@ export async function resume(
     return true;
   }
 
-  const time = clock(s.speed);
-  const hurry = () => time.hurry();
+  const hurry = () => time?.hurry();
   const onKey = (event: KeyboardEvent) => {
     if (["Escape", "Enter", " "].includes(event.key)) hurry();
   };
@@ -152,9 +165,19 @@ export async function resume(
     { once: true },
   );
 
-  const frame = (now: number) => {
-    if (!canvas.isConnected) return;
-    const t = Math.min(end, t0 + time.now(now));
+  // Take over from the CSS on a frame of its own, at the moment the CSS has
+  // got to, so the swap doesn't show; from there the scene's own clock runs.
+  let time: ReturnType<typeof clock> | null = null;
+  let t0 = 0;
+  const frame = () => {
+    if (!time) {
+      t0 = sceneNow();
+      time = clock(s.speed);
+      shown.draw(t0);
+      document.body.append(canvas);
+      landed(root);
+    } else if (!canvas.isConnected) return;
+    const t = Math.min(end, t0 + time.now());
     try {
       shown.draw(t);
     } catch {
@@ -167,5 +190,8 @@ export async function resume(
   requestAnimationFrame(frame);
   return true;
 }
+
+/** This module's own address, for the next page to fetch it early. */
+export const moduleUrl = import.meta.url;
 
 export { play } from "./engine";

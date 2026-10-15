@@ -1,4 +1,4 @@
-import { defineScene } from "./engine";
+import { ACT, defineScene, LEAVE } from "./engine";
 import {
   apply,
   backOut,
@@ -19,13 +19,12 @@ import {
 
 /**
  * Tide pooling: the crab rears up bigger and raises its right claw with the
- * pincer wide open. Poised, it jabs and snaps it shut on the screen, which
- * shakes and puckers toward the pinch, then a shockwave rings out from it:
- * the crab's own dots are swept outward on its front, and the hobby page
- * shows behind it.
+ * pincer wide open, draws it back a touch and jabs, snapping it shut on the
+ * screen, which shakes and puckers toward the pinch. Then a shockwave rings
+ * out from it: the crab's own dots are swept outward on its front, and the
+ * hobby page shows behind it. Reach, wind-up and jab run into each other.
  *
- * The page changes while the claw is poised, and the jab plays over the
- * hobby page (see engine.ts).
+ * It all plays over the hobby page, after the hold (see engine.ts).
  */
 
 const DEG = Math.PI / 180;
@@ -37,14 +36,16 @@ const LEFT_SHOULDER = [262, 214] as const;
 /** The crab stands on the sand here; it rears up about this point. */
 const BASE = [390, 430] as const;
 
-const REAR_FROM = 240;
-const REAR_MS = 560;
-const REACH_FROM = 620;
+const REAR_FROM = ACT;
+const REAR_MS = 520;
+const REACH_FROM = ACT + 240;
 const REACH_MS = 480;
-const LEAVE = REACH_FROM + REACH_MS + 20;
-const HOLD = 200;
-const JAB_FROM = LEAVE + HOLD;
-const JAB_MS = 150;
+/** Drawn back a touch, opening wider, as the reach comes to its end... */
+const WIND_FROM = REACH_FROM + REACH_MS - 120;
+const WIND_MS = 170;
+/** ...and straight into the jab. */
+const JAB_FROM = WIND_FROM + WIND_MS;
+const JAB_MS = 140;
 const SNAP = JAB_FROM + JAB_MS - 30;
 const SNAP_MS = 80;
 /** The pinch pulls the screen in toward it, briefly. */
@@ -134,9 +135,14 @@ export default defineScene({
     const reach = (t: number) =>
       backOut(seg(t, REACH_FROM, REACH_FROM + REACH_MS), 1.3);
     const jab = (t: number) => backOut(seg(t, JAB_FROM, JAB_FROM + JAB_MS), 2);
+    // The wind-up eases in as the reach settles and gives way to the jab.
+    const wind = (t: number) =>
+      smootherstep(seg(t, WIND_FROM, JAB_FROM)) *
+      (1 - smootherstep(seg(t, JAB_FROM, JAB_FROM + JAB_MS * 0.6)));
     const clawAt = (t: number): Mat => {
       const k = lerp(1, 1.3, reach(t));
-      const a = (-10 * rear(t) - 16 * reach(t) + 30 * jab(t)) * DEG;
+      const a =
+        (-10 * rear(t) - 16 * reach(t) - 7 * wind(t) + 30 * jab(t)) * DEG;
       return chain(
         crab(t),
         turn(a, SHOULDER[0], SHOULDER[1]),
@@ -144,9 +150,9 @@ export default defineScene({
       );
     };
     const open = (t: number) =>
-      -38 *
-      DEG *
-      backOut(seg(t, REACH_FROM + 80, REACH_FROM + REACH_MS), 1.6) *
+      -DEG *
+      (38 * backOut(seg(t, REACH_FROM + 80, REACH_FROM + REACH_MS), 1.6) +
+        8 * wind(t)) *
       (1 - backOut(seg(t, SNAP, SNAP + SNAP_MS), 2.4));
     const dactylAt = (t: number): Mat =>
       chain(clawAt(t), turn(open(t), HINGE[0], HINGE[1]));
@@ -164,8 +170,8 @@ export default defineScene({
       s: ctx.stage.s * 1.55,
     };
     const look = (t: number): Cam =>
-      camLerp(ctx.lift(t), near, smootherstep(seg(t, REACH_FROM, LEAVE)));
-    const held = look(LEAVE);
+      camLerp(ctx.lift(t), near, smootherstep(seg(t, REACH_FROM, JAB_FROM)));
+    const held = look(JAB_FROM);
 
     // The snap shakes the screen.
     const shake = (t: number): [number, number] => {
@@ -226,9 +232,9 @@ export default defineScene({
     return {
       duration: SHOCK_FROM + SHOCK_MS,
       leave: LEAVE,
-      depart: JAB_FROM,
+      depart: ACT,
       draw(t, p) {
-        const c = t < LEAVE ? look(t) : held;
+        const c = t < JAB_FROM ? look(t) : held;
         const [sx, sy] = shake(t);
         p.cam({ ...c, ax: c.ax + sx, ay: c.ay + sy });
 

@@ -1,5 +1,14 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import type { DrawOpts, Painter, SceneContext, SceneRun } from "./engine";
+import {
+  ACT,
+  type DrawOpts,
+  HOLD_ZOOM,
+  holdZoom,
+  LEAVE,
+  type Painter,
+  type SceneContext,
+  type SceneRun,
+} from "./engine";
 import { ready, SCENES } from "./index";
 import {
   type Cam,
@@ -14,14 +23,16 @@ import {
   mul,
   seeded,
   smootherstep,
+  cssEaseInOut,
   toScreen,
 } from "./stage";
 
 /**
  * Every scene, driven through a stand-in painter. Each has to play start to
- * finish; a scene that changes page has to hold still while the next page
- * loads, come out the same when the next page builds it again, and leave
- * the next page showing with nothing of itself left on it.
+ * finish; a scene that changes page has to do so as its lift ends and hold
+ * still while the next page loads, come out the same when the next page
+ * builds it again, and leave the next page showing with nothing of itself
+ * left on it.
  */
 
 beforeAll(() => {
@@ -214,6 +225,26 @@ function frame(run: SceneRun, p: Recorder, t: number) {
 
 const dots = plate();
 
+describe("the hold", () => {
+  it("eases the camera in on the landing CSS's curve", () => {
+    const zoom = holdZoom(LEAVE, ACT, true);
+    expect(zoom(0)).toBe(1);
+    expect(zoom(LEAVE)).toBe(1);
+    expect(zoom(ACT)).toBeCloseTo(HOLD_ZOOM, 9);
+    expect(zoom(ACT + 500)).toBeCloseTo(HOLD_ZOOM, 9);
+    for (const k of [0.1, 0.25, 0.5, 0.8])
+      expect(zoom(LEAVE + k * (ACT - LEAVE))).toBeCloseTo(
+        1 + (HOLD_ZOOM - 1) * cssEaseInOut(k),
+        9,
+      );
+  });
+
+  it("doesn't zoom a scene that stays on its page", () => {
+    const zoom = holdZoom(2000, 2000, false);
+    for (const t of [0, 500, 2000, 3000]) expect(zoom(t)).toBe(1);
+  });
+});
+
 describe.each(Object.keys(SCENES))("the %s scene", (slug) => {
   for (const [w, h] of [
     [1440, 900],
@@ -248,8 +279,10 @@ describe.each(Object.keys(SCENES))("the %s scene", (slug) => {
       const { run, painter } = begin(slug, w, h, dots);
       const leave = run.leave!;
       const depart = run.depart!;
-      expect(leave).toBeGreaterThan(900);
-      expect(depart - leave).toBeGreaterThanOrEqual(150);
+      // The page changes as the lift ends, before anything moves, and the
+      // scene stays put through the hold.
+      expect(leave).toBe(LEAVE);
+      expect(depart).toBe(ACT);
       expect(depart).toBeLessThan(run.duration - 300);
       const still = frame(run, painter, leave);
       for (const t of [leave + 1, (leave + depart) / 2, depart])

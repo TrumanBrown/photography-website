@@ -20,6 +20,7 @@ function boot(options: { note?: unknown; path: string; reduced?: boolean }) {
     matchMedia: () => ({ matches: Boolean(options.reduced) }),
   };
   const timers: number[] = [];
+  const links: Array<Record<string, string>> = [];
   const run = new Function(
     "sessionStorage",
     "location",
@@ -44,6 +45,10 @@ function boot(options: { note?: unknown; path: string; reduced?: boolean }) {
           setProperty: (name: string, value: string) => props.set(name, value),
         },
       },
+      createElement: () => ({}),
+      head: {
+        appendChild: (el: Record<string, string>) => links.push(el),
+      },
     },
     win,
     (_: () => void, ms: number) => timers.push(ms),
@@ -54,6 +59,8 @@ function boot(options: { note?: unknown; path: string; reduced?: boolean }) {
     left: store.has(LANDING_KEY),
     timers,
     art: props.get("--landing-dots"),
+    props,
+    links,
     note: win.landingNote,
   };
 }
@@ -103,6 +110,39 @@ describe("landingBootstrap", () => {
     expect(result.dots).toBe(true);
     expect(result.art).toBe(note.art);
     expect(result.note).toEqual(note);
+  });
+
+  it("eases a scene's frame in while the page loads, and fetches the scene", () => {
+    const at = Date.now() - 120;
+    const result = boot({
+      note: {
+        path: "/hobbies/birding/",
+        at,
+        kind: "dots",
+        art: "url(x)",
+        scene: { hold: 420, zoom: 1.03, module: "/_astro/index.abc.js" },
+      },
+      path: "/hobbies/birding/",
+    });
+    expect(result.dots).toBe(true);
+    expect(result.props.get("--landing-zoom")).toBe("1.03");
+    expect(result.props.get("--landing-hold")).toBe("420ms");
+    // Started where the last page left off: some way into the hold already.
+    const delay = parseFloat(result.props.get("--landing-delay")!);
+    expect(delay).toBeLessThanOrEqual(-120);
+    expect(delay).toBeGreaterThan(-1000);
+    expect(result.links).toEqual([
+      { rel: "modulepreload", href: "/_astro/index.abc.js" },
+    ]);
+  });
+
+  it("leaves the hold alone when there's no scene to carry on", () => {
+    const result = boot({
+      note: { path: "/hobbies/birding/", at: Date.now(), kind: "dots" },
+      path: "/hobbies/birding/",
+    });
+    expect(result.props.has("--landing-zoom")).toBe(false);
+    expect(result.links).toEqual([]);
   });
 
   it("matches with or without the trailing slash", () => {

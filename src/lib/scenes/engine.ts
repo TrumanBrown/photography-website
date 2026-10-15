@@ -3,6 +3,8 @@ import {
   camLerp,
   camMat,
   type Cam,
+  clamp01,
+  cssEaseInOut,
   type Dots,
   grow,
   ID,
@@ -25,11 +27,14 @@ import {
  * Most scenes end by opening the hobby page themselves: the fish swims off
  * and its ripples wash the paper away, the crab's pinch sends a shockwave
  * through it, and so on. That has to happen over the hobby page, so those
- * scenes change page during a held pose (`leave` to `depart`). The hobby
- * page paints that same frame before anything else, builds the scene again
- * from the same plate and seed, and plays the rest over itself (resume.ts).
- * The globe instead ends zoomed into a few big dots, and the hobby page
- * opens through those (src/lib/landing.ts).
+ * scenes change page as soon as the plate has lifted (`leave`), before
+ * anything in them moves. Until `depart` the camera only eases in a touch,
+ * which the hobby page carries on in CSS from its first paint while it
+ * loads; then it builds the scene again from the same plate, props and seed
+ * and plays the rest over itself (index.ts `resume`). So nothing ever stops
+ * mid-move to wait for the page. The globe instead plays out here and ends
+ * zoomed into a few big dots, which the hobby page opens through
+ * (src/lib/landing.ts).
  *
  * A second click, tap, Enter or Space hurries the rest along; Escape puts
  * the page back.
@@ -37,6 +42,14 @@ import {
 
 /** How long the plate takes to rise from its card to the middle of the screen. */
 export const LIFT_MS = 450;
+/** Scenes that carry on over the hobby page change page as the lift ends... */
+export const LEAVE = LIFT_MS;
+/** ...hold, the camera easing in a touch, while it loads... */
+export const HOLD = 420;
+/** ...and start moving here. */
+export const ACT = LEAVE + HOLD;
+/** How far the camera eases in over the hold (the landing CSS does the same). */
+export const HOLD_ZOOM = 1.03;
 /** How long the paper takes to cover the page behind. */
 const PAPER_MS = 320;
 /** How much faster the rest of a scene plays once you click again. */
@@ -166,6 +179,9 @@ export type Final =
       rect: [number, number, number, number];
       /** 1, or faster if it was hurried along. */
       speed: number;
+      /** How long the hold lasts from here, wall-clock ms, and how far it eases in. */
+      hold: number;
+      zoom: number;
     };
 
 export interface Colors {
@@ -488,6 +504,7 @@ export function show(o: ShowOptions, className: string): Show {
   );
   const leave = Math.min(run.leave ?? run.duration, run.duration);
   const depart = Math.max(leave, Math.min(run.depart ?? leave, run.duration));
+  const zoom = holdZoom(leave, depart, leave < run.duration);
 
   const pen = new Pen(ctx, o.colors, o.font);
 
@@ -499,7 +516,17 @@ export function show(o: ShowOptions, className: string): Show {
       canvas.width = Math.round(vw * dpr);
     if (canvas.height !== Math.round(vh * dpr))
       canvas.height = Math.round(vh * dpr);
-    ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // The hold's ease in, about the middle of the screen, on everything.
+    const z = zoom(t);
+    const k = dpr * z;
+    ctx!.setTransform(
+      k,
+      0,
+      0,
+      k,
+      (dpr * (1 - z) * vw) / 2,
+      (dpr * (1 - z) * vh) / 2,
+    );
     ctx!.clearRect(0, 0, vw, vh);
     ctx!.globalAlpha = smootherstep(t / PAPER_MS);
     ctx!.fillStyle = o.colors.paper;
@@ -557,6 +584,18 @@ export function show(o: ShowOptions, className: string): Show {
   }
 
   return { run, canvas, leave, depart, draw, art, final };
+}
+
+/**
+ * The camera's ease in over the hold, from `leave` to `depart`: none for a
+ * scene that doesn't change page. The landing CSS plays the same curve.
+ */
+export function holdZoom(leave: number, depart: number, handsOver: boolean) {
+  return (t: number) =>
+    handsOver && depart > leave
+      ? 1 +
+        (HOLD_ZOOM - 1) * cssEaseInOut(clamp01((t - leave) / (depart - leave)))
+      : 1;
 }
 
 /**
@@ -626,8 +665,9 @@ export function play(options: PlayOptions): {
   const { canvas } = s;
 
   const time = clock();
+  const handsOver = s.leave < s.run.duration;
   const finish = (): Final =>
-    s.leave < s.run.duration
+    handsOver
       ? {
           kind: "scene",
           t: s.leave,
@@ -636,6 +676,8 @@ export function play(options: PlayOptions): {
           h,
           rect,
           speed: time.rate,
+          hold: (s.depart - s.leave) / time.rate,
+          zoom: HOLD_ZOOM,
         }
       : s.final();
 
@@ -714,7 +756,15 @@ export function play(options: PlayOptions): {
     stopped = true;
     listen(false);
     options.done(finish());
+    // Ease into the hold until this page goes; the next page carries on
+    // from the same moment.
+    if (handsOver) raf = requestAnimationFrame(holding);
   }
+  const holding = (now: number) => {
+    if (!canvas.isConnected) return;
+    s.draw(Math.min(s.depart, time.now(now)));
+    raf = requestAnimationFrame(holding);
+  };
   raf = requestAnimationFrame(frame);
   return { cancel, dispose };
 }

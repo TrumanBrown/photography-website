@@ -1,4 +1,4 @@
-import { defineScene, LIFT_MS } from "./engine";
+import { ACT, defineScene, LEAVE } from "./engine";
 import {
   along,
   type Cam,
@@ -27,8 +27,7 @@ import {
  * fades and blurs away into the hobby page. He walks the mountain's real
  * skyline, read off the plate's dots.
  *
- * The page changes while he stands there, arms up; the rush in plays over
- * the hobby page (see engine.ts).
+ * It all plays over the hobby page, after the hold (see engine.ts).
  */
 
 const DEG = Math.PI / 180;
@@ -36,14 +35,13 @@ const DEG = Math.PI / 180;
 const FOOT_X = 806;
 const SUMMIT_NEAR = 430;
 
-const APPEAR = 360;
-const WALK_FROM = LIFT_MS;
-const WALK_MS = 1120;
+const APPEAR = ACT;
+const WALK_FROM = ACT + 60;
+const WALK_MS = 1040;
 const CHEER_FROM = WALK_FROM + WALK_MS;
-const CHEER_MS = 480;
-const LEAVE = CHEER_FROM + CHEER_MS;
-const HOLD = 160;
-const RUSH = LEAVE + HOLD;
+const CHEER_MS = 460;
+/** The camera rushes in as his arms come back up from the pump. */
+const RUSH = CHEER_FROM + CHEER_MS - 20;
 const RUSH_MS = 560;
 /** How much closer the camera gets, and how soft the drawing goes, CSS px. */
 const RUSH_ZOOM = 7;
@@ -193,8 +191,7 @@ export default defineScene<Prep>({
         fx: x,
         fy: y - 34,
         s:
-          base.s *
-          lerp(1.5, 2.3, smootherstep(seg(t, CHEER_FROM - 300, LEAVE))),
+          base.s * lerp(1.5, 2.3, smootherstep(seg(t, CHEER_FROM - 300, RUSH))),
       };
       return camLerp(
         base,
@@ -202,10 +199,10 @@ export default defineScene<Prep>({
         0.88 * smootherstep(seg(t, WALK_FROM, CHEER_FROM + 200)),
       );
     };
-    const held = look(LEAVE);
+    const held = look(RUSH);
     // The rush in: toward his chest, speeding up, as it all fades.
     const chest = (() => {
-      const m = bodyAt(LEAVE);
+      const m = bodyAt(RUSH);
       return [m[2] * -24 + m[4], m[3] * -24 + m[5]] as const;
     })();
     const rush = (t: number): Cam => {
@@ -224,10 +221,10 @@ export default defineScene<Prep>({
     return {
       duration: RUSH + RUSH_MS,
       leave: LEAVE,
-      depart: RUSH,
+      depart: ACT,
       draw(t, p) {
         const body = bodyAt(t);
-        p.cam(t < LEAVE ? look(t) : t < RUSH ? held : rush(t));
+        p.cam(t < RUSH ? look(t) : rush(t));
         const u = seg(t, RUSH, RUSH + RUSH_MS);
         p.look({
           opacity: 1 - smootherstep(seg(u, 0.3, 1)),

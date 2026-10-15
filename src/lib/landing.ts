@@ -64,6 +64,11 @@ export interface LandingNote {
     dark: boolean;
     /** 1, or faster if it was hurried along. */
     speed: number;
+    /** The hold it left in: how long it lasts, wall-clock ms, and how far it eases in. */
+    hold: number;
+    zoom: number;
+    /** The scenes module, to fetch it while this page is still loading. */
+    module?: string;
   };
 }
 
@@ -77,10 +82,12 @@ declare global {
 /**
  * Inline <head> script. Before the first paint, marks <html> with `landing`
  * (the banner photograph alone, full screen, until settleLanding() takes
- * over) or `landing-dots` (paper, and the scene's last dots if it sent them,
- * until settleDots() opens it) when this page is the one a transition is
- * landing in. If neither runs, the page shows itself after four seconds
- * anyway.
+ * over) or `landing-dots` (paper and the frame the card's scene left on,
+ * until settleDots() picks it up) when this page is the one a transition is
+ * landing in. A scene that's carrying on over this page is in its hold: the
+ * CSS eases the frame in from the moment it left, timed off the note, while
+ * the page loads, and the scenes module is fetched straight away. If nothing
+ * takes over, the page shows itself after four seconds anyway.
  *
  * Keep it free of backslashes and template placeholders: scripts/csp-hash.mjs
  * hashes this source text as written, and the hash has to match the string
@@ -100,6 +107,18 @@ export const landingBootstrap = `
     var root = document.documentElement;
     var mark = note.kind === 'dots' ? 'landing-dots' : 'landing';
     if (typeof note.art === 'string') root.style.setProperty('--landing-dots', note.art);
+    var scene = note.scene;
+    if (scene) {
+      root.style.setProperty('--landing-zoom', String(scene.zoom || 1));
+      root.style.setProperty('--landing-hold', (scene.hold || 0) + 'ms');
+      root.style.setProperty('--landing-delay', (note.at - Date.now()) + 'ms');
+      if (typeof scene.module === 'string') {
+        var link = document.createElement('link');
+        link.rel = 'modulepreload';
+        link.href = scene.module;
+        document.head.appendChild(link);
+      }
+    }
     window.landingNote = note;
     root.classList.add(mark);
     setTimeout(function () { root.classList.remove(mark); }, 4000);
@@ -377,7 +396,13 @@ function carryOn(root: HTMLElement, note: LandingNote) {
  */
 export function landed(root: HTMLElement): void {
   root.classList.remove("landing-dots");
-  root.style.removeProperty("--landing-dots");
+  for (const name of [
+    "--landing-dots",
+    "--landing-zoom",
+    "--landing-hold",
+    "--landing-delay",
+  ])
+    root.style.removeProperty(name);
   window.landingNote = undefined;
 }
 
