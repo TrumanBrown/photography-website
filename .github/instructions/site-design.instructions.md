@@ -61,6 +61,10 @@ look. Everything below is about the public pages.
   `prefers-reduced-motion: reduce` version that settles instantly.
 - Hover effects (card skim, rail peek, plate boil) are for fine pointers. Nothing on a touch
   screen depends on them.
+- Going from one page to another never morphs one photograph into a different one (a card's
+  cover into a session's banner reads as a glitch). A session card opens its page with a plain
+  page change: a 200ms fade between the pages and the session rising 8px into place
+  ([open.ts](../../src/lib/open.ts), [landing.ts](../../src/lib/landing.ts)).
 
 ## Layout, images, touch
 

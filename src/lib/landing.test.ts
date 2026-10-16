@@ -114,7 +114,7 @@ function boot(options: {
     ...(options.workers ? { Worker, OffscreenCanvas: class {} } : {}),
   };
   const timers: Array<{ ms: number; fn: () => void }> = [];
-  const links: Array<Record<string, string>> = [];
+  const links: Array<Record<string, unknown>> = [];
   const run = new Function(
     "sessionStorage",
     "location",
@@ -145,6 +145,11 @@ function boot(options: {
         appendChild: (el: unknown) => appended.push(el),
       },
       createElement: (tag: string) => {
+        if (tag === "style") {
+          const style: Record<string, unknown> = { tag, removed: false };
+          style.remove = () => (style.removed = true);
+          return style;
+        }
         if (tag !== "canvas") return {};
         const canvas: FakeCanvas & Record<string, unknown> = {
           className: "",
@@ -166,7 +171,7 @@ function boot(options: {
         return canvas;
       },
       head: {
-        appendChild: (el: Record<string, string>) => links.push(el),
+        appendChild: (el: Record<string, unknown>) => links.push(el),
       },
       dispatchEvent: (event: { type: string }) => dispatched.push(event.type),
     },
@@ -235,6 +240,36 @@ describe("landingBootstrap", () => {
     });
     expect(result).toMatchObject({ dots: true, landing: false, left: false });
     expect(result.timers).toEqual([4000]);
+  });
+
+  it("lets a session page a card opened rise into place, fading from the last page", () => {
+    const note = {
+      path: "/sessions/olympic-winter-2026/",
+      at: Date.now(),
+      kind: "page",
+    };
+    const result = boot({ note, path: "/sessions/olympic-winter-2026/" });
+    // Not the photograph landing: the banner stays where it is.
+    expect(result).toMatchObject({ landing: false, dots: false, left: false });
+    expect(result.classes.has("landing-page")).toBe(true);
+    expect(result.links).toEqual([
+      expect.objectContaining({
+        tag: "style",
+        textContent: "@view-transition { navigation: auto; }",
+      }),
+    ]);
+    // Only for the navigation that brought it here.
+    result.fire(4000);
+    expect(result.classes.has("landing-page")).toBe(false);
+    expect(result.links[0].removed).toBe(true);
+
+    const reduced = boot({
+      note,
+      path: "/sessions/olympic-winter-2026/",
+      reduced: true,
+    });
+    expect(reduced.classes.size).toBe(0);
+    expect(reduced.links).toEqual([]);
   });
 
   it("paints a scene's last dots before the first paint, and keeps the note", () => {

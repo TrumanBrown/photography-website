@@ -23,9 +23,11 @@ export { findDots, quietSpot, type DotField } from "./plate-dots";
  * Leaving a page from a card, the way the globe leaves for a session.
  *
  * - A session (a card on the home or places pages, or a row in the rail)
- *   grows its cover until it fills the screen while the session's banner
- *   photograph loads; then the session page opens on that photograph and
- *   settles it into its banner (src/lib/landing.ts).
+ *   simply opens. The page you're on fades into the session's where the
+ *   browser can (a cross-document view transition), and the session rises
+ *   into place (src/lib/landing.ts). Nothing grows out of the card: its cover
+ *   is rarely the session's banner photograph, and one photograph cutting to
+ *   another reads as a glitch.
  * - A hobby card plays its hobby's scene (src/lib/scenes/): the plate's own
  *   dots, read off the image and drawn as circles, lift off the card and act
  *   out a little story, ending zoomed into a few big dots that the hobby page
@@ -46,25 +48,32 @@ const smootherstep = (x: number) => {
 };
 const lerp = (a: number, b: number, k: number) => a + (b - a) * k;
 
+/** Tell the page at `href` how we're arriving. */
+function noteArrival(
+  href: string,
+  kind: NonNullable<LandingNote["kind"]>,
+  more: Partial<LandingNote> = {},
+): void {
+  const note: LandingNote = {
+    ...more,
+    path: new URL(href, window.location.href).pathname,
+    at: more.at ?? Date.now(),
+    kind,
+  };
+  try {
+    sessionStorage.setItem(LANDING_KEY, JSON.stringify(note));
+  } catch {
+    // Private mode can refuse storage; the page just loads normally.
+  }
+}
+
 /** Leave for `href`, telling the page there how we're arriving. */
 function leave(
   href: string,
   kind: LandingNote["kind"] | null,
   more: Partial<LandingNote> = {},
 ): void {
-  if (kind) {
-    const note: LandingNote = {
-      ...more,
-      path: new URL(href, window.location.href).pathname,
-      at: more.at ?? Date.now(),
-      kind,
-    };
-    try {
-      sessionStorage.setItem(LANDING_KEY, JSON.stringify(note));
-    } catch {
-      // Private mode can refuse storage; the page just loads normally.
-    }
-  }
+  if (kind) noteArrival(href, kind, more);
   window.location.assign(href);
 }
 
@@ -82,15 +91,11 @@ let busy = false;
 
 /* ------------------------------------------------------------- sessions */
 
-const GROW_MS = 440;
-const SWAP_MS = 170;
-const BANNER_WAIT_MS = 1500;
 /** How long a pointer rests on a session before its page is fetched. */
 const WARM_AFTER_MS = 150;
 const WARM_KEEP = 6;
 
 interface Warm {
-  ready: Promise<HTMLImageElement | null>;
   abort: AbortController;
   holder: HTMLElement;
 }
@@ -99,9 +104,9 @@ interface Warm {
 const warmed = new Map<string, Warm>();
 
 /**
- * Fetch a session page and decode its banner photograph out of sight, so a
- * click can go straight to it. Pointing at a session for a moment, or
- * pressing on it, starts this; the click picks up whatever has arrived.
+ * Fetch a session page and decode its banner photograph out of sight, so the
+ * page opens from the cache with its photograph ready for the first paint.
+ * Pointing at a session for a moment, or pressing on it, starts this.
  */
 function warmSession(href: string): Warm {
   const known = warmed.get(href);
@@ -110,8 +115,8 @@ function warmSession(href: string): Warm {
   holder.hidden = true;
   document.body.append(holder);
   const abort = new AbortController();
-  const ready = loadBanner(href, holder, null, abort.signal).catch(() => null);
-  const warm = { ready, abort, holder };
+  loadBanner(href, holder, null, abort.signal).catch(() => null);
+  const warm = { abort, holder };
   warmed.set(href, warm);
   if (warmed.size > WARM_KEEP) {
     const [oldest, stale] = warmed.entries().next().value!;
@@ -122,97 +127,22 @@ function warmSession(href: string): Warm {
   return warm;
 }
 
-function openSession(link: HTMLAnchorElement): boolean {
-  const href = link.href;
-  // What it grows from: the photo showing on the card (a skimmed one if
-  // you're thumbing through), or the rail's peek when it's out.
-  const peek = document.querySelector<HTMLImageElement>("#rail-peek.on img");
-  const cover =
-    link.querySelector<HTMLImageElement>(".skim-frame:not([hidden])") ??
-    link.querySelector<HTMLImageElement>(".shot-img") ??
-    (link.matches("[data-rail-item]") && peek ? peek : null);
-  const from = (cover ?? link).getBoundingClientRect();
-  const src = cover?.currentSrc || cover?.src || link.dataset.peek || "";
-
-  const layer = document.createElement("div");
-  layer.className = "open-layer";
-  layer.setAttribute("aria-hidden", "true");
-  const paper = document.createElement("div");
-  paper.className = "open-paper";
-  const photo = document.createElement("img");
-  photo.className = "open-photo";
-  photo.alt = "";
-  if (src) photo.src = src;
-  layer.append(paper, photo);
-  document.body.append(layer);
-
-  const slug = new URL(href).pathname.split("/").filter(Boolean).pop();
+/**
+ * Open a session. The link navigates as usual; this only sets up how the page
+ * changes: both pages opt in to a view transition for this one navigation
+ * (the session page from the note left for it), and the session page rises
+ * into place whether or not the browser can fade between them.
+ */
+function openSession(link: HTMLAnchorElement): void {
+  const slug = new URL(link.href).pathname.split("/").filter(Boolean).pop();
+  // The globe in the rail turns to the session's place on the way.
   document.dispatchEvent(new CustomEvent("session:open", { detail: { slug } }));
-
-  const warm = warmSession(href);
-  let banner: HTMLImageElement | null = null;
-  let failed = false;
-  warm.ready.then(
-    (img) => {
-      if (!img) {
-        failed = true;
-        return;
-      }
-      // Over the cover, still unseen until the swap.
-      layer.append(img.closest("picture") ?? img);
-      banner = img;
-    },
-    () => {
-      failed = true;
-    },
-  );
-
-  const start = performance.now();
-  let swapping = false;
-  function frame(now: number) {
-    const w = document.documentElement.clientWidth;
-    const h = document.documentElement.clientHeight;
-    const k = clamp01((now - start) / GROW_MS);
-    const e = smootherstep(k);
-    photo.style.left = `${lerp(from.left, 0, e)}px`;
-    photo.style.top = `${lerp(from.top, 0, e)}px`;
-    photo.style.width = `${lerp(from.width, w, e)}px`;
-    photo.style.height = `${lerp(from.height, h, e)}px`;
-    paper.style.opacity = String(smootherstep(k / 0.6));
-    if (k < 1 || swapping) {
-      if (!swapping) requestAnimationFrame(frame);
-      return;
-    }
-    if (banner) {
-      // The banner photograph comes up over the cover, full screen: the
-      // frame the session page opens on.
-      swapping = true;
-      const ready = banner;
-      ready
-        .animate([{ opacity: 0 }, { opacity: 1 }], {
-          duration: SWAP_MS,
-          easing: "ease-out",
-          fill: "forwards",
-        })
-        .finished.then(
-          () => requestAnimationFrame(() => leave(href, "photo")),
-          () => leave(href, "photo"),
-        );
-      return;
-    }
-    if (failed || now - start > GROW_MS + BANNER_WAIT_MS) {
-      leave(href, null);
-      return;
-    }
-    requestAnimationFrame(frame);
-  }
-  requestAnimationFrame(frame);
-
-  onReturn(() => {
-    layer.remove();
-    busy = false;
-  });
-  return true;
+  const optIn = document.createElement("style");
+  optIn.textContent = "@view-transition { navigation: auto; }";
+  document.head.append(optIn);
+  // Only this navigation: the page Back returns to doesn't fade into anything.
+  window.addEventListener("pagehide", () => optIn.remove(), { once: true });
+  noteArrival(link.href, "page");
 }
 
 /* -------------------------------------------------------------- hobbies */
@@ -989,12 +919,11 @@ export function initOpeners(): void {
       return;
     }
     const kind = link.dataset.open;
-    const took =
-      kind === "session"
-        ? openSession(link)
-        : kind === "hobby"
-          ? openHobby(link)
-          : false;
+    if (kind === "session") {
+      openSession(link);
+      return;
+    }
+    const took = kind === "hobby" ? openHobby(link) : false;
     if (!took) return;
     busy = true;
     event.preventDefault();

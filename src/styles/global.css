@@ -419,8 +419,8 @@ html.landing-dots body::after {
     cubic-bezier(0.33, 1, 0.68, 1) var(--landing-delay, 0ms) both;
 }
 
-/* Leaving from a card (src/lib/open.ts): a session's cover growing to fill
-   the screen over paper, or a hobby plate's dots on a canvas. */
+/* Leaving from a hobby card (src/lib/open.ts) when its scene can't play: the
+   plate's dots on a canvas, or the plate sinking into paper. */
 .open-layer {
   position: fixed;
   inset: 0;

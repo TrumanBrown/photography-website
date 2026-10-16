@@ -11,11 +11,17 @@ import {
 /**
  * Landing in a page after a transition out of the last one.
  *
- * Two kinds, both started on the page you leave:
- * - `photo`: the globe's flight (src/lib/flight.ts) or a session card
- *   (src/lib/open.ts) ends with the session's banner photograph filling the
- *   screen. The session page opens on that same full-screen photograph, then
- *   settles it into the banner while the rest of the page appears around it.
+ * Three kinds, all started on the page you leave:
+ * - `photo`: the globe's flight (src/lib/flight.ts) ends with the session's
+ *   banner photograph filling the screen. The session page opens on that
+ *   same full-screen photograph, then settles it into the banner while the
+ *   rest of the page appears around it.
+ * - `page`: a session card or a row in the rail (src/lib/open.ts). The page
+ *   you left fades into the session's where the browser can (a
+ *   cross-document view transition, which both pages opt in to for this one
+ *   navigation), and the session's banner, note and photographs rise into
+ *   place. Nothing carries over from the card: its cover is rarely the
+ *   banner photograph.
  * - `dots`: a hobby card plays its scene (src/lib/scenes/) and ends zoomed
  *   into a few big ink dots. The hobby page opens on those same dots, and
  *   each one hollows into a ring and then a window onto the page, until the
@@ -57,7 +63,7 @@ export interface LandingNote {
   /** Date.now() when it left. A stale note is ignored. */
   at: number;
   /** How it arrives; a photograph unless it says otherwise. */
-  kind?: "photo" | "dots";
+  kind?: "photo" | "page" | "dots";
   /** The big dots the scene ended on: x, y, radius, CSS px, in a flat list. */
   dots?: number[];
   /** The viewport those were measured in. */
@@ -123,7 +129,9 @@ declare global {
 /**
  * Inline <head> script. Before the first paint, marks <html> with `landing`
  * (the banner photograph alone, full screen, until settleLanding() takes
- * over) or `landing-dots` (paper and the frame the card's scene left on,
+ * over), `landing-page` (the session page's CSS rises it into place, and the
+ * page opts in to the view transition the last page started) or
+ * `landing-dots` (paper and the frame the card's scene left on,
  * until settleDots() picks it up) when this page is the one a transition is
  * landing in. A scene that's carrying on over this page is in its hold: its
  * frame is painted here, once, on a canvas of its own (as a CSS picture, the
@@ -155,7 +163,13 @@ export const landingBootstrap = `
     if (!note || note.path !== here || Math.abs(Date.now() - note.at) > 10000) return;
     if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     var root = document.documentElement;
-    var mark = note.kind === 'dots' ? 'landing-dots' : 'landing';
+    var mark = note.kind === 'dots' ? 'landing-dots' : note.kind === 'page' ? 'landing-page' : 'landing';
+    var optIn;
+    if (note.kind === 'page') {
+      optIn = document.createElement('style');
+      optIn.textContent = '@view-transition { navigation: auto; }';
+      document.head.appendChild(optIn);
+    }
     if (typeof note.art === 'string') root.style.setProperty('--landing-dots', note.art);
     var scene = note.scene;
     if (scene) {
@@ -232,6 +246,7 @@ export const landingBootstrap = `
     setTimeout(function () {
       root.classList.remove(mark);
       if (frame) frame.remove();
+      if (optIn) optIn.remove();
       var early = window.landingWorker;
       if (early) {
         window.landingWorker = undefined;

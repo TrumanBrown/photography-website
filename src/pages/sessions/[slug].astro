@@ -244,9 +244,10 @@ const structuredData = {
   <article class="session">
     <header class="banner">
       {
-        /* Decoded before it's painted: a page landing from a spin or a card
-          opens on this photograph alone (src/lib/landing.ts), and a first
-          frame without it is a flash of bare paper. */
+        /* Decoded before it's painted: a page landing from a spin opens on
+          this photograph alone (src/lib/landing.ts), and one opened from a
+          card fades in with it, so a first frame without it is a flash of
+          bare paper. */
       }
       <Picture
         src={bannerImage.src}
@@ -608,6 +609,43 @@ const structuredData = {
   html.landed .banner::after {
     opacity: 0;
     transition: none;
+  }
+
+  /* Opened from a card or the rail (src/lib/landing.ts, kind "page"). The
+     page you left fades into this one where the browser can, and the session
+     rises into place in three short steps: Magic UI's blur-fade, without the
+     blur. Nothing carries the card's photograph over. */
+  html.landing-page::view-transition-old(root),
+  html.landing-page::view-transition-new(root) {
+    animation-duration: 200ms;
+    animation-timing-function: var(--ease);
+  }
+  html.landing-page .session > .banner,
+  html.landing-page .session > .note,
+  html.landing-page .session > .photos {
+    animation: session-rise 280ms var(--ease) backwards;
+  }
+  html.landing-page .session > .note {
+    animation-delay: 40ms;
+  }
+  html.landing-page .session > .photos {
+    animation-delay: 80ms;
+  }
+  @keyframes session-rise {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html.landing-page::view-transition-group(*),
+    html.landing-page::view-transition-old(*),
+    html.landing-page::view-transition-new(*),
+    html.landing-page .session > .banner,
+    html.landing-page .session > .note,
+    html.landing-page .session > .photos {
+      animation: none;
+    }
   }
 </style>
 
