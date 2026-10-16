@@ -1,12 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
   ADMIN_THUMB_SIZES,
+  BUILD_COPY_VERSION,
+  buildCopyIsCurrent,
+  buildCopyWidth,
   generateAdminThumbs,
   hashKey,
+  makeBuildCopy,
+  pruneCache,
   reorderByList,
+  restoreBuildCopy,
   sanitizeSlug,
   targetFileForBlob,
   uprightSize,
@@ -297,5 +304,292 @@ describe("admin thumbnails", () => {
       containerClient: container,
     });
     expect(container.uploads).toEqual([]);
+  });
+});
+
+describe("build copy size", () => {
+  it("keeps the photo's exact shape", () => {
+    expect(buildCopyWidth(6192, 4128)).toBe(2400);
+    expect(buildCopyWidth(4128, 6192)).toBe(2400);
+    expect(buildCopyWidth(4032, 3024)).toBe(2400);
+    // 115:129, so the nearest exact width is a few pixels past 2400.
+    expect(buildCopyWidth(3680, 4128)).toBe(2415);
+  });
+
+  it("settles for 2400 when no exact width is close", () => {
+    expect(buildCopyWidth(6191, 4127)).toBe(2400);
+  });
+
+  it("leaves a photo that's already small enough alone", () => {
+    expect(buildCopyWidth(2400, 1600)).toBeNull();
+    expect(buildCopyWidth(1808, 1205)).toBeNull();
+    // Its nearest exact width is its own.
+    expect(buildCopyWidth(2450, 1633)).toBeNull();
+  });
+
+  it("makes no copy of a photo sharp couldn't size", () => {
+    expect(buildCopyWidth(0, 0)).toBeNull();
+    expect(buildCopyWidth(6192, 0)).toBeNull();
+    expect(buildCopyWidth(undefined, undefined)).toBeNull();
+  });
+});
+
+describe("build copy freshness", () => {
+  it("trusts a copy made from the same source with the current settings", () => {
+    expect(
+      buildCopyIsCurrent(
+        { sourceetag: "0x8DE1", buildcopy: BUILD_COPY_VERSION },
+        '"0x8DE1"',
+      ),
+    ).toBe(true);
+  });
+
+  it("refuses a copy of an older source, older settings, or no record", () => {
+    expect(
+      buildCopyIsCurrent(
+        { sourceetag: "0x8DE0", buildcopy: BUILD_COPY_VERSION },
+        '"0x8DE1"',
+      ),
+    ).toBe(false);
+    expect(
+      buildCopyIsCurrent({ sourceetag: "0x8DE1", buildcopy: "0" }, '"0x8DE1"'),
+    ).toBe(false);
+    expect(buildCopyIsCurrent(undefined, '"0x8DE1"')).toBe(false);
+  });
+});
+
+/** Stand-in for the blob that holds one photo's build copy. */
+function fakeCopyBlob({ metadata, bytes, status, downloadStatus } = {}) {
+  const calls = { downloads: [], uploads: [] };
+  return {
+    name: "build-copies/costa-rica-2026/DSC0001.JPEG",
+    calls,
+    async getProperties() {
+      if (status) {
+        const error = new Error("BlobNotFound");
+        error.statusCode = status;
+        throw error;
+      }
+      return { metadata, etag: '"0xC0FFEE"' };
+    },
+    async downloadToFile(path, offset, count, options) {
+      calls.downloads.push(options?.conditions?.ifMatch);
+      if (downloadStatus) {
+        await writeFile(path, Buffer.from("partial"));
+        const error = new Error("ConditionNotMet");
+        error.statusCode = downloadStatus;
+        throw error;
+      }
+      await writeFile(path, bytes);
+    },
+    async uploadData(data, options) {
+      calls.uploads.push({ data, options });
+    },
+  };
+}
+
+describe("making a build copy", () => {
+  let dir;
+
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), "build-copy-"));
+  });
+
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  /** A camera JPEG stored sideways, the way a portrait comes off a Sony. */
+  async function sidewaysPhoto(path) {
+    const { default: sharp } = await import("sharp");
+    await sharp({
+      create: {
+        width: 4800,
+        height: 3200,
+        channels: 3,
+        background: { r: 40, g: 90, b: 60 },
+      },
+    })
+      .jpeg()
+      .withExif({
+        IFD0: { Make: "SONY", Model: "ILCE-6700" },
+        IFD2: { DateTimeOriginal: "2026:06:21 11:55:46" },
+      })
+      .withMetadata({ orientation: 6 })
+      .toFile(path);
+    return uprightSize(await sharp(path).metadata());
+  }
+
+  it("shrinks the photo upright, keeps its EXIF, and uploads it", async () => {
+    const localPath = join(dir, "DSC0001.JPEG");
+    const cacheFile = join(dir, "cache", "copy.bin");
+    const { width, height } = await sidewaysPhoto(localPath);
+    const client = fakeCopyBlob();
+
+    await makeBuildCopy({
+      localPath,
+      width,
+      height,
+      client,
+      sourceEtag: '"0x8DE1"',
+      cacheFile,
+    });
+
+    const { default: sharp } = await import("sharp");
+    const meta = await sharp(localPath).metadata();
+    expect([meta.width, meta.height]).toEqual([2400, 3600]);
+    expect(meta.orientation ?? 1).toBe(1);
+    const { default: exifr } = await import("exifr");
+    const exif = await exifr.parse(localPath, {
+      tiff: true,
+      ifd0: true,
+      exif: true,
+    });
+    expect(exif.Model).toBe("ILCE-6700");
+    expect(exif.DateTimeOriginal).toBeInstanceOf(Date);
+
+    expect(client.calls.uploads).toHaveLength(1);
+    const [{ data, options }] = client.calls.uploads;
+    expect(options.metadata).toEqual({
+      sourceetag: "0x8DE1",
+      buildcopy: BUILD_COPY_VERSION,
+    });
+    expect(options.blobHTTPHeaders.blobContentType).toBe("image/jpeg");
+    expect(Buffer.compare(data, await readFile(localPath))).toBe(0);
+    expect(Buffer.compare(await readFile(cacheFile), data)).toBe(0);
+  });
+
+  it("only swaps the working copy when there's nowhere to keep it", async () => {
+    const localPath = join(dir, "DSC0001.JPEG");
+    const { width, height } = await sidewaysPhoto(localPath);
+
+    await makeBuildCopy({ localPath, width, height });
+
+    const { default: sharp } = await import("sharp");
+    expect((await sharp(localPath).metadata()).width).toBe(2400);
+    expect(await readdir(dir)).toEqual(["DSC0001.JPEG"]);
+  });
+
+  it("uses a photo that's already small as its own copy", async () => {
+    const { default: sharp } = await import("sharp");
+    const localPath = join(dir, "small.JPEG");
+    await sharp({
+      create: { width: 1200, height: 800, channels: 3, background: "#345" },
+    })
+      .jpeg()
+      .toFile(localPath);
+    const before = await readFile(localPath);
+    const client = fakeCopyBlob();
+
+    await makeBuildCopy({
+      localPath,
+      width: 1200,
+      height: 800,
+      client,
+      sourceEtag: '"0x8DE1"',
+      cacheFile: join(dir, "copy.bin"),
+    });
+
+    expect(Buffer.compare(await readFile(localPath), before)).toBe(0);
+    expect(Buffer.compare(client.calls.uploads[0].data, before)).toBe(0);
+  });
+});
+
+describe("restoring a build copy", () => {
+  let dir;
+  let localPath;
+  let cacheFile;
+
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), "restore-copy-"));
+    localPath = join(dir, "images", "DSC0001.JPEG");
+    cacheFile = join(dir, "cache", "copy.bin");
+    await mkdir(join(dir, "images"), { recursive: true });
+  });
+
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it("takes the cached copy without asking Blob", async () => {
+    await mkdir(join(dir, "cache"), { recursive: true });
+    await writeFile(cacheFile, "cached copy");
+    const client = fakeCopyBlob({ status: 500 });
+
+    await expect(
+      restoreBuildCopy({ client, etag: '"0x8DE1"', localPath, cacheFile }),
+    ).resolves.toBe(true);
+    expect(await readFile(localPath, "utf8")).toBe("cached copy");
+    expect(client.calls.downloads).toEqual([]);
+  });
+
+  it("downloads a current copy and keeps it in the cache", async () => {
+    const client = fakeCopyBlob({
+      metadata: { sourceetag: "0x8DE1", buildcopy: BUILD_COPY_VERSION },
+      bytes: Buffer.from("copy from blob"),
+    });
+
+    await expect(
+      restoreBuildCopy({ client, etag: '"0x8DE1"', localPath, cacheFile }),
+    ).resolves.toBe(true);
+    expect(await readFile(localPath, "utf8")).toBe("copy from blob");
+    expect(await readFile(cacheFile, "utf8")).toBe("copy from blob");
+    // Only the copy it checked, not one replaced in between.
+    expect(client.calls.downloads).toEqual(['"0xC0FFEE"']);
+  });
+
+  it("never downloads a copy of an older source", async () => {
+    const client = fakeCopyBlob({
+      metadata: { sourceetag: "0x8DE0", buildcopy: BUILD_COPY_VERSION },
+      bytes: Buffer.from("stale"),
+    });
+
+    await expect(
+      restoreBuildCopy({ client, etag: '"0x8DE1"', localPath, cacheFile }),
+    ).resolves.toBe(false);
+    expect(client.calls.downloads).toEqual([]);
+    expect(existsSync(localPath)).toBe(false);
+  });
+
+  it("falls back to the full photo when there's no copy yet", async () => {
+    const client = fakeCopyBlob({ status: 404 });
+
+    await expect(
+      restoreBuildCopy({ client, etag: '"0x8DE1"', localPath, cacheFile }),
+    ).resolves.toBe(false);
+  });
+
+  it("leaves nothing half-downloaded in the cache", async () => {
+    const client = fakeCopyBlob({
+      metadata: { sourceetag: "0x8DE1", buildcopy: BUILD_COPY_VERSION },
+      downloadStatus: 412,
+    });
+
+    await expect(
+      restoreBuildCopy({ client, etag: '"0x8DE1"', localPath, cacheFile }),
+    ).resolves.toBe(false);
+    expect(await readdir(join(dir, "cache"))).toEqual([]);
+    expect(existsSync(localPath)).toBe(false);
+  });
+});
+
+describe("prebuild cache pruning", () => {
+  it("keeps only what this build used", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "prune-"));
+    try {
+      for (const name of ["full-photo.bin", "copy.bin", "old-copy.bin"]) {
+        await writeFile(join(dir, name), name);
+      }
+      await expect(pruneCache(dir, new Set(["copy.bin"]))).resolves.toBe(2);
+      expect(await readdir(dir)).toEqual(["copy.bin"]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("does nothing when there's no cache yet", async () => {
+    await expect(
+      pruneCache(join(tmpdir(), "no-such-prebuild-cache"), new Set()),
+    ).resolves.toBe(0);
   });
 });

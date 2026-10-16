@@ -65,7 +65,7 @@ All inside resource group `rg-photography-prod`, except the bootstrap identity (
 | ↳ Container `derivatives` | RAW→JPEG sidecars written by the build. Same access. |
 | ↳ Container `variants` | Responsive WebP/JPEG outputs and tiny admin thumbnails. Same access. |
 | ↳ Container `hobby-media` | Full/display hobby-gallery photos, kept separate from sessions. Same access. |
-| ↳ Container `metadata` | Private. Build manifest, the admin index, the photo pipeline's records (`photos/`) and the Instagram poster's state (`social/`). |
+| ↳ Container `metadata` | Private. Build manifest, the admin index, the 2,400 px copies the build reads instead of the originals (`build-copies/`), the photo pipeline's records (`photos/`) and the Instagram poster's state (`social/`). |
 | ↳ Container `incoming` | Private. New uploads wait here until the build removes any GPS position and publishes them to `originals` or `hobby-media`. |
 | ↳ Tables | Contact messages, pageviews, and hashed contact rate-limit counters. Bicep creates `contactmessages`; the Functions create the other two on first write. |
 | **Static Web App** `swa-photography-prod` (Free SKU) | Hosting + global CDN + auto-TLS + PR previews. |
@@ -91,16 +91,16 @@ Assumes ~30 GB stored, ~5 GB egress, personal traffic. Region `westus3`.
 |---|---|---|
 | Static Web Apps | Free tier (100 GB bandwidth, TLS, PR previews) | $0.00 |
 | Blob capacity | 30 GB hot LRS @ ~$0.018/GB | $0.55 |
-| Blob ops + egress | <1M reads; first 100 GB egress free | <$0.05 |
+| Blob ops + egress | <1M reads. This subscription pays for internet egress from the first GB ($0.087/GB, no free 100 GB). Builds run on GitHub's runners, Azure VMs in other regions, so what they download is $0.02/GB: they read 2,400 px build copies, about 2 GB when their cache is cold ([image-pipeline.md](image-pipeline.md#why-the-build-works-from-copies)) | ~$0.50 |
 | App Service Domain (`.com`) | $11.99/yr amortized | ~$1.00 |
 | Azure DNS zone | 1 zone @ $0.50 | $0.50 |
 | Log Analytics | Not created by default; free allowance covers optional storage diagnostics | $0.00 |
 | Azure OpenAI (optional) | Pay per use: about $10–15 once for an 800-photo archive, then cents per new session, nothing while idle | <$0.25 |
 | Logic App timer (optional) | Consumption, about 1,000 runs a month | <$0.10 |
 | Bicep deployments | Always free | $0.00 |
-| **Total** | | **~$2.10 – $2.60** |
+| **Total** | | **~$2.55 – $3.05** |
 
-Even at 10× traffic and 100 GB stored, the bill stays under $6/mo, comfortably inside $150/mo credits.
+Even at 10× traffic and 100 GB stored, the bill stays under $10/mo, comfortably inside $150/mo credits.
 
 ### What we deliberately don't use
 

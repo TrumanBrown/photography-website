@@ -64,6 +64,10 @@ type Resolved = {
   caption?: string;
   exif: string;
   fullUrl: string;
+  // The original's size. src is prebuild's 2400 px build copy, so the
+  // lightbox would stop zooming at the copy's size if it went by src.
+  fullWidth: number;
+  fullHeight: number;
   ratio: number;
   viewUrl: string;
 };
@@ -105,7 +109,9 @@ const resolved: Resolved[] = await Promise.all(
       caption: img.caption,
       exif: formatExif(img.exif),
       fullUrl,
-      ratio: mod.default.width / mod.default.height,
+      fullWidth: img.width,
+      fullHeight: img.height,
+      ratio: img.width / img.height,
       viewUrl: view.src,
     };
   }),
@@ -290,8 +296,8 @@ const structuredData = {
                       <a
                         href={img.viewUrl}
                         data-pswp-full={img.fullUrl}
-                        data-pswp-width={img.src.width}
-                        data-pswp-height={img.src.height}
+                        data-pswp-width={img.fullWidth}
+                        data-pswp-height={img.fullHeight}
                         data-pswp-caption={img.caption ?? ""}
                         data-pswp-exif={img.exif}
                         data-pswp-filename={img.file}

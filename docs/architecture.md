@@ -60,7 +60,7 @@ flowchart TB
 
     subgraph CI["GitHub Actions: Build and Deploy"]
         direction TB
-        PRE["prebuild.mjs<br/>sync originals, RAW to JPEG,<br/>strip any GPS"]
+        PRE["prebuild.mjs<br/>2400 px build copies, RAW to JPEG,<br/>strip any GPS"]
         BUILD["astro build<br/>HTML/CSS/JS + image variants"]
         SYNCV["sync-variants.mjs<br/>move variants to Blob"]
         DEPLOY["SWA deploy<br/>dist/ + api/"]
@@ -112,7 +112,7 @@ flowchart TB
     SECRETS -. "OIDC + deploy token" .-> CI
     PRE -- "DefaultAzureCredential (OIDC)" --> ORIG
     PRE -- "write JPEGs" --> DERIV
-    PRE -- "manifest.json" --> META
+    PRE -- "manifest.json, build copies" --> META
     SYNCV -- "upload variants" --> VAR
     DEPLOY -- "publish" --> STATIC
     DEPLOY -- "deploy functions" --> FCON
@@ -172,7 +172,7 @@ sequenceDiagram
     GH->>GA: Start "Build and Deploy"
     GA->>GA: npm ci (site and api/), then unit tests
     GA->>AZ: OIDC login (build identity)
-    GA->>AZ: prebuild.mjs publishes incoming/ to originals/ (GPS removed),<br/>reads originals/, writes derivatives/
+    GA->>AZ: prebuild.mjs publishes incoming/ to originals/ (GPS removed),<br/>reads build copies (originals only for new photos), writes derivatives/
     GA->>GA: az logout, then astro build (HTML + responsive variants)
     GA->>AZ: OIDC login again, sync-variants.mjs uploads variants/
     GA->>SWA: deploy dist/ + api/ functions

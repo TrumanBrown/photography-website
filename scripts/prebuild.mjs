@@ -18,6 +18,8 @@
  *   3. For each prefix:
  *        - Read _session.json if present, else synthesize from defaults.
  *        - For each image blob:
+ *            * Already checked for a location, full size on record → use its
+ *              2400 px build copy, from the cache or metadata/build-copies/.
  *            * Unchanged etag → reuse cached local copy.
  *            * RAW + matching derivative exists → reuse the derivative.
  *            * RAW without derivative → dcraw_emu → sharp → upload to
@@ -25,12 +27,15 @@
  *            * Other → download into src/content/sessions/<slug>/images/.
  *        - Strip GPS from every photo that records one, everywhere it's
  *          published (keepLocationsPrivate, scripts/location.mjs).
+ *        - Swap every photo read in full for its build copy, and upload the
+ *          copy so later builds never need the full photo.
  *        - Write src/content/sessions/<slug>.json.
  *   4. Save updated manifest back to metadata/manifest.json.
+ *   5. Delete whatever this run didn't use from .cache/prebuild.
  *
  * Exit code 0 even when no sessions exist — the site renders an empty state.
  */
-import { mkdir, mkdtemp, writeFile, readFile, rm, access, copyFile as fsCopyFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, writeFile, readFile, rename, rm, access, copyFile as fsCopyFile } from 'node:fs/promises';
 import { appendFileSync, existsSync } from 'node:fs';
 import { dirname, join, basename, extname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -78,6 +83,26 @@ const DERIVATIVE_JPEG = { quality: 95, mozjpeg: true, chromaSubsampling: '4:4:4'
 const DERIVATIVES = 'derivatives';
 const METADATA = 'metadata';
 const MANIFEST_BLOB = 'manifest.json';
+// The build never needs a photo bigger than this. Astro's widest page image is
+// the 2000 px session banner and the lightbox loads the original straight from
+// Blob, so prebuild works from a 2400 px copy of each photo. GitHub's runners
+// are Azure VMs in other regions, so every byte a build downloads is billed:
+// a cold cache costs the copies, about a fifth of the originals, instead of
+// every original. Each page image is still a downscale, to the same size it
+// would have from the original (buildCopyWidth), and visually the same at 1:1.
+// Bump the version when the copy changes, so each one is made again once.
+const BUILD_COPY_WIDTH = 2400;
+const BUILD_COPY_JPEG = { quality: 95, mozjpeg: true, chromaSubsampling: '4:4:4' };
+export const BUILD_COPY_VERSION = '1';
+// Private, in the metadata container: build-copies/<slug>/<file>.
+const BUILD_COPIES = 'build-copies';
+const IMAGE_CONTENT_TYPES = {
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.png': 'image/png',
+  '.webp': 'image/webp',
+  '.avif': 'image/avif',
+};
 const MAX_TITLE = 200;
 const MAX_LOCATION = 200;
 const MAX_DESCRIPTION = 1000;
@@ -134,15 +159,18 @@ async function main() {
   // naming error cannot destroy the last usable local build inputs.
   await clearSessionsDir();
 
+  const cacheInUse = new Set();
   const indexRecords = [];
   for (const prefix of sessionPrefixes) {
     const rec = await processSession({
       prefix,
       originalsClient,
       derivativesClient,
+      metadataClient,
       service,
       manifest,
       nextManifest,
+      cacheInUse,
     });
     if (rec) indexRecords.push(rec);
   }
@@ -150,6 +178,7 @@ async function main() {
   await saveManifest(metadataClient, nextManifest);
   await writeAdminIndex(metadataClient, indexRecords);
   await reportNewPhotos(metadataClient, indexRecords);
+  await pruneCache(CACHE_DIR, cacheInUse);
   console.log('Prebuild complete.');
 }
 
@@ -264,7 +293,16 @@ async function listSessionPrefixes(originalsClient) {
   return prefixes.sort();
 }
 
-async function processSession({ prefix, originalsClient, derivativesClient, service, manifest, nextManifest }) {
+async function processSession({
+  prefix,
+  originalsClient,
+  derivativesClient,
+  metadataClient,
+  service,
+  manifest,
+  nextManifest,
+  cacheInUse,
+}) {
   const slug = sanitizeSlug(prefix);
   const sessionDir = join(SESSIONS_DIR, slug);
   const imagesDir = join(sessionDir, 'images');
@@ -351,9 +389,23 @@ async function processSession({ prefix, originalsClient, derivativesClient, serv
     // conversion logic added) invalidates old cached bytes.
     const cacheKey = `${b.name}@${b.etag}@${targetFile}`;
     const manifestEntry = manifest[b.name];
+    const sameSource = manifestEntry?.etag === b.etag && manifestEntry?.target === targetFile;
+    const copyClient = metadataClient.getBlockBlobClient(buildCopyBlobName(slug, targetFile));
+    const copyCacheFile = join(CACHE_DIR, hashKey(buildCopyCacheKey(b.name, b.etag, targetFile)));
 
-    let useCached = false;
-    if (manifestEntry?.etag === b.etag && manifestEntry?.target === targetFile) {
+    // A photo an earlier build checked for a location, with its full size on
+    // record, is built from its copy and never downloaded in full again.
+    const fromCopy =
+      sameSource &&
+      manifestEntry.private === true &&
+      manifestEntry.width > 0 &&
+      manifestEntry.height > 0 &&
+      (await restoreBuildCopy({ client: copyClient, etag: b.etag, localPath, cacheFile: copyCacheFile }));
+
+    let useCached = fromCopy;
+    if (fromCopy) {
+      cacheInUse.add(basename(copyCacheFile));
+    } else if (sameSource) {
       const cached = join(CACHE_DIR, hashKey(cacheKey));
       if (existsSync(cached)) {
         await copyFile(cached, localPath);
@@ -392,9 +444,12 @@ async function processSession({ prefix, originalsClient, derivativesClient, serv
       }
     }
 
-    // Read intrinsic dimensions + EXIF date.
+    // Read intrinsic dimensions + EXIF date. A build copy is smaller than the
+    // photo, so the photo's size comes from the manifest; its EXIF is the photo's.
     const { default: sharp } = await import('sharp');
-    const { width, height } = uprightSize(await sharp(localPath).metadata());
+    const { width, height } = fromCopy
+      ? { width: manifestEntry.width, height: manifestEntry.height }
+      : uprightSize(await sharp(localPath).metadata());
 
     let captureDate;
     let exifSettings;
@@ -421,8 +476,22 @@ async function processSession({ prefix, originalsClient, derivativesClient, serv
         : blobPublicUrl(originalsClient, b.name),
     });
 
-    nextManifest.blobs[b.name] = { etag: b.etag, target: targetFile, derivative: willConvert ? `${slug}/${targetFile}` : undefined };
-    published.push({ blob: b, localPath, targetFile, willConvert, derivName: `${slug}/${targetFile}` });
+    nextManifest.blobs[b.name] = {
+      etag: b.etag,
+      target: targetFile,
+      derivative: willConvert ? `${slug}/${targetFile}` : undefined,
+      width,
+      height,
+    };
+    published.push({
+      blob: b,
+      localPath,
+      targetFile,
+      willConvert,
+      derivName: `${slug}/${targetFile}`,
+      fromCopy,
+      copyClient,
+    });
   }
 
   await keepLocationsPrivate({
@@ -432,6 +501,35 @@ async function processSession({ prefix, originalsClient, derivativesClient, serv
     originalsClient,
     derivativesClient,
   });
+
+  // Photos read in full this time are swapped for their build copy now that
+  // any location is gone, so Astro always works from the same file. This has
+  // to come after keepLocationsPrivate, which uploads a cleaned working copy
+  // back as the original. Only a photo cleared of its location is uploaded:
+  // anything else is read in full again next build anyway. Four at a time,
+  // since each JPEG encode uses one core.
+  const toCopy = published.filter((item) => !item.fromCopy);
+  for (let i = 0; i < toCopy.length; i += 4) {
+    await Promise.all(
+      toCopy.slice(i, i + 4).map(async (item) => {
+        const entry = nextManifest.blobs[item.blob.name];
+        const cleared = entry.private === true;
+        const cacheFile = join(CACHE_DIR, hashKey(buildCopyCacheKey(item.blob.name, entry.etag, item.targetFile)));
+        try {
+          await makeBuildCopy({
+            localPath: item.localPath,
+            width: entry.width,
+            height: entry.height,
+            ...(cleared ? { client: item.copyClient, sourceEtag: entry.etag, cacheFile } : {}),
+          });
+          if (cleared) cacheInUse.add(basename(cacheFile));
+        } catch (e) {
+          // Never fail a build over a copy; this photo is read in full again next time.
+          console.warn(`  build copy skip: ${item.blob.name}: ${e.message}`);
+        }
+      }),
+    );
+  }
 
   // Sort images by filename for stable ordering (override via sidecar.images if provided).
   const orderedImages = Array.isArray(sidecar.images)
@@ -780,6 +878,12 @@ export async function keepLocationsPrivate({
     return !verified;
   });
   if (pending.length === 0) return;
+  // A cleaned working copy goes back up as the original, so it must never be
+  // a build copy. processSession only uses one for a photo already verified.
+  const copies = pending.filter((item) => item.fromCopy);
+  if (copies.length > 0) {
+    throw new Error(`Build copies can't be checked for a location: ${copies.map((item) => item.blob.name).join(', ')}`);
+  }
 
   const scratch = await mkdtemp(join(tmpdir(), 'location-'));
   try {
@@ -1142,6 +1246,120 @@ function stripQuotes(s) {
 /** A derivative made from this exact source, by the current conversion. */
 export function derivativeIsCurrent(metadata, blob) {
   return metadata?.sourceetag === stripQuotes(blob.etag) && metadata?.derivative === DERIVATIVE_VERSION;
+}
+
+function buildCopyBlobName(slug, targetFile) {
+  return `${BUILD_COPIES}/${slug}/${targetFile}`;
+}
+
+function buildCopyCacheKey(name, etag, targetFile) {
+  return `build-copy-${BUILD_COPY_VERSION}@${name}@${etag}@${targetFile}`;
+}
+
+/** A build copy made from this exact source, by the current settings. */
+export function buildCopyIsCurrent(metadata, etag) {
+  return metadata?.sourceetag === stripQuotes(etag) && metadata?.buildcopy === BUILD_COPY_VERSION;
+}
+
+/**
+ * Width of a photo's build copy, or null when the photo is small enough to
+ * use as it is. The smallest width from BUILD_COPY_WIDTH that keeps the
+ * photo's exact aspect ratio (3:2 is 2400 x 1600, an odd crop a few pixels
+ * more), so Astro rounds every page image to the height it would from the
+ * original. A crop with no such width close by gets BUILD_COPY_WIDTH, and its
+ * page images may come out a pixel shorter.
+ */
+export function buildCopyWidth(width, height) {
+  if (!Number.isInteger(width) || !Number.isInteger(height) || height <= 0) return null;
+  if (width <= BUILD_COPY_WIDTH) return null;
+  const step = width / gcd(width, height);
+  const exact = Math.ceil(BUILD_COPY_WIDTH / step) * step;
+  const copy = exact - BUILD_COPY_WIDTH <= 160 ? exact : BUILD_COPY_WIDTH;
+  return copy < width ? copy : null;
+}
+
+function gcd(a, b) {
+  return b ? gcd(b, a % b) : a;
+}
+
+/**
+ * Put a photo's build copy at `localPath`, from the local cache or else from
+ * Blob. False when there's no copy made from this exact source, and the
+ * caller reads the full photo instead. Cache files only ever appear whole
+ * (written aside, then renamed), since a cancelled run's cache is still saved.
+ */
+export async function restoreBuildCopy({ client, etag, localPath, cacheFile }) {
+  if (existsSync(cacheFile)) {
+    await copyFile(cacheFile, localPath);
+    return true;
+  }
+  const part = `${cacheFile}.part`;
+  try {
+    const props = await client.getProperties();
+    if (!buildCopyIsCurrent(props.metadata, etag)) return false;
+    await mkdir(dirname(cacheFile), { recursive: true });
+    await client.downloadToFile(part, 0, undefined, { conditions: { ifMatch: props.etag } });
+    await rename(part, cacheFile);
+    await copyFile(cacheFile, localPath);
+    console.log(`  copy:     ${client.name}`);
+    return true;
+  } catch (e) {
+    await rm(part, { force: true });
+    if (e.statusCode !== 404) console.warn(`  build copy probe failed: ${client.name}: ${e.message}`);
+    return false;
+  }
+}
+
+/**
+ * Replace the full-size photo at `localPath` with its build copy. With a
+ * `client`, also upload the copy and keep it in the local cache, so later
+ * builds never need the full photo. The camera's EXIF stays, since the session
+ * date and the lightbox's settings line are read from it; any GPS position is
+ * gone by now (keepLocationsPrivate). Photos that are already small, and the
+ * rare PNG, WebP or AVIF, are their own copy.
+ */
+export async function makeBuildCopy({ localPath, width, height, client, sourceEtag, cacheFile }) {
+  const copyWidth = buildCopyWidth(width, height);
+  let data;
+  if (copyWidth && /\.jpe?g$/i.test(localPath)) {
+    const { default: sharp } = await import('sharp');
+    data = await sharp(localPath)
+      .rotate()
+      .resize({ width: copyWidth, height: Math.round((copyWidth * height) / width), fit: 'fill' })
+      .keepExif()
+      .jpeg(BUILD_COPY_JPEG)
+      .toBuffer();
+    await writeFile(localPath, data);
+  }
+  if (!client) return;
+  data ??= await readFile(localPath);
+  await client.uploadData(data, {
+    blobHTTPHeaders: {
+      blobContentType: IMAGE_CONTENT_TYPES[extname(localPath).toLowerCase()] ?? 'application/octet-stream',
+    },
+    metadata: { sourceetag: stripQuotes(sourceEtag), buildcopy: BUILD_COPY_VERSION },
+  });
+  console.log(`  upload:   ${client.name}`);
+  await mkdir(dirname(cacheFile), { recursive: true });
+  await writeFile(`${cacheFile}.part`, data);
+  await rename(`${cacheFile}.part`, cacheFile);
+}
+
+/**
+ * Leave only what this run used in the prebuild cache. CI restores and saves
+ * the whole folder, and GitHub keeps 10 GB of caches per repository: full-size
+ * photos left in here pushed this cache or the image-variant cache out on most
+ * runs, and the next build downloaded every photo again.
+ */
+export async function pruneCache(dir, keep) {
+  let removed = 0;
+  for (const name of await readdirSafe(dir)) {
+    if (keep.has(name)) continue;
+    await rm(join(dir, name), { recursive: true, force: true });
+    removed++;
+  }
+  if (removed > 0) console.log(`cache: removed ${removed} file(s) this build didn't use`);
+  return removed;
 }
 
 /**

@@ -131,7 +131,7 @@ machine.
 |---|---|
 | Upload ([scripts/upload-session.sh](../scripts/upload-session.sh), [scripts/upload-hobby-media.mjs](../scripts/upload-hobby-media.mjs)) | Photos go to the private `incoming` container, unreadable by URL. Nothing is changed on your machine. |
 | Every build, first ([scripts/prebuild.mjs](../scripts/prebuild.mjs), `publishIncoming`) | Removes the position from anything in `incoming` that records one, then publishes it to `originals` (or `hobby-media`) and deletes it from `incoming`. A photo that can't be cleaned stops the build and stays private. |
-| Every build, per photo (`keepLocationsPrivate`) | A backstop for photos put in `originals` some other way (Storage Explorer, `az`) and ones published before any of this existed. Once per photo and ETag it checks the working copy Astro reads and, for HEIC/RAW, the source file (its URL is easy to guess from the derivative's), and strips whatever records a position everywhere it's published, keeping each blob's name and headers. A working copy, derivative, linked original or new HEIC/RAW source that can't be cleaned fails the build; a HEIC/RAW source an earlier build already published gets a warning and another try. |
+| Every build, per photo (`keepLocationsPrivate`) | A backstop for photos put in `originals` some other way (Storage Explorer, `az`) and ones published before any of this existed. Once per photo and ETag it checks the working copy Astro reads and, for HEIC/RAW, the source file (its URL is easy to guess from the derivative's), and strips whatever records a position everywhere it's published, keeping each blob's name and headers. A working copy, derivative, linked original or new HEIC/RAW source that can't be cleaned fails the build; a HEIC/RAW source an earlier build already published gets a warning and another try. Only then is the working copy swapped for a 2,400 px copy of the cleaned file, kept in the private `metadata` container, which later builds read instead. |
 | Monthly, or on demand ([`photo-locations.yml`](../.github/workflows/photo-locations.yml)) | Scans every public container, including Astro's old copies in `variants/`, and strips anything that still records a position. A scheduled run that finds something fails, so GitHub emails you. The log shows counts only. `node scripts/location.mjs blobs` does the same from your machine if you'd rather. |
 
 The only image a build re-encodes at full size is a HEIC or RAW photo, which
@@ -139,7 +139,8 @@ browsers can't display: it becomes a full-resolution JPEG in one step from a
 lossless decode, at quality 95 with full colour resolution, and the HEIC/RAW
 itself stays in `originals`. The smaller copies the pages show first (grid
 images, the lightbox's quick preview) are resized on purpose; the lightbox
-always ends on the full-size file.
+always ends on the full-size file. So is the 2,400 px copy the build works
+from, which is made only after any position is gone and is never published.
 
 Nothing derives a position from photos any more: the home-page globe pins each
 session from a hand-kept table of coarse, public points

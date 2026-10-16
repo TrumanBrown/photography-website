@@ -14,7 +14,7 @@
     │                     │                         │                         │
     │                     │ ◄── list blobs ──────── │                         │
     │                     │                         │                         │
-    │                     │ ◄── download originals ─│                         │
+    │                     │ ◄── download copies ────│                         │
     │                     │                         │                         │
     │                     │ ◄── (if RAW) upload ── │                         │
     │                     │      JPEG sidecar       │                         │
@@ -143,6 +143,7 @@ What happens inside `scripts/prebuild.mjs`:
   - Reject sources that would produce the same case-insensitive output name (for example `DSC0123.ARW` plus `DSC0123.jpg`) instead of overwriting one.
    - **For each image blob:**
      - Compare its ETag to what's in the manifest.
+     - If the manifest says this exact version was already checked for a location and records its full size → use its **build copy** (below): the cached one, else `metadata/build-copies/<session>/<file>`. Skip the full download.
      - If unchanged AND a cached local copy exists → reuse it. Skip download.
      - If it's a RAW file → check whether `derivatives/<session>/<base>.jpg` already exists with metadata `source-etag` matching the RAW's current ETag.
        - **Yes** → reuse the existing derivative.
@@ -150,12 +151,33 @@ What happens inside `scripts/prebuild.mjs`:
      - If it's a standard image → download it.
    - Read width/height with sharp and EXIF with exifr. A photograph the camera stored sideways (EXIF orientation 5–8) has its width and height swapped, so the recorded shape is the upright one the site shows. That's what the admin's 3:2 check and the home page's lead box go by. The earliest `DateTimeOriginal` becomes the session date; per-photo capture settings (camera, lens, focal length, aperture, shutter, ISO) are stored on each image and shown beneath it in the lightbox. EXIF survives RAW conversion because sharp is told to `keepExif()`. The HEIC converter writes none, so iPhone HEIC photos show no settings, and synthetic fixtures and stripped images simply have none either.
    - **Keep locations private (backstop).** For photos that reached `originals/` without going through `incoming`, and ones published before this check existed: once per photo and ETag, `keepLocationsPrivate` checks the working copy Astro will read and, for RAW/HEIC, the source file. Any that records a GPS position is stripped with exiftool (metadata only) in every place it's published: the working copy, the derivative, and the original in `originals/`, which keeps its name and headers. A working copy, derivative, linked original or new RAW/HEIC source that can't be cleaned fails the build; a RAW/HEIC source an earlier build already published gets a warning and another try. See [security.md](security.md#photo-locations).
+   - **Swap in the build copy.** Every photo read in full (a new one, or every photo once after the copy settings change) is replaced by a 2,400 px copy: JPEG quality 95 with full colour resolution and the camera's EXIF, at the smallest width from 2,400 that keeps the photo's exact aspect ratio, so every page image comes out at the size it would from the original. The copy is uploaded to the private `metadata/build-copies/` with `source-etag` and `buildcopy` metadata, so it's made again only when the photo or the copy settings change, and the photo's full size goes in the manifest. This comes after the location check, which uploads a cleaned working copy back as the original.
    - Write `src/content/sessions/<slug>.json` for Astro to consume.
 5. **Save the updated manifest** back to `metadata/manifest.json`.
+6. **Prune the cache.** Anything in `.cache/prebuild/` this run didn't use is deleted, so it holds exactly one build copy per photo.
 
 The cache key hashes the full blob name, ETag, and generated target filename
 with SHA-256. Azure changes the ETag whenever content changes, while the name
 and target prevent renames or conversion-format changes from aliasing old bytes.
+A build copy's key also carries the copy settings' version.
+
+### Why the build works from copies
+
+The site never shows a page image wider than the 2,000 px session banner, and
+the lightbox loads the original straight from Blob, so the build has no use for
+a 6,192 px original. It matters because GitHub's runners are Azure VMs in other
+regions: every byte prebuild downloads from Blob is billed as transfer between
+regions. Full-size photos also made the prebuild cache about 9 GB, which with
+Astro's variants passed GitHub's 10 GB of cache per repository. GitHub then
+evicted one of the two on most runs, and the next build downloaded every
+original again, about 1,300 GB in the month before this changed. The copies
+are about a fifth of the size, so both caches fit with room to grow, and a
+build that does start cold downloads about 2 GB rather than 9.
+
+They look the same: tested on the hardest photos in the archive (smooth blur,
+saturated colour on black, sky gradients, night noise), page images made from
+a copy score within SSIMULACRA2's noise of ones made from the original, and
+the difference is far smaller than moving Astro's WebP from quality 80 to 75.
 
 ---
 
@@ -193,10 +215,10 @@ Once `src/content/sessions/` is populated, Astro's `astro build` does the rest:
 
 - **Content collection.** Astro reads each `<slug>.json` against the Zod schema in `src/content/config.ts`. This independently validates generated output after the earlier sidecar checks.
 - **Image optimization**: every reference to a session image goes through `<Picture>`, which during build calls sharp to produce:
-  - Multiple widths: 480, 800, 1200 px on cards, plus 1600 px on session pages
+  - Multiple widths: 320 to 960 px on cards, 480 to 1600 px in a session's grid, and up to 2000 px for the session banner, the widest image on any page
   - Two formats per width: WebP (broadly supported, small) and JPEG (universal fallback). AVIF is intentionally **not** generated: its encoder is several times slower than WebP and would dominate build time for little extra savings.
 - **Static HTML**: every page is pre-rendered to a `.html` file. The `<picture>` tags contain `srcset` listing every variant; the browser picks the right one.
-- **Lightbox sources.** Each gallery link carries two URLs: `href` points at a size-capped WebP that paints quickly, and `data-pswp-full` points at the original. The declared `data-pswp-width`/`height` are the **original's**, so zoom is never capped. See [Viewing: full resolution without the wait](#viewing-full-resolution-without-the-wait).
+- **Lightbox sources.** Each gallery link carries two URLs: `href` points at a size-capped WebP that paints quickly, and `data-pswp-full` points at the original. The declared `data-pswp-width`/`height` are the **original's**, read from the session JSON because Astro itself only sees the build copy, so zoom is never capped. See [Viewing: full resolution without the wait](#viewing-full-resolution-without-the-wait).
 - **Loading priority.** The first homepage cover and first photograph on each session page are eager/high priority because they are the likely LCP elements. All remaining photographs stay lazy. Pages preconnect to the Blob origin so DNS/TLS negotiation can begin before the browser discovers the first image in the body.
 
 The output starts as a `dist/` folder containing static files and generated
@@ -323,11 +345,11 @@ Incremental builds (only one new photo since last run) are usually under 90 seco
 | `derivatives/` | RAW→JPEG sidecars. Regenerable. | Reads of known URLs | No |
 | `variants/` | Responsive WebP/JPEG files + admin thumbnails. Regenerable. | Reads of known URLs | No |
 | `hobby-media/` | Full/display images used only by hobby galleries. | Reads of known URLs | No |
-| `metadata/` | `manifest.json` + `admin-index.json`, and the photo and Instagram pipelines' state (`photos/`, `social/`). | No | No |
+| `metadata/` | `manifest.json` + `admin-index.json`, the 2,400 px copies the build reads (`build-copies/`), and the photo and Instagram pipelines' state (`photos/`, `social/`). | No | No |
 
 | Path in repo | Contents |
 |---|---|
 | `src/content/sessions/*.json` | Per-session metadata + image list. Gitignored, written fresh by prebuild every run. |
-| `src/content/sessions/<slug>/images/*` | The actual JPEGs Astro processes. Gitignored. |
+| `src/content/sessions/<slug>/images/*` | The 2,400 px build copies Astro processes. Gitignored. |
 | `dist/` | The built site. Gitignored. Recreated every build. |
-| `.cache/prebuild/` | Local cache of downloaded blobs keyed by ETag. Gitignored. Persisted between CI runs via `actions/cache`. |
+| `.cache/prebuild/` | One build copy per photo (about 2 GB), keyed by ETag; whatever a run didn't use is deleted at its end. Gitignored. Persisted between CI runs via `actions/cache`. |

@@ -152,12 +152,15 @@ jobs:
         # .cache/astro holds Astro's optimized image variants. Persisting it
         # means only new/changed photos are re-encoded by sharp each build,
         # instead of regenerating every variant from scratch.
+        # Astro never removes an entry, so the key changes when every variant
+        # does: v2 started when prebuild began handing Astro 2400 px build
+        # copies instead of the originals.
         uses: actions/cache@v4
         with:
           path: .cache/astro
-          key: astro-cache-${{ github.run_id }}
+          key: astro-cache-v2-${{ github.run_id }}
           restore-keys: |
-            astro-cache-
+            astro-cache-v2-
 
       - name: Astro build
         run: npm run build
@@ -191,7 +194,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: .cache/astro
-          key: astro-cache-${{ github.run_id }}
+          key: astro-cache-v2-${{ github.run_id }}
 
       - name: Deploy to Azure Static Web Apps
         if: env.CAN_USE_AZURE == 'true'
