@@ -45,7 +45,7 @@ The project started as a photography portfolio and has grown into a small person
 - **Domain + DNS:** Azure App Service Domain + Azure DNS
 - **IaC:** Bicep, see [docs/iac-bicep.md](docs/iac-bicep.md)
 - **CI/CD:** GitHub Actions, OIDC federation (no long-lived secrets) with a blob-only identity for builds and a separate one for the manual infra deploy, see [docs/cicd.md](docs/cicd.md)
-- **Cost target:** ~$2–3/month at personal traffic (incl. `.com` domain), see [docs/azure.md#monthly-cost](docs/azure.md#monthly-cost)
+- **Cost target:** about $5/month at personal traffic (incl. `.com` domain), see [What it costs](#what-it-costs) and [docs/azure.md#monthly-cost](docs/azure.md#monthly-cost)
 - **What about your name/address/etc. in this repo?** See [docs/privacy.md](docs/privacy.md)
 
 ---
@@ -337,6 +337,55 @@ nothing about the account ever goes in the repository: it's in GitHub secrets
 and private storage, and the workflow logs show counts only. Step-by-step
 setup, the posting rules, and troubleshooting: [docs/social.md](docs/social.md).
 Preview what's coming with `npm run social -- preview`.
+
+---
+
+## What it costs
+
+The site costs about $5 a month to run. That's the bill for the month to
+October 15, 2026, without the build's old downloads (below), plus a twelfth of
+the domain's yearly fee. About $1.65 is photos sent to visitors, $1.50 is the
+`.com` domain and its DNS zone, about $1.35 is storage requests, and the
+remaining 55 cents is storage space, the caption model, an alert rule and the
+posting timer. Details are in [docs/azure.md](docs/azure.md#monthly-cost).
+
+The line Azure calls Bandwidth is data leaving the storage account. Anything
+that reads a photo by its public URL counts. That's mostly visitors, about
+19 GB a month, at $0.087/GB from the first GB on this subscription. The other
+reader is the build. GitHub's runners are Azure VMs in other regions, so
+whatever prebuild downloads from Blob is billed as transfer between regions,
+at $0.02/GB.
+
+From mid-September to mid-October 2026 that transfer was most of the bill.
+Prebuild kept every photo at full size in its GitHub Actions cache, about
+9 GB, and together with Astro's image cache that passed GitHub's limit of
+10 GB per repository. GitHub then deleted one of the two caches on most runs,
+and the next build downloaded the whole library again, 6 to 9 GB at a time and
+more than 20 times on a busy day. Builds downloaded about 1,300 GB that month,
+and $21.03 of the site's $26.31 bill was that transfer.
+
+The build now reads a 2,400 px copy of each photo instead
+([docs/image-pipeline.md](docs/image-pipeline.md#why-the-build-works-from-copies)).
+No page shows an image wider than 2,000 px, and the lightbox still loads the
+original straight from Blob, so visitors see the same photos. The copies come
+to about 2 GB, so both caches fit with room to spare. A normal build downloads
+nothing from storage, and one that starts with an empty cache downloads about
+2 GB instead of 9. In the 11 hours after the change, builds downloaded 0.04 GB
+from storage, against 86 GB in the 17 hours before it.
+
+If the Bandwidth line climbs again, these show whether the build is the cause:
+
+```bash
+gh cache list   # prebuild-cache-* about 1.9 GB, astro-cache-v2-* about 1.5 GB
+az monitor metrics list \
+  --resource "$(az storage account show -n <storage-account> --query id -o tsv)/blobServices/default" \
+  --metric Egress --interval P1D --aggregation Total --filter "Authentication eq '*'"
+```
+
+In the Egress numbers, `OAuth` is the build and anything else signed in to
+Azure, like a local prebuild, and `Anonymous` is photos read by public URL,
+mostly by visitors. The subscription has no budget alert. Cost Management can
+email you when the month's forecast passes an amount you set.
 
 ---
 

@@ -85,22 +85,24 @@ Full module-by-module breakdown: [iac-bicep.md#what-the-bicep-deploys-resource-b
 
 ## Monthly cost
 
-Assumes ~30 GB stored, ~5 GB egress, personal traffic. Region `westus3`.
+Measured from the bill for September 16 to October 15, 2026, without the build's own downloads, which stopped on October 16 ([image-pipeline.md](image-pipeline.md#why-the-build-works-from-copies)). About 17 GB stored and about 19 GB a month read by public URL. Region `westus3`.
 
 | Service | Tier / Usage | Monthly |
 |---|---|---|
 | Static Web Apps | Free tier (100 GB bandwidth, TLS, PR previews) | $0.00 |
-| Blob capacity | 30 GB hot LRS @ ~$0.018/GB | $0.55 |
-| Blob ops + egress | <1M reads. This subscription pays for internet egress from the first GB ($0.087/GB, no free 100 GB). Builds run on GitHub's runners, Azure VMs in other regions, so what they download is $0.02/GB: they read 2,400 px build copies, about 2 GB when their cache is cold ([image-pipeline.md](image-pipeline.md#why-the-build-works-from-copies)) | ~$0.50 |
+| Blob capacity | About 17 GB hot LRS @ ~$0.018/GB | $0.31 |
+| Blob requests | About 2.7M a month, most of them the build checking which page images and admin thumbnails are already uploaded (about 15,000 per build) | $1.35 |
+| Egress | About 19 GB a month read by public URL, mostly by visitors, at $0.087/GB from the first GB (this subscription gets no free 100 GB). Builds run on GitHub's runners, Azure VMs in other regions, so what they download is $0.02/GB: they read 2,400 px build copies, about 2 GB when their cache is cold | $1.66 |
 | App Service Domain (`.com`) | $11.99/yr amortized | ~$1.00 |
-| Azure DNS zone | 1 zone @ $0.50 | $0.50 |
+| Azure DNS zone | 1 zone @ $0.50 | $0.49 |
 | Log Analytics | Not created by default; free allowance covers optional storage diagnostics | $0.00 |
-| Azure OpenAI (optional) | Pay per use: about $10–15 once for an 800-photo archive, then cents per new session, nothing while idle | <$0.25 |
-| Logic App timer (optional) | Consumption, about 1,000 runs a month | <$0.10 |
+| Azure OpenAI (optional) | Pay per use: about $10–15 once for an 800-photo archive, then cents per new session, nothing while idle | $0.14 |
+| Azure Monitor alert | One metric alert rule (new contact message) | $0.10 |
+| Logic App timer (optional) | Consumption, about 1,000 runs a month | $0.01 |
 | Bicep deployments | Always free | $0.00 |
-| **Total** | | **~$2.55 – $3.05** |
+| **Total** | | **~$5.05** |
 
-Even at 10× traffic and 100 GB stored, the bill stays under $10/mo, comfortably inside $150/mo credits.
+At 10× the traffic and 100 GB stored it would be about $23 a month, mostly egress, and still well inside the $150/mo credits.
 
 ### What we deliberately don't use
 
