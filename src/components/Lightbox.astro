@@ -8,7 +8,9 @@
  *   data-pswp-width={intrinsicWidth}
  *   data-pswp-height={intrinsicHeight}
  *   data-pswp-caption={optional caption}
- * and contain a thumbnail <img> child.
+ *   data-pswp-exif={optional capture settings line}
+ * and contain a thumbnail <img> child. The caption and capture line sit under
+ * the photograph, never over it.
  *
  * Optionally, when href points at a size-capped copy rather than the original:
  *   data-pswp-full={originalUrl}
@@ -34,6 +36,7 @@ const { gallerySelector = "#gallery", prints = false } = Astro.props;
   import PhotoSwipeLightbox from "photoswipe/lightbox";
   import "photoswipe/style.css";
   import { createUpgrader } from "@/lib/lightbox";
+  import { lightboxCaptions } from "@/lib/lightbox-caption";
   import { printInquiry } from "@/lib/prints";
 
   // Read the per-page selector from the marker element below.
@@ -57,6 +60,11 @@ const { gallerySelector = "#gallery", prints = false } = Astro.props;
       }
     });
 
+  /* A caption and capture line sit under the photograph, never over it, on
+     every screen: each photograph is fitted into the space above its own
+     caption (src/lib/lightbox-caption.ts). */
+  const captions = lightboxCaptions();
+
   const lightbox = new PhotoSwipeLightbox({
     gallery: selector,
     children: "a",
@@ -69,7 +77,9 @@ const { gallerySelector = "#gallery", prints = false } = Astro.props;
     // wait on the network at every step. These are the size-capped copies, not
     // the originals, so looking past a photograph stays cheap.
     preload: [1, 2],
+    paddingFn: captions.padding,
   });
+  captions.attach(lightbox);
 
   /* PhotoSwipe only reuses the gallery thumbnail as a placeholder on the first
      slide. The thumbnails are already decoded in the grid behind the lightbox,
@@ -213,39 +223,6 @@ const { gallerySelector = "#gallery", prints = false } = Astro.props;
         });
       },
     });
-
-    // Caption + EXIF capture settings beneath the photo.
-    lightbox.pswp?.ui?.registerElement({
-      name: "caption",
-      order: 9,
-      isButton: false,
-      appendTo: "root",
-      html: "",
-      onInit: (el, instance) => {
-        instance.on("change", () => {
-          const slideEl = instance.currSlide?.data?.element as
-            | HTMLElement
-            | undefined;
-          const caption = slideEl?.dataset?.pswpCaption ?? "";
-          const exif = slideEl?.dataset?.pswpExif ?? "";
-          // Build via textContent (not innerHTML) so caption/EXIF strings can
-          // never inject markup.
-          el.textContent = "";
-          if (caption) {
-            const c = document.createElement("span");
-            c.className = "pswp__caption-text";
-            c.textContent = caption;
-            el.appendChild(c);
-          }
-          if (exif) {
-            const e = document.createElement("span");
-            e.className = "pswp__caption-exif";
-            e.textContent = exif;
-            el.appendChild(e);
-          }
-        });
-      },
-    });
   });
 
   /* Photographs are what this site is for, so the lightbox always ends up
@@ -313,22 +290,46 @@ const { gallerySelector = "#gallery", prints = false } = Astro.props;
   hidden></span>
 
 <style is:global>
+  /* Under the photograph in its slide, never on it (lightbox-caption.ts
+     places it and keeps the room). It shows and hides with the toolbar, and
+     fades while the photograph is zoomed in or dragged. */
   .pswp__caption {
     position: absolute;
-    bottom: 1rem;
-    left: 50%;
-    transform: translateX(-50%);
+    left: 0;
+    right: 0;
+    width: min(100% - 2rem, 40rem);
+    margin-inline: auto;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 0.15rem;
     color: #f5f5f5;
     font-size: 0.875rem;
-    padding: 0.3rem 0.75rem;
-    background: rgba(0, 0, 0, 0.55);
-    max-width: 90vw;
+    line-height: 1.45;
     text-align: center;
     pointer-events: none;
+    opacity: 0;
+    transition: opacity var(--pswp-transition-duration, 250ms)
+      cubic-bezier(0.4, 0, 0.22, 1);
+  }
+  .pswp--ui-visible .pswp__caption {
+    opacity: 1;
+  }
+  .pswp--ui-visible .pswp__caption.pswp__caption--away {
+    opacity: 0;
+    transition-duration: 150ms;
+  }
+  /* The same caption laid out off screen, to measure the room it needs. */
+  .pswp__caption.pswp__caption--ruler {
+    position: fixed;
+    top: 0;
+    visibility: hidden;
+    transition: none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .pswp__caption {
+      transition: none;
+    }
   }
 
   /* A word, not an icon, in the toolbar's own colour and size. */
@@ -371,10 +372,6 @@ const { gallerySelector = "#gallery", prints = false } = Astro.props;
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
-  }
-
-  .pswp__caption:empty {
-    display: none;
   }
 
   .pswp__caption-exif {

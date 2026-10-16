@@ -64,6 +64,12 @@ look. Everything below is about the public pages.
 
 ## Layout, images, touch
 
+- A caption never goes over its photograph, at any screen size, in the lightbox or anywhere
+  else. A photo's caption and capture line sit under it, and the photograph gets smaller to make
+  room. The lightbox fits each photo above its own caption
+  ([lightbox-caption.ts](../../src/lib/lightbox-caption.ts) and its tests), and a zoomed or
+  dragged photo covers its caption, never the reverse. Check a long caption on a phone with its
+  browser bars showing (390×664) as well as on a desktop.
 - Photography pages sit in the archive shell (rail plus main) and use `var(--gutter)`. Hobby
   pages use the header. The shell switches to the phone bar below 900px.
 - Every `<img>` has `width` and `height`. Images on the first screen (the first row of cards,
