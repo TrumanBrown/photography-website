@@ -255,8 +255,17 @@ using three tiers that each do one job:
 PhotoSwipe normally reuses the gallery thumbnail only on the first slide; a
 `placeholderSrc` filter in `src/components/Lightbox.astro` lets every slide use
 one, so a photograph is on screen immediately rather than after a round trip.
-The bridge arrives next, then `upgradeToOriginal()` swaps in the original once
-it has decoded, so the visible image never flashes blank.
+The bridge arrives next, then the upgrader in `src/lib/lightbox.ts`
+(`createUpgrader()`) swaps in the original once it has decoded, so the visible
+image never flashes blank.
+
+The upgrade is tracked per `<img>`, not per photograph. PhotoSwipe keeps the
+images for only five slides and throws the rest away, and throws them all away
+when the lightbox closes. When you come back to a photograph it builds a new
+`<img>` on the bridge, and that one has to be upgraded too. Tracking the
+photograph instead left anyone who stepped six photographs on and back, or
+closed and reopened the lightbox, looking at the 1600 px bridge until they
+reloaded the page.
 
 Two details make this cheap rather than merely clever:
 
@@ -267,7 +276,11 @@ Two details make this cheap rather than merely clever:
   so every viewing re-downloaded the whole file. The prebuild now backfills
   `public, max-age=31536000, immutable` while it is already enumerating blobs
   (see `ORIGINALS_CACHE_CONTROL` in `scripts/prebuild.mjs`), which makes it a
-  no-op after the first run. Repeat views cost nothing.
+  no-op after the first run. Repeat views cost nothing, including the second
+  upgrade of a rebuilt `<img>`. The exception is a private window: Chrome
+  keeps its cache in memory there and won't hold an entry over about 6 MB, so
+  coming back to a larger original downloads it again, just as reloading the
+  page would.
 
 Measured against the previous approach, where `href` pointed straight at the
 original and PhotoSwipe's default `preload: [1, 2]` therefore pulled **seven**

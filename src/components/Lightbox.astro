@@ -33,6 +33,7 @@ const { gallerySelector = "#gallery", prints = false } = Astro.props;
   // @ts-ignore - photoswipe ships its own types under subpaths
   import PhotoSwipeLightbox from "photoswipe/lightbox";
   import "photoswipe/style.css";
+  import { createUpgrader } from "@/lib/lightbox";
   import { printInquiry } from "@/lib/prints";
 
   // Read the per-page selector from the marker element below.
@@ -256,42 +257,22 @@ const { gallerySelector = "#gallery", prints = false } = Astro.props;
 
      Only the photograph actually on screen is upgraded. Neighbours stay on the
      cheap version until you reach them, so flicking through a session doesn't
-     queue up tens of megabytes you never look at. */
-  const upgrading = new WeakSet<HTMLElement>();
-
-  function upgradeToOriginal(pswp: any) {
-    const slide = pswp?.currSlide;
-    const anchor = slide?.data?.element as HTMLElement | undefined;
-    const img = slide?.content?.element as HTMLImageElement | undefined;
-    if (!anchor || !img || upgrading.has(anchor)) return;
-
-    const full = anchor.dataset.pswpFull;
-    // Galleries that already link the original have nothing to upgrade to.
-    if (!full || img.src === full) return;
-
-    upgrading.add(anchor);
-    const original = new Image();
-    original.decoding = "async";
-    original.onload = () => {
-      // Decode before swapping so the visible image never flashes blank.
-      const swap = () => {
-        img.src = full;
-        img.srcset = "";
-      };
-      if (original.decode) original.decode().then(swap, swap);
-      else swap();
-    };
-    original.onerror = () => {
-      // Leave the stand-in on screen rather than breaking the slide.
-      upgrading.delete(anchor);
-    };
-    original.src = full;
-  }
+     queue up tens of megabytes you never look at. It's checked again every
+     time a photograph comes on screen, because PhotoSwipe rebuilds slides it
+     has dropped on the capped copy (see createUpgrader). */
+  const upgrade = createUpgrader();
 
   lightbox.on("afterInit", () => {
     const pswp = lightbox.pswp;
     if (!pswp) return;
-    const run = () => upgradeToOriginal(pswp);
+    const run = () => {
+      const slide = pswp.currSlide;
+      const anchor = slide?.data?.element as HTMLElement | undefined;
+      upgrade(
+        slide?.content?.element as HTMLImageElement | undefined,
+        anchor?.dataset.pswpFull,
+      );
+    };
     run();
     pswp.on("change", run);
   });
