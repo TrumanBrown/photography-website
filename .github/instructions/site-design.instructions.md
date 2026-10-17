@@ -61,6 +61,9 @@ look. Everything below is about the public pages.
   `prefers-reduced-motion: reduce` version that settles instantly.
 - Hover effects (card skim, rail peek, plate boil) are for fine pointers. Nothing on a touch
   screen depends on them.
+- Feedback a visitor sets off (a stamp, a points pop, a badge) lands beside the thing it's about:
+  never on a photograph or an animal, and never in the middle of the screen (the first-find stamp
+  sits in its own row beside the photo, [specimen.ts](../../src/lib/hobbies/specimen.ts)).
 - Going from one page to another never morphs one photograph into a different one (a card's
   cover into a session's banner reads as a glitch). A session card opens its page with a plain
   page change: a 200ms fade between the pages and the session rising 8px into place

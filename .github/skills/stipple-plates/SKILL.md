@@ -76,6 +76,11 @@ downloads the isnet-general-use model (about 170 MB). Afterwards use
 6. **Show Truman** the plate in context: `npm run dev`, then /hobbies/ and
    the band at the foot of the home page. `npm test` checks every hobby has
    all twelve files.
+7. **Replay the hobby's opening scene.** Each scene in `src/lib/scenes/` is
+   traced by hand on its plate (`parts` polygons, and points like the crab's
+   `SHOULDER`), and its tests use a synthetic plate, so a re-render can break
+   it without failing anything. Click the card with `?scene-debug` and step
+   through it (the [hobby-scenes](../hobby-scenes/SKILL.md) skill).
 
 Each render writes `<name>-<size>[-dark].webp` plus two re-inked frames,
 `-b1` and `-b2`, for the hover "boil". `PlateArt.astro` cycles the three

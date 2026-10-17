@@ -2,6 +2,8 @@
 
 A reference for picking up the project on a new machine, in a new chat, or after a long break. The full design rationale lives in [docs/](.). This file is the short "what works today + what landed the hard way" version.
 
+For an agent, each part of the site also has a skill in [.github/skills/](../.github/skills/), listed in [copilot-instructions.md](../.github/copilot-instructions.md#skills): the steps that work for that part, the owner's verdicts on it, and the lessons from reworking it. New lessons go there as they happen.
+
 > **Operational specifics (subscription/tenant/MI IDs, exact resource names)** are not in this file. Reproduce them on demand with `az` against the live deployment, or keep your own private notes outside the repo.
 
 ---

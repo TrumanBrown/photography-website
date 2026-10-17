@@ -396,8 +396,8 @@ photography-website/
 ├── .github/
 │   ├── workflows/             # CI/CD, see docs/cicd.md
 │   ├── instructions/          # voice rules for every visitor-facing string
-│   └── skills/                # agent skills: the owner's writing voice (truman-voice,
-│                              # caption-voice, humanizer) and the hobby card plates (stipple-plates)
+│   └── skills/                # agent skills, one per part of the site (how it works, the owner's
+│                              # verdicts, lessons learned), plus his writing voice and card plates
 ├── api/                       # Azure Functions: contact, sessionmgr, track (+ shared/ helpers)
 ├── docs/                      # detailed docs (this README is the index)
 ├── infra/                     # Bicep IaC, see docs/iac-bicep.md
