@@ -62,9 +62,15 @@ if [ -z "$TOKEN" ]; then
 fi
 
 echo "=== Writing TXT record at apex ==="
-az network dns record-set txt delete --resource-group "$RG" --zone-name "$DOMAIN" --name "@" --yes >/dev/null 2>&1 || true
-az network dns record-set txt create --resource-group "$RG" --zone-name "$DOMAIN" --name "@" --ttl 300 >/dev/null
-az network dns record-set txt add-record --resource-group "$RG" --zone-name "$DOMAIN" --record-set-name "@" --value "$TOKEN" >/dev/null
+# Add the token next to whatever the apex TXT set already holds. Google Search
+# Console's verification lives in the same set, and deleting the set removed it.
+EXISTING=$(az network dns record-set txt show --resource-group "$RG" --zone-name "$DOMAIN" --name "@" \
+  --query "txtRecords[].value[]" -o tsv 2>/dev/null | tr -d '\r' || true)
+if printf '%s\n' "$EXISTING" | grep -qxF "$TOKEN"; then
+  echo "  (token already present)"
+else
+  az network dns record-set txt add-record --resource-group "$RG" --zone-name "$DOMAIN" --record-set-name "@" --value "$TOKEN" >/dev/null
+fi
 
 echo "=== Writing A apex (alias to SWA) ==="
 az network dns record-set a delete --resource-group "$RG" --zone-name "$DOMAIN" --name "@" --yes >/dev/null 2>&1 || true

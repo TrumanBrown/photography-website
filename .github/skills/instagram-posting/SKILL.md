@@ -62,7 +62,7 @@ Switches (repository variables): `SOCIAL_ENABLED` (planning), `SOCIAL_LIVE` (onl
 
 Candidates are photos at least 1080 px on the short side that were never storied, aren't queued as posts, and weren't posted in the last 30 days. Vertical ones (height at least 1.2× width) go first. The time is picked from the date within 10:00 to 21:00. The frame shows the whole photo over a blurred, dimmed copy of itself. Selection rules are in `storyCandidates` and `pickStory` (`story.mjs`), the frame in `renderStory`, timing in `decideStory` (`schedule.mjs`), tests in `story.test.mjs`.
 
-The API can't add text, stickers, music, a location or a link to a story, and it can't share a feed post as a story. Truman asked for that on 2026-10-14 ("it should post the feed post itself, as a story, not a copy of the image"); it isn't possible through the API, so it wasn't built. He tags story locations himself with a separate app.
+The API can't add text, stickers, music, a location or a link to a story, and it can't share a feed post as a story. Truman asked for that on 2026-10-14 ("it should post the feed post itself, as a story, not a copy of the image"); it isn't possible through the API, so it wasn't built. He tags story locations himself with Muse, a separate scheduling app that also posts its own daily story. He's open to tools like it for what the API can't do (2026-10-13).
 
 ## When a Social post run fails
 
@@ -87,6 +87,7 @@ Instagram's API can only turn comments on or off and delete. To change a live ca
 
 - 2026-10-10: one photo used once; "make sure to post the full res image, no cropping or anything"; "2-3 pics a day"; nothing in the repo may show where it posts.
 - 2026-10-10: he'll put the site in his bio, so posts say the full resolution is there (the link line).
+- 2026-10-11: reusing a fun fact on two posts about the same species or place is fine: "so spread out no one will know."
 - 2026-10-12: posts "still... read a little too AI", with his own rewrites (caption-voice holds them).
 - 2026-10-13: "the text on these images looks ai, i would say automate 1 story post a day, typically try to do vertical shots so less blurred space. no text or anything else."
 - 2026-10-13: "don't pause any image posting, i just want to see the drafts."

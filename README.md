@@ -151,6 +151,17 @@ Then set `domainName` in `infra/main.parameters.json` and re-run the Infra workf
 
 After the first infra deploy, set `blobHost` in [site.config.ts](site.config.ts) to the actual storage account hostname (printed in the deploy output), and put the same host in the two `blob.core.windows.net` sources of the Content-Security-Policy in [staticwebapp.config.json](staticwebapp.config.json) (`npm run check:csp` fails until they match). For uploads, set `AZURE_STORAGE_ACCOUNT` in `.env`. Commit and push.
 
+### 7. Tell Google about the site (optional)
+
+In [Google Search Console](https://search.google.com/search-console), add a Domain property for your domain and put the TXT value it gives you at the apex, beside the Static Web Apps token:
+
+```bash
+az network dns record-set txt add-record -g rg-photography-prod -z yourdomain.com -n @ \
+  --value "google-site-verification=<value from Google>"
+```
+
+Never delete the apex TXT record set: both values live in it. Once Google verifies the domain, submit `https://yourdomain.com/sitemap-index.xml` and `https://yourdomain.com/image-sitemap.xml`. "Couldn't fetch" right after a push usually means a deploy was running, so submit again later. The aim is for session pages to come up when people search the places in their titles.
+
 ---
 
 ## Adding a session

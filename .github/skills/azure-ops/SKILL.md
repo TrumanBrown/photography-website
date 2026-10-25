@@ -73,6 +73,7 @@ Secrets and settings are listed in the [secrets cheat sheet](../../../docs/cicd.
 7. **The Logic App reads the SWA `GITHUB_TOKEN` setting at deploy time.** When that token expires, the timer and the Rebuild button both stop: replace the setting, then run Infra again.
 8. **The October 2026 security review** found photos with GPS, globe pins precise to a metre and a herp map precise to 50 m. It led to the private inbox, the coarse gazetteer and 0.1° map grid, and a CSP pinned to one storage account (`79259d2`, `c33d9e4`). Keep any new feature inside those lines.
 9. **The Windows `az` CLI under WSL appends `\r`** to its output, which broke string comparisons in scripts until it was stripped.
+10. **Re-running `scripts/bind-domain.sh` would have removed Google's Search Console verification.** It deleted the whole apex TXT record set before writing the Static Web Apps token, and Google's value lives in the same set. It now adds the token beside what's there (2026-10-25). Never delete the apex TXT set.
 
 ## Gotchas
 

@@ -32,7 +32,7 @@ Where the patterns came from: Cult UI (rolling number, direction-aware tabs, the
 - **Only in answer to the visitor.** The lead photo is the one thing that changes by itself, and it has a pause.
 - **150 to 320 ms on `var(--ease)`, `transform` and `opacity` only, properties listed.** The stamp, the developing postcard and the lead crossfade run longer on purpose; don't cite them as precedent.
 - **Never morph one photograph into a different one** across a page change; the cover and the banner are almost always different photos (2026-10-16).
-- **Nothing lands on a photograph or an animal**, and feedback sits by the thing it's about, never in the middle of the screen: "not in middle of screen, but subtly and noticeably by the score" (2026-10-14).
+- **Nothing covers the animal**, and feedback sits by the thing it's about, never in the middle of the screen: "not in middle of screen, but subtly and noticeably by the score" (2026-10-14). A small stamp in the corner of a large photo is fine, as Narrow nature's price is (2026-10-25); a stamp across the subject isn't, as the first-find stamp was (2026-10-15).
 - **Decide what rapid clicks do** before building (below). "if they spam, it should just have multiple jump in, keep it smooth" (2026-10-14).
 - **Hover is a bonus for a mouse.** Nothing a phone needs sits behind hover.
 - **Reduced motion keeps the information and drops the movement.**
@@ -62,6 +62,8 @@ Count work in flight against limits (`fish.length + jumps.pending`), and give "S
 
 ## Port a pattern from a component library
 
+When he sends a reel or a video, get the video itself, transcribe the audio, sample frames, and list its points before proposing anything: "did you watch the reel and see those tips? if so summarize them before moving on" (2026-10-14). Instagram won't play reels without signing in.
+
 1. Read the component's registry JSON (Cult UI `https://www.cult-ui.com/r/<name>.json`, Magic UI `https://magicui.design/r/<name>.json`, Skiper UI `https://skiper-ui.com/r/skiperNN.json`). Don't install React or the library: eight original components measured about 150 KB of gzipped JS against 2.4 KB for the ports.
 2. Write down the mechanic (properties, from and to, duration, easing, stagger, enter and exit) and drop the look: pills, rounded boxes, blur, gradients, shimmer, springs, icon sets, `transition-all`, playing on mount, third-party calls.
 3. Build it as a bundled `<script>` or a module in `src/lib/`, never an inline script (that would need a CSP hash), on the tokens and parts that exist.
@@ -75,6 +77,7 @@ Count work in flight against limits (`fish.length + jumps.pending`), and give "S
 - 2026-10-14: the globe flight, "i like that alot". For Narrow nature, a "-X points" stamp "slamming first like a stamp and slowly drifting down and away"; for the aquarium, a fish that "jumps into the tank, with water droplets"; "maybe tip the tank over" on Start over. On sessions, "or simply zooms into the cover image", which shipped and was later rejected.
 - 2026-10-15: the first-find stamp, "don't put this directly over the animal image, put it elsewhere."
 - 2026-10-16: "the session load animation is bad. it cuts poorly from the cover image to the header image (which are almost always different)... just a smooth website animation nothing to do with the images themselves" (`fe3d302`).
+- 2026-10-25: Narrow nature's price stamp may sit on the corner of the clue photo: "its fine on the photo since the photo is large and this is small and in top right."
 
 ## Hard-won lessons
 

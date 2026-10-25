@@ -23,6 +23,8 @@ look. Everything below is about the public pages.
   so token classes need no `dark:` variants.
 - `ink` for titles, `ink-3` for prose, `ink-2` for labels and quiet links (4.5:1 in both themes).
   Color comes from the photographs, not from accent colors.
+- The favicon (`public/favicon.svg`, a sunset mountain) is colorful on purpose. He asked for a
+  logo that's "clean and maybe somewhat colorful" (2026-10-07), so don't recolor it to the tokens.
 
 ## Type
 

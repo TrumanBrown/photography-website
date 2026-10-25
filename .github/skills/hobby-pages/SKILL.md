@@ -30,7 +30,7 @@ Related skills: [stipple-plates](../stipple-plates/SKILL.md) for the card art, [
 - **Real maps.** "make it a real map and make it a heat map of the actual true locations" (2026-07-08), and on a phone it must pinch and zoom (2026-07-09).
 - **On device, no per-visitor AI spend.** He turned down a generative model for the selfie bird because "a couple users could spam that and immedaitely eat my credits" (2026-06-28). A selfie never leaves the device, and the page says so.
 - **Privacy.** iNaturalist places show a town or region at most, on a 0.1° grid. Hidden fishing spots are never named, in copy, file names or URLs ("just say small river", 2026-10-13). Photographer credits sit in a closed footnote, because a name can give a place away.
-- **Nothing lands on the animal.** Stamps and badges go beside the photo, never over it ("don't put this directly over the animal image", 2026-10-15).
+- **Nothing covers the animal.** Stamps and badges go beside the photo, never over it ("don't put this directly over the animal image", 2026-10-15). The one exception is Narrow nature's small price stamp in the corner of a large clue photo: "its fine on the photo since the photo is large and this is small and in top right" (2026-10-25).
 - **New toys start quiet.** He asked for the first version of the puzzle "not making it too visible yet" (2026-10-08). Ask before putting something new at the top of the section.
 - Clean, "not overly animated slop" (2026-10-14).
 
@@ -61,7 +61,7 @@ Use one of the blocks that already exist before writing new plumbing: `media` (a
 ## Galleries, catches and maps
 
 - Gallery: full-size files in `staging/hobby-<slug>/`, then `AZURE_STORAGE_ACCOUNT=<account> node scripts/upload-hobby-media.mjs <slug> --hero <file>`, which writes the `media` block. Add captions (otherwise the link reads "Open full-resolution photo"), commit and push. Full-size links work once the next build publishes `incoming/` to `hobby-media/` with GPS stripped.
-- Catches: add the entry to `fishing-catches.json`, put the original in `staging/fishing/`, run `node scripts/upload-fishing-catches.mjs`, and commit the JSON with its copy in `src/assets/hobbies/fishing/`.
+- Catches: add the entry to `fishing-catches.json`, put the original in the main checkout's `staging/fishing/` (check it decodes, photo-sessions lesson 11), run `node scripts/upload-fishing-catches.mjs`, and commit the JSON with its copy in `src/assets/hobbies/fishing/`.
 - Map data: `npm run build:herp-geo`, `node scripts/build-fishing-geo.mjs`. Each downloads its source into `.cache/` once.
 
 ## Rename a hobby or its URL
@@ -75,6 +75,7 @@ Day list became Narrow nature in two commits: the title and copy first (`dfca9e4
 ## Truman's verdicts
 
 - Cards: "a logo for each... not clearly AI generated" (2026-10-06); "the logos are really not good... your own created ones are bad" (2026-10-07). Stipple plates from his own photos stuck: "these are great, im impressed" (2026-10-11).
+- Home page: "the hobby section to show up a bit more visible and definitily in mobile view as well" (2026-10-06). The `HobbyBand` stays visible on phones.
 - Birding: "(persons face plus some minor bird aspects) and not the other way around"; "needs to look realisitic... not some cartoon" (2026-06-27). No cloud model (2026-06-28). "split the full list into families" (2026-06-29); "show my inaturalist pics... not just generic" (2026-06-30); the life list needed bigger photos on phones, plus search and sort (2026-07-01).
 - Herping: "find amphibians in the dark... mainly only salamanders"; "eyeshine glint is a great idea"; "more salamander focused"; "why the flat squares of light and why do eyes completely dissapear in the light"; extend the map to other countries (all 2026-07-08). Faster road finds, and pinch zoom on phones (2026-07-09).
 - Aquarium: a new fish "flies and transforms from the color sprite to the actual fish and jumps into the tank, with water droplets... if they spam, it should just have multiple jump in"; clearing the tank should "tip the tank over" (2026-10-14).

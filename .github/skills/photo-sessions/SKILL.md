@@ -125,6 +125,7 @@ Then run `gh workflow run build-and-deploy.yml`. A run cancelled by a newer push
 8. **A misspelled folder spread into captions and hashtags** ("Crater Lake Oreogn", `2ac6a1c`). The uploader now refuses swapped letters in place names.
 9. **A prebuild path that only runs against Blob broke a deploy** (`ReferenceError: sessionCoords`, `0cf49ff`). `prebuild:local` never runs that code, so ESLint's `no-undef` and a careful read of the diff are the only checks before CI.
 10. **The first build after a split downloads every moved photo again**, and the old derivatives, thumbnails and copies stay behind. That's cheap, but nothing cleans them up.
+11. **Staged photos arrived corrupted in an agent worktree** (2026-06-28). The worktree had no `staging/`, because it's gitignored, and all 17 photos he copied into it had about two thirds of their bytes replaced by `EF BF BD`, the UTF-8 replacement character, which can't be undone. Read `staging/` from the main checkout, check each staged photo decodes before using it, and if one is full of `EF BF BD`, ask him to copy it again directly or as a zip.
 
 ## Gotchas
 

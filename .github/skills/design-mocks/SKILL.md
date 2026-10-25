@@ -6,14 +6,17 @@ argument-hint: 'the question to explore, e.g. "three directions for the prints p
 
 # Design mocks
 
-New directions get tried as mocks before they touch the site: self-contained HTML pages in `mocks/` that Truman can open and use. The folder is gitignored, as are the prep scripts in `scripts-local/`, so mocks live on his laptop only and never deploy. The house look they should start from is in [site-design.instructions.md](../../instructions/site-design.instructions.md) and the words in [site-copy.instructions.md](../../instructions/site-copy.instructions.md). Card art comes from the [stipple-plates](../stipple-plates/SKILL.md) skill, never from drawn icons.
+New directions get tried as mocks before they touch the site: self-contained HTML pages in `mocks/` that Truman can open and use. The folder is gitignored, as are the prep scripts in `scripts-local/`, so mocks live only on his own machines (git doesn't carry them; he copies the folder across) and never deploy. The house look they should start from is in [site-design.instructions.md](../../instructions/site-design.instructions.md) and the words in [site-copy.instructions.md](../../instructions/site-copy.instructions.md). Card art comes from the [stipple-plates](../stipple-plates/SKILL.md) skill, never from drawn icons.
 
 ## Truman's spec for a mock
 
 - **A mock is the real experience without the real plumbing**: one file "I can open in a browser and actually use", real-looking data, empty, loading and error states, and good enough that someone shown it for ten seconds would think it was the finished feature. His reaction to text sketches: "these mocs are horrible, unusuable. I want actual mocks of what the end user experience would be" (2026-09-27).
 - **Not default AI.** "NOT DEFAULT AI looking. This is so important... People automatically ignore websites if they have this" (2026-10-06). The list below is the spec.
 - **Unique and useful.** "this is good but not unique, its the same idea as kriliion... inatguesser was unique and good" (2026-10-08). "are these really ones people would come back to?" (2026-09-28).
+- **A flagship needn't be a game or about nature.** "it needs to be unique, solves an interesting use case, and a clean, profession UX. more fleshed out than the mini games" (2026-09-28), and it "isn't super basic like some of the hobbies we have done". Geography is an interest the site doesn't show yet. Ones he points to: iNatGuessr, The Pudding's 3D city, Krillion, and Magnitudle's "Size it up" ("people will come back to and it is learning as well").
+- **Not held back by Azure cost.** Scope the idea at its best; the credit covers it (azure-ops).
 - **Simple.** The first redesign round was "far too complicated, too much going on in the screen" (2026-10-06).
+- **Portfolio looks must suit every session**, not only wildlife: "it's not just field photography, it's landscapes, cities, etc" (2026-10-06).
 - **Desktop and a true phone view** in every mock, visible without resizing the window.
 - **Built from the current site**: "remember to buidl it from the current ux not the old" (2026-10-08).
 - **Some motion, not overboard**; the scroll-reveal era is over.
@@ -29,11 +32,11 @@ From his 2026-10-06 brief. If a direction needs one of these, justify it in writ
 
 ## Run a round
 
-1. If he asks, rewrite his prompt first and hand it back for him to edit (he did this on 2026-09-27 and 2026-10-06), with the banned list, the deliverables, the checks, and "state assumptions and keep working".
+1. If he asks, rewrite his prompt first and hand it back for him to edit (he did this on 2026-09-27 and 2026-10-06), with the banned list, the deliverables, the checks, and "state assumptions and keep working". Ask clarifying questions before writing it, hand back only the prompt and stop: "you're supposed to give me the refined prompt that I Will pass back to you... not immediately do the actual work" (2026-09-27). Ask again when he sends it back.
 2. Read the real site first (pages, components, tokens, copy rules, content) and write a five-to-eight-point critique of what's there. The critique drives the directions.
 3. Build in `mocks/<topic>/` and never touch `src/`. An `index.html` links each direction with a one-paragraph thesis and what it refuses. Use real content (session titles and photos, hobby JSON) and copy that follows the copy rules. Give every mock a desktop and phone toggle and a dark mode.
 4. Directions that should diverge get their own CSS. Mocks meant to look like the live site copy the tokens from `src/styles/global.css` and self-host Libre Franklin, as `mocks/things-to-try/mock.css` does. Game mocks make no network calls: data comes from `scripts-local/prep-*.mjs` and assets are inlined.
-5. For each direction, say what it took from where, what it left out, and the trade-off. End with two or three decisions for him and your recommendation.
+5. For each direction, say what it took from where, what it left out, and the trade-off. End with two or three decisions for him and your recommendation. In a brainstorm, add "a much much longer list of less / to no mocks but technically feasible other ideas" (2026-09-28), and for each top idea a 1-to-10 confidence that you can build it, naming any external data, new service, key, rate limit, licence or re-architecture it needs.
 6. Check it yourself: serve it, open every page, no console errors or failed requests, screenshots at desktop and phone width, and a reread against the banned list naming anything that slipped through.
 7. Present it the way he can open it from Windows: `cd mocks && python3 -m http.server <free port> --bind 127.0.0.1` as a background service, then `http://localhost:<port>/<path>` links, plus the `\\wsl.localhost\Ubuntu\...` path as a fallback (ship-and-ci). Keep earlier rounds collapsed at the bottom of the index.
 8. Iterate on his verdicts. When he approves one, port it into `src/` ("port the look, not the mock's file structure"); helpers working in parallel should each own separate files. From there the normal ship rules apply.
@@ -52,6 +55,8 @@ From his 2026-10-06 brief. If a direction needs one of these, justify it in writ
 | 2026-10-12 | motion mock F, eight ideas                                                                                                | all but idea 2 ("i chose the header specifically")                                                          | `408328e`, `ba360e4`                                                                           |
 
 Still unbuilt from mock F, waiting on his go-ahead since 2026-10-12: a redesigned contact button, a stipple-plate 404 page, filtering by animal kept in the URL, and arrows between sessions.
+
+Still unbuilt from 2026-09-28, his own tide pool idea: pick any point on the Washington coast, see its tide chart, and the animals (no plants) iNaturalist has from there for a chosen span of months across all years. He turned down the fixed-beach page because "locked only to a few beaches is pointless I go to new tidepool spots all the time". He liked blur-to-guess, where each wrong guess makes the photo clearer. The notes from that brainstorm (a 40-idea list, the flagship report, data-source research) are in `mocks/notes/brainstorm-2026-09/`.
 
 ## Hard-won lessons
 

@@ -58,7 +58,7 @@ He pastes `.../actions/runs/<id>` and asks why it failed.
 Truman often runs several Copilot sessions in this repo at once.
 
 - Before editing, look for changes you didn't make. Never `git restore`, `git checkout --`, `git stash` or `git reset` files you didn't change.
-- Long or overlapping work goes in a worktree: `git worktree add ../photography-website.worktrees/<name> -b agents/<name>`, push with `git push origin HEAD:main`, then remove the worktree.
+- Long or overlapping work goes in a worktree: `git worktree add ../photography-website.worktrees/<name> -b agents/<name>`, push with `git push origin HEAD:main`, then remove the worktree. A worktree has no `staging/`, `mocks/`, `.env` or downloaded sessions, because they're gitignored. Read those from the main checkout.
 - Tell the other session which files you touch and which you won't, stage only yours, and `git pull --rebase` before pushing. Whoever pushes second rebases. If docs/hobbies.md conflicts, keep both sides. If your commit changed a CSP hash, say so, and never revert theirs.
 - After pushing, say which run deploys both commits; the older one gets cancelled.
 - If your commit picked up someone else's hunk, take just that hunk back out in a follow-up (`3a6fe10`) and leave their working tree alone.
@@ -72,7 +72,7 @@ The default is to push. The exception is when he asks: "because these are a lot 
 2. Start the dev server on a free port as a background service: `npm run dev -- --port 4411` (his own server may hold 4321). WSL forwards localhost to Windows, so give him `http://localhost:4411/<path>/` links.
 3. For files, give Windows paths: `\\wsl.localhost\Ubuntu\home\trumanbrown\projects\photography-website\<path>` (`wslpath -w <file>` prints it); he also opens `file://wsl$/Ubuntu/...`. Never a bare Linux path: "give file name full path so i can open from browser on main machine this is WSL remember this" (2026-10-08).
 4. List what to try (click, click again, Escape, Back, reduced motion, phone width) and the calls you made that he may want changed.
-5. Warn about things only the dev server does: processing images on first request, the Astro dev toolbar, a hidden VS Code browser panel pausing animation, and Windows "Animation effects" being off, which browsers report as reduced motion. Judge smoothness on `npm run build && npm run preview`.
+5. Warn about things only the dev server does: processing images on first request, the Astro dev toolbar, a hidden VS Code browser panel pausing animation, and Windows "Animation effects" being off, which browsers report as reduced motion. Judge smoothness on `npm run build && npm run preview`. The camera (the birding selfie) needs HTTPS, so a phone can't use it from the dev server over the network. A pull request preview has an HTTPS address, but on 2026-06-27 he chose to test camera work on the live site.
 6. When he says go: merge to `main`, run the checks, push, watch the runs, check the live site, and stop the server.
 
 ## Truman's verdicts
@@ -80,7 +80,7 @@ The default is to push. The exception is when he asks: "because these are a lot 
 - 2026-06-27: "dont do prs just push directly unless that is bad idea? im the owner of the website not some contributor."
 - 2026-06-29: "deploy live and dont open pr just commit directly to main repo that's how we've done it in the past. stop local server if not needed anymore."
 - 2026-10-06: "Build this all out, test it locally, then push it to live... I expect if any build issues come up or anything, for you to fix them."
-- 2026-10-11: on autopilot, "still ask if meaningful changes."
+- 2026-10-11: on autopilot, "still ask if meaningful changes. just pign, make a system noise when input is needed" (the command is in copilot-instructions.md).
 - 2026-10-13: "when i say to do something, you should push it, not just make it locally."
 - 2026-10-14: the big animation batch went to localhost first; later that night, "push it to live since I am going to bed."
 
@@ -103,5 +103,6 @@ The default is to push. The exception is when he asks: "because these are a lot 
 - The keepalive bot can push "Keep scheduled workflows enabled" to `main`, so pull before pushing.
 - Builds take 3 to 7 minutes, not the 3 the docs promise.
 - There's no browser test in the repo. Screenshots and smoothness checks have used Playwright from a scratch folder outside the repo, which won't exist on another machine.
+- His screen recordings are Snipping Tool `.mp4` files under `/mnt/c/Users/<user>/AppData/Local/Packages/Microsoft.ScreenSketch_*/TempState/Recordings/`. There's no system ffmpeg and system pip is locked, so use npm's `ffmpeg-static` or `pip install --target`, then tile frames at about 5 fps with timestamps into contact sheets to judge the motion (2026-10-14).
 
 Add new verdicts and lessons here, dated, in the commit that acts on them.

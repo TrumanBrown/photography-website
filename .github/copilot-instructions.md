@@ -34,6 +34,16 @@ never restore, stash or reset files you didn't change, and `git pull --rebase` b
   could follow.
 - The repo is public. No secrets, Azure ids, personal email or the Instagram account in code,
   docs, skills or logs.
+- Don't scale a feature down to save Azure money. He has a monthly Azure credit he barely uses and
+  wants performance first: "i dont know how this keeps getting lost" (2026-09-27). The one limit
+  is a paid call a visitor can trigger ([azure-ops](skills/azure-ops/SKILL.md)).
+- When he says he's walking away, make the calls yourself from his prompts and the docs, write
+  each assumption down and keep going: "if any decisions needed make them on your best judgement"
+  (2026-06-27). While he's around, ask about meaningful changes and play a sound when you need
+  him: `powershell.exe -NoProfile -Command "[System.Media.SystemSounds]::Exclamation.Play()"`
+  (2026-10-11).
+- On long work, tell him where it stands and what's blocking it without being asked: "youve been
+  working for horus on this, what is the current status and what are you stuck on" (2026-10-15).
 
 ## Skills
 

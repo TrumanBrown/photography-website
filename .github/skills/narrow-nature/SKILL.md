@@ -29,7 +29,7 @@ The long version, including every accuracy rule, is [docs/hobbies.md](../../../d
 - **The map has to work on a phone**: zoom to see how close you were, more detail than flat continents, state and country borders (2026-10-12).
 - **Photographer names stay off the board.** Credits go in a closed footnote, because a name can give the place away (2026-10-13).
 - **More lists is capped at ten a day**, so places don't repeat and it doesn't cost much (2026-10-12).
-- **Feedback lands by the score, not in the middle of the screen**: the "-X points" stamp "slamming first like a stamp and slowly drifting down and away" (2026-10-14).
+- **Feedback lands by what it's about, not in the middle of the screen**: the "-X points" stamp "slamming first like a stamp and slowly drifting down and away" (2026-10-14). It lands on the top-right corner of the clue photo it bought, since the score is often off screen on a phone, and he's fine with that: "its fine on the photo since the photo is large and this is small and in top right" (2026-10-25).
 
 ## Add places or rebuild the rounds
 
@@ -55,6 +55,7 @@ The long version, including every accuracy rule, is [docs/hobbies.md](../../../d
 - 2026-10-12: "need to be able to zoom in on the map so i can see how close I was... especially important for mobile... maybe satellite or topographic"; an unlimited mode "maybe cap at 10 a day"; "add state and country borders to the map."
 - 2026-10-13: "Put day list hobby at top of the things to try section... name it something other than day list. the name shoudl explain what it is. like narrow nature maybe"; "hide the cc information for each image, the names sometimes give away the location"; "make the images bigger."
 - 2026-10-14: the URL had to change to match the name (`a9c0572`); a points stamp by the score that slams and drifts.
+- 2026-10-25: the points stamp on the corner of the clue photo stays: "its fine on the photo since the photo is large and this is small and in top right."
 
 ## Hard-won lessons
 

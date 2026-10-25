@@ -28,6 +28,7 @@ State is private in Blob under `metadata/photos/` (`catalog.json`, `inat-index.j
 - **Show drafts before changing what it writes, and never pause posting**: "don't pause any image posting, i just want to see the drafts for the final version of captions you have before you update the pipeline going forward" (2026-10-13).
 - **His edits win.** Anything changed in /admin is never rewritten. Clearing the field hands it back to the pipeline.
 - **Repeatable**: a new session must get its captions and description with nothing done by hand (2026-10-10).
+- **Never name a precise place for an observation iNaturalist has obscured.** He approved this on 2026-10-10 ("this looks good") to protect sensitive herps. It isn't enforced yet (see Gotchas).
 
 ## Commands
 
@@ -109,7 +110,7 @@ A run handles 300 photos by default (`limit`); the archive was about 1,250 in Oc
 - `redo` also redoes the session description. A trip note (`npm run social -- note`) rewrites the description and planned openings too.
 - A caption edited in /admin never updates again, even when the iNaturalist ID changes. Clear it to hand it back.
 - A new session is invisible to the pipeline until a build has written `metadata/admin-index.json`.
-- iNaturalist hides the exact location of some species. The record stores an `obscured` flag but nothing uses it yet, and a post has named a trail for one such species. Ask Truman before changing this.
+- iNaturalist hides the exact location of some species. The record stores an `obscured` flag but nothing uses it yet, and a post has named a trail for one such species. The rule is settled (Truman's rules above); the code that applies it hasn't been written.
 - Rate limits: the model at 50K tokens a minute (backfills slow down, and two at once share it), iNaturalist about one request a second, Wikipedia one per 1.2 s.
 
 Add new verdicts and lessons here, dated, in the commit that acts on them.

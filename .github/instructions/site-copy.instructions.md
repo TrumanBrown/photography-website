@@ -163,3 +163,6 @@ it ([website.mjs](../../scripts/photos/website.mjs) `descriptionPrompt`).
 1. Read it out loud. If it sounds like a product page, rewrite it shorter and more literal.
 2. Check it against a neighboring string in the same file for casing, punctuation, and length.
 3. Cut any clause that only adds enthusiasm.
+4. Fix older strings that break these rules in any component you touch or show him, in the same
+   change: "no make those changes too... it's good to get a pass on these older components"
+   (2026-10-15).
