@@ -57,7 +57,9 @@ look. Everything below is about the public pages.
 ## Motion
 
 - Things move only in answer to the visitor. The lead photo is the one thing that changes on its
-  own, and it has a pause.
+  own, and it has a pause. The other exception is the video of his tank on the aquarium page,
+  which plays muted by itself because he picked a moving hero there (2026-10-25). It has the
+  player's pause, stops off screen and waits for play with reduced motion.
 - UI transitions run 150 to 320ms on `var(--ease)`, animate `transform` and `opacity` only, and
   list their properties (never `transition: all`). Each one needs a
   `prefers-reduced-motion: reduce` version that settles instantly.

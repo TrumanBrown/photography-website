@@ -123,6 +123,7 @@ node scripts/location.mjs blobs                                 # public photos 
 | Each photo's camera, lens and exposure settings, and its caption | Under the photo in the lightbox, and in the page's structured data |
 | Roughly where each session was | A globe pin from a hand-kept table of public places, never a photo's GPS ([src/lib/geo.ts](../src/lib/geo.ts)) |
 | Your iNaturalist observations | Hobby pages, at town or region level and on an ~11 km grid |
+| The video of your tank, and so your YouTube channel | The aquarium page plays it in YouTube's privacy-enhanced player and links to it on YouTube (`video` in [aquarium-keeping.json](../src/content/hobbies/aquarium-keeping.json)) |
 | What the site keeps about visitors, in plain words | `/privacy/` ([src/pages/privacy.astro](../src/pages/privacy.astro)), linked from the footer and under the contact form's Send button. Update it, and its "Last updated" date, whenever the contact form, analytics, browser storage or the outside hosts a page loads from change |
 | The site's full set of pages | Indexable by search engines (`robots.txt` allows it) |
 
@@ -133,7 +134,7 @@ node scripts/location.mjs blobs                                 # public photos 
 - No visitor cookies (analytics uses an ephemeral `sessionStorage` id only, cleared when the tab closes).
 - No visitor accounts. The site owner's `/admin` access uses SWA GitHub OAuth and a server-side allowlist.
 - No third-party analytics scripts: analytics is self-hosted in your own Azure Table Storage, and nothing leaves your tenant.
-- No third-party ad networks.
+- No third-party ad networks. The one outside player, the YouTube video on the aquarium page, uses YouTube's privacy-enhanced mode, where views don't personalize ads or recommendations, and it loads only when a visitor scrolls to it.
 - No payment info.
 
 ## TL;DR

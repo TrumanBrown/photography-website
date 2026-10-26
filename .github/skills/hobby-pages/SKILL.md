@@ -10,7 +10,7 @@ argument-hint: 'the hobby and the change, e.g. "herping: add the rough-skinned n
 
 | Hobby              | Island                                                                                 | Data                                                            | Personal element                                                         |
 | ------------------ | -------------------------------------------------------------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| `aquarium-keeping` | `AquariumTank.astro`; `aquarium.ts`, `aquarium-jump.ts`, `stocking.ts`                 | `aquarium-species.ts`                                           | his tank gallery (`media`)                                               |
+| `aquarium-keeping` | `AquariumTank.astro`; `aquarium.ts`, `aquarium-jump.ts`, `stocking.ts`                 | `aquarium-species.ts`                                           | the video of his tank (`video`, `HobbyVideo.astro`) and his tank gallery (`media`) |
 | `tide-pooling`     | `TidePool.astro` + `FieldJournal` + `SpecimenCard`; `tidepool.ts`                      | `tidepool-species.ts`, `tidepool-photos.json`                   | his iNaturalist observations (`INatObservations.astro`)                  |
 | `fishing`          | `Fishing.astro`; `fishing.ts`, `fishing-sprites.ts`                                    | `fishing-waters.json`, `fishing-species.ts`, `fishing-geo.json` | his catches (`fishing-catches.json`)                                     |
 | `birding`          | `Birding.astro`; `birding.ts` (MediaPipe, on device), `birding-bird.ts`, `bird-ink.ts` | `public/birding/face_landmarker.task`                           | spark bird and life list (`BirdingSpark.astro`, `BirdingLifeList.astro`) |
@@ -48,7 +48,7 @@ Related skills: [stipple-plates](../stipple-plates/SKILL.md) for the card art, [
 
 ## Give a hobby its personal element
 
-Use one of the blocks that already exist before writing new plumbing: `media` (a gallery), `inaturalist` (his observations, filtered with `iconicTaxa` or `taxonId`), `lifeList`, `spark`, `herpMap`, or a real-data gallery like the fishing catches. The iNaturalist ones load lazily near the viewport, fail quietly, and round places through `inat-place.ts`. His iNaturalist user id comes from the hobby JSON.
+Use one of the blocks that already exist before writing new plumbing: `media` (a gallery), `video` (one of his YouTube uploads in place of the hero photo, with `moments` the toy can link to; [docs/hobbies.md](../../../docs/hobbies.md#a-video-of-the-real-thing)), `inaturalist` (his observations, filtered with `iconicTaxa` or `taxonId`), `lifeList`, `spark`, `herpMap`, or a real-data gallery like the fishing catches. The iNaturalist ones load lazily near the viewport, fail quietly, and round places through `inat-place.ts`. His iNaturalist user id comes from the hobby JSON.
 
 ## Species, facts and reveal photos
 
@@ -78,7 +78,7 @@ Day list became Narrow nature in two commits: the title and copy first (`dfca9e4
 - Home page: "the hobby section to show up a bit more visible and definitily in mobile view as well" (2026-10-06). The `HobbyBand` stays visible on phones.
 - Birding: "(persons face plus some minor bird aspects) and not the other way around"; "needs to look realisitic... not some cartoon" (2026-06-27). No cloud model (2026-06-28). "split the full list into families" (2026-06-29); "show my inaturalist pics... not just generic" (2026-06-30); the life list needed bigger photos on phones, plus search and sort (2026-07-01).
 - Herping: "find amphibians in the dark... mainly only salamanders"; "eyeshine glint is a great idea"; "more salamander focused"; "why the flat squares of light and why do eyes completely dissapear in the light"; extend the map to other countries (all 2026-07-08). Faster road finds, and pinch zoom on phones (2026-07-09).
-- Aquarium: a new fish "flies and transforms from the color sprite to the actual fish and jumps into the tank, with water droplets... if they spam, it should just have multiple jump in"; clearing the tank should "tip the tank over" (2026-10-14).
+- Aquarium: a new fish "flies and transforms from the color sprite to the actual fish and jumps into the tank, with water droplets... if they spam, it should just have multiple jump in"; clearing the tank should "tip the tank over" (2026-10-14). For the video of his tank he picked a muted hero that starts at the time of day and "seen in my tank" links from the fish, and turned down self-hosting the footage: "can't use just embed youtube somehow" (2026-10-25).
 - Fishing: "remove the chinook salmon entry entirely, and remove the river name from the coho... just say small river" (2026-10-13).
 - Tide pooling and herping: the first-find stamp off the animal, and a pass over older facts with the new copy rules: "it's good to get a pass on these older components" (2026-10-15).
 

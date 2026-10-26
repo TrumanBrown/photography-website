@@ -7,6 +7,23 @@
   "order": 1,
   "interactive": "aquarium",
   "mediaTitle": "My tank",
+  "video": {
+    "youtubeId": "DVBmoPfp8n4",
+    "title": "A video of my planted tank, playing muted",
+    "lengthSeconds": 36012,
+    "linkText": "All 10 hours, with music, on YouTube",
+    "caption": "One honey gourami, six celestial pearl danios, a reticulated hillstream loach, six pygmy cories, five amano shrimp, a Thai micro crab, and a bunch of ramshorn and Malaysian trumpet snails. See if you can spot them all",
+    "moments": [
+      { "species": "honey-gourami", "label": "honey gourami", "at": 220 },
+      {
+        "species": "celestial-pearl-danio",
+        "label": "celestial pearl danios",
+        "at": 660
+      },
+      { "species": "pygmy-cory", "label": "pygmy cories", "at": 90 },
+      { "species": "amano-shrimp", "label": "amano shrimp", "at": 300 }
+    ]
+  },
   "media": {
     "hero": {
       "src": "https://stphotoprodnowiur.blob.core.windows.net/hobby-media/aquarium-keeping/full/aquarium-full-pic.jpeg",

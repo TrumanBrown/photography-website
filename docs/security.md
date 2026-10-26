@@ -60,6 +60,7 @@ img-src 'self' https://<account>.blob.core.windows.net https://static.inaturalis
 script-src 'self' 'wasm-unsafe-eval';
 worker-src 'self' blob:;
 connect-src 'self' https://<account>.blob.core.windows.net https://api.inaturalist.org;
+frame-src https://www.youtube-nocookie.com;
 style-src 'self' 'unsafe-inline';
 font-src 'self' data:;
 object-src 'none';
@@ -76,6 +77,7 @@ Translation:
 - **`script-src 'self' 'wasm-unsafe-eval'`**: own-origin scripts only. `'wasm-unsafe-eval'` lets the Birding island compile the self-hosted MediaPipe WASM; it permits WebAssembly only, **not** JavaScript `eval`.
 - **`worker-src 'self' blob:`**: the hobby cards' opening scenes draw in a same-origin worker (`/_astro/worker-…js`, see [hobbies.md](hobbies.md#opening-scenes)), and the MediaPipe runtime spawns a same-origin worker (and a `blob:` worker) to run the landmark model off the main thread. The scene worker fetches plates from the storage account, which `connect-src` already allows.
 - **`connect-src 'self' ...`**: own origin (the Birding model + WASM are fetched from `/birding/`, so `'self'` covers them), the site's storage account (lightbox original download), and the public iNaturalist API.
+- **`frame-src https://www.youtube-nocookie.com`**: the one thing the site puts in an iframe, the video of the tank on the aquarium page, in YouTube's privacy-enhanced player ([hobbies.md](hobbies.md#a-video-of-the-real-thing)). The page talks to it over `postMessage` instead of loading YouTube's iframe API script, so `script-src` stays `'self'`. The player's own requests are governed by YouTube, not this policy. Without this directive `default-src 'self'` blocks every iframe.
 - **`style-src 'self' 'unsafe-inline'`**: `'unsafe-inline'` is required by Astro's scoped style blocks. Can be tightened later with hashes; modest risk.
 - **`object-src 'none'`**: no `<object>` / `<embed>` / Flash-era nonsense.
 - **`frame-ancestors 'none'`**: modern equivalent of `X-Frame-Options: DENY`.

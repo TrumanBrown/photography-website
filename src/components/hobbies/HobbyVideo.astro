@@ -1,0 +1,88 @@
+---
+/**
+ * A YouTube video of the real thing, at the top of a hobby's media section
+ * (the `video` block in the hobby JSON). Until the player loads, and without
+ * script, the box is the hero photo linking to the video on YouTube.
+ * Behaviour lives in src/lib/hobbies/hobby-video.ts.
+ */
+interface Props {
+  youtubeId: string;
+  title: string;
+  lengthSeconds: number;
+  poster?: { src: string; width: number; height: number };
+}
+
+const { youtubeId, title, lengthSeconds, poster } = Astro.props;
+const watchUrl = `https://www.youtube.com/watch?v=${youtubeId}`;
+---
+
+<div
+  id="hobby-video"
+  class="hv"
+  data-hobby-video
+  data-youtube-id={youtubeId}
+  data-length={lengthSeconds}
+  data-title={title}
+>
+  <div class="hv-frame" data-hobby-video-frame>
+    <a
+      href={watchUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      class="hv-poster"
+      aria-label="Watch it on YouTube"
+    >
+      {
+        poster && (
+          <img
+            src={poster.src}
+            alt=""
+            width={poster.width}
+            height={poster.height}
+            loading="lazy"
+            decoding="async"
+          />
+        )
+      }
+    </a>
+  </div>
+</div>
+
+<style>
+  .hv {
+    scroll-margin: 24px;
+  }
+  .hv-frame {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    border: 1px solid var(--rule);
+    background: var(--band);
+  }
+  .hv-poster,
+  .hv-poster img {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  .hv-poster img {
+    object-fit: cover;
+  }
+  /* The player is made by script, so it has no scope attribute. */
+  .hv-frame :global(iframe) {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: 0;
+  }
+</style>
+
+<script>
+  import { initHobbyVideo } from "@/lib/hobbies/hobby-video";
+
+  document
+    .querySelectorAll<HTMLElement>("[data-hobby-video]")
+    .forEach(initHobbyVideo);
+</script>

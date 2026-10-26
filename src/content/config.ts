@@ -147,6 +147,39 @@ const hobbies = defineCollection({
       })
       .optional(),
     /**
+     * Optional video of the real thing, a YouTube upload shown at the top of
+     * the media section in place of the hero photo (which joins the grid).
+     * HobbyVideo.astro loads it from youtube-nocookie.com once it's near the
+     * viewport, muted, starting at the point in `lengthSeconds` that matches
+     * the visitor's time of day. `moments` are seconds where one species is
+     * easy to see; the aquarium picker links each `species` id to its moment.
+     */
+    video: z
+      .object({
+        youtubeId: z.string().regex(/^[A-Za-z0-9_-]{11}$/),
+        /** Accessible name for the player. */
+        title: z.string(),
+        /** Full length of the upload, so the clock start stays inside it. */
+        lengthSeconds: z.number().int().positive(),
+        /** Text of the link out to YouTube, beside the section heading. */
+        linkText: z.string(),
+        /** Line under the heading, e.g. what lives in the tank. */
+        caption: z.string().optional(),
+        moments: z
+          .array(
+            z.object({
+              /** Species id from the hobby's species data. */
+              species: z.string(),
+              /** How the name reads in a sentence ("pygmy cories"). */
+              label: z.string(),
+              /** Second in the video. */
+              at: z.number().int().nonnegative(),
+            }),
+          )
+          .default([]),
+      })
+      .optional(),
+    /**
      * Optional daily puzzle: six species recorded at one real place in one
      * month, revealed commonest-first, with a world map to guess where. Data is
      * built by scripts/build-day-list.mjs. Opt-in per hobby; it has its own

@@ -672,11 +672,37 @@ Any hobby can show a photo gallery, a hero image up top plus a thumbnail grid, e
 
 Web-friendly originals (JPG/PNG/WebP) are published byte for byte as uploaded, with one exception: hobby photos are often taken at home, so the build removes any GPS position before they're public (metadata only, the image is untouched; [security.md](security.md#photo-locations)). HEIC/TIFF, which browsers can't show, become one full-size JPEG at quality 95 with full colour resolution, the same settings the photography build uses (HEIC needs `libheif` available to `sharp`). The `--hero` flag (or the first file alphabetically) chooses the large image at the top.
 
+## A video of the real thing
+
+A hobby can show one of Truman's YouTube uploads at the top of its media section, in place of the hero photo. The aquarium page plays the 10-hour video of his tank this way. It's driven by the optional `video` block in the hobby JSON:
+
+| Field | What it does |
+|---|---|
+| `youtubeId` | The 11-character id from the watch URL. |
+| `title` | The player's accessible name. |
+| `lengthSeconds` | The upload's length, so the start point stays inside it. |
+| `linkText` | The link out to YouTube beside the section heading. |
+| `caption` | An optional line under the heading (the aquarium lists who lives in the tank, from the video's description). |
+| `moments` | `{ species, label, at }`: a species id from the toy, how its name reads in a sentence, and a second in the video where it's easy to see. |
+
+How it behaves ([HobbyVideo.astro](../src/components/hobbies/HobbyVideo.astro), [hobby-video.ts](../src/lib/hobbies/hobby-video.ts)):
+
+- Until the visitor scrolls near it, the box is the hero photo, linking to the video on YouTube (which is also all a visitor without JavaScript gets). Nothing loads from YouTube before then.
+- Then an iframe from `www.youtube-nocookie.com` (YouTube's privacy-enhanced mode) replaces it, playing muted and looping, from the second of the video that matches the visitor's time of day (seconds since local midnight, wrapped to `lengthSeconds`). Browsers only autoplay muted video, so the visitor turns the sound on in the player.
+- It pauses when it scrolls off screen or the tab is hidden, and carries on when it's back, unless the visitor paused it. With reduced motion it loads without autoplay, with sound, and waits for the play button.
+- Any link with `data-video-at="<seconds>"` scrolls to the video and plays it from that second. The aquarium picker writes one per `moments` entry, under the hint: "A few of these live in my tank. See the honey gourami, ... in the video below."
+- The page sends the player commands (`seekTo`, `playVideo`, `pauseVideo`) and reads its state over `postMessage`, the protocol YouTube's iframe API uses. That keeps YouTube's script off the page, so the CSP only needs `frame-src https://www.youtube-nocookie.com` ([security.md](security.md#the-csp-unpacked)). The /privacy/ page says what YouTube sees.
+- The hero photo moves to the start of the thumbnail grid, so it still opens full size in the lightbox.
+
+To find moments in a long upload, YouTube's scrub thumbnails (the `storyboards` spec in the watch page's player response) give a 320×180 frame every 10 seconds. They showed the tank video is 16 min 40 s of footage looped 36 times, so moments only had to be found once. Small fish need full-resolution frames: `yt-dlp -f 299 -g <url>` prints a direct 1080p stream URL that a local `<video>` page can seek through. The aquarium moments, checked on 1080p frames on 2026-10-25: honey gourami 220 s (front and centre), celestial pearl danios 660 s (several in front of the rock), pygmy cories 90 s (two on the gravel, middle), amano shrimp 300 s (on the rock, left of centre).
+
+If the upload ever gets a copyright claim that turns off embedding (its music is from Minecraft), the box shows YouTube's error and the link beside the heading still works. Swap in another upload or remove the block.
+
 ## A personal element on every hobby
 
 The section pairs each playful interactive with something **real and personal**, so it remains a window into the actual hobby and not just a collection of toys:
 
-- **Aquarium** → real photos of the tank (the `hobby-media` gallery above).
+- **Aquarium** → a video of the real tank (below) and real photos of it (the `hobby-media` gallery above). The fish in the toy that also live in the tank link to a moment in the video.
 - **Tide pooling** → the species photos in the game are real CC-licensed shots, plus a live grid of the author's own **iNaturalist observations** at the bottom of the page.
 - **Fishing** → a gallery of the author's real catches, paired with the same species sprites used on the maps.
 - **Birding** → a live **life list** built from the author's real iNaturalist sightings (rarest species featured with a fun-fact/range blurb), plus a written **"spark bird"** story shown beside the author's own observation of that bird.

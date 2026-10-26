@@ -11,6 +11,18 @@
  */
 import { SPECIES, type Zone } from "@/lib/hobbies/aquarium-species";
 
+interface Props {
+  /** Fish from the picker that show up in the video of my tank (HobbyVideo). */
+  moments?: ReadonlyArray<{ species: string; label: string; at: number }>;
+}
+
+const moments = (Astro.props.moments ?? []).filter((m) =>
+  SPECIES.some((s) => s.id === m.species),
+);
+/** "a, b, c or d" */
+const sep = (i: number): string =>
+  i < moments.length - 2 ? ", " : i === moments.length - 2 ? " or " : "";
+
 const ZONES: ReadonlyArray<{ zone: Zone; label: string }> = [
   { zone: "top", label: "Top" },
   { zone: "mid", label: "Middle" },
@@ -109,6 +121,19 @@ const groups = ZONES.map(({ zone, label }) => ({
         Tap a species to add one, then tap in the tank to drop more. The bioload
         meter is just for fun, not necessarily entirely accurate.
       </p>
+      {
+        moments.length > 0 && (
+          <p class="aq-hint aq-mine">
+            A few of these live in my tank. See the{" "}
+            {moments.map((m, i) => (
+              <>
+                <a href="#hobby-video" data-video-at={m.at}>{m.label}</a>{sep(i)}
+              </>
+            ))}{" "}
+            in the video below.
+          </p>
+        )
+      }
     </div>
   </div>
 </section>
@@ -235,6 +260,18 @@ const groups = ZONES.map(({ zone, label }) => ({
     margin: 14px 0 0;
     font-size: 12px;
     color: var(--ink-2);
+  }
+  .aq-mine {
+    margin-top: 6px;
+  }
+  .aq-mine a {
+    color: var(--ink);
+    text-decoration: underline;
+    text-decoration-color: var(--ink-3);
+    text-underline-offset: 2px;
+  }
+  .aq-mine a:hover {
+    text-decoration-color: currentColor;
   }
 
   /* ---- tank panel ---- */
