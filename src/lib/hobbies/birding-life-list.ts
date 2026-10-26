@@ -31,6 +31,9 @@ const SPECIES_COUNTS =
   "https://api.inaturalist.org/v1/observations/species_counts";
 const OBSERVATIONS = "https://api.inaturalist.org/v1/observations";
 const TAXA = "https://api.inaturalist.org/v1/taxa";
+// Each request gives up after this long, so a hung one can't leave the list
+// on its loading line forever.
+const FETCH_TIMEOUT_MS = 15_000;
 const PHOTO_HOSTS = [
   "https://inaturalist-open-data.s3.amazonaws.com/",
   "https://static.inaturalist.org/",
@@ -134,6 +137,7 @@ async function fetchSpecies(
   if (iconic) q.set("iconic_taxa", iconic);
   const res = await fetch(`${SPECIES_COUNTS}?${q.toString()}`, {
     headers: { Accept: "application/json" },
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = (await res.json()) as { results?: SpeciesCount[] };
@@ -161,8 +165,9 @@ async function fetchSummaries(ids: number[]): Promise<Map<number, string>> {
   if (ids.length === 0) return map;
   const res = await fetch(`${TAXA}/${ids.join(",")}?locale=en`, {
     headers: { Accept: "application/json" },
-  });
-  if (!res.ok) return map;
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+  }).catch(() => null);
+  if (!res?.ok) return map;
   const data = (await res.json()) as { results?: TaxonDetail[] };
   for (const t of data.results ?? []) {
     const blurb = plainSummary(t.wikipedia_summary);
@@ -221,8 +226,9 @@ async function fetchMyObservationData(
     if (iconic) q.set("iconic_taxa", iconic);
     const res = await fetch(`${OBSERVATIONS}?${q.toString()}`, {
       headers: { Accept: "application/json" },
-    });
-    if (!res.ok) break;
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    }).catch(() => null);
+    if (!res?.ok) break;
     const data = (await res.json()) as {
       total_results?: number;
       results?: INatObservation[];

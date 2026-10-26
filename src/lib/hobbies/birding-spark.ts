@@ -67,6 +67,7 @@ export function initBirdingSpark(root: HTMLElement): void {
       });
       const res = await fetch(`${API}?${q.toString()}`, {
         headers: { Accept: "application/json" },
+        signal: AbortSignal.timeout(15_000),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = (await res.json()) as { results?: INatObs[] };

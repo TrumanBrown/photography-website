@@ -62,7 +62,11 @@ export function initINatObservations(root: HTMLElement): void {
       });
       if (iconic) q.set('iconic_taxa', iconic);
       if (taxon) q.set('taxon_id', taxon);
-      const res = await fetch(`${API}?${q.toString()}`, { headers: { Accept: 'application/json' } });
+      // A hung request would leave the placeholder tiles pulsing forever.
+      const res = await fetch(`${API}?${q.toString()}`, {
+        headers: { Accept: 'application/json' },
+        signal: AbortSignal.timeout(10_000),
+      });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = (await res.json()) as { results?: INatObs[] };
       const items = (data.results ?? []).filter((o) => o.photos?.[0]?.url);

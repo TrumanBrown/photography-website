@@ -257,7 +257,7 @@
     const btn = form.querySelector('button[type="submit"]') as HTMLButtonElement;
     const originalText = btn.textContent;
     btn.disabled = true;
-    btn.textContent = 'Sending…';
+    btn.textContent = 'Sending...';
 
     try {
       const data = Object.fromEntries(new FormData(form));
@@ -265,6 +265,9 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
+        // A cold API takes a few seconds. Past this, say so instead of
+        // leaving the button on Sending... for good.
+        signal: AbortSignal.timeout(20_000),
       });
       const json = await res.json();
 

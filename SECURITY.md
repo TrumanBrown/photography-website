@@ -4,7 +4,7 @@
 
 Please report security issues privately. Do not open a public issue for anything exploitable.
 
-- Preferred: use GitHub's private vulnerability reporting on this repository (the **Security** tab, then **Report a vulnerability**). This opens a private advisory visible only to the maintainer.
+- Preferred: use GitHub's private vulnerability reporting on this repository (the **Security** tab, then **Report a vulnerability**). This opens a private advisory visible only to the maintainer. The site's [security.txt](https://trumanbrown.com/.well-known/security.txt) points to the same place.
 - If private reporting is not available, open a minimal public issue that says only that you have a security report and would like a private channel. Do not include exploit details in the public issue.
 
 Where possible, include:

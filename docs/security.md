@@ -51,6 +51,18 @@ Delivered via [staticwebapp.config.json](../staticwebapp.config.json) `globalHea
 | `Referrer-Policy` | `strict-origin-when-cross-origin` | Outbound links leak only origin, not full URL. |
 | `Permissions-Policy` | `camera=(self), microphone=(), geolocation=(), payment=()` | Deny powerful APIs, except `camera` for the site's own origin (the Birding hobby's optional selfie capture; see note below). |
 | `X-Frame-Options` | `DENY` | Other sites can't iframe yours (clickjacking). |
+| `Cross-Origin-Opener-Policy` | `same-origin` | A page this site opens, or one that opens it, can't reach back into it through `window.opener` (tab-nabbing, cross-window leaks). The site's own new-tab links already use `noopener`. |
+| `Cross-Origin-Resource-Policy` | `same-site` | Other sites can't embed the site's own files (scripts, fonts, plates). The photos come from Blob Storage, which this header doesn't cover. |
+
+The `/admin` routes add `Cache-Control: no-store` and `X-Robots-Tag: noindex, nofollow`, so the admin shell is never cached by a browser or proxy and never listed by a search engine. `Cross-Origin-Embedder-Policy` is left off: it would block the iNaturalist photos on the hobby pages, which don't send the header it needs.
+
+#### Error pages
+
+`responseOverrides` in the same file serve the site's own pages for errors: 404 shows [404.astro](../src/pages/404.astro) (with links back to the archive), 403 shows [403.astro](../src/pages/403.astro) (built to `/403/index.html`, which is what the override names), and 401 sends you to the GitHub sign-in for `/admin`. Both pages are `noindex`. Static Web Apps doesn't let a site replace its 5xx pages, and a static page can't throw one; the API functions answer their own errors as JSON with flat, detail-free messages.
+
+#### security.txt
+
+[/.well-known/security.txt](https://trumanbrown.com/.well-known/security.txt) ([RFC 9116](https://www.rfc-editor.org/rfc/rfc9116)) tells researchers where to report a problem: GitHub's private vulnerability reporting, as in [SECURITY.md](../SECURITY.md). It's built by [security.txt.ts](../src/pages/.well-known/security.txt.ts) from [src/lib/security-txt.ts](../src/lib/security-txt.ts). The RFC requires an `Expires` date, so the build sets it 180 days ahead and every build moves it forward. If the site went six months without a build, the file would say it had expired, which is accurate.
 
 #### The CSP unpacked
 
@@ -191,7 +203,20 @@ traffic. Revisit if admin upload or broader accounts ship.
 - **Runtime secrets stay in SWA app settings:** the storage connection string and optional GitHub rebuild PAT. The Infra workflow masks the connection string before writing it.
 - **Domain registration contact info** (`contact.json`, contains your real address and phone) is gitignored.
 - **Commit metadata is public too.** Every commit records an author email. Commit with your GitHub noreply address (`git config --global user.email <id>+<user>@users.noreply.github.com`) and turn on **Settings → Emails → Block command line pushes that expose my email**. An address already in history stays visible unless the history is rewritten.
-- **Dependabot** is enabled for the `npm` and `github-actions` ecosystems, auto-PRs when a dependency has a CVE.
+- **Dependabot** is enabled for the `npm` and `github-actions` ecosystems. Alerts and security updates are on, so a dependency with a published CVE gets a pull request right away; routine version bumps come monthly.
+
+### GitHub repository settings
+
+These live in the repository's settings rather than in a file, so they're listed here to be checked or redone on a fork (`gh api repos/<owner>/<repo>` shows most of them):
+
+| Setting | State | Why |
+|---|---|---|
+| Secret scanning and push protection | on | A push containing a recognised credential is refused before it reaches GitHub. |
+| Private vulnerability reporting | on | The channel [SECURITY.md](../SECURITY.md) and security.txt point to. Turn on with `gh api -X PUT repos/<owner>/<repo>/private-vulnerability-reporting`. |
+| Dependabot alerts and security updates | on | `gh api -X PUT repos/<owner>/<repo>/vulnerability-alerts` and `.../automated-security-fixes`. |
+| Code scanning | CodeQL, from [codeql.yml](../.github/workflows/codeql.yml) | See [cicd.md](cicd.md#codeqlyml-code-scanning). |
+| Ruleset "Protect main" | blocks force pushes and deleting `main` | History on `main` can't be rewritten or lost, even by the owner by accident. It doesn't require pull requests or checks, because the owner pushes finished work straight to `main` and a required check would refuse a push that hasn't been checked yet. CI still runs on every push. |
+| Default `GITHUB_TOKEN` permission | read | Each workflow asks for what it needs in its `permissions:` block. |
 
 ### GitHub Actions and Azure identities
 
@@ -217,10 +242,19 @@ Moving an existing setup onto this model (one-time): run the Infra workflow with
 
 | Surface | Mitigation |
 |---|---|
-| Malicious npm package | `npm ci` against committed `package-lock.json`; Dependabot alerts; no autopilot updates. In CI, packages install and the site builds without Azure credentials, and the credential the build does hold reaches blobs only. |
-| Compromised GitHub Action version | All third-party actions pinned to major version (e.g. `@v4`). Consider full SHA pinning if you become more paranoid. |
+| Malicious npm package | `npm ci` against committed `package-lock.json`; Dependabot alerts and security updates; no autopilot updates. In CI, packages install and the site builds without Azure credentials, and the credential the build does hold reaches blobs only. |
+| Compromised GitHub Action version | Every action is pinned to a full commit SHA with the version in a comment, and Dependabot bumps both ([cicd.md](cicd.md#how-the-workflows-pin-their-actions)). CodeQL's `actions` queries flag any that slip back to a tag. |
 | Compromised npm registry mirror | Currently we trust the public registry; nothing avoids this at this scale. |
-| Image tools installed in CI | `libraw-bin` and `exiftool` come from Ubuntu's apt archive; `pillow` and `pillow-heif` from PyPI, unpinned, before any sign-in. |
+| Image tools installed in CI | `libraw-bin` and `exiftool` come from Ubuntu's apt archive on a pinned `ubuntu-24.04` runner; `pillow` and `pillow-heif` from PyPI, unpinned, before any sign-in. |
+
+#### Known advisories that stay open
+
+`npm audit` reports a few advisories that have no fix this repo can take yet. As of 2026-10-26:
+
+- **Astro 5** (`astro` and the `zod`, `esbuild` and nested `sharp` it brings): the fixes are in Astro 6 and 7, a major migration that also moves the Tailwind integration. The critical one is an XSS through `define:vars` and the high one is in server islands; the site uses neither, and it's a static build with no server rendering. The `esbuild` one affects only the dev server on Windows. The nested `sharp` 0.34 processes only the owner's own photos at build time. The site's own `sharp` is on 0.35, which has the libvips fixes.
+- **`@azure/msal-node`** under `@azure/identity`: the fix is msal-node 7.1, and the newest `@azure/identity` (4.14) still requires 6. The advisory is about the authorization-code sign-in flow, which nothing here uses: the scripts use `DefaultAzureCredential`, which in CI picks up the Azure CLI session from the OIDC sign-in.
+
+Check with `npm audit --omit=dev` after any dependency change, and take the Astro migration as its own piece of work.
 
 ### Data we collect
 
@@ -260,7 +294,8 @@ Aim for an A or A+ on both securityheaders.com and ssllabs.com on first deploy.
 
 In rough order:
 1. **CSP `'unsafe-inline'` tightening** via Astro's hash mode, easy win once we stop iterating on styles.
-2. **`Cross-Origin-Opener-Policy: same-origin`** + **`Cross-Origin-Embedder-Policy: require-corp`** if we ever need full cross-origin isolation.
+2. **`Cross-Origin-Embedder-Policy: require-corp`** if we ever need full cross-origin isolation (COOP is already on). It needs the iNaturalist photos proxied or dropped first.
 3. **WAF + stricter edge rate limiting** the moment the site gets an upload endpoint or broader login model.
 4. **Allowlist admins by SWA `userId`** instead of GitHub username: a username freed by a rename can be registered by someone else.
-5. **Full SHA pinning** for third-party actions, and hash-pinned `pip` installs in the build.
+5. **Hash-pinned `pip` installs** in the build. The actions are already pinned to SHAs.
+6. **Astro 7**, which closes the advisories listed under [Known advisories that stay open](#known-advisories-that-stay-open).

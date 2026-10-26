@@ -1,13 +1,27 @@
 ---
-import BaseLayout from '@/layouts/BaseLayout.astro';
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { siteConfig } from "../../site.config";
 ---
 
-<BaseLayout title="Not found" description="That page could not be found.">
+<BaseLayout
+  title="Not found"
+  description="That page could not be found."
+  noindex
+>
   <section class="mx-auto max-w-prose px-4 py-20 text-center sm:px-6">
     <h1 class="text-2xl font-light tracking-tight sm:text-[30px]">404</h1>
-    <p class="mt-2 text-sm text-ink-3">That page doesn't exist.</p>
-    <p class="mt-6">
+    <p class="mt-2 text-sm text-ink-3">
+      That page doesn't exist. It may have moved when a session got a new name.
+    </p>
+    <p class="mt-6 flex flex-wrap justify-center gap-x-6 gap-y-2">
       <a href="/" class="u-label">← All sessions</a>
+      {
+        siteConfig.sections.hobbies && (
+          <a href="/hobbies/" class="u-label">
+            Things to try →
+          </a>
+        )
+      }
     </p>
   </section>
 </BaseLayout>

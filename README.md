@@ -1,5 +1,30 @@
 # photography-website
 
+The code behind **[trumanbrown.com](https://trumanbrown.com)**, my wildlife, landscape and travel photography site.
+
+[![Build and Deploy](https://github.com/TrumanBrown/photography-website/actions/workflows/build-and-deploy.yml/badge.svg?branch=main)](https://github.com/TrumanBrown/photography-website/actions/workflows/build-and-deploy.yml)
+[![Lint and Type Check](https://github.com/TrumanBrown/photography-website/actions/workflows/lint.yml/badge.svg?branch=main)](https://github.com/TrumanBrown/photography-website/actions/workflows/lint.yml)
+[![CodeQL](https://github.com/TrumanBrown/photography-website/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/TrumanBrown/photography-website/actions/workflows/codeql.yml)
+
+<a href="https://trumanbrown.com">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/home-dark.jpg">
+    <img src="docs/images/home-light.jpg" alt="The home page of trumanbrown.com: the session list and globe on the left, a rotating lead photograph of the Kauai coast, and the first row of session cards" width="840">
+  </picture>
+</a>
+
+Try it: [the photo archive](https://trumanbrown.com), [Things to try](https://trumanbrown.com/hobbies/) (small interactive nature toys) and [Narrow nature](https://trumanbrown.com/hobbies/narrow-nature/), a daily puzzle where you guess where and when six species were seen together.
+
+## What's worth a look
+
+- **Security.** A strict Content Security Policy with hashed inline scripts and no `'unsafe-inline'` scripts, HSTS preload, keyless OIDC deploys through two least-privilege Azure identities, SHA-pinned actions, CodeQL, Dependabot and secret scanning with push protection. Photos have their GPS removed before they're published. [docs/security.md](docs/security.md)
+- **Infrastructure as code.** Every Azure resource is in Bicep and deploys from a manual workflow behind a GitHub environment. [docs/iac-bicep.md](docs/iac-bicep.md)
+- **CI/CD.** Builds run on every push and every hour, pick up new photos from Blob Storage, and move the image variants back to Blob so the Static Web Apps deploy stays a few megabytes. Azure sign-ins retry, so a GitHub token hiccup doesn't fail a deploy. [docs/cicd.md](docs/cicd.md)
+- **Photo pipeline.** A vision model writes captions, matched to my own iNaturalist observations and checked against Wikipedia, and a second pipeline posts to Instagram a few times a day. [docs/photos.md](docs/photos.md), [docs/social.md](docs/social.md)
+- **Cost.** About $5 a month, domain included. [What it costs](#what-it-costs)
+
+## About the project
+
 A personal website built around a photography portfolio, with a **Hobbies** section of small hand-drawn interactive toys, a browser-based **admin panel** for editing content, a contact form, and privacy-friendly **traffic analytics**. Photos live in Azure Blob Storage and the site is a static Astro build hosted on Azure Static Web Apps. Drop a folder of photos into Blob and the site picks them up on the next build.
 
 The project started as a photography portfolio and has grown into a small personal site. The portfolio is still the home page; everything else (hobbies, admin, analytics, the contact form) sits beside it and can be toggled off in [site.config.ts](site.config.ts).
@@ -405,12 +430,13 @@ email you when the month's forecast passes an amount you set.
 ```
 photography-website/
 ├── .github/
-│   ├── workflows/             # CI/CD, see docs/cicd.md
+│   ├── actions/               # shared steps (azure-login: OIDC sign-in with retries)
+│   ├── workflows/             # CI/CD and CodeQL, see docs/cicd.md
 │   ├── instructions/          # voice rules for every visitor-facing string
 │   └── skills/                # agent skills, one per part of the site (how it works, the owner's
 │                              # verdicts, lessons learned), plus his writing voice and card plates
 ├── api/                       # Azure Functions: contact, sessionmgr, track (+ shared/ helpers)
-├── docs/                      # detailed docs (this README is the index)
+├── docs/                      # detailed docs (this README is the index), images/ holds its screenshots
 ├── infra/                     # Bicep IaC, see docs/iac-bicep.md
 ├── public/                    # static assets copied verbatim to the site root
 ├── scripts/                   # prebuild, upload + bootstrap scripts, photos/ (captions), social/ (Instagram)

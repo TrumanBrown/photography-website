@@ -863,6 +863,8 @@ export function initHerpMap(root: HTMLElement): void {
       });
       const res = await fetch(`${API}?${q.toString()}`, {
         headers: { Accept: "application/json" },
+        // A hung request would leave the map on its loading line forever.
+        signal: AbortSignal.timeout(15_000),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = (await res.json()) as {

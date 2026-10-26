@@ -62,8 +62,9 @@ export default defineConfig({
   integrations: [
     tailwind({ applyBaseStyles: false }),
     sitemap({
-      // Admin is a private tool — keep it out of search engines.
-      filter: (page) => !page.includes('/admin'),
+      // Admin is a private tool — keep it out of search engines, along with
+      // the error pages.
+      filter: (page) => !page.includes('/admin') && !page.endsWith('/403/'),
       serialize(item) {
         const path = new URL(item.url).pathname.replace(/\/$/, '');
         const lastmod = path === '' ? newestSession : lastmodBySession.get(path);
