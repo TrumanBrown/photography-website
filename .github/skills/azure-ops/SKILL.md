@@ -74,6 +74,7 @@ Secrets and settings are listed in the [secrets cheat sheet](../../../docs/cicd.
 8. **The October 2026 security review** found photos with GPS, globe pins precise to a metre and a herp map precise to 50 m. It led to the private inbox, the coarse gazetteer and 0.1° map grid, and a CSP pinned to one storage account (`79259d2`, `c33d9e4`). Keep any new feature inside those lines.
 9. **The Windows `az` CLI under WSL appends `\r`** to its output, which broke string comparisons in scripts until it was stripped.
 10. **Re-running `scripts/bind-domain.sh` would have removed Google's Search Console verification.** It deleted the whole apex TXT record set before writing the Static Web Apps token, and Google's value lives in the same set. It now adds the token beside what's there (2026-10-25). Never delete the apex TXT set.
+11. **"Failed to fetch federated token from GitHub" doesn't always mean a missing `id-token: write`.** It's what `azure/login` says about any failure to get GitHub's OIDC token, including GitHub's token service not answering. On 2026-10-26 it failed the hourly build's second sign-in while the first, five minutes earlier, had worked. Every workflow now signs in through `.github/actions/azure-login`, which retries twice. If all three tries fail, then check the permission and the federated credential's subject.
 
 ## Gotchas
 

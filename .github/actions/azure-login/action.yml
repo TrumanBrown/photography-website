@@ -1,0 +1,58 @@
+name: Azure login (OIDC, with retries)
+description: >-
+  Signs in to Azure with azure/login over OIDC and tries again after a pause if
+  it fails. GitHub's token service now and then doesn't hand out the OIDC token
+  ("Failed to fetch federated token from GitHub"), which failed the 2026-10-26
+  hourly build while the same commit built fine an hour before and after. A
+  real problem (a missing federated credential, a wrong client id) fails all
+  three tries, so it still stops the job.
+
+inputs:
+  client-id:
+    description: Client id of the managed identity to sign in as
+    required: true
+  tenant-id:
+    description: Entra tenant id
+    required: true
+  subscription-id:
+    description: Azure subscription id
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - id: first
+      continue-on-error: true
+      uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+      with:
+        client-id: ${{ inputs.client-id }}
+        tenant-id: ${{ inputs.tenant-id }}
+        subscription-id: ${{ inputs.subscription-id }}
+
+    - if: steps.first.outcome == 'failure'
+      shell: bash
+      run: |
+        echo "::warning::Azure login failed, trying again in 20 seconds"
+        sleep 20
+
+    - id: second
+      if: steps.first.outcome == 'failure'
+      continue-on-error: true
+      uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+      with:
+        client-id: ${{ inputs.client-id }}
+        tenant-id: ${{ inputs.tenant-id }}
+        subscription-id: ${{ inputs.subscription-id }}
+
+    - if: steps.second.outcome == 'failure'
+      shell: bash
+      run: |
+        echo "::warning::Azure login failed twice, last try in 60 seconds"
+        sleep 60
+
+    - if: steps.second.outcome == 'failure'
+      uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+      with:
+        client-id: ${{ inputs.client-id }}
+        tenant-id: ${{ inputs.tenant-id }}
+        subscription-id: ${{ inputs.subscription-id }}

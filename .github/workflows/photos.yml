@@ -44,14 +44,14 @@ jobs:
     # On when a model is configured: the keyless Azure OpenAI variable, or
     # PHOTOS_ENABLED=true for an API key.
     if: github.ref == 'refs/heads/main' && (vars.AZURE_OPENAI_ENDPOINT != '' || vars.PHOTOS_ENABLED == 'true')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 300
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           cache: npm
@@ -62,7 +62,7 @@ jobs:
 
       # The build identity (AZURE_DEPLOY_CLIENT_ID) when it's set; docs/cicd.md.
       - name: Azure login (OIDC)
-        uses: azure/login@v2
+        uses: ./.github/actions/azure-login
         with:
           client-id: ${{ secrets.AZURE_DEPLOY_CLIENT_ID || secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}

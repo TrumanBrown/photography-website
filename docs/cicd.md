@@ -22,12 +22,18 @@ For this project we use it for two distinct purposes:
 ├── infra.yml              # deploy Bicep (manual trigger)
 ├── build-and-deploy.yml   # rebuild + publish site (push, hourly, manual)
 ├── lint.yml               # PR quality gate
+├── codeql.yml             # code scanning: push, PR, weekly
 ├── photos.yml             # photo captions + session descriptions, and Instagram planning (see docs/photos.md)
 ├── social-post.yml        # optional: publishes the day's Instagram posts (see docs/social.md)
 └── photo-locations.yml    # monthly + manual: removes GPS from anything public that still has it
 
+.github/actions/
+└── azure-login/           # the OIDC sign-in every workflow uses, with retries (below)
+
 infra/modules/scheduler.bicep  # optional: Azure timer that starts photos.yml and social-post.yml on time
 ```
+
+Every job runs on `ubuntu-24.04` rather than `ubuntu-latest`, so GitHub moving `ubuntu-latest` to a new Ubuntu release can't change the image tools under a build. Moving to a newer image is a deliberate one-line change in each workflow.
 
 ### [`infra.yml`](../.github/workflows/infra.yml): deploy Azure infrastructure
 
@@ -35,7 +41,7 @@ infra/modules/scheduler.bicep  # optional: Azure timer that starts photos.yml an
 
 **What it does:**
 1. Logs into Azure via OIDC as the bootstrap identity. The job declares `environment: prod`, the only subject that identity trusts ([below](#two-identities-least-privilege-by-job)).
-2. Runs `azure/arm-deploy@v2` against `infra/subscription.bicep`. This creates or updates the resource group and everything inside it.
+2. Runs `azure/arm-deploy` (v2) against `infra/subscription.bicep`. This creates or updates the resource group and everything inside it.
 3. Reads the deployment outputs (SWA name/token, storage account name, build identity client ID).
 4. Writes the storage connection string and a derived private analytics salt directly to masked SWA app settings. It initializes `ADMIN_GITHUB_USERS` to the invoking user only when no allowlist exists, preserving later manual additions.
 5. Writes the deploy token, storage account name and build identity (`AZURE_DEPLOY_CLIENT_ID`) into repo secrets via `gh` if `GH_PAT_FOR_SECRETS` is configured. Otherwise use `scripts/bootstrap-swa-token.sh` once.
@@ -61,7 +67,7 @@ A `concurrency` block cancels older runs on the same branch when a new one arriv
 **Steps in order (with explanations):**
 
 1. **Checkout** the repo, pulls the code into the runner's working directory.
-2. **Set up Node.js 22** with `actions/setup-node@v4`, caches npm by `package-lock.json` so subsequent runs are fast.
+2. **Set up Node.js 22** with `actions/setup-node`, caches npm by `package-lock.json` so subsequent runs are fast.
 3. **`npm ci`** for the site, then for `api/`: installs dependencies from the lock files. Everything is installed, install scripts included, before the job signs in to anything. Then **`npm test`** runs the pure-logic suite (session/date helpers, prebuild validation and the location check, API auth/rate limiting/IP parsing, Blob URLs, HTML escaping, hobby engines, the photo and social pipelines); a failure stops the run before build or deploy.
 4. **Choose the content path.** Trusted events install the image tools (`libraw-bin` for RAW, `exiftool` for removing GPS, `pillow-heif` for iPhone HEIC), sign in to Azure via OIDC as the build identity, restore the prebuild cache, and run `scripts/prebuild.mjs` against Blob. Prebuild first publishes new uploads from the private `incoming` container, removing any GPS position (metadata only; the image itself is untouched), and makes sure no photo it publishes records where it was taken ([security.md](security.md#photo-locations)). It then works from 2,400 px build copies rather than the originals ([image-pipeline.md](image-pipeline.md#why-the-build-works-from-copies)). The completed prebuild cache is saved immediately for the next run, then its local copy is deleted because the images have already been materialized under `src/content/`. Dependabot and fork PRs cannot receive those secrets, so they run `scripts/generate-fixtures.mjs` instead. Both paths produce schema-valid session content for the same production build command.
 5. **Sign out of Azure** before the site build, so Astro, Vite and their plugins never run with a credential.
@@ -114,7 +120,19 @@ GitHub's scheduler is best effort and skips many scheduled runs: here an hourly 
 
 This catches broken templates and schema-violating session JSON **before** they hit `main` and break a real build.
 
-Dependabot groups npm minor/patch releases into monthly PRs. Semver-major updates are ignored by automation and handled as explicit migrations, so tightly coupled packages such as Astro, its Tailwind integration, and Tailwind itself are upgraded and tested together instead of producing known-invalid peer dependency combinations.
+Dependabot groups npm minor/patch releases into monthly PRs. Semver-major updates are ignored by automation and handled as explicit migrations, so tightly coupled packages such as Astro, its Tailwind integration, and Tailwind itself are upgraded and tested together instead of producing known-invalid peer dependency combinations. Security updates are separate: when a package in the lock file gets a published advisory, Dependabot opens a pull request for the fixed version straight away (Settings → Code security → Dependabot security updates).
+
+### [`codeql.yml`](../.github/workflows/codeql.yml): code scanning
+
+**When it runs:** on every push to `main` that isn't only docs, on pull requests, once a week (so new CodeQL queries reach old code), and by hand.
+
+**What it does:** runs GitHub's CodeQL with the `security-extended` queries over three languages: `javascript-typescript` (the site, the API functions, the build and pipeline scripts), `actions` (these workflows: script injection, over-broad tokens, unpinned actions) and `python` (the HEIC converter). Nothing needs building, so each language takes a few minutes. Findings show under the repository's **Security → Code scanning** tab; they don't fail the run, so a new finding never blocks a deploy, but it should be fixed or dismissed with a reason.
+
+### How the workflows pin their actions
+
+Every `uses:` names a full commit SHA with the version as a comment, for example `actions/checkout@3d3c42e... # v7.0.1`. A tag like `@v7` can be moved by whoever controls the action's repository, and a moved tag would run new code with this repo's secrets and Azure identity. A SHA can't move. Dependabot (the `github-actions` entry in [dependabot.yml](../.github/dependabot.yml), which also watches `.github/actions/`) opens a monthly pull request that bumps both the SHA and the comment.
+
+To pin a new action by hand: `gh api repos/<owner>/<action>/git/ref/tags/<tag>`. If the object it returns is a `tag`, look that up with `gh api repos/<owner>/<action>/git/tags/<sha>` to get the commit it points at.
 
 ---
 
@@ -147,11 +165,17 @@ GitHub Actions can mint short-lived **OIDC JSON Web Tokens** (JWTs) that prove "
 
 The flow:
 1. Workflow starts. GitHub mints a JWT with claims about this run.
-2. `azure/login@v2` sends the JWT to Azure's token endpoint, saying "give me a token for managed identity ID `<x>`."
+2. The sign-in step ([.github/actions/azure-login](../.github/actions/azure-login/action.yml), which wraps `azure/login`) sends the JWT to Azure's token endpoint, saying "give me a token for managed identity ID `<x>`."
 3. Azure checks: does that MI have a federated credential whose `subject` matches the JWT's claims? If yes, issues a real Azure token valid for ~1 hour.
 4. Subsequent `az` calls use that short-lived token.
 
 After the workflow finishes, the token expires and there's nothing to leak. Even if someone breaks into your runner, they have at most an hour of access.
+
+### Why the sign-in retries
+
+Step 1 is a call to GitHub's own token service, and now and then it doesn't answer. On 2026-10-26 the hourly build failed at its second sign-in (the one before the variant sync) with `Failed to fetch federated token from GitHub. Please make sure to give write permissions to id-token in the workflow.` The permission was there: the first sign-in in the same run had worked five minutes earlier, and the same commit built fine the hour before and after. The message is what `azure/login` says about any failure to get the token.
+
+So every workflow signs in through the shared composite action instead of calling `azure/login` directly. It tries, waits 20 seconds and tries again, then waits 60 seconds for a last try. A blip costs a minute and a warning in the log. A real problem, like a federated credential that doesn't match or a wrong client id, fails all three tries and stops the job as before. The wait happens only after a failure, so a normal run is no slower.
 
 ### Two identities, least privilege by job
 

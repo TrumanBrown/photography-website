@@ -35,7 +35,7 @@ permissions:
 jobs:
   post:
     if: vars.SOCIAL_ENABLED == 'true' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     outputs:
       ran: ${{ steps.publish.outputs.ran }}
@@ -50,17 +50,17 @@ jobs:
       SOCIAL_STORIES: ${{ vars.SOCIAL_STORIES }}
       SOCIAL_STORY_WINDOW: ${{ vars.SOCIAL_STORY_WINDOW }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           cache: npm
 
       - name: Azure login (OIDC)
-        uses: azure/login@v2
+        uses: ./.github/actions/azure-login
         with:
           client-id: ${{ secrets.AZURE_DEPLOY_CLIENT_ID || secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -82,7 +82,7 @@ jobs:
 
       - name: Azure login (OIDC)
         if: inputs.force || inputs.story || steps.due.outputs.due == 'true'
-        uses: azure/login@v2
+        uses: ./.github/actions/azure-login
         with:
           client-id: ${{ secrets.AZURE_DEPLOY_CLIENT_ID || secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -124,12 +124,12 @@ jobs:
   keepalive:
     needs: post
     if: needs.post.outputs.ran == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Keep scheduled workflows enabled
         run: |

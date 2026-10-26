@@ -39,9 +39,12 @@ updates:
         update-types:
           - version-update:semver-major
 
-  # GitHub Actions used by the workflows
+  # GitHub Actions used by the workflows and the shared login action. They're
+  # pinned to commit SHAs; Dependabot bumps the SHA and the version comment.
   - package-ecosystem: github-actions
-    directory: "/"
+    directories:
+      - "/"
+      - "/.github/actions/*"
     schedule:
       interval: monthly
     open-pull-requests-limit: 5

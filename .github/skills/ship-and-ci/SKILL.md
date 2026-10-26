@@ -37,6 +37,7 @@ He pastes `.../actions/runs/<id>` and asks why it failed.
 | Astro build                   | out of disk (`18ea907`); `Missing CSP token(s)` or `Stale CSP token(s)`; schema errors from session metadata                              | see image-delivery, the CSP section below, photo-sessions                                                                                |
 | Deploy to Static Web Apps     | content over 250 MB (`3ef60eb`)                                                                                                           | see image-delivery                                                                                                                       |
 | Azure login on a pull request | Dependabot and fork pull requests get no secrets                                                                                          | they build from fixtures by design (`29e1fb8`)                                                                                           |
+| Azure login, on `main`        | `Failed to fetch federated token from GitHub` from GitHub's token service, with the permission in place (2026-10-26)                      | the shared login action retries twice; if all three fail, check `id-token: write` and the federated credential (azure-ops)               |
 | Prettier, in Lint             | advisory (`continue-on-error`), the run stays green                                                                                       | format only your own files                                                                                                               |
 | Social post, Photo captions   |                                                                                                                                           | see instagram-posting and photo-captions                                                                                                 |
 
@@ -83,6 +84,7 @@ The default is to push. The exception is when he asks: "because these are a lot 
 - 2026-10-11: on autopilot, "still ask if meaningful changes. just pign, make a system noise when input is needed" (the command is in copilot-instructions.md).
 - 2026-10-13: "when i say to do something, you should push it, not just make it locally."
 - 2026-10-14: the big animation batch went to localhost first; later that night, "push it to live since I am going to bed."
+- 2026-10-26: getting the repo "ready to show off on a resume". He kept direct pushes to `main` (the ruleset only blocks force pushes and deleting `main`), wanted CodeQL as a workflow with a README badge, and "loading pages" meant loading and failure states where something fetches, not a loading screen in front of pages.
 
 ## Hard-won lessons
 
@@ -94,6 +96,7 @@ The default is to push. The exception is when he asks: "because these are a lot 
 6. **CSP hashes churn.** The landing script's hash changed five times in three days across sessions. Re-run `check:csp` after every rebase and keep other sessions' hashes.
 7. **Docs-only commits used to run the full image build.** Markdown and `docs/` are now in `paths-ignore` (`3b48f75`).
 8. **Dependabot and fork pull requests failed at Azure login** because they get no secrets. They build from fixtures now, and major version bumps are ignored until migrated deliberately (`29e1fb8`).
+9. **One hourly build failed at its second Azure sign-in** because GitHub's token service didn't hand out the OIDC token (2026-10-26). Nothing in the repo had changed. Workflows sign in through `.github/actions/azure-login`, which retries, and actions are pinned to commit SHAs on a fixed `ubuntu-24.04` runner so an upstream change can't break a build unannounced. A new workflow that signs in to Azure should use that action, never `azure/login` directly.
 
 ## Gotchas
 
