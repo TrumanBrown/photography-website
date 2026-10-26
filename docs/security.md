@@ -218,6 +218,14 @@ These live in the repository's settings rather than in a file, so they're listed
 | Ruleset "Protect main" | blocks force pushes and deleting `main` | History on `main` can't be rewritten or lost, even by the owner by accident. It doesn't require pull requests or checks, because the owner pushes finished work straight to `main` and a required check would refuse a push that hasn't been checked yet. CI still runs on every push. |
 | Default `GITHUB_TOKEN` permission | read | Each workflow asks for what it needs in its `permissions:` block. |
 
+#### Code scanning triage
+
+CodeQL's first scan (2026-10-26) raised 21 alerts. Four were fixed: two HTML-stripping helpers that ran one pass and decoded `&amp;` before the other entities ([inat.mjs](../scripts/photos/inat.mjs), [build-day-list.mjs](../scripts/build-day-list.mjs)), and two cache reads that checked for a file before reading it ([build-day-list-relief.mjs](../scripts/build-day-list-relief.mjs), [build-day-list-borders.mjs](../scripts/build-day-list-borders.mjs)). The rest were dismissed in the Security tab with these reasons, so a new alert of the same kind still shows up for review:
+
+- **Network data written to files** (`js/http-to-file-access`) and **file data sent over the network** (`js/file-access-to-http`): the data scripts download public datasets (Natural Earth, iNaturalist, Wikipedia) into caches and the photo pipeline sends photos and metadata to its APIs. That's their job, and they run on the owner's machine or in CI, never for a visitor.
+- **The scene worker** (`src/lib/scenes/worker.ts`): a dedicated worker can only be messaged by the page that created it, so it needs no origin check; the "dynamic method call" is a `Map` lookup, which can't reach a prototype method; and the plate URLs it fetches come from the page's own build, with the CSP limiting where it can connect.
+- **The preview opener** (`scripts/photos/open.mjs`): it only opens an HTML file the script itself just wrote.
+
 ### GitHub Actions and Azure identities
 
 Workflows sign in to Azure with OIDC, so there is no Azure password anywhere. Two managed identities split the work by how much code each one runs:

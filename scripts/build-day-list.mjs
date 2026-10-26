@@ -554,10 +554,13 @@ async function api(path, params = {}, attempt = 1) {
 }
 
 function stripHtml(value) {
-  return String(value || "")
-    .replace(/<[^>]+>/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
+  // Strip until nothing's left, so a tag split by another tag can't survive.
+  let text = String(value || "");
+  for (let previous = ""; previous !== text;) {
+    previous = text;
+    text = text.replace(/<[^>]*>/g, "");
+  }
+  return text.replace(/\s+/g, " ").trim();
 }
 
 /** Trim a Wikipedia summary to whole sentences so it never ends mid-word. */

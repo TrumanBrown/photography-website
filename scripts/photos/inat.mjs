@@ -348,11 +348,18 @@ const IUCN = {
 };
 
 function plainText(html) {
-  return String(html ?? "")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&amp;/g, "&")
+  // Strip until nothing's left to strip, so a tag split by another tag
+  // (`<<b>script>`) can't survive one pass, and decode &amp; last so
+  // `&amp;quot;` stays `&quot;` instead of becoming a quote.
+  let text = String(html ?? "");
+  for (let previous = ""; previous !== text;) {
+    previous = text;
+    text = text.replace(/<[^>]*>/g, "");
+  }
+  return text
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&")
     .replace(/\s+/g, " ")
     .trim();
 }

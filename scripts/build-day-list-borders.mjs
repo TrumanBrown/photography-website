@@ -47,7 +47,6 @@
  *   src/lib/hobbies/day-list-borders/l<level>-<col>-<row>.json
  */
 import {
-  existsSync,
   mkdirSync,
   readdirSync,
   readFileSync,
@@ -101,14 +100,18 @@ const LEFT_OUT = new Set(["Lease limit", "Overlay limit"]);
 
 async function geojson(name) {
   const file = join(CACHE, `${name}.geojson`);
-  if (!existsSync(file)) {
+  let text;
+  try {
+    text = readFileSync(file, "utf8");
+  } catch {
     console.log(`Downloading ${name}`);
     const res = await fetch(`${NE}${name}.geojson`);
     if (!res.ok) throw new Error(`HTTP ${res.status} for ${name}`);
+    text = await res.text();
     mkdirSync(CACHE, { recursive: true });
-    writeFileSync(file, Buffer.from(await res.arrayBuffer()));
+    writeFileSync(file, text);
   }
-  return JSON.parse(readFileSync(file, "utf8"));
+  return JSON.parse(text);
 }
 
 function* partsOf(geometry) {

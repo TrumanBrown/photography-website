@@ -22,13 +22,7 @@
  * Bump VERSION when the tiles change, so browsers holding the old ones (they're
  * served as immutable) fetch the new set.
  */
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { inflateRawSync } from "node:zlib";
@@ -49,7 +43,11 @@ const SOURCE_WATER = 106;
 const QUALITY = 70;
 
 async function download() {
-  if (existsSync(CACHE)) return readFileSync(CACHE);
+  try {
+    return readFileSync(CACHE);
+  } catch {
+    // Not cached yet.
+  }
   console.log(`Downloading ${SOURCE}`);
   const res = await fetch(SOURCE);
   if (!res.ok) throw new Error(`Download failed: HTTP ${res.status}`);
