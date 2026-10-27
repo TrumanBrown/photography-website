@@ -163,6 +163,10 @@ jobs:
             astro-cache-v2-
 
       - name: Astro build
+        env:
+          # Links the site's footer to the Instagram account without naming it
+          # in the repository. Secrets are masked in the log (docs/social.md).
+          INSTAGRAM_URL: ${{ secrets.INSTAGRAM_URL }}
         run: npm run build
 
       - name: Azure login for the variant sync (OIDC)

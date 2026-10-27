@@ -234,6 +234,7 @@ If you've used Node before, none of this is new. If you haven't:
 | `AZURE_STORAGE_ACCOUNT` | Bicep output | `scripts/prebuild.mjs`, `sync-variants.mjs` and the photo and posting pipelines (env var) |
 | `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` | You create them (optional) | `photos.yml`, only when not using keyless Azure OpenAI, see [docs/photos.md](photos.md#settings) |
 | `IG_ACCESS_TOKEN`, `SOCIAL_SECRET_KEY`, `IG_USER_ID` | You create them (optional) | `photos.yml` and `social-post.yml`, see [docs/social.md](social.md#settings) |
+| `INSTAGRAM_URL` | You enter it (optional): the Instagram profile address | The Astro build step in `build-and-deploy.yml`, for the footer link, see [docs/social.md](social.md#settings) |
 
 The four `AZURE_*` IDs are identifiers, not credentials: without a matching
 GitHub OIDC token they grant nothing. They're secrets so they stay out of logs.

@@ -66,8 +66,9 @@ Adding iNaturalist observations later is fine: the next Photo captions run match
 | The images sent to Instagram | Uploaded to the private container, given to Instagram as a link that expires after two hours, deleted after posting | No |
 | Workflow logs | Public, like every Actions log in a public repository | Yes, but they only contain counts and generic messages. Errors pass through [redact.mjs](../scripts/photos/redact.mjs), which strips tokens, account and media ids, signed links and provider ids |
 | This code and these docs | The repository | Yes, by design |
+| The link to the account on the live site | The site's footer and the home page's structured data, built from the `INSTAGRAM_URL` secret | Yes, on the site only. The repository and its logs never contain it |
 
-Someone reading the repository can tell the feature exists (the workflow runs are visible), but not which account it posts to. The same photographs are public on the site and on Instagram, so a reverse image search could still connect them. The repository just won't be what gives it away.
+Someone reading the repository can tell the feature exists (the workflow runs are visible), but not which account it posts to. The live site does link to the account, so a visitor who follows the README to the site can find it. That's on purpose, because the posts are there to send people to the site and the link sends them back. The same photographs are public on the site and on Instagram, so a reverse image search could connect them too. The repository just won't be what gives it away.
 
 ---
 
@@ -288,6 +289,7 @@ Set these as **secrets** (masked in logs) or **variables** under Settings → Se
 | `SOCIAL_STORIES` | variable | off | `true` posts one story a day (only while `SOCIAL_LIVE` is `true`); `rehearse` does everything but publish |
 | `SOCIAL_STORY_WINDOW` | variable | `10:00-21:00` | The day's story goes out at a time picked within this window, different each day |
 | `IG_LOGIN_MODE`, `IG_USER_ID` | variable, secret | `instagram` | Only for the [Facebook Login setup](#location-tags-and-tagging-accounts) |
+| `INSTAGRAM_URL` | secret | none | The account's profile address (`https://www.instagram.com/<handle>/`). Build and Deploy reads it to add an Instagram link to the site's footer and the home page's structured data ([instagram.ts](../src/lib/instagram.ts)). Anything else is ignored. Without it the site doesn't link the account |
 
 The timer's own settings are parameters of [scheduler.bicep](../infra/modules/scheduler.bicep): `timeZone` (a Windows time zone name, `Pacific Standard Time` by default; keep it the same as `SOCIAL_TIMEZONE`), `postingHours` (7 to 22, which covers the default slots, the story window and the 11 pm cutoff) and `pipelineHour` (3). Change them there and run the Infra workflow.
 

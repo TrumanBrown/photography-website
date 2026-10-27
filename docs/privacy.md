@@ -59,6 +59,7 @@ These are real secrets. They're set in **GitHub → Settings → Secrets and var
 | `IG_ACCESS_TOKEN` (optional) | **Yes, real secret** | Instagram token for [social posting](social.md) |
 | `SOCIAL_SECRET_KEY` (optional) | **Yes, real secret** | Random key that seals the refreshed Instagram token in Blob |
 | `IG_USER_ID` (optional) | Identifies the Instagram account | Only with Facebook Login; kept secret so it's masked in logs |
+| `INSTAGRAM_URL` (optional) | Identifies the Instagram account | Its profile address, for the site's footer link. Kept secret so the repo and its logs never show it |
 | `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` (optional) | **Yes, real secret** | Vision model for [photo captions](photos.md), only when not using keyless Azure OpenAI |
 
 The three "identifier only" Azure IDs are technically not secrets in Microsoft's threat model, knowing them doesn't grant access. They're stored as secrets out of tidiness.
@@ -85,7 +86,7 @@ If you turn on [social posting](social.md), nothing in this repository or its pu
 - the workflows log counts only, through a redactor that strips tokens, ids and signed URLs
 - the facts in posts come from Wikipedia's public API. Its requests name your site's domain, as Wikimedia's etiquette asks, and never the Instagram account
 
-The workflow runs themselves are visible, so someone reading the repo can tell the feature is in use, but not where. The photographs are the same ones on the site, so a reverse image search could still connect the two, and your Instagram bio links to the site by design. Nothing links the other way.
+The workflow runs themselves are visible, so someone reading the repo can tell the feature is in use, but not where. The photographs are the same ones on the site, so a reverse image search could still connect the two, and your Instagram bio links to the site by design. With the `INSTAGRAM_URL` secret set, the live site's footer links back to the account, so the site connects them on purpose. The repository still doesn't.
 
 Checked in October 2026, after posting went live: the tracked files, the full git history including commit messages, and the logs of every workflow run since the feature was added contain no account name, Meta app name, access token or signed link. The only identifiers in the logs are ones that grant nothing on their own: the storage account (already public in `blobHost`) and the Azure OpenAI endpoint hostname, which the logs print because it's a repository variable and which only accepts your Azure sign-in.
 

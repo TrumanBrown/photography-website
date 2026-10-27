@@ -2,6 +2,9 @@
 import { copyrightLine } from '@/lib/sessions';
 import { PRINTS_PATH } from '@/lib/prints';
 import { siteConfig } from '../../site.config';
+import { instagramUrl } from '@/lib/instagram';
+
+const instagram = instagramUrl();
 ---
 
 {
@@ -20,6 +23,16 @@ import { siteConfig } from '../../site.config';
         )
       }
       <a href="/privacy/" class="draw text-ink-2 no-underline hover:text-ink">Privacy</a>
+      {
+        instagram && (
+          <a
+            href={instagram}
+            target="_blank"
+            rel="me noopener noreferrer"
+            class="draw text-ink-2 no-underline hover:text-ink"
+          >Instagram</a>
+        )
+      }
       <a
         href="https://github.com/TrumanBrown/photography-website"
         target="_blank"

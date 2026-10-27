@@ -9,6 +9,7 @@ import { sortSessions, sessionSlug, splitSessionTitle } from "@/lib/sessions";
 import { buildLeadFrames, coverFileOf, type LeadItem } from "@/lib/archive";
 import { jsonForScript } from "@/lib/html";
 import { siteConfig } from "../../site.config";
+import { instagramUrl } from "@/lib/instagram";
 
 // Eagerly resolve every image under src/content/sessions/ so we can look up
 // image metadata at build time. Astro processes each as an ImageMetadata.
@@ -62,6 +63,7 @@ const firstCover = first?.data.images.find(
 );
 
 const siteOrigin = (Astro.site ?? `https://${siteConfig.domain}`).toString();
+const instagram = instagramUrl();
 // Identifies the photographer as an entity, with the off-site profiles that
 // corroborate it. Kept to the home page so it isn't repeated site-wide.
 const personSchema = {
@@ -73,6 +75,7 @@ const personSchema = {
   sameAs: [
     "https://www.inaturalist.org/people/trumanbrown",
     "https://github.com/TrumanBrown",
+    ...(instagram ? [instagram] : []),
   ],
 };
 ---

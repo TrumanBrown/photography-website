@@ -27,7 +27,7 @@ Private state lives in Blob under `metadata/social/`: the queue, the ledgers of 
 - **The whole photo at full quality.** He first asked for no cropping at all; when borders read as bars, he chose a slight crop "to make it fit in the natural area" (2026-10-14), which is now the default.
 - **Stories: one a day, the photo only, no text**, vertical shots first "so less blurred space" (2026-10-13).
 - **Never pause posting.** Review happens on drafts while posting carries on (2026-10-13).
-- **Nobody reading the public repo can tell which account this posts to** (2026-10-10). The handle, app name, user id, hub accounts and location ids stay in secrets or `config.json`, and logs print counts through `redact()`.
+- **Nobody reading the public repo can tell which account this posts to** (2026-10-10). The handle, app name, user id, hub accounts and location ids stay in secrets or `config.json`, and logs print counts through `redact()`. The live site may link the account (2026-10-26): its footer link comes from the `INSTAGRAM_URL` secret at build time, never from code.
 - Don't automate follows, likes, comments or DMs, and don't hand his Instagram password to any tool. That was the agent's advice on 2026-10-13 when he asked what else to automate, and it still stands.
 
 ## Commands
@@ -93,6 +93,7 @@ Instagram's API can only turn comments on or off and delete. To change a live ca
 - 2026-10-13: "don't pause any image posting, i just want to see the drafts."
 - 2026-10-13: some emoji "are too much, like the heart eyes"; stick to the animal or the scene.
 - 2026-10-14: frames that don't fit get a slight crop instead of a border.
+- 2026-10-26: asked whether the README should name the account: keep it private, "on the repo itself don't post the handle, but highlight the automated instagram pipeline it has, that's still pretty cool". He did want the site's footer to link the account, and a real number for visits it sends.
 
 ## Hard-won lessons
 
