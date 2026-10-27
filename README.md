@@ -17,46 +17,11 @@ Try it: [the photo archive](https://trumanbrown.com), [Things to try](https://tr
 
 ## What's worth a look
 
-- **Instagram on autopilot.** The site posts its own photos to Instagram, three a day plus a daily story, in captions that sound like I wrote them, and it's the site's biggest source of referred visitors. [How it works](#instagram-on-autopilot)
 - **Security.** A strict Content Security Policy with hashed inline scripts and no `'unsafe-inline'` scripts, HSTS preload, keyless OIDC deploys through two least-privilege Azure identities, SHA-pinned actions, CodeQL, Dependabot and secret scanning with push protection. Photos have their GPS removed before they're published. [docs/security.md](docs/security.md)
 - **Infrastructure as code.** Every Azure resource is in Bicep and deploys from a manual workflow behind a GitHub environment. [docs/iac-bicep.md](docs/iac-bicep.md)
 - **CI/CD.** Builds run on every push and every hour, pick up new photos from Blob Storage, and move the image variants back to Blob so the Static Web Apps deploy stays a few megabytes. Azure sign-ins retry, so a GitHub token hiccup doesn't fail a deploy. [docs/cicd.md](docs/cicd.md)
-- **Photo captions.** A vision model looks at each photo once and writes its caption and alt text, with the species taken from my own iNaturalist observations and facts checked against Wikipedia. [docs/photos.md](docs/photos.md)
+- **Photo pipeline.** A vision model looks at each photo once and writes its caption and alt text, with the species taken from my own iNaturalist observations and facts checked against Wikipedia. The same pipeline posts to Instagram three times a day in captions that sound like me, and Instagram now sends the site more referred visits than any other source. [docs/photos.md](docs/photos.md), [The Instagram pipeline](#the-instagram-pipeline)
 - **Cost.** About $5 a month, domain included. [What it costs](#what-it-costs)
-
-## Instagram on autopilot
-
-The site runs my photography Instagram. After I upload a session, its photos go out over the following weeks, three a day plus one story a day, and I don't touch any of it. The point is to bring people back to the site. Instagram only holds a 1440 px copy, so every caption ends by pointing to the full-resolution photo and the rest of the session through the link in my bio, and the site's footer links back to the account.
-
-How a photo becomes a post:
-
-1. **Upload.** A session goes into Blob Storage and the next build publishes it on the site.
-2. **One look.** The Photo captions workflow has a vision model look at each new photo once, for both the website caption and the post. The species comes from my own iNaturalist observation of that exact photo, never from the model.
-3. **Plan.** It plans two weeks ahead: every photo once, never two from the same session in a day, never the same species within about five days, and a landscape every third post.
-4. **Write.** Each post gets an opening in my voice (below), the place on its own line, a fun fact from Wikipedia that's checked against the article, the camera and lens from EXIF, and five hashtags built from data.
-5. **Publish.** A Logic App timer starts the Social post workflow every 30 minutes, because GitHub's own schedules skip most runs. It publishes through Instagram's Graph API exactly once per slot, renews its own token every week, and after a day with no post it fails a run on purpose so GitHub emails me.
-
-From October 10, 2026, when posting started, to October 27, 21 of the site's 208 visits came through the Instagram bio link. Every other site put together sent 5. Most of the rest arrive with no referrer, which includes people typing the address. The numbers come from the site's own cookieless analytics ([docs/analytics.md](docs/analytics.md)).
-
-### Teaching it to sound like me
-
-People scroll past posts that read like AI wrote them, and the first drafts did: a name, a pose and a place, like alt text. I rewrote twelve of them by hand over two rounds, and those rewrites are what the generator learns from.
-
-| The pipeline wrote | I rewrote it to |
-| --- | --- |
-| Groove-billed ani (Crotophaga sulcirostris) munching on an insect on a mossy post, Bijagua, Alajuela Province, Costa Rica. Such an interesting, unique beak on it. | Saw this Groove-billed ani (Crotophaga sulcirostris) munching on some insect in Bijagua. Such a unique bird, the beak goes so far up its head, almost looks like a horn lol 🐦 |
-| Ran into this northwestern garter snake (Thamnophis ordinoides) with its mouth open among the grass and fallen leaves around Puget Sound. Can't tell what was going on, but that's such a big expression for a small snake lol 😅 | Ran into this northwestern garter snake (Thamnophis ordinoides) with some gunk on his jaws. Looks like he just finished a big meal, was pretty lethargic when moving 🐍 |
-
-The first round taught it to tell how I came across the animal instead of labelling the photo. The second taught it to stop trying so hard: no quips, one animal is "he", and the emoji is the animal or the scene, never a face.
-
-How it holds to that:
-
-- **The rules are plain Markdown.** How I write is in the [truman-voice](.github/skills/truman-voice/SKILL.md) skill and how a post reads is in [caption-voice](.github/skills/caption-voice/SKILL.md), both with my rewrites next to what they replaced. [voice.mjs](scripts/photos/voice.mjs) puts those files into the prompt for every batch of posts, so editing them is how the voice changes, and bumping one version number rewrites the posts already planned.
-- **Code checks every opening before it's kept.** It can't say what I was doing ("pulled over on the side of the road") unless my private trip notes say so. It can't start like any of the four posts before it, use "lol" on more than one post in four, or use the usual AI words, and it gets exactly one emoji. An opening that fails waits for the next run instead of going out with a fallback.
-- **It can't misname an animal.** The model writes `{name}`, and code puts in the verified species and its scientific name.
-- **My words win.** One command writes a post's opening myself, asks for a redraft, or skips a photo.
-
-The repository never names the account. The token and ids are GitHub secrets, the plan and posting history live in private Blob Storage, and the workflow logs show counts only. To see the posts, use the Instagram link in the site's footer. Setup and every rule are in [docs/social.md](docs/social.md).
 
 ## About the project
 
@@ -107,6 +72,21 @@ The project started as a photography portfolio and has grown into a small person
 - **CI/CD:** GitHub Actions, OIDC federation (no long-lived secrets) with a blob-only identity for builds and a separate one for the manual infra deploy, see [docs/cicd.md](docs/cicd.md)
 - **Cost target:** about $5/month at personal traffic (incl. `.com` domain), see [What it costs](#what-it-costs) and [docs/azure.md#monthly-cost](docs/azure.md#monthly-cost)
 - **What about your name/address/etc. in this repo?** See [docs/privacy.md](docs/privacy.md)
+
+---
+
+## The Instagram pipeline
+
+The site also runs my photography Instagram: three photos a day plus a story, with nothing for me to do after an upload. The vision model's one look at each photo feeds the post too, the species comes from my own iNaturalist observation, and a Logic App timer publishes each post exactly once through Instagram's Graph API. Every caption points back to the full-resolution photo on the site. From October 10, 2026, when posting started, to October 27, the Instagram bio link sent 21 of the site's 208 visits, against 5 from every other site put together ([analytics](docs/analytics.md)).
+
+The first captions read like alt text, so I rewrote a dozen of them by hand, and the generator learns from those rewrites:
+
+| The pipeline wrote | I rewrote it to |
+| --- | --- |
+| Groove-billed ani (Crotophaga sulcirostris) munching on an insect on a mossy post, Bijagua, Alajuela Province, Costa Rica. Such an interesting, unique beak on it. | Saw this Groove-billed ani (Crotophaga sulcirostris) munching on some insect in Bijagua. Such a unique bird, the beak goes so far up its head, almost looks like a horn lol 🐦 |
+| Ran into this northwestern garter snake (Thamnophis ordinoides) with its mouth open among the grass and fallen leaves around Puget Sound. Can't tell what was going on, but that's such a big expression for a small snake lol 😅 | Ran into this northwestern garter snake (Thamnophis ordinoides) with some gunk on his jaws. Looks like he just finished a big meal, was pretty lethargic when moving 🐍 |
+
+The rewrites live in two Markdown skills, [truman-voice](.github/skills/truman-voice/SKILL.md) and [caption-voice](.github/skills/caption-voice/SKILL.md), that go into the prompt with every batch of posts ([voice.mjs](scripts/photos/voice.mjs)). Code then checks each opening before it's kept: no backstory my trip notes don't back up, no opener that repeats a recent post, one emoji of the animal or the scene, and the species name filled in from the verified identification so it can't be wrong. The account isn't named anywhere in this repository. Setup and every rule: [docs/social.md](docs/social.md).
 
 ---
 
