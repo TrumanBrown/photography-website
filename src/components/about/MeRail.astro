@@ -34,8 +34,8 @@ const links = [
     <Picture
       src={me}
       alt="Me in front of Everest's north face in Tibet"
-      widths={[180, 360, 540]}
-      sizes="(min-width: 900px) 180px, 96px"
+      widths={[216, 432, 620]}
+      sizes="(min-width: 900px) 216px, 96px"
       formats={["webp"]}
       fallbackFormat="jpeg"
       loading="eager"
@@ -77,10 +77,11 @@ const links = [
 </aside>
 
 <style>
-  /* The archive rail's frame and top (ArchiveRail.astro), kept identical so
-     the top of the rail holds still between the two pages. */
+  /* The archive rail's frame and top (ArchiveRail.astro), so the top holds
+     still between the two pages. It's wider than the archive's 212px because
+     it holds a photo and a few links rather than a long list. */
   .rail {
-    width: var(--rail-w, 212px);
+    width: 248px;
     flex: none;
     position: sticky;
     top: 0;

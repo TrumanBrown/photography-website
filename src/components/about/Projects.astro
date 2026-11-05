@@ -93,7 +93,7 @@ const watchUrl = `https://www.youtube.com/watch?v=${COZY_VIDEO.youtubeId}`;
                     src={pickImage}
                     alt={pick?.caption ?? `${pickLabel} header photograph`}
                     widths={[480, 720, 960, 1280]}
-                    sizes="(min-width: 900px) 34vw, 92vw"
+                    sizes="(min-width: 900px) 320px, 92vw"
                     formats={["webp"]}
                     fallbackFormat="jpeg"
                     loading="lazy"
@@ -131,7 +131,7 @@ const watchUrl = `https://www.youtube.com/watch?v=${COZY_VIDEO.youtubeId}`;
                       src={poster}
                       alt=""
                       widths={[480, 720, 1280]}
-                      sizes="(min-width: 900px) 34vw, 92vw"
+                      sizes="(min-width: 900px) 320px, 92vw"
                       formats={["webp"]}
                       fallbackFormat="jpeg"
                       loading="lazy"
@@ -235,7 +235,6 @@ const watchUrl = `https://www.youtube.com/watch?v=${COZY_VIDEO.youtubeId}`;
 <style>
   .wsec {
     padding: 6vh var(--gutter) 0;
-    max-width: calc(1060px + var(--gutter) * 2);
   }
   .shead {
     padding-bottom: 6px;
@@ -246,12 +245,14 @@ const watchUrl = `https://www.youtube.com/watch?v=${COZY_VIDEO.youtubeId}`;
     margin: 0;
     padding: 0;
   }
+  /* The picture is a small column beside the words, so the projects take
+     less room than the work above them. */
   .proj {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 18px 30px;
+    grid-template-columns: 320px minmax(0, 1fr);
+    gap: 18px 32px;
     align-items: start;
-    padding: 26px 0 28px;
+    padding: 24px 0 26px;
     border-top: 1px solid var(--rule);
   }
   .proj:first-child {
@@ -318,7 +319,7 @@ const watchUrl = `https://www.youtube.com/watch?v=${COZY_VIDEO.youtubeId}`;
     display: block;
     width: 100%;
     height: auto;
-    aspect-ratio: 4 / 3;
+    aspect-ratio: 3 / 2;
     object-fit: cover;
     background: var(--band);
   }
@@ -330,6 +331,10 @@ const watchUrl = `https://www.youtube.com/watch?v=${COZY_VIDEO.youtubeId}`;
   .site-live figcaption {
     display: block;
     margin-top: 10px;
+  }
+  .site-live figcaption .u-label {
+    display: block;
+    line-height: 1.6;
   }
   .site-cap {
     display: block;
@@ -382,14 +387,14 @@ const watchUrl = `https://www.youtube.com/watch?v=${COZY_VIDEO.youtubeId}`;
   .radar canvas {
     display: block;
     width: 100%;
-    max-width: 380px;
+    max-width: 240px;
     aspect-ratio: 1;
     border: 1px solid var(--rule);
     background: #0b0b0a;
     image-rendering: pixelated;
   }
   .radar-cap {
-    max-width: 380px;
+    max-width: 320px;
   }
   .radar-says {
     display: block;
@@ -423,7 +428,6 @@ const watchUrl = `https://www.youtube.com/watch?v=${COZY_VIDEO.youtubeId}`;
       gap: 14px;
       padding: 20px 0 24px;
     }
-    .radar canvas,
     .radar-cap {
       max-width: none;
     }

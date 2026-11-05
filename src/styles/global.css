@@ -467,6 +467,15 @@ html.landing-page::view-transition-new(root) {
   animation-duration: 280ms;
   animation-timing-function: var(--ease);
 }
+/* The front door's rail is wider than the archive's, so the top of the rail
+   keeps its natural size, pinned to its left edge, and only the theme word
+   at its right crossfades between the two places. */
+::view-transition-old(rail-top),
+::view-transition-new(rail-top) {
+  height: 100%;
+  object-fit: none;
+  object-position: left top;
+}
 ::view-transition-old(lead-photo) {
   animation: none;
   opacity: 0;

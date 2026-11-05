@@ -103,7 +103,6 @@ const SHOW = 3;
 <style>
   .wsec {
     padding: 6vh var(--gutter) 0;
-    max-width: calc(1060px + var(--gutter) * 2);
   }
   .shead {
     padding-bottom: 6px;
@@ -111,9 +110,9 @@ const SHOW = 3;
   }
   .summary {
     margin: 14px 0 0;
-    max-width: 72ch;
-    font-size: 14px;
-    line-height: 1.55;
+    max-width: 80ch;
+    font-size: 15px;
+    line-height: 1.6;
     color: var(--ink-3);
   }
   .jobs {
@@ -123,40 +122,40 @@ const SHOW = 3;
   }
   .job {
     display: grid;
-    grid-template-columns: 150px minmax(0, 1fr);
-    gap: 4px 24px;
-    padding: 18px 0;
+    grid-template-columns: 160px minmax(0, 1fr);
+    gap: 4px 28px;
+    padding: 22px 0;
     border-top: 1px solid var(--rule);
   }
   .job:first-child {
     border-top: 0;
   }
   .job-when {
-    padding-top: 4px;
+    padding-top: 6px;
   }
   .job-role {
     margin: 0;
-    font-size: 16px;
+    font-size: 18px;
     font-weight: 400;
     line-height: 1.3;
     color: var(--ink);
   }
   .job-org {
-    margin: 2px 0 0;
-    font-size: 13px;
+    margin: 3px 0 0;
+    font-size: 13.5px;
     color: var(--ink-2);
   }
   .job-lines {
     margin: 10px 0 0;
     padding: 0 0 0 16px;
     list-style: disc;
-    max-width: 72ch;
-    font-size: 14px;
-    line-height: 1.55;
+    max-width: 88ch;
+    font-size: 15px;
+    line-height: 1.6;
     color: var(--ink-3);
   }
   .job-lines li {
-    margin: 4px 0;
+    margin: 5px 0;
   }
   .job-lines li::marker {
     color: var(--ink-2);
@@ -166,7 +165,7 @@ const SHOW = 3;
   }
   .job-more {
     margin-top: 4px;
-    font-size: 12px;
+    font-size: 13px;
     color: var(--ink-2);
   }
   .job-more:hover {
@@ -176,10 +175,10 @@ const SHOW = 3;
     margin: 0;
     padding-top: 16px;
     display: grid;
-    grid-template-columns: 150px minmax(0, 1fr);
-    gap: 10px 24px;
-    font-size: 14px;
-    line-height: 1.55;
+    grid-template-columns: 160px minmax(0, 1fr);
+    gap: 10px 28px;
+    font-size: 15px;
+    line-height: 1.6;
   }
   .skills dt {
     padding-top: 3px;
@@ -187,7 +186,7 @@ const SHOW = 3;
   .skills dd {
     margin: 0;
     color: var(--ink-3);
-    max-width: 72ch;
+    max-width: 88ch;
   }
   @media (max-width: 899px) {
     .job,

@@ -247,8 +247,12 @@ const personSchema = {
 </BaseLayout>
 
 <style>
+  /* One centered column, as wide as the footer's, so a wide screen keeps
+     the page together instead of leaving its right third empty. */
   .door {
     position: relative;
+    max-width: calc(1104px + var(--gutter) * 2);
+    margin-inline: auto;
     padding-bottom: 4vh;
   }
   /* Where /#weekdays lands: just above the switch, so a link from another

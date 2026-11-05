@@ -30,6 +30,7 @@ description: 'The front door at / and About me: the Weekends and Weekdays switch
 - **Don't link seattlebalc.com.** It's a friend's site that the radar reads from, not his work. The radar's link goes to the balcFlights-LED README, where a video shows the real panel. The privacy page still names the site in words, because visitors' browsers talk to it.
 - **Photos he picked, not the first one.** The site project shows the newest session's header photo, chosen the way the session page chooses its banner (`banner`, then a wide cover, then the widest).
 - **One Resume button on screen.** Filled ink in the rail's foot; on a phone, where that's hidden, the Weekdays row shows it instead.
+- **Today's layout, sized up.** Round 2's three-column, two-page and projects-first layouts all crowded the page. What fixed the blank space was a wider rail (248px, the archive's stays 212px), one centered column the footer's width, bigger resume type (15px lines, 18px titles) and smaller project pictures (a 320px column, the radar 240px). The work should always take more room than the projects.
 - **Same photo, never a different one,** when moving between pages. The lead photo is handed over by its URL and moves to its place. Nothing else carries over.
 
 ## Update the resume
@@ -54,6 +55,8 @@ If it says NO DATA, `curl -s https://seattlebalc.com/api/v1/flights | head` firs
 - 2026-11-05: of the portfolio mocks, "A weekends is good." Side projects: "only highlight these three - and I suggest using a photo or live elemtn for each. live site under the website project seems not useful since they are already on the site." The switch: "mak esure the weekends and weekdays tab isn't too hard to miss. it's good, but just want to make sure it isn' tmissed." The portrait: "use whichever looks better and more fiting for the section" of Everest and a boat in Ninh Binh. Everest won, since his own Everest session is in the archive and the photo links to it. "Write to me" should "mention the about me section first and then the print or photo", and every message should reach his email.
 
 - 2026-11-05, on the live page: "a lot of blank space on this page" on the Weekdays side; the newest session should use "either the cover or the header images considering I selected those"; "don't highlight seattlebalc.com with a link to it. I didn't make that so it isn't really impressive. my friend made it"; "maybe the side bar could be a bit bigger?"; "why is one resume button off color while the other isn't". The two Resume buttons were the rail's outlined `.btn` and the Weekdays row's filled `.btn-ink`, two of the same action in two styles. Round 2 mocks (`mocks/portfolio/r2-*.html`) for the space and the rail width.
+
+- 2026-11-05, on round 2: "i think fixed is still better, just make the side bar a bit bigger, and maybe center or make the experience section bigger too. I think anything else overcrowds the page too much." And "the side projects are just a bit too big, the images are quite large. takes up more space than the actual experience imo."
 
 ## Hard-won lessons
 
