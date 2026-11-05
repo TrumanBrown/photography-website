@@ -27,8 +27,9 @@ never restore, stash or reset files you didn't change, and `git pull --rebase` b
 
 ## Working with Truman
 
-- He works from Windows into this WSL checkout. Give files as Windows paths
-  (`\\wsl.localhost\Ubuntu\home\trumanbrown\projects\photography-website\...`) and servers as
+- He works from Windows into this WSL checkout, on more than one PC, and the Linux user name
+  differs between them. Give files as Windows paths from `wslpath -w <file>`
+  (`\\wsl.localhost\Ubuntu\home\<user>\projects\photography-website\...`) and servers as
   `http://localhost:<port>/` links, never bare Linux paths.
 - Update the docs a change touches in the same commit, in plain words someone rebuilding the site
   could follow.

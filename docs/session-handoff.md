@@ -131,6 +131,8 @@ npm ci --prefix api
 az login --use-device-code
 gh auth login
 gh auth setup-git
+git config --global user.name "<Your Name>"
+git config --global user.email "<id>+<user>@users.noreply.github.com"  # commits are public
 
 # Verify (substitute your storage account name + repo)
 az account show --query name

@@ -31,9 +31,15 @@ sudo apt-get upgrade
 sudo apt-get install --no-install-recommends libraw-bin libimage-exiftool-perl python3-venv
 gh auth login --web
 gh auth setup-git
+git config --global user.name "<Your Name>"
+git config --global user.email "<id>+<user>@users.noreply.github.com"
 az login --use-device-code
 az bicep install
 ```
+
+Every commit's author email is public, so commit with your GitHub noreply
+address (GitHub shows it under Settings → Emails), see
+[security.md](security.md#secret-hygiene).
 
 CLI sign-ins belong to the Linux user that ran them. `az account show` can
 display an account even when its cached sign-in has expired; verify a fresh
@@ -46,6 +52,17 @@ az account get-access-token --resource https://storage.azure.com/ --query expire
 After system-library updates or a change to WSL's default user, save your work
 and restart the distro from Windows. Do not restart WSL while another session
 is still working in it.
+
+Copilot chat sessions belong to the Linux user too. They're kept in
+`~/.copilot/session-state/`, so once WSL's default user changes from `root`,
+chats started as root no longer show up in VS Code. To open one again, find
+it, copy it into your own folder and reload the window:
+
+```bash
+sudo sh -c 'grep -l photography-website /root/.copilot/session-state/*/workspace.yaml'
+sudo cp -a /root/.copilot/session-state/<id> ~/.copilot/session-state/
+sudo chown -R "$USER:$USER" ~/.copilot/session-state/<id>
+```
 
 ## Common commands
 
