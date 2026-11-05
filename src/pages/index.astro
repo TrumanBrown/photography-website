@@ -225,8 +225,11 @@ const personSchema = {
     >
       <p class="dintro">{WEEKDAYS}</p>
       <p class="dacts">
-        <a class="btn btn-ink" href={RESUME_PDF} target="_blank" rel="noopener"
-          >Resume (PDF)</a
+        <a
+          class="btn btn-ink resume-phone"
+          href={RESUME_PDF}
+          target="_blank"
+          rel="noopener">Resume (PDF)</a
         >
         <button type="button" class="btn" data-contact-open>Write to me</button>
         <a
@@ -405,6 +408,11 @@ const personSchema = {
     aspect-ratio: 1 / 1;
   }
 
+  /* One Resume button on screen at a time: the rail's on a desktop, this one
+     on a phone, where the rail's foot is hidden. */
+  .resume-phone {
+    display: none;
+  }
   .dacts {
     display: flex;
     flex-wrap: wrap;
@@ -434,6 +442,9 @@ const personSchema = {
     }
     .dcount {
       display: none;
+    }
+    .dacts .resume-phone {
+      display: inline-flex;
     }
     .dintro {
       margin-top: 16px;

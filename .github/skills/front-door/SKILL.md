@@ -27,6 +27,9 @@ description: 'The front door at / and About me: the Weekends and Weekdays switch
 - **Side projects are the three pinned on his GitHub**: this site, cozy-vibe-vids, balcFlights-LED. Each has a photo or a live element, never a link to something already on the site.
 - **The switch can't be missed.** Heading-size words, a tracked line under each saying what's behind it, a 2px bar.
 - **Every "About me" goes to `/#weekdays`.** It works without script through `:target`, and `/about/` redirects there.
+- **Don't link seattlebalc.com.** It's a friend's site that the radar reads from, not his work. The radar's link goes to the balcFlights-LED README, where a video shows the real panel. The privacy page still names the site in words, because visitors' browsers talk to it.
+- **Photos he picked, not the first one.** The site project shows the newest session's header photo, chosen the way the session page chooses its banner (`banner`, then a wide cover, then the widest).
+- **One Resume button on screen.** Filled ink in the rail's foot; on a phone, where that's hidden, the Weekdays row shows it instead.
 - **Same photo, never a different one,** when moving between pages. The lead photo is handed over by its URL and moves to its place. Nothing else carries over.
 
 ## Update the resume
@@ -50,9 +53,11 @@ If it says NO DATA, `curl -s https://seattlebalc.com/api/v1/flights | head` firs
 
 - 2026-11-05: of the portfolio mocks, "A weekends is good." Side projects: "only highlight these three - and I suggest using a photo or live elemtn for each. live site under the website project seems not useful since they are already on the site." The switch: "mak esure the weekends and weekdays tab isn't too hard to miss. it's good, but just want to make sure it isn' tmissed." The portrait: "use whichever looks better and more fiting for the section" of Everest and a boat in Ninh Binh. Everest won, since his own Everest session is in the archive and the photo links to it. "Write to me" should "mention the about me section first and then the print or photo", and every message should reach his email.
 
+- 2026-11-05, on the live page: "a lot of blank space on this page" on the Weekdays side; the newest session should use "either the cover or the header images considering I selected those"; "don't highlight seattlebalc.com with a link to it. I didn't make that so it isn't really impressive. my friend made it"; "maybe the side bar could be a bit bigger?"; "why is one resume button off color while the other isn't". The two Resume buttons were the rail's outlined `.btn` and the Weekdays row's filled `.btn-ink`, two of the same action in two styles. Round 2 mocks (`mocks/portfolio/r2-*.html`) for the space and the rail width.
+
 ## Hard-won lessons
 
 1. **The Windows `az` under WSL crashes printing Bicep** that has a `→` in it (`'charmap' codec can't encode`). Build with `--outfile` and a `wslpath -w` path instead of `--stdout`.
 2. **A hidden VS Code browser panel skips view transitions** (`document.visibilityState` is `hidden`), and headless Chromium never paints after one. Check the handover by reading `.lead[data-current]` on both pages, and see the fade in a visible browser.
-3. **Local sessions have no `showcase` picks or captions,** so the lead photo and "Newest caption" are empty on a local build. Copy `src/content/sessions/*.json` aside, add picks for a look, and put them back.
+3. **Local sessions have no `showcase` picks or captions,** so the lead photo is empty and the site project has no caption on a local build. Copy `src/content/sessions/*.json` aside, add picks for a look, and put them back.
 4. **The first deploy failed on a duplicate route.** `/about` and `/about/` were both redirects, and Static Web Apps treats them as one route and refuses the whole config, which nothing local checked. One rule, `/about`, covers both, and `scripts/swa-config.test.mjs` fails on a repeat.

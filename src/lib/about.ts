@@ -168,7 +168,7 @@ export const PROJECTS: Project[] = [
     since: "2026-08",
     media: "radar",
     blurb:
-      "The planes flying over Seattle, on a 64×64 LED panel run by a Raspberry Pi 4. It reads seattlebalc.com's public flight API and draws a radar with the nearest plane's callsign, type and altitude. The panel here is the same radar, drawn live in your browser.",
+      "The planes flying over Seattle, on a 64×64 LED panel run by a Raspberry Pi 4. It pulls from a friend's flight API for Seattle and draws a radar with the nearest plane's callsign, type and altitude. The panel here is the same radar, drawn live in your browser.",
   },
 ];
 

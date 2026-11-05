@@ -1,8 +1,9 @@
 /**
  * The live LED radar beside balcFlights-LED on the front door's Weekdays side
- * (src/components/about/LedRadar.astro). It fetches seattlebalc.com's public
- * flight API, the same feed my panel reads, and draws the panel's radar on a
- * 64 × 64 grid of LEDs: the nearest plane's callsign, its type, altitude,
+ * (src/components/about/Projects.astro). It fetches the same public flight
+ * API my panel reads (seattlebalc.com, a friend's site, so the page credits
+ * it in words but doesn't link it) and draws the panel's radar on a 64 × 64
+ * grid of LEDs: the nearest plane's callsign, its type, altitude,
  * speed and climb, and every plane in range with a sweep passing over them.
  *
  * Nothing loads until the panel is on screen. It asks for new data every 20
@@ -260,7 +261,7 @@ export function initLedRadar(root: HTMLElement): void {
       ? describe(r!, snapshot.rangeNm)
       : failed
         ? "No flight data right now. The panel tries again in a moment."
-        : "Asking seattlebalc.com what's flying...";
+        : "Looking for planes over Seattle...";
     if (says) says.textContent = text;
     canvas!.setAttribute(
       "aria-label",

@@ -30,15 +30,21 @@ const captioned = sessions.reduce(
   0,
 );
 
-/* The newest session's first captioned photograph; without captions (a
-   local build), its cover. */
-const newest =
-  sessions.find((s) => s.data.images.some((i) => i.caption?.trim())) ??
-  sessions[0];
+/* The newest session's header photograph, chosen the way its page chooses
+   its banner: the header picked in the admin panel, else the cover when it's
+   wide enough, else the session's widest photograph. Never just its first
+   photograph. */
+const BANNER_MIN_RATIO = 1.2;
+const newest = sessions[0];
+const ratio = (i: { width: number; height: number }) => i.width / i.height;
+const cover = newest?.data.images.find((i) => i.file === coverFileOf(newest));
 const pick = newest
-  ? (newest.data.images.find((i) => i.caption?.trim()) ??
-    newest.data.images.find((i) => i.file === coverFileOf(newest)))
+  ? (newest.data.images.find((i) => i.file === newest.data.banner) ??
+    (cover && ratio(cover) >= BANNER_MIN_RATIO
+      ? cover
+      : newest.data.images.reduce((a, b) => (ratio(b) > ratio(a) ? b : a))))
   : undefined;
+const pickFocus = newest?.data.bannerFocus;
 const pickImage =
   newest && pick
     ? images[`/src/content/sessions/${sessionSlug(newest)}/images/${pick.file}`]
@@ -49,10 +55,11 @@ const pickLabel = newest ? splitSessionTitle(newest.data.title).label : "";
 const fmt = (n: number) => n.toLocaleString("en-US");
 const siteFacts = [
   `${fmt(sessions.length)} sessions`,
-  `${fmt(photos)} photographs`,
-  captioned ? `${fmt(captioned)} captioned` : null,
+  captioned && captioned === photos
+    ? `${fmt(photos)} photographs, every one captioned`
+    : `${fmt(photos)} photographs`,
   `${hobbies.length} things to try`,
-].filter(Boolean);
+];
 
 const watchUrl = `https://www.youtube.com/watch?v=${COZY_VIDEO.youtubeId}`;
 ---
@@ -84,20 +91,20 @@ const watchUrl = `https://www.youtube.com/watch?v=${COZY_VIDEO.youtubeId}`;
                   <i class="s2" aria-hidden="true" />
                   <Picture
                     src={pickImage}
-                    alt={pick?.caption ?? `${pickLabel} cover photograph`}
-                    widths={[480, 720, 960]}
+                    alt={pick?.caption ?? `${pickLabel} header photograph`}
+                    widths={[480, 720, 960, 1280]}
                     sizes="(min-width: 900px) 34vw, 92vw"
                     formats={["webp"]}
                     fallbackFormat="jpeg"
                     loading="lazy"
                     class="stack-img"
+                    style={
+                      pickFocus ? `object-position:${pickFocus}` : undefined
+                    }
                   />
                 </a>
                 <figcaption>
-                  <span class="u-label">
-                    {pick?.caption ? "Newest caption" : "Newest session"} ·{" "}
-                    {pickLabel}
-                  </span>
+                  <span class="u-label">Newest session · {pickLabel}</span>
                   {pick?.caption && (
                     <span class="site-cap">{pick.caption}</span>
                   )}
@@ -155,16 +162,16 @@ const watchUrl = `https://www.youtube.com/watch?v=${COZY_VIDEO.youtubeId}`;
                 />
                 <figcaption class="radar-cap">
                   <span class="radar-says" data-radar-says>
-                    Planes over Seattle right now, from seattlebalc.com.
+                    Planes over Seattle right now.
                   </span>
                   <span class="radar-row">
                     <a
-                      class="u-label"
-                      href="https://seattlebalc.com/"
+                      class="draw"
+                      href={`https://github.com/TrumanBrown/${project.repo}#readme`}
                       target="_blank"
                       rel="noopener noreferrer"
                     >
-                      Live from seattlebalc.com ↗
+                      Watch the real panel on GitHub ↗
                     </a>
                     <button
                       type="button"
@@ -396,9 +403,6 @@ const watchUrl = `https://www.youtube.com/watch?v=${COZY_VIDEO.youtubeId}`;
     margin-top: 4px;
   }
   .radar-row a {
-    text-decoration: none;
-  }
-  .radar-row a:hover {
     color: var(--ink);
   }
   .radar-pause {
