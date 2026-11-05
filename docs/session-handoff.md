@@ -123,10 +123,11 @@ storage, salt, and admin settings. Set `GITHUB_TOKEN` (fine-grained PAT,
 git clone <repo-url>
 cd photography-website
 
-# Install Node 22 + Azure CLI + GitHub CLI + Bicep
+# Install Node 22.23.4+ + Azure CLI + GitHub CLI + Bicep
 # (see README for full install commands)
 
 npm ci
+npm ci --prefix api
 az login --use-device-code
 gh auth login
 gh auth setup-git
@@ -143,4 +144,4 @@ Photos in Blob, secrets in GH, infra in Azure: none is per-machine state. The on
 
 - A dormant cleanup item: a leftover service principal from an unrelated project may still have sub-scope perms. Audit periodically with `az role assignment list --include-inherited`.
 - The workflows now prefer the Bicep build identity (`AZURE_DEPLOY_CLIENT_ID`) and fall back to the bootstrap MI until that secret exists. Once a build has passed with it, remove the bootstrap MI's `github-main`/`github-pull-request` credentials and its User Access Administrator role (re-run `setup-federated-credential.sh` for the exact commands), and the build identity's unused Storage Table Data Contributor role ([cicd.md](cicd.md#two-identities-least-privilege-by-job)).
-- Astro 5 to 7. `npm audit` still lists advisories whose only fix is a newer Astro major, none of them reachable on this static site ([security.md](security.md#known-advisories-that-stay-open)). Upgrade Astro, `@astrojs/tailwind` and `@astrojs/check` together as their own change, then run the full build.
+- Keep dependency advisory checks green after upgrades ([security.md](security.md#dependency-advisory-checks)). The site now uses Astro 7, JSON glob loaders in `src/content.config.ts`, and Tailwind v3 through PostCSS.

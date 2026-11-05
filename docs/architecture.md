@@ -302,7 +302,7 @@ For a mostly public photo portfolio with one owner-only admin tool, era 3 is a s
 
 ## What each piece in this project does
 
-### Astro 5: the website framework
+### Astro 7: the website framework
 
 **What it is:** a tool that reads your source code (templates, components, content files) and outputs a folder of static HTML/CSS/JS. That folder is the website. Astro doesn't run when visitors arrive. It ran once, during the build.
 
@@ -310,6 +310,11 @@ For a mostly public photo portfolio with one owner-only admin tool, era 3 is a s
 - Ships **near-zero JavaScript** by default. Most modern frameworks (Next.js, etc.) send the entire React engine to the browser even when the page is static. Astro sends only what each page actually needs.
 - Built-in **image optimization pipeline**: when you reference a photo, Astro generates WebP + JPEG variants at multiple widths and the browser picks the smallest one that fits its screen. You write zero code for this. (AVIF could be enabled too but isn't, to keep build times and stored variants down.)
 - **Content collections**: describe your data shape once (sessions with title/date/location), get a type-checked API to read it. Perfect fit for "scan a folder and turn it into pages."
+
+The JSON collections use glob loaders in `src/content.config.ts`, with filenames
+kept as entry IDs so existing session and hobby URLs do not change. Tailwind v3
+runs directly through PostCSS rather than the retired Astro Tailwind integration.
+HTML-aware whitespace compression stays enabled to preserve the existing text.
 
 **Alternatives considered:**
 - *Hugo*: fast but image pipeline is weaker.

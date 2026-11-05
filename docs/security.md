@@ -255,14 +255,20 @@ Moving an existing setup onto this model (one-time): run the Infra workflow with
 | Compromised npm registry mirror | Currently we trust the public registry; nothing avoids this at this scale. |
 | Image tools installed in CI | `libraw-bin` and `exiftool` come from Ubuntu's apt archive on a pinned `ubuntu-24.04` runner; `pillow` and `pillow-heif` from PyPI, unpinned, before any sign-in. |
 
-#### Known advisories that stay open
+#### Dependency advisory checks
 
-`npm audit` reports a few advisories that have no fix this repo can take yet. As of 2026-10-26:
+The 2026-11-05 dependency update moves the site to patched Astro 7 and updates
+`@azure/identity` to the release using patched MSAL. Tailwind v3 runs directly
+through PostCSS, without the older Astro integration.
 
-- **Astro 5** (`astro` and the `zod`, `esbuild` and nested `sharp` it brings): the fixes are in Astro 6 and 7, a major migration that also moves the Tailwind integration. The critical one is an XSS through `define:vars` and the high one is in server islands; the site uses neither, and it's a static build with no server rendering. The `esbuild` one affects only the dev server on Windows. The nested `sharp` 0.34 processes only the owner's own photos at build time. The site's own `sharp` is on 0.35, which has the libvips fixes.
-- **`@azure/msal-node`** under `@azure/identity`: the fix is msal-node 7.1, and the newest `@azure/identity` (4.14) still requires 6. The advisory is about the authorization-code sign-in flow, which nothing here uses: the scripts use `DefaultAzureCredential`, which in CI picks up the Azure CLI session from the OIDC sign-in.
+One scoped npm override keeps `@typescript-eslint/typescript-estree` on
+`minimatch` 11.0.1 or newer to fix glob amplification. Its `minimatch` call
+uses the same API, and lint runs with the override. Remove the override when
+the parser's own dependency range includes a patched release.
 
-Check with `npm audit --omit=dev` after any dependency change, and take the Astro migration as its own piece of work.
+Run both `npm audit` and `npm audit --omit=dev` after dependency changes,
+alongside the tests, lint, Astro check and production build. Check the API
+dependencies separately with `npm audit --prefix api`.
 
 ### Data we collect
 
@@ -306,4 +312,3 @@ In rough order:
 3. **WAF + stricter edge rate limiting** the moment the site gets an upload endpoint or broader login model.
 4. **Allowlist admins by SWA `userId`** instead of GitHub username: a username freed by a rename can be registered by someone else.
 5. **Hash-pinned `pip` installs** in the build. The actions are already pinned to SHAs.
-6. **Astro 7**, which closes the advisories listed under [Known advisories that stay open](#known-advisories-that-stay-open).

@@ -248,4 +248,4 @@ Two ways to start a GitHub Actions workflow through GitHub's API instead of a pu
 
 ### Zod
 
-A TypeScript-first schema validation library. Astro's content collections use Zod to type-check the JSON files in `src/content/`. We define the session shape in `src/content/config.ts`.
+A TypeScript-first schema validation library. Astro's content collections use Zod to type-check the JSON files in `src/content/`. We define the session shape in `src/content.config.ts`.

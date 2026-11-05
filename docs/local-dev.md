@@ -4,7 +4,7 @@
 
 ## Requirements
 
-- **Node.js 22**: see [.nvmrc](../.nvmrc). On Ubuntu 24.04: install via [NodeSource](https://github.com/nodesource/distributions); on macOS via `brew install node@22`; with `nvm` use `nvm install && nvm use`.
+- **Node.js 22.23.4 or newer**, using the Node 22 line in [.nvmrc](../.nvmrc). On Ubuntu 24.04: install via [NodeSource](https://github.com/nodesource/distributions); on macOS via `brew install node@22`; with `nvm` use `nvm install && nvm use`.
 - **npm 10+** ships with Node 22.
 - (Optional) **`az` CLI** if you want to test the prebuild against a real Azure account, upload photos, or use the `photos`/`social` commands.
 - (Optional) **`gh` CLI** for the bootstrap scripts and `upload-session.sh --build`.
@@ -17,7 +17,35 @@
 git clone <your-repo>
 cd photography-website
 npm ci            # exact dependency install from package-lock.json
+npm ci --prefix api
 ```
+
+### Ubuntu / WSL
+
+Work as your normal Linux user, not `root`, and make sure that user owns the
+checkout before installing dependencies. Do not use `sudo npm`.
+
+```bash
+sudo apt-get update
+sudo apt-get upgrade
+sudo apt-get install --no-install-recommends libraw-bin libimage-exiftool-perl python3-venv
+gh auth login --web
+gh auth setup-git
+az login --use-device-code
+az bicep install
+```
+
+CLI sign-ins belong to the Linux user that ran them. `az account show` can
+display an account even when its cached sign-in has expired; verify a fresh
+token without printing it:
+
+```bash
+az account get-access-token --resource https://storage.azure.com/ --query expiresOn -o tsv
+```
+
+After system-library updates or a change to WSL's default user, save your work
+and restart the distro from Windows. Do not restart WSL while another session
+is still working in it.
 
 ## Common commands
 
@@ -47,8 +75,7 @@ npm ci            # exact dependency install from package-lock.json
 ## Workflow you'll actually use day-to-day
 
 ```bash
-# Start fresh with fixtures
-rm -rf src/content/sessions/* && touch src/content/sessions/.gitkeep
+# Only generate fixtures if you do not already have local sessions.
 npm run fixtures      # or fixtures:many
 
 # Run dev server
@@ -59,6 +86,11 @@ npm run check
 ```
 
 The dev server hot-reloads on any file change. Component edits appear instantly; content-collection schema changes need a full restart.
+
+Keep existing local sessions and `staging/` photos: they are gitignored, and
+may include photos that have not been uploaded. A normal setup does not need
+to remove them. Collection schemas and JSON glob loaders live in
+`src/content.config.ts`.
 
 ## How the local site differs from the live site
 

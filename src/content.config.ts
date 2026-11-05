@@ -1,4 +1,6 @@
-import { defineCollection, z } from "astro:content";
+import { defineCollection } from "astro:content";
+import { glob } from "astro/loaders";
+import { z } from "astro/zod";
 import { isIsoDate } from "@/lib/sessions";
 
 /**
@@ -10,7 +12,11 @@ import { isIsoDate } from "@/lib/sessions";
  * Its referenced images live alongside: src/content/sessions/<slug>/images/*.jpg
  */
 const sessions = defineCollection({
-  type: "data",
+  loader: glob({
+    pattern: "*.json",
+    base: "./src/content/sessions",
+    generateId: ({ entry }) => entry,
+  }),
   schema: z.object({
     title: z.string(),
     date: z.string().refine(isIsoDate, {
@@ -99,7 +105,11 @@ const hobbyMediaItem = z.object({
 });
 
 const hobbies = defineCollection({
-  type: "data",
+  loader: glob({
+    pattern: "*.json",
+    base: "./src/content/hobbies",
+    generateId: ({ entry }) => entry,
+  }),
   schema: z.object({
     title: z.string(),
     /** Short blurb shown on the hobby card. */

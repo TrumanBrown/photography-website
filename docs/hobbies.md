@@ -14,7 +14,7 @@ This doc covers how the section is wired, how to add a hobby, the conventions ev
 | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | On/off toggle           | [site.config.ts](../site.config.ts) → `sections.hobbies` (boolean)                                                                           |
 | Content (one per hobby) | `src/content/hobbies/<slug>.json`, a **committed** content collection                                                                        |
-| Schema                  | [src/content/config.ts](../src/content/config.ts) → `hobbies` collection                                                                     |
+| Schema                  | [src/content.config.ts](../src/content.config.ts) → `hobbies` collection                                                                     |
 | Landing grid            | [src/pages/hobbies/index.astro](../src/pages/hobbies/index.astro)                                                                            |
 | Per-hobby page          | [src/pages/hobbies/[slug].astro](../src/pages/hobbies/%5Bslug%5D.astro)                                                                      |
 | Card                    | [src/components/HobbyCard.astro](../src/components/HobbyCard.astro)                                                                          |

@@ -2,7 +2,8 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { defineConfig } from 'astro/config';
-import tailwind from '@astrojs/tailwind';
+import autoprefixer from 'autoprefixer';
+import tailwindcss from 'tailwindcss';
 import sitemap from '@astrojs/sitemap';
 import { siteConfig } from './site.config';
 
@@ -48,6 +49,8 @@ export default defineConfig({
   // (SWA's own "trailingSlash": "never" is unreliable for nested directory
   // indexes — see Azure/static-web-apps#1262 — so we align with SWA instead.)
   trailingSlash: 'always',
+  // Keep the HTML-aware whitespace handling used before Astro 7.
+  compressHTML: true,
   // Keep Astro's build cache (including optimized image variants) outside
   // node_modules so `npm ci` can't wipe it and CI can persist it between runs.
   cacheDir: './.cache/astro',
@@ -60,7 +63,6 @@ export default defineConfig({
     service: { entrypoint: 'astro/assets/services/sharp' },
   },
   integrations: [
-    tailwind({ applyBaseStyles: false }),
     sitemap({
       // Admin is a private tool — keep it out of search engines, along with
       // the error pages.
@@ -73,6 +75,11 @@ export default defineConfig({
     }),
   ],
   vite: {
+    css: {
+      postcss: {
+        plugins: [tailwindcss(), autoprefixer()],
+      },
+    },
     build: {
       // Avoid bundling massive image binaries into JS chunks.
       assetsInlineLimit: 0,

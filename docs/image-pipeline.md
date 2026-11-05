@@ -213,7 +213,7 @@ If you add a new RAW format, just add its lowercase extension to the `RAW_EXTS` 
 
 Once `src/content/sessions/` is populated, Astro's `astro build` does the rest:
 
-- **Content collection.** Astro reads each `<slug>.json` against the Zod schema in `src/content/config.ts`. This independently validates generated output after the earlier sidecar checks.
+- **Content collection.** Astro reads each `<slug>.json` against the Zod schema in `src/content.config.ts`. This independently validates generated output after the earlier sidecar checks.
 - **Image optimization**: every reference to a session image goes through `<Picture>`, which during build calls sharp to produce:
   - Multiple widths: 320 to 960 px on cards, 480 to 1600 px in a session's grid, and up to 2000 px for the session banner, the widest image on any page
   - Two formats per width: WebP (broadly supported, small) and JPEG (universal fallback). AVIF is intentionally **not** generated: its encoder is several times slower than WebP and would dominate build time for little extra savings.

@@ -60,7 +60,7 @@ The project started as a photography portfolio and has grown into a small person
 
 ## Tech at a glance
 
-- **Frontend:** Astro 5 + Tailwind v3 (static build, near-zero JS), see [docs/architecture.md](docs/architecture.md)
+- **Frontend:** Astro 7 + Tailwind v3 (static build, near-zero JS), see [docs/architecture.md](docs/architecture.md)
 - **Interactive hobbies:** hand-drawn canvas islands (aquarium, tide pooling, fishing, birding selfie-to-bird, herping night drive, hiking trail studio) plus the Narrow nature daily puzzle, each card illustrated with a stipple plate drawn from one of the photos, see [docs/hobbies.md](docs/hobbies.md)
 - **Dynamic API:** three Azure Functions bundled with SWA (contact form, admin session manager, analytics beacon), see [docs/architecture.md](docs/architecture.md)
 - **Admin + analytics:** browser `/admin` panel gated by GitHub sign-in, cookieless traffic metrics, see [docs/admin.md](docs/admin.md) and [docs/analytics.md](docs/analytics.md)
@@ -94,9 +94,12 @@ The rewrites live in two Markdown skills, [truman-voice](.github/skills/truman-v
 
 Full version in [docs/local-dev.md](docs/local-dev.md).
 
+Use Node.js 22.23.4 or newer (the supported development line is Node 22).
+
 ```bash
 npm ci
-npm run fixtures           # synthetic sessions for local dev
+npm ci --prefix api
+npm run fixtures           # only if you don't already have local sessions
 npm run dev                # → http://localhost:4321
 ```
 
