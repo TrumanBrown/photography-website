@@ -53,6 +53,7 @@ From his 2026-10-06 brief. If a direction needs one of these, justify it in writ
 | 2026-10-08 | Deep cut (rarity) and Day list                                                                                            | Deep cut "the same idea as kriliion"; Day list kept                                                         | Narrow nature                                                                                  |
 | 2026-10-11 | Things to try A to E, plate previews                                                                                      | the plates: "these are great, im impressed"                                                                 | stipple plates (`1d90166`, `3b646a4`)                                                          |
 | 2026-10-12 | motion mock F, eight ideas                                                                                                | all but idea 2 ("i chose the header specifically")                                                          | `408328e`, `ba360e4`                                                                           |
+| 2026-11-05 | portfolio: front doors A Weekends, B One caption, C Inside cover; about pages notebook and log (`mocks/portfolio/`)       | waiting on his verdict                                                                                      | recommended B with the notebook about page                                                     |
 
 Still unbuilt from mock F, waiting on his go-ahead since 2026-10-12: a redesigned contact button, a stipple-plate 404 page, filtering by animal kept in the URL, and arrows between sessions.
 
@@ -74,5 +75,8 @@ Still unbuilt from 2026-09-28, his own tide pool idea: pick any point on the Was
 - `file://` pages aren't a secure context, so the clipboard is blocked; serve them. Windows paths into WSL can show a stale cached copy.
 - Pick a free port; other sessions leave servers running.
 - `scripts/photos/open.mjs` (`openCommand`) opens a file in his Windows browser from WSL, and `explorer.exe <file>` does too, exiting 1 even when it works.
+- Playwright's cached Chromium in WSL won't start without `libnspr4`, `libnss3` and `libasound2t64`. Without sudo, `apt-get download` them, `dpkg-deb -x` each into a folder and point `LD_LIBRARY_PATH` at its `usr/lib/x86_64-linux-gnu`.
+- That headless Chromium never paints the next page after a cross-document view transition (even two bare pages with `@view-transition { navigation: auto }`), so screenshots and clicks time out. Check page changes in VS Code's integrated browser (`openBrowserPage`, `runPlaywrightCode`, reading `pagereveal`'s `viewTransition`), and run headless checks with `reducedMotion: 'reduce'`.
+- Live content for a mock: `scripts-local/prep-portfolio.mjs` reads trumanbrown.com's home and Things to try pages and saves the covers, lead frames, rail, places and plates into the mock folder. `mocks/portfolio/lib.js` is the real `globe.ts` and `motion.ts` bundled with esbuild from `_lib.ts`.
 
 Add new verdicts and lessons here, dated, in the commit that acts on them.
