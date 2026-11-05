@@ -23,11 +23,6 @@
       "statusCode": 302
     },
     {
-      "route": "/about/",
-      "redirect": "/#weekdays",
-      "statusCode": 302
-    },
-    {
       "route": "/hobbies/day-list",
       "redirect": "/hobbies/narrow-nature/",
       "statusCode": 301
