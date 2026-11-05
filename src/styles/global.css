@@ -440,6 +440,60 @@ html.landing-dots body::after {
   object-fit: cover;
 }
 
+/* Moving between the front door, the archive and About me (src/lib/open.ts,
+   kind "page"). The pages fade into each other in 200 ms, the top of the
+   rail holds still, and the lead photograph moves to its place on the next
+   page. It's the same photograph on both (LeadPhoto.astro opens on the one
+   it was handed), so this isn't one photo turning into another. The names
+   go on only for this change: page-leaving on the page you leave, and
+   landing-page on a page with a lead or my rail on the page you reach. */
+html.page-leaving .lead .plate,
+html.landing-page:has(.lead) .lead .plate {
+  view-transition-name: lead-photo;
+}
+@media (min-width: 900px) {
+  html.page-leaving .rail-top,
+  html.landing-page:has(.lead, .me-rail) .rail-top {
+    view-transition-name: rail-top;
+  }
+}
+html.landing-page::view-transition-old(root),
+html.landing-page::view-transition-new(root) {
+  animation-duration: 200ms;
+  animation-timing-function: var(--ease);
+}
+::view-transition-group(lead-photo),
+::view-transition-group(rail-top) {
+  animation-duration: 280ms;
+  animation-timing-function: var(--ease);
+}
+::view-transition-old(lead-photo) {
+  animation: none;
+  opacity: 0;
+}
+::view-transition-new(lead-photo) {
+  animation: none;
+}
+/* Only one page has a lead (a session page and the front door): it fades
+   with the page instead. */
+::view-transition-old(lead-photo):only-child {
+  animation: page-fade-out 200ms var(--ease) both;
+  opacity: 1;
+}
+::view-transition-new(lead-photo):only-child {
+  animation: page-fade-in 200ms var(--ease) both;
+}
+@keyframes page-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes page-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .btn,
   .draw::after,

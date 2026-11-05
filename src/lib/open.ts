@@ -145,6 +145,40 @@ function openSession(link: HTMLAnchorElement): void {
   noteArrival(link.href, "page");
 }
 
+/* ---------------------------------------------------- the front door */
+
+/** sessionStorage key for the lead photograph a page hands to the next one. */
+export const LEAD_KEY = "lead-handover";
+
+/**
+ * Move between the front door, the archive and About me (`data-open="page"`).
+ * The same plain page change a session gets, plus two things that stay put:
+ * the top of the rail, and the lead photograph, which the next page opens on
+ * (LeadPhoto.astro reads it) and which moves to its place there. It's the
+ * same photograph on both pages, never a different one.
+ */
+function openPage(link: HTMLAnchorElement): void {
+  if (link.pathname === window.location.pathname) return;
+  const lead = document.querySelector<HTMLElement>(".lead[data-current]");
+  try {
+    if (lead?.dataset.current)
+      sessionStorage.setItem(
+        LEAD_KEY,
+        JSON.stringify({ src: lead.dataset.current, at: Date.now() }),
+      );
+  } catch {
+    // Without storage the next page just picks its own photograph.
+  }
+  const root = document.documentElement;
+  root.classList.add("page-leaving");
+  const optIn = document.createElement("style");
+  optIn.textContent = "@view-transition { navigation: auto; }";
+  document.head.append(optIn);
+  window.addEventListener("pagehide", () => optIn.remove(), { once: true });
+  onReturn(() => root.classList.remove("page-leaving"));
+  noteArrival(link.href, "page");
+}
+
 /* -------------------------------------------------------------- hobbies */
 
 const DIVE_MS = 820;
@@ -921,6 +955,10 @@ export function initOpeners(): void {
     const kind = link.dataset.open;
     if (kind === "session") {
       openSession(link);
+      return;
+    }
+    if (kind === "page") {
+      openPage(link);
       return;
     }
     const took = kind === "hobby" ? openHobby(link) : false;

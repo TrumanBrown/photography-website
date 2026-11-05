@@ -1,0 +1,57 @@
+---
+name: front-door
+description: 'The front door at / and About me: the Weekends and Weekdays switch (src/pages/index.astro), my rail with the Everest photo (src/components/about/MeRail.astro), the resume (src/lib/about.ts, Resume.astro, public/Truman-Brown-Resume.pdf), the three side projects and their live pieces (Projects.astro, the LED flight radar in src/lib/radar.ts and led-radar.ts, the cozy-vibe-vids video), the page change into /photographs/ with the lead photo handed over, and "Write to me". Use when: updating the resume, a job, the summary or the PDF; adding, removing or reordering a side project; changing the Weekends or Weekdays lines; the switch is missed or misbehaves; the radar is blank, says NO DATA or draws wrong; changing the portrait; links to About me or /#weekdays break; or moving between the front door and the archive looks wrong.'
+---
+
+# The front door and About me
+
+`/` is the front door. It has the archive's frame (a 212px rail and a main column) with me in the rail instead of the sessions, and one switch at the top between **Weekends** (the lead photo, then rows into Photographs and Things to try) and **Weekdays** (the resume and the side projects). The archive itself is `/photographs/`. The full write-up is in [docs/product-experience.md](../../../docs/product-experience.md#a-front-door-with-me-in-it-november-2026). The mocks it came from are `mocks/portfolio/` ([design-mocks](../design-mocks/SKILL.md)).
+
+| Path                                                          | What's there                                                                                                            |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `src/pages/index.astro`                                       | the switch, both sides, the person structured data, the script that reads `#weekdays`                                   |
+| `src/components/about/MeRail.astro`                           | the rail: name, nav, the portrait, where I live, links, "Write to me", Resume (PDF). A block above the page under 900px |
+| `src/lib/about.ts`                                            | every word on the Weekdays side: my two lines, the summary, jobs, school, skills, the three projects, the video         |
+| `src/components/about/Resume.astro`                           | work, school and skills as ruled rows, three lines a job and "N more"                                                   |
+| `src/components/about/Projects.astro`                         | each project beside its live piece                                                                                      |
+| `src/lib/radar.ts`, `src/lib/led-radar.ts`                    | the balcFlights-LED radar: maths, text, font and layout (tested), then the canvas driver                                |
+| `src/assets/about/`                                           | `me-everest.jpg` (the portrait), `cozy-critter.jpg` (the video's poster)                                                |
+| `public/Truman-Brown-Resume.pdf`                              | the public resume, without my phone number or personal email                                                            |
+| `src/lib/open.ts` `openPage`, `LeadPhoto.astro`, `global.css` | the page change between the front door, the archive and About me (`data-open="page"`)                                   |
+| `src/components/ContactForm.astro`, `api/contact/notify.js`   | "Write to me" and the email copy of each message ([azure-ops](../azure-ops/SKILL.md))                                   |
+
+## Rules
+
+- **His words stay his.** The Weekends and Weekdays lines are what he wrote, with only typos fixed. Don't polish them. Resume lines are the PDF's, with job titles in sentence case.
+- **No phone number or personal email** anywhere on the site, in `about.ts`, in the PDF or in the repo. `about.test.ts` checks the text. Contact is "Write to me", LinkedIn and GitHub.
+- **Side projects are the three pinned on his GitHub**: this site, cozy-vibe-vids, balcFlights-LED. Each has a photo or a live element, never a link to something already on the site.
+- **The switch can't be missed.** Heading-size words, a tracked line under each saying what's behind it, a 2px bar.
+- **Every "About me" goes to `/#weekdays`.** It works without script through `:target`, and `/about/` redirects there.
+- **Same photo, never a different one,** when moving between pages. The lead photo is handed over by its URL and moves to its place. Nothing else carries over.
+
+## Update the resume
+
+1. Edit `WORK`, `SUMMARY`, `SCHOOL` or `SKILLS` in `src/lib/about.ts`, newest job first, months as `YYYY-MM`.
+2. Replace the PDF. Open his new PDF with PyMuPDF (`pip install --target` a scratch folder), redact the phone and email spans on the contact line, write `Seattle, WA | linkedin.com/in/trumanbrown` back in the PDF's own embedded Cambria (`doc.extract_font`), keep the LinkedIn link, clear `creator` and `producer`, and check with `page.get_text()` and `strings` that the number and the email are gone. Save it as `public/Truman-Brown-Resume.pdf`.
+3. `npx vitest run src/lib/about.test.ts`, then look at `/#weekdays` at 1440×900 and 390×844.
+
+## Add or change a side project
+
+1. Edit `PROJECTS` in `src/lib/about.ts` and keep `about.test.ts`'s list in step.
+2. A new `media` kind needs its own block in `Projects.astro`. Prefer something live and cheap: a build-time read of the site's own data, a third-party embed that loads only on a press, or a public API read only while on screen. A new host goes in the narrowest CSP directive in `staticwebapp.config.json` and on the privacy page.
+
+## The radar
+
+The panel draws what the real one does (`balc_flights_led/display.py` and `presentation.py` in his balcFlights-LED repo): the callsign as big as fits, type and altitude, speed and climb in the trend colour, compass point and distance on the right, dashed rings, a sweep at 85°/s, contacts brightest as the sweep passes, and the nearest with a trail and a blinking marker. The data is `https://seattlebalc.com/api/v1/flights` (no key, CORS `*`, cached 20 s, asks not to be polled harder). It's fetched only while the panel is on screen and the tab visible, every 20 s, with planes moved along their headings in between. Pause stops it, and reduced motion draws it still. `connect-src` allows `https://seattlebalc.com`.
+
+If it says NO DATA, `curl -s https://seattlebalc.com/api/v1/flights | head` first. A `degraded` status draws the callsign in amber.
+
+## Truman's verdicts
+
+- 2026-11-05: of the portfolio mocks, "A weekends is good." Side projects: "only highlight these three - and I suggest using a photo or live elemtn for each. live site under the website project seems not useful since they are already on the site." The switch: "mak esure the weekends and weekdays tab isn't too hard to miss. it's good, but just want to make sure it isn' tmissed." The portrait: "use whichever looks better and more fiting for the section" of Everest and a boat in Ninh Binh. Everest won, since his own Everest session is in the archive and the photo links to it. "Write to me" should "mention the about me section first and then the print or photo", and every message should reach his email.
+
+## Hard-won lessons
+
+1. **The Windows `az` under WSL crashes printing Bicep** that has a `→` in it (`'charmap' codec can't encode`). Build with `--outfile` and a `wslpath -w` path instead of `--stdout`.
+2. **A hidden VS Code browser panel skips view transitions** (`document.visibilityState` is `hidden`), and headless Chromium never paints after one. Check the handover by reading `.lead[data-current]` on both pages, and see the fade in a visible browser.
+3. **Local sessions have no `showcase` picks or captions,** so the lead photo and "Newest caption" are empty on a local build. Copy `src/content/sessions/*.json` aside, add picks for a look, and put them back.

@@ -6,6 +6,7 @@ import { landingBootstrap } from "@/lib/landing";
 import Header from "@/components/Header.astro";
 import Footer from "@/components/Footer.astro";
 import ArchiveRail from "@/components/ArchiveRail.astro";
+import MeRail from "@/components/about/MeRail.astro";
 import ContactForm from "@/components/ContactForm.astro";
 import ThemeToggle from "@/components/ThemeToggle.astro";
 
@@ -21,10 +22,11 @@ interface Props {
   /** Slug of the current session, for nav highlight. */
   activeSlug?: string;
   /**
-   * Top-level section. 'photography' (default) shows the sessions sidebar and
-   * its hamburger; 'hobbies' hides them and highlights the Hobbies nav item.
+   * Top-level section. 'photography' (default) shows the sessions rail and
+   * its phone bar; 'home' is the front door, the same frame with me in the
+   * rail; 'hobbies' swaps both for the header.
    */
-  section?: "photography" | "hobbies";
+  section?: "photography" | "hobbies" | "home";
 }
 
 const {
@@ -102,7 +104,17 @@ const ogImageAbsolute = ogImage
   <body class="min-h-screen">
     <a class="skip-link" href="#main">Skip to content</a>
     {
-      section === "photography" ? (
+      section === "home" ? (
+        <div id="page-shell" class="archive-shell home-shell">
+          <MeRail />
+          <div id="page-content" class="archive-main">
+            <main id="main" tabindex="-1" class="flex-1">
+              <slot />
+            </main>
+            <Footer />
+          </div>
+        </div>
+      ) : section === "photography" ? (
         <div id="page-shell" class="archive-shell">
           <ArchiveRail activeSlug={activeSlug} section={section} />
           <button
@@ -114,7 +126,7 @@ const ogImageAbsolute = ogImage
           />
           <div id="page-content" class="archive-main">
             <div class="archive-bar">
-              <a class="bar-me" href="/">
+              <a class="bar-me" href="/" data-open="page">
                 {siteConfig.ownerName}
               </a>
               <span class="bar-acts">
@@ -204,6 +216,12 @@ const ogImageAbsolute = ogImage
     }
     .archive-bar {
       display: none;
+    }
+    /* The front door's rail is a block above the page on a phone. */
+    @media (max-width: 899px) {
+      .home-shell {
+        display: block;
+      }
     }
     .archive-scrim {
       display: none;

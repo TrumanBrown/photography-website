@@ -27,7 +27,7 @@ Try it: [the photo archive](https://trumanbrown.com), [Things to try](https://tr
 
 A personal website built around a photography portfolio, with a **Hobbies** section of small hand-drawn interactive toys, a browser-based **admin panel** for editing content, a contact form, and privacy-friendly **traffic analytics**. Photos live in Azure Blob Storage and the site is a static Astro build hosted on Azure Static Web Apps. Drop a folder of photos into Blob and the site picks them up on the next build.
 
-The project started as a photography portfolio and has grown into a small personal site. The portfolio is still the home page; everything else (hobbies, admin, analytics, the contact form) sits beside it and can be toggled off in [site.config.ts](site.config.ts).
+The project started as a photography portfolio and has grown into a small personal site. The front page is about me: a Weekends side that leads into the photographs and the hobbies, and a Weekdays side with my resume and side projects. The portfolio itself is at `/photographs/`, and the hobbies, admin, analytics and contact form sit beside it.
 
 **Why each piece exists**: see [docs/architecture.md](docs/architecture.md).
 **New to any of this?** Start with [docs/glossary.md](docs/glossary.md).
@@ -404,7 +404,9 @@ October 15, 2026, without the build's old downloads (below), plus a twelfth of
 the domain's yearly fee. About $1.65 is photos sent to visitors, $1.50 is the
 `.com` domain and its DNS zone, about $1.35 is storage requests, and the
 remaining 55 cents is storage space, the caption model, an alert rule and the
-posting timer. Details are in [docs/azure.md](docs/azure.md#monthly-cost).
+posting timer. Emailing me a copy of each contact message adds a fraction of a
+cent a message, and it sends at most ten an hour, so spam can't run it up.
+Details are in [docs/azure.md](docs/azure.md#monthly-cost).
 
 The line Azure calls Bandwidth is data leaving the storage account. Anything
 that reads a photo by its public URL counts. That's mostly visitors, about
@@ -469,7 +471,7 @@ photography-website/
 │   ├── layouts/               # page shells
 │   ├── lib/                   # blob URLs, sessions, archive + globe, theme, admin, analytics
 │   │   └── hobbies/           # canvas engines and their data (zero runtime dependencies)
-│   ├── pages/                 # routes: /, /sessions, /places, /hobbies, /admin, sitemap
+│   ├── pages/                 # routes: / (front door), /photographs, /sessions, /places, /hobbies, /admin, sitemap
 │   └── styles/                # Tailwind entry
 ├── staging/                   # gitignored drop zone for photos before upload (README kept)
 ├── site.config.ts             # display config (committed; not for secrets)

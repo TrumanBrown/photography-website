@@ -73,6 +73,7 @@ All inside resource group `rg-photography-prod`, except the bootstrap identity (
 | **User-assigned managed identity** `id-photography-deploy-<env>` | The build identity: Build and Deploy, Photo captions and Social post sign in as it via OIDC (`AZURE_DEPLOY_CLIENT_ID`). RBAC: `Storage Blob Data Contributor` on the storage account, `Reader` on the RG, and `Cognitive Services OpenAI User` on the Azure OpenAI account when that's deployed. No table access. |
 | ↳ Federated credentials `github-main`, `github-pull-request` | Trust JWTs from this specific repo + branch. No long-lived secrets. |
 | **Azure OpenAI account** `oai-photography-<env>-<suffix>` | Created only when `enableDescribeModel=true`. One model deployment (`gpt-6.1-sol`, US data zone) that the photo pipeline uses to look at each photo once and write captions and session descriptions ([docs/photos.md](photos.md)). API keys are disabled; workflows reach it through their OIDC login, with inference-only access. |
+| **Communication Services** `acs-photography-<env>-<suffix>` and **Email Communication Service** `email-photography-<env>-<suffix>` | Created only when `enableContactEmail=true`. Emails you a copy of each contact form message from an Azure-managed sending address (`DoNotReply@<id>.azurecomm.net`), so there's no DNS to set up. See [Contact form email](#contact-form-email). |
 | **Logic App** `logic-photography-<env>-scheduler` | Created only when `enableSocialScheduler=true`. A timer that starts the Instagram posting and photo workflows on GitHub, because GitHub's own scheduler skips many runs ([docs/social.md](social.md#what-runs-automatically)). Uses the Static Web App's `GITHUB_TOKEN` setting. |
 | **App Service Domain** `yourdomain.com` | `.com` registration. Only created when `domainName` is set; first-time purchase needs `az appservice domain create --accept-terms` once. |
 | **Azure DNS zone** `yourdomain.com` | Holds `A` (apex → SWA), `CNAME` `www`, `TXT` (SWA ownership token). |
@@ -97,12 +98,47 @@ Measured from the bill for September 16 to October 15, 2026, without the build's
 | Azure DNS zone | 1 zone @ $0.50 | $0.49 |
 | Log Analytics | Not created by default; free allowance covers optional storage diagnostics | $0.00 |
 | Azure OpenAI (optional) | Pay per use: about $10–15 once for an 800-photo archive, then cents per new session, nothing while idle | $0.14 |
-| Azure Monitor alert | One metric alert rule (new contact message) | $0.10 |
+| Azure Monitor alert | One metric alert rule (new contact message), made by hand before the email copy existed | $0.10 |
+| Communication Services email (optional) | $0.00025 a message plus $0.00012 a MB, capped at ten an hour | under $0.01 |
 | Logic App timer (optional) | Consumption, about 1,000 runs a month | $0.01 |
 | Bicep deployments | Always free | $0.00 |
 | **Total** | | **~$5.05** |
 
 At 10× the traffic and 100 GB stored it would be about $23 a month, mostly egress, and still well inside the $150/mo credits.
+
+### Contact form email
+
+Each message someone sends through "Write to me" is saved in the
+`contactmessages` table first, then [api/contact/notify.js](../api/contact/notify.js)
+emails a copy to you, with the sender as the Reply-To, so answering is just
+replying. The email goes out through Azure Communication Services
+([infra/modules/email.bicep](../infra/modules/email.bicep)), using an
+Azure-managed sending domain, so there's no DNS record to add.
+
+It needs three app settings on the Static Web App:
+
+| Setting | What it is | Set by |
+|---|---|---|
+| `CONTACT_EMAIL_CONNECTION_STRING` | The Communication Services resource's connection string | The Infra workflow, from the resource |
+| `CONTACT_EMAIL_FROM` | Its sender, `DoNotReply@<id>.azurecomm.net` | The Infra workflow, from the Bicep output |
+| `CONTACT_NOTIFY_TO` | The inbox that gets the copy | The Infra workflow, from the `CONTACT_NOTIFY_EMAIL` GitHub secret. Without that secret it keeps whatever is already set |
+
+To turn it on for a new copy of the site: set `enableContactEmail` to `true`
+in `infra/main.parameters.json`, add the `CONTACT_NOTIFY_EMAIL` secret
+(`gh secret set CONTACT_NOTIFY_EMAIL`), register the resource provider once
+(`az provider register -n Microsoft.Communication`), then run Infra. Until all
+three settings exist, the form keeps saving messages and simply sends no email.
+
+Sending is best effort. The message is already saved when the email goes out,
+so if Communication Services is down the visitor still sees "Message sent" and
+the message waits in the table. At most ten emails go out an hour across all
+visitors, which is also the most an Azure-managed domain allows, so spam can't
+run up the bill. The admin panel's messages tab still shows everything.
+
+The metric alert `new-contact-message` (and its action group `contact-notify`)
+was made by hand before this, and sends a generic "a table was written to"
+email. With the copy in place it's redundant. Delete both in the portal when
+you're happy the copies arrive.
 
 ### What we deliberately don't use
 

@@ -4,7 +4,7 @@
 
 ## Product direction
 
-The site is a photography archive first and a collection of interactive hobbies second. The design should feel personal, quiet, and direct:
+The site is a photography archive first, a collection of interactive hobbies second, and since November 2026 a place to find out who I am and what I do for work. The design should feel personal, quiet, and direct:
 
 - Put real photographs in the first viewport; avoid a marketing hero or decorative art.
 - Keep navigation predictable while making the photographer and archive scale clear.
@@ -42,6 +42,19 @@ The integrated browser runs in a hidden tab, which suppresses the Largest Conten
 The homepage now has a compact `Photographs` H1, the existing site description, and a live session/photo count. This fixes the missing page-level heading and tells visitors what archive they are looking at without pushing the first photograph out of the viewport.
 
 The mobile header uses two rows below the desktop breakpoint. The full site name now has its own row instead of collapsing to `T…` beside four competing controls.
+
+### A front door with me in it (November 2026)
+
+Before this, `/` opened straight onto the archive. Someone arriving from a resume or LinkedIn landed in a photo archive with no picture of me and no line on what I do, and the site's own code, the best project I have, was one footer link. After a round of mocks (`mocks/portfolio/`, the design-mocks skill), direction A, "Weekends", became the front door ([src/pages/index.astro](../src/pages/index.astro)):
+
+- **The archive's frame, with me in the rail.** The front door uses the same shell as the archive, so the top of the rail (name, nav, theme) holds still between the two. Under it, where the archive has sessions and the globe, the front door has a photo of me in front of Everest, where I live, GitHub, LinkedIn, iNaturalist, "Write to me" and a Resume (PDF) button ([MeRail.astro](../src/components/about/MeRail.astro)). On a phone it's a short block above the page.
+- **One switch at the top: Weekends or Weekdays.** The site's underline tabs at heading size, each with a line saying what's behind it ("Photographs and things to try", "Resume and side projects") and a 2px bar under the chosen one, so the second side isn't missed. The new side slides in 16px from the side its tab is on (Cult UI's direction-aware tabs). Weekdays has its own address, `/#weekdays`, which every "About me" link uses, and works without script through `:target`. `/about/` redirects there.
+- **Weekends** is a line in my words, the lead photo, and two ruled rows into Photographs (the five newest covers as prints) and Things to try (the seven plates).
+- **Weekdays** is a line in my words, Resume (PDF), "Write to me" and LinkedIn, then the resume in ruled rows ([Resume.astro](../src/components/about/Resume.astro)), the three side projects, school and skills. Each job shows three lines with "7 more" for the rest. The lines are the ones on my PDF, kept in [src/lib/about.ts](../src/lib/about.ts), and the public PDF (`public/Truman-Brown-Resume.pdf`) has my phone number and personal email taken out.
+- **Each side project sits beside something live** ([Projects.astro](../src/components/about/Projects.astro)). This site shows the newest photograph with its pipeline caption and the archive's counts, all read at build time. cozy-vibe-vids shows one of its videos, which loads from YouTube's privacy-enhanced player only when you press Play. balcFlights-LED shows the panel's own radar on a 64 × 64 grid of LEDs, drawn in the browser from the same seattlebalc.com flight API the Raspberry Pi reads: the nearest plane's callsign, type, altitude, speed and climb, and every plane in range with a sweep going over them ([radar.ts](../src/lib/radar.ts), [led-radar.ts](../src/lib/led-radar.ts)). It asks for data only while it's on screen, every 20 seconds (the API's cache), moves the planes along their headings in between, has a Pause, and under reduced motion draws the planes still. A sentence under it says the same thing for screen readers.
+- **The archive moved to `/photographs/`.** It's otherwise unchanged. The rail and the hobby header gain "About me", the rail gains "Write to me", the name goes to the front door, and "← All sessions" goes to `/photographs/`. Session addresses didn't change.
+- **Moving between them** ([open.ts](../src/lib/open.ts) `openPage`, `data-open="page"`) is the session page change: a 200ms cross-document fade. The top of the rail holds still, and the lead photo you were looking at moves to its place on the next page, because the next page opens on that same photo (it's handed over in `sessionStorage` and decoded before first paint). It's always the same photograph on both pages, never one turning into another.
+- **"Write to me" replaced the round mail button.** It's a word in the footer, the rails and the Weekdays side, and the drawer is ink and paper now: a light heading, inputs with a 1px rule under them, one ink button, and plain text for "Message sent. Thank you!". Its line puts my work first: "About my work or projects, a print, or a photo you'd like to use." Every message is also emailed to me ([azure.md](azure.md#contact-form-email)). Closed, the drawer is `inert` and hidden, so it never takes keyboard focus.
 
 ### Faster first photograph
 
@@ -112,7 +125,7 @@ A later review took five ideas from a reel about AI-built interfaces looking gen
 - **Places and 404 back on the system.** Light H1, `.u-label` meta line and back link, ink tokens. The places grid loads its first row eagerly, like the home page.
 - **Line breaks.** Headings wrap `balance` and everything else `pretty`, so rail and card titles no longer end on a lone "Rica".
 - **Touch.** The lead photo's arrows and Pause are at least 24px, and on touch screens they get 44px-tall hit areas that don't move the caption. "Things to try" stays on one line in the phone bar from 360px up.
-- **The mail button.** The footer keeps 96px free below its links, so the fixed button no longer sits on "How this site is built" at the bottom of short pages.
+- **The mail button.** The footer kept 96px free below its links so the fixed button didn't sit on "How this site is built". The button is gone now (November 2026) and so is the space.
 - **Contact form.** Name and email declare `autocomplete` (WCAG 1.3.5, which axe doesn't check), and the email field skips spellcheck.
 
 ## What remains intentionally unchanged
@@ -126,17 +139,17 @@ A later review took five ideas from a reel about AI-built interfaces looking gen
 
 ## Ranked roadmap
 
-| Opportunity                                               | Visitor/owner value                                                            |         Effort | Confidence | Recommendation                                                                                  |
-| --------------------------------------------------------- | ------------------------------------------------------------------------------ | -------------: | ---------: | ----------------------------------------------------------------------------------------------- |
-| Write session descriptions and captions for featured work | Stronger storytelling, SEO, and non-visual access                              | Content effort |       High | Start now in Admin; prioritize covers and the first 5–10 photos per session                     |
-| Add optional `featured` editorial ordering                | Lets the owner lead with strongest work rather than only chronology            |         Medium |     Medium | Near term after enough curated captions exist                                                   |
-| Add related sessions from explicit tags/collections       | Better discovery than date adjacency when the archive grows                    |         Medium |     Medium | Add only with an owner-maintained taxonomy                                                      |
-| Draft/preview publication status                          | Safer metadata review before public builds                                     |         Medium |     Medium | Useful when publishing becomes frequent                                                         |
-| Static map or timeline exploration                        | Spatial/temporal discovery                                                     |          Large |     Medium | Proposal only; avoid an always-loaded map SDK                                                   |
-| Bulk caption editing/import                               | Faster metadata work for hundreds of images                                    |         Medium |       High | Add if per-session Admin editing becomes tedious                                                |
-| Structured production monitoring                          | Faster diagnosis of Function/storage failures                                  |         Medium |     Medium | Enable optional diagnostics when traffic or operational value justifies it                      |
-| Restyle the contact drawer and mail button                | The last stock-Tailwind UI on the public site; one design language everywhere  |          Small |       High | Paper panel, square inputs with a 1px rule, `.btn-ink`, a square mail button without the shadow |
-| Committed browser check for layout regressions            | Catches overflow, covered links, faux bold and lazy first images before deploy |         Medium |     Medium | A Playwright script over the validation routes first; CI only if it stays fast                  |
+| Opportunity                                                          | Visitor/owner value                                                            |         Effort | Confidence | Recommendation                                                                    |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------------------ | -------------: | ---------: | --------------------------------------------------------------------------------- |
+| Write session descriptions and captions for featured work            | Stronger storytelling, SEO, and non-visual access                              | Content effort |       High | Start now in Admin; prioritize covers and the first 5–10 photos per session       |
+| Add optional `featured` editorial ordering                           | Lets the owner lead with strongest work rather than only chronology            |         Medium |     Medium | Near term after enough curated captions exist                                     |
+| Add related sessions from explicit tags/collections                  | Better discovery than date adjacency when the archive grows                    |         Medium |     Medium | Add only with an owner-maintained taxonomy                                        |
+| Draft/preview publication status                                     | Safer metadata review before public builds                                     |         Medium |     Medium | Useful when publishing becomes frequent                                           |
+| Static map or timeline exploration                                   | Spatial/temporal discovery                                                     |          Large |     Medium | Proposal only; avoid an always-loaded map SDK                                     |
+| Bulk caption editing/import                                          | Faster metadata work for hundreds of images                                    |         Medium |       High | Add if per-session Admin editing becomes tedious                                  |
+| Structured production monitoring                                     | Faster diagnosis of Function/storage failures                                  |         Medium |     Medium | Enable optional diagnostics when traffic or operational value justifies it        |
+| ~~Restyle the contact drawer and mail button~~ Done in November 2026 | The last stock-Tailwind UI on the public site; one design language everywhere  |          Small |       High | Shipped with the front door: "Write to me" as a word, the drawer in ink and paper |
+| Committed browser check for layout regressions                       | Catches overflow, covered links, faux bold and lazy first images before deploy |         Medium |     Medium | A Playwright script over the validation routes first; CI only if it stays fast    |
 
 ## Validation checklist
 
@@ -150,4 +163,4 @@ npm test
 npm run build
 ```
 
-Then inspect `/`, one short session, one long session, `/hobbies`, each Hobbies route, `/admin`, and a missing route at 1440×900, 768×1024, and 390×844. Check keyboard focus, horizontal overflow, console/page errors, and the first image's `loading`/`fetchpriority` attributes. Open a session's lightbox on a photo with a long caption at 1440×900 and at 390×664 (a phone with its browser bars showing): the caption sits under the photograph and never touches it.
+Then inspect `/` (both the Weekends and the Weekdays side, `/#weekdays`), `/photographs/`, one short session, one long session, `/hobbies`, each Hobbies route, `/admin`, and a missing route at 1440×900, 768×1024, and 390×844. Check keyboard focus, horizontal overflow, console/page errors, and the first image's `loading`/`fetchpriority` attributes. Open a session's lightbox on a photo with a long caption at 1440×900 and at 390×664 (a phone with its browser bars showing): the caption sits under the photograph and never touches it.

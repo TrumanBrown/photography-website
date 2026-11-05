@@ -1,0 +1,179 @@
+---
+import { getCollection } from "astro:content";
+import type { ImageMetadata } from "astro";
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import SessionCard from "@/components/SessionCard.astro";
+import LeadPhoto from "@/components/LeadPhoto.astro";
+import HobbyBand from "@/components/HobbyBand.astro";
+import { sortSessions, sessionSlug, splitSessionTitle } from "@/lib/sessions";
+import { buildLeadFrames, coverFileOf, type LeadItem } from "@/lib/archive";
+
+// Eagerly resolve every image under src/content/sessions/ so we can look up
+// image metadata at build time. Astro processes each as an ImageMetadata.
+const images = import.meta.glob<{ default: ImageMetadata }>(
+  "/src/content/sessions/**/images/*.{jpg,jpeg,png,webp,avif,JPG,JPEG,PNG,WEBP,AVIF}",
+  { eager: true },
+);
+
+function resolveImage(slug: string, file: string): ImageMetadata {
+  const key = `/src/content/sessions/${slug}/images/${file}`;
+  const mod = images[key];
+  if (!mod) {
+    throw new Error(
+      `Image not found for session "${slug}": expected ${key}. ` +
+        `Check that scripts/prebuild.mjs placed the file or update the session JSON.`,
+    );
+  }
+  return mod.default;
+}
+
+const sessions = sortSessions(await getCollection("sessions"));
+const totalPhotos = sessions.reduce(
+  (total, session) => total + session.data.images.length,
+  0,
+);
+const places = new Set(
+  sessions.map((entry) => entry.data.location?.trim()).filter(Boolean),
+);
+
+const summary = [
+  `${sessions.length} session${sessions.length === 1 ? "" : "s"}`,
+  `${totalPhotos} photograph${totalPhotos === 1 ? "" : "s"}`,
+  places.size > 1 ? `${places.size} places` : null,
+]
+  .filter(Boolean)
+  .join(" · ");
+
+// The photographs that rotate in the lead box: only the ones picked in the
+// admin panel (each session's `showcase`). A session with no picks isn't in it.
+const lead: LeadItem[] = buildLeadFrames(sessions).map((frame) => ({
+  slug: frame.slug,
+  title: frame.title,
+  location: frame.location,
+  image: resolveImage(frame.slug, frame.file),
+  alt:
+    frame.caption ?? `Photograph from ${splitSessionTitle(frame.title).label}`,
+}));
+
+const first = sessions[0];
+const firstCover = first?.data.images.find(
+  (image) => image.file === coverFileOf(first),
+);
+---
+
+<BaseLayout
+  title="Photographs"
+  description="Every photography session, newest first: wildlife, landscapes and travel from Washington, Costa Rica, China, Tibet and more."
+  ogImage={firstCover?.fullUrl}
+  ogImageAlt={first ? `${first.data.title} cover photograph` : undefined}
+>
+  <div class="overview">
+    <div class="ohead">
+      <h1>Photographs</h1>
+      {sessions.length > 0 && <span class="u-label">{summary}</span>}
+    </div>
+
+    {lead.length > 0 && <LeadPhoto items={lead} />}
+
+    {
+      sessions.length === 0 ? (
+        <div class="empty">
+          <p>
+            No sessions yet. Add a folder under <code>originals/</code> in Blob
+            Storage, then trigger a build.
+          </p>
+        </div>
+      ) : (
+        <div class="grid">
+          <div class="cards">
+            {sessions.map((entry, index) => (
+              <SessionCard
+                entry={entry}
+                cover={resolveImage(sessionSlug(entry), coverFileOf(entry))}
+                priority={index < 3}
+              />
+            ))}
+          </div>
+        </div>
+      )
+    }
+  </div>
+
+  <HobbyBand />
+</BaseLayout>
+
+<style>
+  .ohead {
+    padding: 26px var(--gutter) 0;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 18px;
+    flex-wrap: wrap;
+  }
+  .ohead h1 {
+    font-size: clamp(20px, 2.2vw, 27px);
+    font-weight: 300;
+    margin: 0;
+    line-height: 1.12;
+    letter-spacing: -0.012em;
+  }
+
+  .grid {
+    padding: 6vh var(--gutter) 10vh;
+  }
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 30px 22px;
+  }
+
+  .empty {
+    margin: 40px var(--gutter) 10vh;
+    border: 1px dashed var(--rule);
+    padding: 40px;
+    text-align: center;
+    color: var(--ink-2);
+    font-size: 14px;
+  }
+  .empty code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13px;
+  }
+
+  @media (max-width: 899px) {
+    .ohead {
+      padding-top: 18px;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .cards {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 22px 14px;
+    }
+    .grid {
+      padding-top: 5vh;
+    }
+  }
+</style>
+
+<script>
+  /* Pointing at a card moves the globe to where that session was shot. */
+  const cards = document.querySelectorAll<HTMLElement>("[data-session-card]");
+  function highlight(location: string | null, note?: string) {
+    document.dispatchEvent(
+      new CustomEvent("archive:highlight", { detail: { location, note } }),
+    );
+  }
+  for (const card of cards) {
+    card.addEventListener("pointerenter", () =>
+      highlight(card.dataset.location || null, card.dataset.note),
+    );
+    card.addEventListener("focus", () =>
+      highlight(card.dataset.location || null, card.dataset.note),
+    );
+  }
+  document
+    .querySelector(".cards")
+    ?.addEventListener("pointerleave", () => highlight(null));
+</script>

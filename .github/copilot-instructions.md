@@ -54,6 +54,7 @@ the matching skill before changing that part, even when the change looks small.
 
 | Skill                                                                                                                                | For                                                                                                 |
 | ------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------- |
+| [front-door](skills/front-door/SKILL.md)                                                                                             | the front door at /, Weekends and Weekdays, the resume, side projects, the flight radar             |
 | [photo-sessions](skills/photo-sessions/SKILL.md)                                                                                     | uploading, splitting or renaming sessions, sidecars, the admin panel, builds broken by session data |
 | [image-delivery](skills/image-delivery/SKILL.md)                                                                                     | full resolution, the lightbox, image sizes and priority, captions under photos, the Blob bill       |
 | [session-globe](skills/session-globe/SKILL.md)                                                                                       | globe pins, the spin, the flight into a session                                                     |

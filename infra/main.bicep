@@ -29,6 +29,9 @@ param enableDescribeModel bool
 @description('Deploy the timer that starts the Instagram posting and photo workflows on schedule (docs/social.md). Uses the Static Web App\'s GITHUB_TOKEN setting.')
 param enableSocialScheduler bool = false
 
+@description('Deploy Azure Communication Services email, so each contact form message is also emailed to me (docs/azure.md). A fraction of a cent per message.')
+param enableContactEmail bool = false
+
 @description('Tags applied to every resource.')
 param tags object
 
@@ -109,6 +112,15 @@ module scheduler 'modules/scheduler.bicep' = if (enableSocialScheduler) {
   }
 }
 
+module email 'modules/email.bicep' = if (enableContactEmail) {
+  name: 'email'
+  params: {
+    name: 'acs-${namePrefix}-${suffix}'
+    emailServiceName: 'email-${namePrefix}-${suffix}'
+    tags: tags
+  }
+}
+
 module domain 'modules/domain.bicep' = if (!empty(domainName)) {
   name: 'domain'
   params: {
@@ -127,3 +139,5 @@ output managedIdentityPrincipalId string = identity.outputs.principalId
 output describeEndpoint string = enableDescribeModel ? ai!.outputs.endpoint : ''
 output describeDeployment string = enableDescribeModel ? ai!.outputs.deploymentName : ''
 output schedulerEnabled bool = enableSocialScheduler ? scheduler!.outputs.enabled : false
+output contactEmailResourceId string = enableContactEmail ? email!.outputs.id : ''
+output contactEmailSender string = enableContactEmail ? email!.outputs.senderAddress : ''

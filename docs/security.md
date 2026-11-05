@@ -112,7 +112,8 @@ a title or caption containing `</script>` can't end the block and inject markup.
 The public contact endpoint (`api/contact`) has layered protection:
 
 - **Honeypot field.** A hidden `website` input that humans never see. Bots that fill it get a fake success and are silently dropped.
-- **Server-side validation.** Name, email, and message are length-checked and the email is format-checked before anything is stored. Nothing is emailed, so there are no mail headers to inject.
+- **Server-side validation.** Name, email, and message are length-checked and the email is format-checked before anything is stored.
+- **The email copy can't be steered.** Each saved message is emailed to the owner through Azure Communication Services ([api/contact/notify.js](../api/contact/notify.js)). The recipient is fixed by the `CONTACT_NOTIFY_TO` app setting, so a visitor can only ever reach that one inbox. The sender's name is flattened to one line with control characters removed before it goes in the subject, so it can't add headers, and their address goes only in Reply-To. Across all visitors, at most ten emails go out an hour, so a flood can't run up the bill. Anything over that is still saved in the table.
 - **Per-IP rate limit.** Each client is capped at five messages per hour. The limiter stores only a secret-salted, truncated hash of the IP, never the raw IP, in a `contactratelimit` table. ETag-conditional updates prevent parallel requests from overwriting the count. It fails open on a storage outage so a legitimate message is not rejected solely because the limiter is unavailable.
 - **Limits of the limit.** The client IP is the first `X-Forwarded-For` entry SWA hands the Function ([api/shared/client-ip.js](../api/shared/client-ip.js)). SWA doesn't document whether a client-supplied value can survive there, so treat the limit as a speed bump against floods, not a guarantee.
 

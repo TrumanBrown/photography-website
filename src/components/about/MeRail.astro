@@ -1,0 +1,239 @@
+---
+/**
+ * The front door's rail (src/pages/index.astro). It has the archive rail's
+ * frame and top, so walking into Photographs only changes what's under the
+ * name: the sessions and the globe there, me here. Below 900px it's a short
+ * block at the top of the page instead of a column.
+ */
+import { Picture } from "astro:assets";
+import me from "@/assets/about/me-everest.jpg";
+import ThemeToggle from "@/components/ThemeToggle.astro";
+import { LINKS, RESUME_PDF } from "@/lib/about";
+import { instagramUrl } from "@/lib/instagram";
+import { siteConfig } from "../../../site.config";
+
+const instagram = instagramUrl();
+const links = [
+  ...LINKS,
+  ...(instagram ? [{ label: "Instagram", href: instagram }] : []),
+];
+---
+
+<aside class="rail me-rail" aria-label="About me">
+  <div class="rail-top">
+    <a class="me" href="/" aria-current="page">{siteConfig.ownerName}</a>
+    <nav class="rail-nav u-label" aria-label="Primary">
+      <a class="rail-link" href="/photographs/" data-open="page">Photographs</a>
+      <a class="rail-link" href="/hobbies/">Things to try</a>
+      <a class="rail-link" href="/#weekdays" data-week-link>About me</a>
+    </nav>
+    <span class="rail-theme"><ThemeToggle /></span>
+  </div>
+
+  <figure class="me-pic">
+    <Picture
+      src={me}
+      alt="Me in front of Everest's north face in Tibet"
+      widths={[180, 360, 540]}
+      sizes="(min-width: 900px) 180px, 96px"
+      formats={["webp"]}
+      fallbackFormat="jpeg"
+      loading="eager"
+      class="me-img"
+    />
+    <figcaption>
+      <a href="/sessions/mt-everest-may-2026/" data-open="session"
+        >Everest north face, Tibet</a
+      >
+    </figcaption>
+  </figure>
+
+  <div class="me-about">
+    <p class="u-label me-where">Seattle, Washington</p>
+    <nav class="me-links" aria-label="Elsewhere">
+      {
+        links.map((link) => (
+          <a
+            class="me-link"
+            href={link.href}
+            target="_blank"
+            rel="me noopener noreferrer"
+          >
+            {link.label} ↗
+          </a>
+        ))
+      }
+      <button type="button" class="me-link" data-contact-open
+        >Write to me</button
+      >
+    </nav>
+  </div>
+
+  <div class="me-foot">
+    <a class="btn" href={RESUME_PDF} target="_blank" rel="noopener"
+      >Resume (PDF)</a
+    >
+  </div>
+</aside>
+
+<style>
+  /* The archive rail's frame and top (ArchiveRail.astro), kept identical so
+     the top of the rail holds still between the two pages. */
+  .rail {
+    width: var(--rail-w, 212px);
+    flex: none;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--rule);
+    background: var(--paper);
+    z-index: 40;
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+  .rail-top {
+    padding: 18px 16px 12px;
+    position: relative;
+  }
+  .me {
+    display: block;
+    color: var(--ink);
+    text-decoration: none;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+  .rail-nav {
+    display: flex;
+    flex-direction: column;
+    margin-top: 8px;
+  }
+  .rail-link {
+    display: flex;
+    align-items: center;
+    min-height: 24px;
+    color: var(--ink-2);
+    text-decoration: none;
+  }
+  .rail-link:hover {
+    color: var(--ink);
+    text-decoration: none;
+  }
+  .rail-theme {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+  }
+
+  .me-pic {
+    margin: 8px 16px 0;
+  }
+  .me-pic :global(.me-img) {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 4 / 5;
+    object-fit: cover;
+    background: var(--band);
+  }
+  .me-pic figcaption {
+    margin-top: 6px;
+    font-size: 11px;
+    line-height: 1.35;
+  }
+  .me-pic figcaption a {
+    color: var(--ink-2);
+    text-decoration: none;
+  }
+  .me-pic figcaption a:hover {
+    color: var(--ink);
+    text-decoration: underline;
+  }
+  .me-about {
+    padding: 14px 16px 0;
+  }
+  .me-where {
+    margin: 0 0 6px;
+  }
+  .me-links {
+    display: flex;
+    flex-direction: column;
+  }
+  .me-link {
+    display: flex;
+    align-items: center;
+    min-height: 26px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--ink-2);
+    font: inherit;
+    font-size: 13px;
+    text-align: left;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .me-link:hover {
+    color: var(--ink);
+    text-decoration: none;
+  }
+  .me-foot {
+    margin-top: auto;
+    padding: 14px 16px 16px;
+    border-top: 1px solid var(--rule);
+  }
+  .me-foot .btn {
+    width: 100%;
+  }
+
+  /* On a phone the rail is a block above the page: name and theme on top,
+     then the photo beside where I live and the links. The page's own tabs
+     and doors take over the rail's navigation. */
+  @media (max-width: 899px) {
+    .rail {
+      position: static;
+      width: auto;
+      height: auto;
+      overflow: visible;
+      border-right: 0;
+      border-bottom: 1px solid var(--rule);
+      display: grid;
+      grid-template-columns: 96px minmax(0, 1fr);
+      grid-template-areas:
+        "top top"
+        "pic about";
+      column-gap: 16px;
+      padding-bottom: 16px;
+    }
+    .rail-top {
+      grid-area: top;
+      padding: 14px var(--gutter, 18px) 12px;
+    }
+    .rail-nav {
+      display: none;
+    }
+    .rail-theme {
+      top: 10px;
+      right: var(--gutter, 18px);
+    }
+    .me-pic {
+      grid-area: pic;
+      margin: 0 0 0 var(--gutter, 18px);
+    }
+    .me-pic figcaption {
+      display: none;
+    }
+    .me-about {
+      grid-area: about;
+      padding: 0 var(--gutter, 18px) 0 0;
+    }
+    .me-link {
+      min-height: 24px;
+    }
+    .me-foot {
+      display: none;
+    }
+  }
+</style>

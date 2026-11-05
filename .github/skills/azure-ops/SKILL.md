@@ -15,11 +15,12 @@ Everything runs in one resource group, `rg-photography-prod`, defined in Bicep a
 | Identities                                   | `infra/modules/identity.bicep`, `scripts/setup-federated-credential.sh` | a bootstrap identity for the Infra workflow only, and a limited build identity for everything else ([why](../../../docs/cicd.md#two-identities-least-privilege-by-job))                                           |
 | Azure OpenAI                                 | `infra/modules/ai.bicep`                                                | keyless, used only by the Photo captions workflow                                                                                                                                                                 |
 | Logic App timer                              | `infra/modules/scheduler.bicep`                                         | starts Photo captions and Social post, because GitHub's scheduler skips runs                                                                                                                                      |
+| Contact email                                | `infra/modules/email.bicep`, `api/contact/notify.js`                    | Communication Services with an Azure-managed sender; emails Truman each contact message, ten an hour at most. Recipient is `CONTACT_NOTIFY_TO`, from the `CONTACT_NOTIFY_EMAIL` secret                            |
 | Domain and DNS                               | `infra/modules/domain.bicep`, `scripts/bind-domain.sh`                  | custom-domain bindings are done by the script after Infra, never in Bicep                                                                                                                                         |
 | API                                          | `api/contact/`, `api/track/`, `api/sessionmgr/`, `api/shared/`          | CommonJS, `function.json` per function, tests as `*.test.cjs`                                                                                                                                                     |
 | Headers and CSP                              | `staticwebapp.config.json`                                              | copied into `dist/` by the workflow; see ship-and-ci for inline-script hashes                                                                                                                                     |
 
-Secrets and settings are listed in the [secrets cheat sheet](../../../docs/cicd.md#secrets-cheat-sheet) and docs/session-handoff.md. Runtime settings for the Functions (`AZURE_STORAGE_CONNECTION_STRING`, `ADMIN_GITHUB_USERS`, `ANALYTICS_SALT`, and `GITHUB_TOKEN` for Rebuild and the timer) live only as SWA app settings.
+Secrets and settings are listed in the [secrets cheat sheet](../../../docs/cicd.md#secrets-cheat-sheet) and docs/session-handoff.md. Runtime settings for the Functions (`AZURE_STORAGE_CONNECTION_STRING`, `ADMIN_GITHUB_USERS`, `ANALYTICS_SALT`, `GITHUB_TOKEN` for Rebuild and the timer, and `CONTACT_EMAIL_CONNECTION_STRING`, `CONTACT_EMAIL_FROM` and `CONTACT_NOTIFY_TO` for the contact email) live only as SWA app settings.
 
 ## Truman's rules
 
@@ -56,6 +57,8 @@ Secrets and settings are listed in the [secrets cheat sheet](../../../docs/cicd.
 
 ## Truman's verdicts
 
+- 2026-11-05: "can we make it so any message I get on the site gives me a notification on my email too?" Done with Communication Services rather than the old hand-made metric alert, which only said a table was written to.
+
 - 2026-06-27: "we can go over SWA free tier... I want performance over cost efficiency always."
 - 2026-07-09: "if this is a limitation on the azure static web app or anything in azure REMEMBER WE CAN ALWYAS IMPROVE IT."
 - 2026-09-27: "i dont know how this keeps getting lost, but you need to rememebr this - i have more money credits in azure I can spend."
@@ -83,5 +86,8 @@ Secrets and settings are listed in the [secrets cheat sheet](../../../docs/cicd.
 - `az costmanagement` needs an extension that prompts to install; Cost Management in the portal is simpler.
 - Some resources were made outside Bicep (an alert rule and older monitoring). Ask before removing anything.
 - The free SWA plan includes 100 GB of its own bandwidth with no overage; Blob egress is billed separately.
+- The Windows `az` under WSL crashes on `az bicep build --stdout` when a description has a non-ASCII character such as `→` (cp1252 can't print it). Use `--outfile "$(wslpath -w /tmp/x.json)"`, and for what-if set `PYTHONIOENCODING=utf-8` with `WSLENV=PYTHONIOENCODING`.
+- A new resource type needs its provider registered on the subscription first (`az provider register -n Microsoft.Communication` was needed on 2026-11-05). The bootstrap identity is Contributor, so Infra can't always do it itself.
+- The metric alert `new-contact-message` and action group `contact-notify` were made by hand before the email copy. They're redundant now; delete them once Truman confirms the copies arrive (ask first).
 
 Add new verdicts and lessons here, dated, in the commit that acts on them.

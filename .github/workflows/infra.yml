@@ -83,6 +83,39 @@ jobs:
               "ADMIN_GITHUB_USERS=$ADMIN_GITHUB_USERS" \
             --output none
 
+      # Contact form email (infra/modules/email.bicep). The connection string
+      # and sender come from the resource; where the copy goes comes from the
+      # CONTACT_NOTIFY_EMAIL secret, so the address is never in the repo. With
+      # no secret, an address already set on the Static Web App is kept.
+      - name: Configure contact email
+        if: ${{ steps.deploy.outputs.contactEmailResourceId != '' }}
+        env:
+          RESOURCE_GROUP: ${{ steps.deploy.outputs.resourceGroupName }}
+          SWA_NAME: ${{ steps.deploy.outputs.swaName }}
+          ACS_ID: ${{ steps.deploy.outputs.contactEmailResourceId }}
+          SENDER: ${{ steps.deploy.outputs.contactEmailSender }}
+          NOTIFY_TO: ${{ secrets.CONTACT_NOTIFY_EMAIL }}
+        run: |
+          CONNECTION=$(az rest --method post \
+            --url "https://management.azure.com${ACS_ID}/listKeys?api-version=2023-04-01" \
+            --query primaryConnectionString -o tsv)
+          if [[ -z "$CONNECTION" ]]; then
+            echo "Failed to read the Communication Services connection string." >&2
+            exit 1
+          fi
+          echo "::add-mask::$CONNECTION"
+          SETTINGS=("CONTACT_EMAIL_CONNECTION_STRING=$CONNECTION" "CONTACT_EMAIL_FROM=$SENDER")
+          if [[ -n "${NOTIFY_TO:-}" ]]; then
+            SETTINGS+=("CONTACT_NOTIFY_TO=$NOTIFY_TO")
+          else
+            echo "::warning::CONTACT_NOTIFY_EMAIL isn't set, so CONTACT_NOTIFY_TO keeps whatever the Static Web App has (docs/azure.md)."
+          fi
+          az staticwebapp appsettings set \
+            --name "$SWA_NAME" \
+            --resource-group "$RESOURCE_GROUP" \
+            --setting-names "${SETTINGS[@]}" \
+            --output none
+
       - name: Fetch SWA deployment token
         id: swa-token
         run: |

@@ -1,233 +1,325 @@
 ---
 /**
- * Contact form — slide-out drawer from the right, triggered by a fixed FAB.
- * Posts to /api/contact (SWA managed function → Azure Table Storage).
- * Honeypot field for spam prevention. JS-enhanced inline feedback.
+ * "Write to me": a drawer from the right, opened by any [data-contact-open]
+ * (the footer, the rails, the Weekdays side, /prints) or the contact:open
+ * event (the lightbox's Prints button), either of which can start the
+ * message. Posts to /api/contact, which keeps the message in Table Storage
+ * and emails me a copy. A hidden "website" field catches bots.
  */
 ---
 
-{/* ── Floating action button (bottom-right, always visible) ── */}
-<button
-  id="contact-fab"
-  type="button"
-  aria-label="Open contact form"
-  aria-expanded="false"
-  aria-controls="contact-drawer"
-  class="fixed bottom-6 right-6 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-neutral-900 text-white shadow-lg transition-transform hover:scale-105 hover:bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:ring-offset-2 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-200 dark:focus:ring-neutral-100 dark:focus:ring-offset-neutral-950 sm:h-14 sm:w-14"
->
-  {/* Envelope icon */}
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-    <rect x="2" y="4" width="20" height="16" rx="2" />
-    <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-  </svg>
-</button>
+<div class="cf-scrim" id="contact-backdrop" aria-hidden="true"></div>
 
-{/* ── Backdrop overlay ── */}
-<div
-  id="contact-backdrop"
-  class="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm transition-opacity duration-300 pointer-events-none opacity-0"
-  aria-hidden="true"
-></div>
-
-{/* ── Slide-out drawer ── */}
 <aside
   id="contact-drawer"
+  class="cf"
   role="dialog"
-  aria-label="Contact form"
+  aria-labelledby="contact-title"
   aria-modal="true"
-  aria-hidden="true"
   inert
-  class="fixed inset-y-0 right-0 z-50 flex w-full max-w-md translate-x-full flex-col bg-white shadow-2xl transition-transform duration-300 ease-out dark:bg-neutral-950"
 >
-  {/* Header */}
-  <div class="flex items-center justify-between border-b border-neutral-200 px-6 py-4 dark:border-neutral-800">
-    <div>
-      <h2 class="text-lg font-semibold tracking-tight">Contact me</h2>
-      <p class="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">I'll get back to you soon. Thanks for visiting!</p>
-    </div>
-    <button
-      id="contact-close"
-      type="button"
-      aria-label="Close contact form"
-      class="rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-900 dark:hover:text-neutral-100"
-    >
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M18 6 6 18" /><path d="m6 6 12 12" />
-      </svg>
+  <div class="cf-head">
+    <h2 id="contact-title">Write to me</h2>
+    <button id="contact-close" type="button" class="linkbtn draw cf-close">
+      <span>Back to the page</span>
     </button>
   </div>
+  <p class="cf-lede">
+    About my work or projects, a print, or a photo you'd like to use. I'll get
+    back to you soon.
+  </p>
 
-  {/* Scrollable form body */}
-  <div class="flex-1 overflow-y-auto px-6 py-6">
-    <form
-      id="contact-form"
-      action="/api/contact"
-      method="POST"
-      class="space-y-5"
-    >
-      {/* Honeypot — hidden from humans, bots fill it and get silently rejected */}
-      <div class="absolute -left-[9999px]" aria-hidden="true">
-        <label for="website">Website</label>
-        <input type="text" id="website" name="website" tabindex="-1" autocomplete="off" />
-      </div>
+  <form id="contact-form" action="/api/contact" method="POST" class="cf-form">
+    <div class="cf-trap" aria-hidden="true">
+      <label for="website">Website</label>
+      <input
+        type="text"
+        id="website"
+        name="website"
+        tabindex="-1"
+        autocomplete="off"
+      />
+    </div>
+    <input type="hidden" name="page" id="contact-page" value="" />
 
-      <div>
-        <label for="contact-name" class="block text-sm font-medium">Name</label>
-        <input
-          type="text"
-          id="contact-name"
-          name="name"
-          autocomplete="name"
-          required
-          maxlength="200"
-          class="mt-1 block w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm shadow-sm placeholder:text-neutral-400 focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:placeholder:text-neutral-500 dark:focus:border-neutral-100 dark:focus:ring-neutral-100"
-          placeholder="Your name"
-        />
-      </div>
+    <label class="cf-field" for="contact-name">
+      <span class="u-label">Name</span>
+      <input
+        type="text"
+        id="contact-name"
+        name="name"
+        autocomplete="name"
+        required
+        maxlength="200"
+      />
+    </label>
 
-      <div>
-        <label for="contact-email" class="block text-sm font-medium">Email</label>
-        <input
-          type="email"
-          id="contact-email"
-          name="email"
-          autocomplete="email"
-          spellcheck="false"
-          required
-          maxlength="254"
-          class="mt-1 block w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm shadow-sm placeholder:text-neutral-400 focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:placeholder:text-neutral-500 dark:focus:border-neutral-100 dark:focus:ring-neutral-100"
-          placeholder="you@example.com"
-        />
-      </div>
+    <label class="cf-field" for="contact-email">
+      <span class="u-label">Email</span>
+      <input
+        type="email"
+        id="contact-email"
+        name="email"
+        autocomplete="email"
+        spellcheck="false"
+        required
+        maxlength="254"
+      />
+    </label>
 
-      <div>
-        <label for="contact-message" class="block text-sm font-medium">Message</label>
-        <textarea
-          id="contact-message"
-          name="message"
-          required
-          maxlength="5000"
-          rows="5"
-          class="mt-1 block w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm shadow-sm placeholder:text-neutral-400 focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:placeholder:text-neutral-500 dark:focus:border-neutral-100 dark:focus:ring-neutral-100"
-          placeholder="What's on your mind?"
-        ></textarea>
-        <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-          <span id="char-count">0</span> / 5,000
-        </p>
-      </div>
+    <label class="cf-field" for="contact-message">
+      <span class="u-label">Message</span>
+      <textarea
+        id="contact-message"
+        name="message"
+        required
+        maxlength="5000"
+        rows="7"></textarea>
+    </label>
+    <p class="u-label tabular-nums cf-count">
+      <span id="char-count">0</span> / 5,000
+    </p>
 
-      <button
-        type="submit"
-        class="w-full rounded-md bg-neutral-900 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:ring-offset-2 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-200 dark:focus:ring-neutral-100 dark:focus:ring-offset-neutral-950"
-      >
-        Send message
-      </button>
+    <div class="cf-send">
+      <p id="contact-feedback" class="cf-status" role="status"></p>
+      <button type="submit" class="btn btn-ink">Send message</button>
+    </div>
 
-      <p class="text-xs text-ink-2">
-        I only use your email to reply, and it's never passed on.
-        <a href="/privacy/" class="underline hover:text-ink">Privacy</a>
-      </p>
-
-      {/* Feedback area — populated by JS */}
-      <div id="contact-feedback" class="hidden rounded-md p-3 text-sm" role="alert"></div>
-    </form>
-  </div>
+    <p class="cf-privacy">
+      I only use your email to reply, and it's never passed on.
+      <a href="/privacy/" class="draw">Privacy</a>
+    </p>
+  </form>
 </aside>
 
+<style>
+  .cf-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    background: color-mix(in srgb, var(--ink) 30%, transparent);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 200ms var(--ease);
+  }
+  .cf-scrim.on {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .cf {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 91;
+    width: min(440px, 100%);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 22px 26px 28px;
+    overflow-y: auto;
+    background: var(--paper);
+    border-left: 1px solid var(--rule);
+    transform: translateX(100%);
+    visibility: hidden;
+    transition:
+      transform 260ms var(--ease),
+      visibility 0s linear 260ms;
+  }
+  .cf.on {
+    transform: none;
+    visibility: visible;
+    transition: transform 260ms var(--ease);
+  }
+  .cf-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .cf-head h2 {
+    margin: 0;
+    font-size: 19px;
+    font-weight: 300;
+    line-height: 1.25;
+    color: var(--ink);
+  }
+  .cf-close {
+    font-size: 13px;
+    color: var(--ink-2);
+  }
+  .cf-close:hover {
+    color: var(--ink);
+  }
+  .cf-lede {
+    margin: 0;
+    max-width: 44ch;
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--ink-3);
+  }
+  .cf-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .cf-trap {
+    position: absolute;
+    left: -9999px;
+  }
+  .cf-field {
+    display: block;
+  }
+  .cf-field .u-label {
+    display: block;
+    margin-bottom: 2px;
+  }
+  .cf-field input,
+  .cf-field textarea {
+    display: block;
+    width: 100%;
+    padding: 6px 0;
+    border: 0;
+    border-bottom: 1px solid var(--rule);
+    border-radius: 0;
+    background: none;
+    color: var(--ink);
+    font: inherit;
+    font-size: 15px;
+    line-height: 1.5;
+    resize: vertical;
+  }
+  .cf-field input:focus,
+  .cf-field textarea:focus {
+    outline: none;
+    box-shadow: none;
+    border-color: var(--ink);
+  }
+  .cf-count {
+    margin: -8px 0 0;
+    text-align: right;
+  }
+  .cf-send {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+  }
+  .cf-status {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--ink);
+  }
+  .cf-privacy {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--ink-2);
+  }
+  .cf-privacy a {
+    color: var(--ink-2);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .cf,
+    .cf.on,
+    .cf-scrim {
+      transition: none;
+    }
+  }
+</style>
+
 <script>
-  const fab = document.getElementById('contact-fab')!;
-  const drawer = document.getElementById('contact-drawer')!;
-  const backdrop = document.getElementById('contact-backdrop')!;
-  const closeBtn = document.getElementById('contact-close')!;
-  const form = document.getElementById('contact-form') as HTMLFormElement;
-  const feedback = document.getElementById('contact-feedback')!;
-  const charCount = document.getElementById('char-count')!;
-  const messageField = document.getElementById('contact-message') as HTMLTextAreaElement;
-  const pageShell = document.getElementById('page-shell')!;
+  const drawer = document.getElementById("contact-drawer")!;
+  const backdrop = document.getElementById("contact-backdrop")!;
+  const closeBtn = document.getElementById("contact-close")!;
+  const form = document.getElementById("contact-form") as HTMLFormElement;
+  const feedback = document.getElementById("contact-feedback")!;
+  const charCount = document.getElementById("char-count")!;
+  const messageField = document.getElementById(
+    "contact-message",
+  ) as HTMLTextAreaElement;
+  const pageField = document.getElementById("contact-page") as HTMLInputElement;
+  const pageShell = document.getElementById("page-shell");
 
   let isOpen = false;
-  let previousBodyOverflow = '';
+  let opener: HTMLElement | null = null;
+  let previousBodyOverflow = "";
 
   function focusableElements(): HTMLElement[] {
     return Array.from(
       drawer.querySelectorAll<HTMLElement>(
-        'button:not([disabled]):not([tabindex="-1"]), input:not([disabled]):not([type="hidden"]):not([tabindex="-1"]), textarea:not([disabled]):not([tabindex="-1"]), select:not([disabled]):not([tabindex="-1"]), a[href]:not([tabindex="-1"]), [tabindex]:not([tabindex="-1"])',
+        'button:not([disabled]):not([tabindex="-1"]), input:not([disabled]):not([type="hidden"]):not([tabindex="-1"]), textarea:not([disabled]):not([tabindex="-1"]), a[href]:not([tabindex="-1"])',
       ),
-    ).filter(
-      (element) => !element.hasAttribute('hidden') && !element.closest('[aria-hidden="true"]'),
-    );
+    ).filter((element) => !element.closest('[aria-hidden="true"]'));
   }
 
   function openDrawer() {
     if (isOpen) return;
     isOpen = true;
+    opener =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
     previousBodyOverflow = document.body.style.overflow;
-    drawer.removeAttribute('inert');
-    drawer.setAttribute('aria-hidden', 'false');
-    pageShell.setAttribute('inert', '');
-    fab.setAttribute('inert', '');
-    drawer.classList.remove('translate-x-full');
-    drawer.classList.add('translate-x-0');
-    backdrop.classList.remove('opacity-0', 'pointer-events-none');
-    backdrop.classList.add('opacity-100', 'pointer-events-auto');
-    fab.setAttribute('aria-expanded', 'true');
-    document.body.style.overflow = 'hidden';
-    document.getElementById('contact-name')?.focus();
+    pageField.value = window.location.pathname + window.location.hash;
+    drawer.removeAttribute("inert");
+    pageShell?.setAttribute("inert", "");
+    drawer.classList.add("on");
+    backdrop.classList.add("on");
+    document.body.style.overflow = "hidden";
+    document.getElementById("contact-name")?.focus();
   }
 
   function closeDrawer() {
     if (!isOpen) return;
     isOpen = false;
-    drawer.classList.remove('translate-x-0');
-    drawer.classList.add('translate-x-full');
-    backdrop.classList.remove('opacity-100', 'pointer-events-auto');
-    backdrop.classList.add('opacity-0', 'pointer-events-none');
-    fab.setAttribute('aria-expanded', 'false');
+    drawer.classList.remove("on");
+    backdrop.classList.remove("on");
     document.body.style.overflow = previousBodyOverflow;
-    pageShell.removeAttribute('inert');
-    fab.removeAttribute('inert');
-    fab.focus();
-    drawer.setAttribute('inert', '');
-    drawer.setAttribute('aria-hidden', 'true');
+    pageShell?.removeAttribute("inert");
+    drawer.setAttribute("inert", "");
+    opener?.focus();
   }
 
-  fab.addEventListener('click', openDrawer);
-  closeBtn.addEventListener('click', closeDrawer);
-  backdrop.addEventListener('click', closeDrawer);
+  closeBtn.addEventListener("click", closeDrawer);
+  backdrop.addEventListener("click", closeDrawer);
 
   /* Other parts of the page can open the form with a message already started:
      the lightbox's Prints button names the photo, and buttons on /prints carry
-     data-contact-open. A prefill never replaces something the visitor typed. */
-  let lastPrefill = '';
+     data-contact-message. A prefill never replaces something the visitor typed. */
+  let lastPrefill = "";
   function openWithMessage(message?: string) {
     const current = messageField.value.trim();
-    if (message && (current === '' || current === lastPrefill.trim())) {
+    if (message && (current === "" || current === lastPrefill.trim())) {
       messageField.value = message;
       lastPrefill = message;
       charCount.textContent = String(messageField.value.length);
     }
     openDrawer();
   }
-  window.addEventListener('contact:open', (event) => {
-    openWithMessage((event as CustomEvent<{ message?: string }>).detail?.message);
+  window.addEventListener("contact:open", (event) => {
+    openWithMessage(
+      (event as CustomEvent<{ message?: string }>).detail?.message,
+    );
   });
-  document.addEventListener('click', (event) => {
-    const trigger = (event.target as Element | null)?.closest<HTMLElement>('[data-contact-open]');
+  document.addEventListener("click", (event) => {
+    const trigger = (event.target as Element | null)?.closest<HTMLElement>(
+      "[data-contact-open]",
+    );
     if (!trigger) return;
     event.preventDefault();
     openWithMessage(trigger.dataset.contactMessage);
   });
 
-  // Close on Escape
-  document.addEventListener('keydown', (e) => {
+  document.addEventListener("keydown", (e) => {
     if (!isOpen) return;
-    if (e.key === 'Escape') {
+    if (e.key === "Escape") {
       e.preventDefault();
       closeDrawer();
       return;
     }
-    if (e.key !== 'Tab') return;
-
+    if (e.key !== "Tab") return;
     const focusable = focusableElements();
     if (focusable.length === 0) {
       e.preventDefault();
@@ -235,35 +327,43 @@
     }
     const first = focusable[0];
     const last = focusable[focusable.length - 1];
-    if (e.shiftKey && (document.activeElement === first || !drawer.contains(document.activeElement))) {
+    if (
+      e.shiftKey &&
+      (document.activeElement === first ||
+        !drawer.contains(document.activeElement))
+    ) {
       e.preventDefault();
       last.focus();
-    } else if (!e.shiftKey && (document.activeElement === last || !drawer.contains(document.activeElement))) {
+    } else if (
+      !e.shiftKey &&
+      (document.activeElement === last ||
+        !drawer.contains(document.activeElement))
+    ) {
       e.preventDefault();
       first.focus();
     }
   });
 
-  // Character counter
-  messageField.addEventListener('input', () => {
+  messageField.addEventListener("input", () => {
     charCount.textContent = String(messageField.value.length);
   });
 
-  // Form submission
-  form.addEventListener('submit', async (e) => {
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
-    feedback.className = 'hidden';
+    feedback.textContent = "";
 
-    const btn = form.querySelector('button[type="submit"]') as HTMLButtonElement;
+    const btn = form.querySelector(
+      'button[type="submit"]',
+    ) as HTMLButtonElement;
     const originalText = btn.textContent;
     btn.disabled = true;
-    btn.textContent = 'Sending...';
+    btn.textContent = "Sending...";
 
     try {
       const data = Object.fromEntries(new FormData(form));
-      const res = await fetch('/api/contact', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
         // A cold API takes a few seconds. Past this, say so instead of
         // leaving the button on Sending... for good.
@@ -272,18 +372,17 @@
       const json = await res.json();
 
       if (json.ok) {
-        feedback.textContent = 'Message sent. Thank you!';
-        feedback.className = 'rounded-md bg-green-50 p-3 text-sm text-green-800 dark:bg-green-950 dark:text-green-200';
+        feedback.textContent = "Message sent. Thank you!";
         form.reset();
-        charCount.textContent = '0';
+        charCount.textContent = "0";
+        lastPrefill = "";
       } else {
-        const msg = json.errors?.join(' ') ?? 'Something went wrong.';
-        feedback.textContent = msg;
-        feedback.className = 'rounded-md bg-red-50 p-3 text-sm text-red-800 dark:bg-red-950 dark:text-red-200';
+        feedback.textContent =
+          json.errors?.join(" ") ??
+          "Failed to send message. Please try again later.";
       }
     } catch {
-      feedback.textContent = 'Network error. Please try again.';
-      feedback.className = 'rounded-md bg-red-50 p-3 text-sm text-red-800 dark:bg-red-950 dark:text-red-200';
+      feedback.textContent = "Network error. Please try again.";
     } finally {
       btn.disabled = false;
       btn.textContent = originalText;

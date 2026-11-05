@@ -1,0 +1,474 @@
+---
+/**
+ * The three side projects on the front door's Weekdays side, each beside
+ * something live rather than a screenshot:
+ * - trumanbrown.com: the newest photograph with a caption from the photo
+ *   pipeline, and counts the build reads from the archive.
+ * - cozy-vibe-vids: one of the videos, which loads from YouTube's
+ *   privacy-enhanced player only when someone presses play.
+ * - balcFlights-LED: the panel's radar, drawn live from the same flight API
+ *   (src/lib/led-radar.ts).
+ */
+import { getCollection } from "astro:content";
+import { Picture } from "astro:assets";
+import type { ImageMetadata } from "astro";
+import poster from "@/assets/about/cozy-critter.jpg";
+import { COZY_VIDEO, monthLabel, PROJECTS } from "@/lib/about";
+import { sortSessions, sessionSlug, splitSessionTitle } from "@/lib/sessions";
+import { coverFileOf } from "@/lib/archive";
+
+const images = import.meta.glob<{ default: ImageMetadata }>(
+  "/src/content/sessions/**/images/*.{jpg,jpeg,png,webp,avif,JPG,JPEG,PNG,WEBP,AVIF}",
+  { eager: true },
+);
+
+const sessions = sortSessions(await getCollection("sessions"));
+const hobbies = await getCollection("hobbies");
+const photos = sessions.reduce((n, s) => n + s.data.images.length, 0);
+const captioned = sessions.reduce(
+  (n, s) => n + s.data.images.filter((image) => image.caption?.trim()).length,
+  0,
+);
+
+/* The newest session's first captioned photograph; without captions (a
+   local build), its cover. */
+const newest =
+  sessions.find((s) => s.data.images.some((i) => i.caption?.trim())) ??
+  sessions[0];
+const pick = newest
+  ? (newest.data.images.find((i) => i.caption?.trim()) ??
+    newest.data.images.find((i) => i.file === coverFileOf(newest)))
+  : undefined;
+const pickImage =
+  newest && pick
+    ? images[`/src/content/sessions/${sessionSlug(newest)}/images/${pick.file}`]
+        ?.default
+    : undefined;
+const pickLabel = newest ? splitSessionTitle(newest.data.title).label : "";
+
+const fmt = (n: number) => n.toLocaleString("en-US");
+const siteFacts = [
+  `${fmt(sessions.length)} sessions`,
+  `${fmt(photos)} photographs`,
+  captioned ? `${fmt(captioned)} captioned` : null,
+  `${hobbies.length} things to try`,
+].filter(Boolean);
+
+const watchUrl = `https://www.youtube.com/watch?v=${COZY_VIDEO.youtubeId}`;
+---
+
+<section class="wsec" aria-labelledby="projects-h">
+  <div class="shead">
+    <h2 id="projects-h">Side projects</h2>
+    <a
+      class="shead-link draw"
+      href="https://github.com/TrumanBrown"
+      target="_blank"
+      rel="noopener noreferrer">More on GitHub ↗</a
+    >
+  </div>
+  <ul class="projs">
+    {
+      PROJECTS.map((project) => (
+        <li class="proj">
+          <div class="proj-media">
+            {project.media === "site" && newest && pickImage && (
+              <figure class="site-live">
+                <a
+                  class="stack"
+                  href={`/sessions/${sessionSlug(newest)}/`}
+                  data-open="session"
+                  aria-label={`Open ${pickLabel}`}
+                >
+                  <i class="s1" aria-hidden="true" />
+                  <i class="s2" aria-hidden="true" />
+                  <Picture
+                    src={pickImage}
+                    alt={pick?.caption ?? `${pickLabel} cover photograph`}
+                    widths={[480, 720, 960]}
+                    sizes="(min-width: 900px) 34vw, 92vw"
+                    formats={["webp"]}
+                    fallbackFormat="jpeg"
+                    loading="lazy"
+                    class="stack-img"
+                  />
+                </a>
+                <figcaption>
+                  <span class="u-label">
+                    {pick?.caption ? "Newest caption" : "Newest session"} ·{" "}
+                    {pickLabel}
+                  </span>
+                  {pick?.caption && (
+                    <span class="site-cap">{pick.caption}</span>
+                  )}
+                </figcaption>
+              </figure>
+            )}
+            {project.media === "video" && (
+              <figure
+                class="pvideo"
+                data-project-video
+                data-youtube-id={COZY_VIDEO.youtubeId}
+                data-title={COZY_VIDEO.title}
+              >
+                <div class="pvideo-frame" data-project-video-frame>
+                  <a
+                    class="pvideo-poster"
+                    href={watchUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    data-project-video-play
+                    aria-label={`Play ${COZY_VIDEO.title}`}
+                  >
+                    <Picture
+                      src={poster}
+                      alt=""
+                      widths={[480, 720, 1280]}
+                      sizes="(min-width: 900px) 34vw, 92vw"
+                      formats={["webp"]}
+                      fallbackFormat="jpeg"
+                      loading="lazy"
+                    />
+                  </a>
+                </div>
+                <figcaption class="pvideo-cap">
+                  <span>{COZY_VIDEO.title}</span>
+                  <a
+                    class="linkbtn draw"
+                    href={watchUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    data-project-video-play
+                  >
+                    <span>Play</span>
+                  </a>
+                </figcaption>
+              </figure>
+            )}
+            {project.media === "radar" && (
+              <figure class="radar" data-led-radar>
+                <canvas
+                  width="320"
+                  height="320"
+                  role="img"
+                  aria-label="A 64 by 64 LED radar of the planes over Seattle."
+                />
+                <figcaption class="radar-cap">
+                  <span class="radar-says" data-radar-says>
+                    Planes over Seattle right now, from seattlebalc.com.
+                  </span>
+                  <span class="radar-row">
+                    <a
+                      class="u-label"
+                      href="https://seattlebalc.com/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Live from seattlebalc.com ↗
+                    </a>
+                    <button
+                      type="button"
+                      class="linkbtn radar-pause"
+                      data-radar-pause
+                    >
+                      Pause
+                    </button>
+                  </span>
+                </figcaption>
+              </figure>
+            )}
+          </div>
+          <div class="proj-body">
+            <h3 class="proj-name">
+              <a
+                class="draw"
+                href={`https://github.com/TrumanBrown/${project.repo}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {project.name}
+              </a>
+            </h3>
+            <p class="u-label tabular-nums proj-meta">
+              {project.lang} · since {monthLabel(project.since)}
+            </p>
+            {project.media === "site" && (
+              <p class="u-label tabular-nums proj-meta">
+                {siteFacts.join(" · ")}
+              </p>
+            )}
+            <p class="proj-blurb">{project.blurb}</p>
+            <p class="proj-links">
+              <a
+                class="draw"
+                href={`https://github.com/TrumanBrown/${project.repo}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Code on GitHub →
+              </a>
+              {project.media === "video" && (
+                <a
+                  class="draw"
+                  href={watchUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Watch on YouTube ↗
+                </a>
+              )}
+            </p>
+          </div>
+        </li>
+      ))
+    }
+  </ul>
+</section>
+
+<style>
+  .wsec {
+    padding: 6vh var(--gutter) 0;
+    max-width: calc(1060px + var(--gutter) * 2);
+  }
+  .shead {
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .projs {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .proj {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 18px 30px;
+    align-items: start;
+    padding: 26px 0 28px;
+    border-top: 1px solid var(--rule);
+  }
+  .proj:first-child {
+    border-top: 0;
+  }
+  .proj-name {
+    margin: 0;
+    font-size: 19px;
+    font-weight: 300;
+    line-height: 1.25;
+  }
+  .proj-name a {
+    color: var(--ink);
+  }
+  .proj-meta {
+    margin: 4px 0 0;
+  }
+  .proj-blurb {
+    margin: 10px 0 0;
+    max-width: 62ch;
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--ink-3);
+  }
+  .proj-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 22px;
+    margin: 14px 0 0;
+    font-size: 13px;
+  }
+  .proj-links a {
+    color: var(--ink);
+  }
+
+  /* A print with two sheets behind it, as on a session card. */
+  .stack {
+    position: relative;
+    display: block;
+    margin: 0 8px 8px 0;
+  }
+  .stack i {
+    position: absolute;
+    inset: 0;
+    display: block;
+    transition: transform 260ms var(--ease);
+  }
+  .stack i.s1 {
+    background: var(--stack-1);
+    transform: translate(8px, 8px);
+  }
+  .stack i.s2 {
+    background: var(--stack-2);
+    transform: translate(4px, 4px);
+  }
+  .stack:hover i.s1 {
+    transform: translate(11px, 11px);
+  }
+  .stack:hover i.s2 {
+    transform: translate(5.5px, 5.5px);
+  }
+  .stack :global(.stack-img) {
+    position: relative;
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+    background: var(--band);
+  }
+  .site-live,
+  .pvideo,
+  .radar {
+    margin: 0;
+  }
+  .site-live figcaption {
+    display: block;
+    margin-top: 10px;
+  }
+  .site-cap {
+    display: block;
+    margin-top: 4px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--ink-3);
+  }
+
+  .pvideo-frame {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    border: 1px solid var(--rule);
+    background: var(--band);
+  }
+  .pvideo-poster {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  .pvideo-poster :global(img) {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .pvideo-frame :global(iframe) {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: 0;
+  }
+  .pvideo-cap,
+  .radar-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 8px;
+    font-size: 13px;
+    color: var(--ink-3);
+  }
+  .pvideo.is-live .pvideo-cap .linkbtn {
+    display: none;
+  }
+
+  .radar canvas {
+    display: block;
+    width: 100%;
+    max-width: 380px;
+    aspect-ratio: 1;
+    border: 1px solid var(--rule);
+    background: #0b0b0a;
+    image-rendering: pixelated;
+  }
+  .radar-cap {
+    max-width: 380px;
+  }
+  .radar-says {
+    display: block;
+    margin-top: 10px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--ink-3);
+    min-height: 3em;
+  }
+  .radar-row {
+    margin-top: 4px;
+  }
+  .radar-row a {
+    text-decoration: none;
+  }
+  .radar-row a:hover {
+    color: var(--ink);
+  }
+  .radar-pause {
+    font-size: 12px;
+    color: var(--ink-2);
+    min-height: 24px;
+  }
+  .radar-pause:hover {
+    color: var(--ink);
+  }
+  .radar-pause[hidden] {
+    display: none;
+  }
+
+  @media (max-width: 899px) {
+    .proj {
+      grid-template-columns: 1fr;
+      gap: 14px;
+      padding: 20px 0 24px;
+    }
+    .radar canvas,
+    .radar-cap {
+      max-width: none;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .stack i {
+      transition: none;
+    }
+  }
+</style>
+
+<script>
+  import { initLedRadar } from "@/lib/led-radar";
+  import { embedSrc } from "@/lib/hobbies/hobby-video";
+
+  document
+    .querySelectorAll<HTMLElement>("[data-led-radar]")
+    .forEach(initLedRadar);
+
+  /* Nothing loads from YouTube until someone presses play. Then the poster
+     becomes the privacy-enhanced player, starting at the top. */
+  document
+    .querySelectorAll<HTMLElement>("[data-project-video]")
+    .forEach((root) => {
+      const frame = root.querySelector<HTMLElement>(
+        "[data-project-video-frame]",
+      );
+      const id = root.dataset.youtubeId;
+      if (!frame || !id) return;
+      const play = (event: Event) => {
+        const e = event as MouseEvent;
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.button > 0) return;
+        event.preventDefault();
+        if (root.classList.contains("is-live")) return;
+        const iframe = document.createElement("iframe");
+        iframe.src = embedSrc(id, {
+          start: 0,
+          autoplay: true,
+          origin: window.location.origin,
+        });
+        iframe.title = root.dataset.title ?? "Video";
+        iframe.allow =
+          "autoplay; encrypted-media; picture-in-picture; fullscreen";
+        iframe.referrerPolicy = "strict-origin-when-cross-origin";
+        frame.replaceChildren(iframe);
+        root.classList.add("is-live");
+      };
+      root
+        .querySelectorAll("[data-project-video-play]")
+        .forEach((el) => el.addEventListener("click", play));
+    });
+</script>

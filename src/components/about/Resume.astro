@@ -1,0 +1,223 @@
+---
+/**
+ * The resume on the front door's Weekdays side: work, school and skills, in
+ * ruled rows. Each job shows its first three lines; "N more" opens the rest.
+ * The lines are the ones on my PDF (src/lib/about.ts).
+ */
+import {
+  firstYear,
+  periodLabel,
+  SCHOOL,
+  SKILLS,
+  SUMMARY,
+  WORK,
+  monthLabel,
+} from "@/lib/about";
+
+const SHOW = 3;
+---
+
+<section class="wsec" aria-labelledby="work-h">
+  <div class="shead">
+    <h2 id="work-h">Work</h2>
+    <span class="u-label tabular-nums"
+      >{WORK.length} roles since {firstYear(WORK)}</span
+    >
+  </div>
+  <p class="summary">{SUMMARY}</p>
+  <ul class="jobs">
+    {
+      WORK.map((job) => {
+        const more = job.lines.length - SHOW;
+        return (
+          <li class="job">
+            <span class="u-label tabular-nums job-when">
+              {periodLabel(job.from, job.to)}
+            </span>
+            <div class="job-body" data-job>
+              <h3 class="job-role">{job.role}</h3>
+              <p class="job-org">
+                {job.org} · {job.where}
+                {job.note && ` · ${job.note}`}
+              </p>
+              <ul class="job-lines">
+                {job.lines.map((line, i) => (
+                  <li
+                    hidden={i >= SHOW ? true : undefined}
+                    data-more={i >= SHOW ? "" : undefined}
+                  >
+                    {line}
+                  </li>
+                ))}
+              </ul>
+              {more > 0 && (
+                <button
+                  type="button"
+                  class="linkbtn draw job-more"
+                  aria-expanded="false"
+                  data-more-toggle={`${more} more`}
+                >
+                  <span>{more} more</span>
+                </button>
+              )}
+            </div>
+          </li>
+        );
+      })
+    }
+  </ul>
+</section>
+
+<slot />
+
+<section class="wsec" aria-labelledby="school-h">
+  <div class="shead"><h2 id="school-h">School</h2></div>
+  <ul class="jobs">
+    <li class="job">
+      <span class="u-label tabular-nums job-when"
+        >{monthLabel(SCHOOL.when)}</span
+      >
+      <div class="job-body">
+        <h3 class="job-role">{SCHOOL.degree}</h3>
+        <p class="job-org">{SCHOOL.name}</p>
+        <ul class="job-lines">{SCHOOL.lines.map((line) => <li>{line}</li>)}</ul>
+      </div>
+    </li>
+  </ul>
+</section>
+
+<section class="wsec" aria-labelledby="skills-h">
+  <div class="shead"><h2 id="skills-h">Skills</h2></div>
+  <dl class="skills">
+    {
+      SKILLS.map(([label, list]) => (
+        <>
+          <dt class="u-label">{label}</dt>
+          <dd>{list}</dd>
+        </>
+      ))
+    }
+  </dl>
+</section>
+
+<style>
+  .wsec {
+    padding: 6vh var(--gutter) 0;
+    max-width: calc(1060px + var(--gutter) * 2);
+  }
+  .shead {
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .summary {
+    margin: 14px 0 0;
+    max-width: 72ch;
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--ink-3);
+  }
+  .jobs {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .job {
+    display: grid;
+    grid-template-columns: 150px minmax(0, 1fr);
+    gap: 4px 24px;
+    padding: 18px 0;
+    border-top: 1px solid var(--rule);
+  }
+  .job:first-child {
+    border-top: 0;
+  }
+  .job-when {
+    padding-top: 4px;
+  }
+  .job-role {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 400;
+    line-height: 1.3;
+    color: var(--ink);
+  }
+  .job-org {
+    margin: 2px 0 0;
+    font-size: 13px;
+    color: var(--ink-2);
+  }
+  .job-lines {
+    margin: 10px 0 0;
+    padding: 0 0 0 16px;
+    list-style: disc;
+    max-width: 72ch;
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--ink-3);
+  }
+  .job-lines li {
+    margin: 4px 0;
+  }
+  .job-lines li::marker {
+    color: var(--ink-2);
+  }
+  .job-lines li[hidden] {
+    display: none;
+  }
+  .job-more {
+    margin-top: 4px;
+    font-size: 12px;
+    color: var(--ink-2);
+  }
+  .job-more:hover {
+    color: var(--ink);
+  }
+  .skills {
+    margin: 0;
+    padding-top: 16px;
+    display: grid;
+    grid-template-columns: 150px minmax(0, 1fr);
+    gap: 10px 24px;
+    font-size: 14px;
+    line-height: 1.55;
+  }
+  .skills dt {
+    padding-top: 3px;
+  }
+  .skills dd {
+    margin: 0;
+    color: var(--ink-3);
+    max-width: 72ch;
+  }
+  @media (max-width: 899px) {
+    .job,
+    .skills {
+      grid-template-columns: 1fr;
+    }
+    .job-when {
+      padding-top: 0;
+    }
+    .skills dd {
+      margin-bottom: 6px;
+    }
+  }
+</style>
+
+<script>
+  /* "N more" opens the rest of a job's lines, and "Fewer" puts them away. */
+  document
+    .querySelectorAll<HTMLButtonElement>("[data-more-toggle]")
+    .forEach((button) => {
+      const label = button.querySelector("span");
+      const lines = button
+        .closest("[data-job]")
+        ?.querySelectorAll<HTMLElement>("[data-more]");
+      if (!label || !lines) return;
+      button.addEventListener("click", () => {
+        const open = button.getAttribute("aria-expanded") !== "true";
+        button.setAttribute("aria-expanded", String(open));
+        lines.forEach((line) => (line.hidden = !open));
+        label.textContent = open ? "Fewer" : (button.dataset.moreToggle ?? "");
+      });
+    });
+</script>

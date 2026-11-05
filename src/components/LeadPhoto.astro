@@ -114,7 +114,10 @@ const first = resolved[0];
 }
 
 {/* Which photograph the page opens on is chosen here, while the parser is
-    still working, rather than in the module script below. The module script
+    still working, rather than in the module script below. Coming from the
+    front door or the archive, it's the one that page was showing
+    (src/lib/open.ts, LEAD_KEY), decoded before the first paint so the page
+    change never shows an empty plate. The module script
     runs after the document is parsed, by which point the browser would already
     have fetched whatever was in the markup, so picking there would cost a
     second download of a 150KB photograph and move the largest paint to it.
@@ -132,12 +135,29 @@ const first = resolved[0];
     if (!frames.length) return;
 
     var index = Math.floor(Math.random() * frames.length);
+    var handed = false;
+    try {
+      var note = JSON.parse(sessionStorage.getItem("lead-handover") || "null");
+      sessionStorage.removeItem("lead-handover");
+      if (note && Math.abs(Date.now() - note.at) < 10000) {
+        for (var i = 0; i < frames.length; i++) {
+          if (frames[i].src === note.src) {
+            index = i;
+            handed = true;
+          }
+        }
+      }
+    } catch {
+      // Without storage, the page picks its own photograph.
+    }
     var frame = frames[index];
     var href = "/sessions/" + frame.slug + "/";
     root.dataset.start = String(index);
+    root.dataset.current = frame.src;
 
     var img = document.getElementById("lead-a");
     if (img) {
+      if (handed) img.decoding = "sync";
       img.sizes = "(min-width: 900px) 70vw, 100vw";
       img.srcset = frame.srcset;
       img.src = frame.src;
@@ -372,6 +392,7 @@ const first = resolved[0];
       back.sizes = "(min-width: 900px) 70vw, 100vw";
       back.alt = frame.alt;
 
+      root!.dataset.current = frame.src;
       if (titleEl) {
         titleEl.textContent = frame.label;
         titleEl.href = `/sessions/${frame.slug}/`;

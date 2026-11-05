@@ -43,6 +43,7 @@ const idleClass = "text-ink-2 hover:text-ink";
       }
       <a
         href="/"
+        data-open="page"
         class="truncate text-[11px] uppercase tracking-[0.18em] no-underline hover:opacity-80"
       >
         {siteConfig.ownerName}
@@ -54,7 +55,8 @@ const idleClass = "text-ink-2 hover:text-ink";
       style="border-color: var(--rule)"
     >
       <a
-        href="/"
+        href="/photographs/"
+        data-open="page"
         class:list={[
           linkBase,
           section === "photography" ? activeClass : idleClass,
@@ -76,6 +78,9 @@ const idleClass = "text-ink-2 hover:text-ink";
           </a>
         )
       }
+      <a href="/#weekdays" data-open="page" class:list={[linkBase, idleClass]}
+        >About me</a
+      >
       <ThemeToggle />
     </nav>
   </div>

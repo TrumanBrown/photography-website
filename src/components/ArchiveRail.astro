@@ -93,10 +93,11 @@ await Promise.all(
 
 <aside id="archive-rail" class="rail" aria-label="Sessions">
   <div class="rail-top">
-    <a class="me" href="/">{siteConfig.ownerName}</a>
+    <a class="me" href="/" data-open="page">{siteConfig.ownerName}</a>
     <nav class="rail-nav u-label" aria-label="Primary">
       <a
-        href="/"
+        href="/photographs/"
+        data-open="page"
         class:list={["rail-link", section === "photography" && "here"]}
         >Photographs</a
       >
@@ -110,6 +111,10 @@ await Promise.all(
           </a>
         )
       }
+      <a href="/#weekdays" data-open="page" class="rail-link">About me</a>
+      <button type="button" class="rail-link rail-write" data-contact-open
+        >Write to me</button
+      >
     </nav>
     <button id="rail-close" class="rail-close u-label" type="button"
       >Close</button
@@ -238,6 +243,19 @@ await Promise.all(
   }
   .rail-link.here {
     color: var(--ink);
+  }
+  .rail-link:hover {
+    color: var(--ink);
+    text-decoration: none;
+  }
+  .rail-write {
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    cursor: pointer;
   }
   /* The theme word sits in the rail's top corner. The phone drawer has its
      Close button there instead; the phone bar carries its own switch. */

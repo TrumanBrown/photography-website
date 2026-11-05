@@ -1,86 +1,116 @@
 ---
+/**
+ * The front door. The archive's frame with me in the rail, and one switch
+ * at the top between my weekends (the lead photograph, then the ways into
+ * Photographs and Things to try) and my weekdays (the resume and the side
+ * projects). "About me" anywhere on the site comes here as /#weekdays.
+ * The archive itself is /photographs/.
+ */
 import { getCollection } from "astro:content";
 import type { ImageMetadata } from "astro";
+import { Picture } from "astro:assets";
 import BaseLayout from "@/layouts/BaseLayout.astro";
-import SessionCard from "@/components/SessionCard.astro";
 import LeadPhoto from "@/components/LeadPhoto.astro";
-import HobbyBand from "@/components/HobbyBand.astro";
+import PlateArt from "@/components/PlateArt.astro";
+import Resume from "@/components/about/Resume.astro";
+import Projects from "@/components/about/Projects.astro";
 import { sortSessions, sessionSlug, splitSessionTitle } from "@/lib/sessions";
 import { buildLeadFrames, coverFileOf, type LeadItem } from "@/lib/archive";
+import { sortHobbies, hobbySlug } from "@/lib/hobbies";
 import { jsonForScript } from "@/lib/html";
-import { siteConfig } from "../../site.config";
 import { instagramUrl } from "@/lib/instagram";
+import {
+  LINKS,
+  PROJECTS,
+  RESUME_PDF,
+  WEEKDAYS,
+  WEEKENDS,
+  WORK,
+  firstYear,
+} from "@/lib/about";
+import { siteConfig } from "../../site.config";
 
-// Eagerly resolve every image under src/content/sessions/ so we can look up
-// image metadata at build time. Astro processes each as an ImageMetadata.
 const images = import.meta.glob<{ default: ImageMetadata }>(
   "/src/content/sessions/**/images/*.{jpg,jpeg,png,webp,avif,JPG,JPEG,PNG,WEBP,AVIF}",
   { eager: true },
 );
-
-function resolveImage(slug: string, file: string): ImageMetadata {
-  const key = `/src/content/sessions/${slug}/images/${file}`;
-  const mod = images[key];
-  if (!mod) {
-    throw new Error(
-      `Image not found for session "${slug}": expected ${key}. ` +
-        `Check that scripts/prebuild.mjs placed the file or update the session JSON.`,
-    );
-  }
-  return mod.default;
-}
+const imageFor = (slug: string, file: string) =>
+  images[`/src/content/sessions/${slug}/images/${file}`]?.default;
 
 const sessions = sortSessions(await getCollection("sessions"));
-const totalPhotos = sessions.reduce(
-  (total, session) => total + session.data.images.length,
-  0,
-);
+const hobbies = sortHobbies(await getCollection("hobbies"));
+const totalPhotos = sessions.reduce((n, s) => n + s.data.images.length, 0);
 const places = new Set(
-  sessions.map((entry) => entry.data.location?.trim()).filter(Boolean),
+  sessions.map((s) => s.data.location?.trim()).filter(Boolean),
 );
+const fmt = (n: number) => n.toLocaleString("en-US");
 
-const summary = [
-  `${sessions.length} session${sessions.length === 1 ? "" : "s"}`,
-  `${totalPhotos} photograph${totalPhotos === 1 ? "" : "s"}`,
-  places.size > 1 ? `${places.size} places` : null,
-]
-  .filter(Boolean)
-  .join(" · ");
+const lead: LeadItem[] = buildLeadFrames(sessions).flatMap((frame) => {
+  const image = imageFor(frame.slug, frame.file);
+  return image
+    ? [
+        {
+          slug: frame.slug,
+          title: frame.title,
+          location: frame.location,
+          image,
+          alt:
+            frame.caption ??
+            `Photograph from ${splitSessionTitle(frame.title).label}`,
+        },
+      ]
+    : [];
+});
 
-// The photographs that rotate in the lead box: only the ones picked in the
-// admin panel (each session's `showcase`). A session with no picks isn't in it.
-const lead: LeadItem[] = buildLeadFrames(sessions).map((frame) => ({
-  slug: frame.slug,
-  title: frame.title,
-  location: frame.location,
-  image: resolveImage(frame.slug, frame.file),
-  alt: frame.caption ?? `${splitSessionTitle(frame.title).label} — photograph`,
-}));
+const newest = sessions.slice(0, 5).flatMap((entry) => {
+  const image = imageFor(sessionSlug(entry), coverFileOf(entry));
+  return image
+    ? [{ image, label: splitSessionTitle(entry.data.title).label }]
+    : [];
+});
+/* Narrow nature is a daily puzzle; the rest are hobbies. */
+const hobbyCount = hobbies.filter(
+  (h) => hobbySlug(h) !== "narrow-nature",
+).length;
+
+const counts = {
+  weekends: [
+    `${fmt(sessions.length)} sessions`,
+    `${fmt(totalPhotos)} photographs`,
+    places.size > 1 ? `${places.size} places` : null,
+  ]
+    .filter(Boolean)
+    .join(" · "),
+  weekdays: `${WORK.length} roles since ${firstYear(WORK)} · ${PROJECTS.length} side projects`,
+};
 
 const first = sessions[0];
 const firstCover = first?.data.images.find(
   (image) => image.file === coverFileOf(first),
 );
-
 const siteOrigin = (Astro.site ?? `https://${siteConfig.domain}`).toString();
 const instagram = instagramUrl();
-// Identifies the photographer as an entity, with the off-site profiles that
-// corroborate it. Kept to the home page so it isn't repeated site-wide.
+// Identifies me as an entity, with the off-site profiles that corroborate it.
+// Kept to the front door so it isn't repeated site-wide.
 const personSchema = {
   "@context": "https://schema.org",
   "@type": "Person",
   name: siteConfig.ownerName,
   url: siteOrigin,
-  jobTitle: "Photographer",
+  jobTitle: "Product manager",
+  worksFor: { "@type": "Organization", name: "Microsoft" },
+  homeLocation: { "@type": "Place", name: "Seattle, Washington" },
+  alumniOf: { "@type": "CollegeOrUniversity", name: "University of Minnesota" },
   sameAs: [
-    "https://www.inaturalist.org/people/trumanbrown",
-    "https://github.com/TrumanBrown",
+    ...LINKS.map((link) => link.href),
     ...(instagram ? [instagram] : []),
   ],
 };
 ---
 
 <BaseLayout
+  section="home"
+  description="Truman Brown: wildlife, landscape and travel photography from Washington and beyond, a few things to try, and my resume and side projects."
   ogImage={firstCover?.fullUrl}
   ogImageAlt={first ? `${first.data.title} cover photograph` : undefined}
 >
@@ -90,113 +120,411 @@ const personSchema = {
     is:inline
   />
 
-  <div class="overview">
-    <div class="ohead">
-      <h1>Photographs</h1>
-      {sessions.length > 0 && <span class="u-label">{summary}</span>}
+  <div class="door" data-door>
+    <span id="weekdays" class="week-anchor" aria-hidden="true"></span>
+    <div class="dhead">
+      <div
+        class="utabs week"
+        role="radiogroup"
+        aria-label="Weekends or weekdays"
+        data-utabs
+        data-week
+      >
+        <button
+          type="button"
+          role="radio"
+          aria-checked="true"
+          data-value="weekends"
+          aria-controls="panel-weekends"
+        >
+          <span class="week-t">Weekends</span>
+          <span class="week-s">Photographs and things to try</span>
+        </button>
+        <button
+          type="button"
+          role="radio"
+          aria-checked="false"
+          data-value="weekdays"
+          aria-controls="panel-weekdays"
+        >
+          <span class="week-t">Weekdays</span>
+          <span class="week-s">Resume and side projects</span>
+        </button>
+      </div>
+      <span
+        class="u-label tabular-nums dcount"
+        data-week-count
+        data-weekends={counts.weekends}
+        data-weekdays={counts.weekdays}>{counts.weekends}</span
+      >
     </div>
 
-    {lead.length > 0 && <LeadPhoto items={lead} />}
+    <section
+      class="panel"
+      id="panel-weekends"
+      data-panel="weekends"
+      aria-label="Weekends"
+    >
+      <p class="dintro">{WEEKENDS}</p>
+      {lead.length > 0 && <LeadPhoto items={lead} />}
+      <div class="doors">
+        <a class="drow" href="/photographs/" data-open="page">
+          <span class="drow-h">
+            <span class="drow-t"><span class="draw">Photographs</span></span>
+            <span class="u-label tabular-nums"
+              >{fmt(sessions.length)} sessions, newest first</span
+            >
+            <span class="drow-go">All sessions →</span>
+          </span>
+          <span class="strip" style={`--n:${newest.length}`}>
+            {
+              newest.map(({ image }, i) => (
+                <span class="print">
+                  <i class="s1" aria-hidden="true" />
+                  <i class="s2" aria-hidden="true" />
+                  <Picture
+                    src={image}
+                    alt=""
+                    widths={[240, 400]}
+                    sizes="(min-width: 900px) 14vw, 40vw"
+                    formats={["webp"]}
+                    fallbackFormat="jpeg"
+                    loading={i < 2 ? "eager" : "lazy"}
+                    class="print-img"
+                  />
+                </span>
+              ))
+            }
+          </span>
+        </a>
+        <a class="drow" href="/hobbies/">
+          <span class="drow-h">
+            <span class="drow-t"><span class="draw">Things to try</span></span>
+            <span class="u-label"
+              >{hobbyCount} hobbies · a new puzzle daily</span
+            >
+            <span class="drow-go">Have a go →</span>
+          </span>
+          <span class="strip plates" style={`--n:${hobbies.length}`}>
+            {
+              hobbies.map((entry) => (
+                <PlateArt slug={hobbySlug(entry)} size="mini" />
+              ))
+            }
+          </span>
+        </a>
+      </div>
+    </section>
 
-    {
-      sessions.length === 0 ? (
-        <div class="empty">
-          <p>
-            No sessions yet. Add a folder under <code>originals/</code> in Blob
-            Storage, then trigger a build.
-          </p>
-        </div>
-      ) : (
-        <div class="grid">
-          <div class="cards">
-            {sessions.map((entry, index) => (
-              <SessionCard
-                entry={entry}
-                cover={resolveImage(sessionSlug(entry), coverFileOf(entry))}
-                priority={index < 3}
-              />
-            ))}
-          </div>
-        </div>
-      )
-    }
+    <section
+      class="panel"
+      id="panel-weekdays"
+      data-panel="weekdays"
+      aria-label="Weekdays"
+      hidden
+    >
+      <p class="dintro">{WEEKDAYS}</p>
+      <p class="dacts">
+        <a class="btn btn-ink" href={RESUME_PDF} target="_blank" rel="noopener"
+          >Resume (PDF)</a
+        >
+        <button type="button" class="btn" data-contact-open>Write to me</button>
+        <a
+          class="btn"
+          href="https://www.linkedin.com/in/trumanbrown/"
+          target="_blank"
+          rel="noopener noreferrer">LinkedIn ↗</a
+        >
+      </p>
+      <Resume>
+        <Projects />
+      </Resume>
+    </section>
   </div>
-
-  <HobbyBand />
 </BaseLayout>
 
 <style>
-  .ohead {
-    padding: 26px var(--gutter) 0;
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 18px;
-    flex-wrap: wrap;
+  .door {
+    position: relative;
+    padding-bottom: 4vh;
   }
-  .ohead h1 {
-    font-size: clamp(20px, 2.2vw, 27px);
+  /* Where /#weekdays lands: just above the switch, so a link from another
+     page shows the switch and the resume under it. */
+  .week-anchor {
+    position: absolute;
+    top: 0;
+  }
+  .dhead {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 8px 24px;
+    flex-wrap: wrap;
+    padding: 24px var(--gutter) 0;
+  }
+
+  /* The switch: the site's underline tabs at heading size, each with a line
+     saying what's behind it, so the second side can't be missed. */
+  .utabs.week {
+    gap: 40px;
+  }
+  .utabs.week > [role="radio"] {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px;
+    min-height: 0;
+    padding: 0 0 12px;
+    color: var(--ink-2);
+    text-align: left;
+  }
+  .utabs.week > [role="radio"][aria-checked="true"],
+  .utabs.week > [role="radio"]:hover {
+    color: var(--ink);
+  }
+  .week-t {
+    font-size: clamp(24px, 2.4vw, 30px);
     font-weight: 300;
-    margin: 0;
-    line-height: 1.12;
+    line-height: 1.1;
     letter-spacing: -0.012em;
   }
-
-  .grid {
-    padding: 6vh var(--gutter) 10vh;
-  }
-  .cards {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 30px 22px;
-  }
-
-  .empty {
-    margin: 40px var(--gutter) 10vh;
-    border: 1px dashed var(--rule);
-    padding: 40px;
-    text-align: center;
+  .week-s {
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
     color: var(--ink-2);
-    font-size: 14px;
   }
-  .empty code {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  .utabs.week :global(.utabs-bar) {
+    height: 2px;
+    bottom: -1px;
+  }
+  .dcount {
+    padding-bottom: 14px;
+  }
+
+  .panel[hidden] {
+    display: none;
+  }
+  /* Without script, /#weekdays still shows the weekdays. Once the switch is
+     wired (html.week-ready), it decides. */
+  :global(html:not(.week-ready))
+    .door:has(#weekdays:target)
+    [data-panel="weekends"] {
+    display: none;
+  }
+  :global(html:not(.week-ready))
+    .door:has(#weekdays:target)
+    [data-panel="weekdays"] {
+    display: block;
+  }
+
+  .dintro {
+    margin: 22px var(--gutter) 0;
+    max-width: 60ch;
+    font-size: 17px;
+    font-weight: 300;
+    line-height: 1.55;
+    color: var(--ink-3);
+  }
+  .panel :global(.lead) {
+    padding-top: 18px;
+  }
+
+  .doors {
+    padding: 6vh var(--gutter) 2vh;
+  }
+  .drow {
+    display: grid;
+    grid-template-columns: 200px minmax(0, 1fr);
+    gap: 14px 26px;
+    align-items: start;
+    padding: 22px 0 26px;
+    border-top: 1px solid var(--rule);
+    color: inherit;
+    text-decoration: none;
+  }
+  .drow:hover {
+    text-decoration: none;
+  }
+  .drow-h {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .drow-t {
+    font-size: 21px;
+    font-weight: 300;
+    line-height: 1.2;
+    color: var(--ink);
+  }
+  .drow-go {
+    margin-top: 10px;
     font-size: 13px;
+    color: var(--ink);
+  }
+  .strip {
+    display: grid;
+    grid-template-columns: repeat(var(--n), minmax(0, 1fr));
+    gap: 16px;
+  }
+  .print {
+    position: relative;
+    display: block;
+    margin: 0 6px 6px 0;
+  }
+  .print i {
+    position: absolute;
+    inset: 0;
+    display: block;
+    transition: transform 260ms var(--ease);
+  }
+  .print i.s1 {
+    background: var(--stack-1);
+    transform: translate(6px, 6px);
+  }
+  .print i.s2 {
+    background: var(--stack-2);
+    transform: translate(3px, 3px);
+  }
+  .drow:hover .print i.s1 {
+    transform: translate(8px, 8px);
+  }
+  .drow:hover .print i.s2 {
+    transform: translate(4px, 4px);
+  }
+  .print :global(.print-img) {
+    position: relative;
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+    background: var(--band);
+  }
+  .strip.plates :global(.plate) {
+    aspect-ratio: 1 / 1;
+  }
+
+  .dacts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 18px var(--gutter) 0;
   }
 
   @media (max-width: 899px) {
-    .ohead {
+    .dhead {
       padding-top: 18px;
-      flex-direction: column;
-      gap: 4px;
     }
-    .cards {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 22px 14px;
+    .utabs.week {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      width: 100%;
+      gap: 16px;
     }
-    .grid {
-      padding-top: 5vh;
+    .utabs.week > [role="radio"] {
+      white-space: normal;
+    }
+    .week-t {
+      font-size: 24px;
+    }
+    .week-s {
+      font-size: 9px;
+      line-height: 1.4;
+    }
+    .dcount {
+      display: none;
+    }
+    .dintro {
+      margin-top: 16px;
+      font-size: 15px;
+    }
+    .drow {
+      grid-template-columns: 1fr;
+      padding: 18px 0 20px;
+    }
+    .drow-go {
+      margin-top: 0;
+    }
+    .strip {
+      grid-template-columns: repeat(var(--n), 42%);
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      padding-bottom: 6px;
+      margin-right: calc(-1 * var(--gutter));
+      scrollbar-width: none;
+    }
+    .strip.plates {
+      grid-template-columns: repeat(var(--n), 30%);
+    }
+    .strip > :global(*) {
+      scroll-snap-align: start;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .print i {
+      transition: none;
     }
   }
 </style>
 
 <script>
-  /* Pointing at a card moves the globe to where that session was shot. */
-  const cards = document.querySelectorAll<HTMLElement>("[data-session-card]");
-  function highlight(location: string | null, note?: string) {
-    document.dispatchEvent(
-      new CustomEvent("archive:highlight", { detail: { location, note } }),
-    );
+  import { initUnderlineTabs, prefersReducedMotion } from "@/lib/motion";
+
+  const door = document.querySelector<HTMLElement>("[data-door]");
+  const tabs = door?.querySelector<HTMLElement>("[data-week]");
+  const count = door?.querySelector<HTMLElement>("[data-week-count]");
+  type Side = "weekends" | "weekdays";
+  const panels = {
+    weekends: door?.querySelector<HTMLElement>('[data-panel="weekends"]'),
+    weekdays: door?.querySelector<HTMLElement>('[data-panel="weekdays"]'),
+  };
+
+  if (door && tabs && panels.weekends && panels.weekdays) {
+    let current: Side = "weekends";
+
+    /* The new side comes in from the side its tab sits on (Cult UI's
+       direction-aware tabs, as the site's underline tabs already are). */
+    function show(side: Side, animate: boolean): void {
+      tabs!
+        .querySelectorAll<HTMLElement>('[role="radio"]')
+        .forEach((tab) =>
+          tab.setAttribute("aria-checked", String(tab.dataset.value === side)),
+        );
+      if (count) count.textContent = count.dataset[side] ?? "";
+      if (side === current && !panels[side]!.hidden) return;
+      const dir = side === "weekdays" ? 1 : -1;
+      panels[current]!.hidden = true;
+      panels[side]!.hidden = false;
+      current = side;
+      if (animate && !prefersReducedMotion()) {
+        panels[side]!.animate(
+          [
+            { opacity: 0, transform: `translateX(${16 * dir}px)` },
+            { opacity: 1, transform: "none" },
+          ],
+          { duration: 240, easing: "cubic-bezier(0.4, 0, 0.2, 1)" },
+        );
+      }
+    }
+
+    const fromHash = (): Side =>
+      location.hash === "#weekdays" ? "weekdays" : "weekends";
+    show(fromHash(), false);
+    document.documentElement.classList.add("week-ready");
+    initUnderlineTabs(tabs);
+
+    tabs.addEventListener("utabs:change", (event) => {
+      const side = (event as CustomEvent<string>).detail as Side;
+      show(side, true);
+      history.replaceState(
+        history.state,
+        "",
+        side === "weekdays" ? "#weekdays" : location.pathname + location.search,
+      );
+    });
+
+    /* "About me" in the rail while already here. */
+    window.addEventListener("hashchange", () => show(fromHash(), true));
   }
-  for (const card of cards) {
-    card.addEventListener("pointerenter", () =>
-      highlight(card.dataset.location || null, card.dataset.note),
-    );
-    card.addEventListener("focus", () =>
-      highlight(card.dataset.location || null, card.dataset.note),
-    );
-  }
-  document
-    .querySelector(".cards")
-    ?.addEventListener("pointerleave", () => highlight(null));
 </script>

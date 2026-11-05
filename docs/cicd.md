@@ -235,10 +235,13 @@ If you've used Node before, none of this is new. If you haven't:
 | `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` | You create them (optional) | `photos.yml`, only when not using keyless Azure OpenAI, see [docs/photos.md](photos.md#settings) |
 | `IG_ACCESS_TOKEN`, `SOCIAL_SECRET_KEY`, `IG_USER_ID` | You create them (optional) | `photos.yml` and `social-post.yml`, see [docs/social.md](social.md#settings) |
 | `INSTAGRAM_URL` | You enter it (optional): the Instagram profile address | The Astro build step in `build-and-deploy.yml`, for the footer link, see [docs/social.md](social.md#settings) |
+| `CONTACT_NOTIFY_EMAIL` | You enter it (optional): the inbox that gets a copy of each contact message | `infra.yml` writes it to the `CONTACT_NOTIFY_TO` app setting, see [docs/azure.md](azure.md#contact-form-email) |
 
 The four `AZURE_*` IDs are identifiers, not credentials: without a matching
 GitHub OIDC token they grant nothing. They're secrets so they stay out of logs.
 
-Runtime-only values (`AZURE_STORAGE_CONNECTION_STRING`, `ANALYTICS_SALT`, and
-`ADMIN_GITHUB_USERS`) live in SWA app settings, not GitHub Actions secrets. The
-Infra workflow initializes them without printing their values.
+Runtime-only values (`AZURE_STORAGE_CONNECTION_STRING`, `ANALYTICS_SALT`,
+`ADMIN_GITHUB_USERS`, and the contact email's `CONTACT_EMAIL_CONNECTION_STRING`,
+`CONTACT_EMAIL_FROM` and `CONTACT_NOTIFY_TO`) live in SWA app settings, not
+GitHub Actions secrets. The Infra workflow initializes them without printing
+their values.

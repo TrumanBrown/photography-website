@@ -3,6 +3,7 @@ const { TableClient } = require('@azure/data-tables');
 const { visitorHash } = require('../shared/visitor-hash');
 const { clientIp } = require('../shared/client-ip');
 const { consumeRateLimit } = require('./rate-limit');
+const { notify, cleanPage } = require('./notify');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_NAME = 200;
@@ -11,6 +12,8 @@ const MAX_MESSAGE = 5000;
 const TABLE_NAME = 'contactmessages';
 const RL_TABLE = 'contactratelimit';
 const MAX_PER_HOUR = 5;
+/** Row key in the rate-limit table that counts emails across all visitors. */
+const NOTIFY_ROW = 'notify-all';
 const RL_SALT = process.env.ANALYTICS_SALT || process.env.AZURE_STORAGE_CONNECTION_STRING || '';
 
 // Returns true if this client has exceeded the hourly cap. Fails OPEN: any
@@ -35,6 +38,20 @@ async function isRateLimited(connectionString, req) {
   }
 }
 
+// True once this hour's emails across every visitor reach `max` (notify.js).
+// Same table and hour buckets as the per-visitor limit, under one fixed row.
+function notifyLimit(connectionString) {
+  return async (max) => {
+    const rl = TableClient.fromConnectionString(connectionString, RL_TABLE);
+    return consumeRateLimit(rl, {
+      partitionKey: new Date().toISOString().slice(0, 13),
+      rowKey: NOTIFY_ROW,
+      maxCount: max,
+      updatedAt: new Date().toISOString(),
+    });
+  };
+}
+
 module.exports = async function (context, req) {
   // --- Honeypot: hidden "website" field. Humans never fill it; bots do. ---
   if (req.body && req.body.website) {
@@ -51,6 +68,7 @@ module.exports = async function (context, req) {
   const name = (req.body?.name ?? '').trim();
   const email = (req.body?.email ?? '').trim();
   const message = (req.body?.message ?? '').trim();
+  const page = cleanPage(req.body?.page);
 
   const errors = [];
   if (!name) errors.push('Name is required.');
@@ -101,15 +119,24 @@ module.exports = async function (context, req) {
     const partitionKey = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
     const rowKey = `${String(9999999999999 - now.getTime()).padStart(13, '0')}-${randomUUID()}`;
 
-    await client.createEntity({
+    const entry = {
       partitionKey,
       rowKey,
       name,
       email,
       message,
+      page,
       submittedAt: now.toISOString(),
       read: false,
+    };
+    await client.createEntity(entry);
+
+    // A copy to my inbox. Best effort: the message is already saved.
+    const sent = await notify(entry, {
+      limit: notifyLimit(connectionString),
+      log: (line) => context.log.warn(line),
     });
+    if (sent !== 'sent') context.log(`Contact email ${sent}.`);
 
     context.res = {
       status: 200,

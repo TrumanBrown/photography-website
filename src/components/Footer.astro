@@ -7,14 +7,15 @@ import { instagramUrl } from '@/lib/instagram';
 const instagram = instagramUrl();
 ---
 
-{
-  /* pb-24 leaves room under the links for the fixed mail button, which would
-     otherwise sit on top of them once you reach the bottom of a page. */
-}
-<footer class="mt-16 border-t border-rule pb-24 pt-8 text-sm text-ink-2">
+<footer class="mt-16 border-t border-rule pb-10 pt-8 text-sm text-ink-2">
   <div class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 sm:px-6">
     <p>{copyrightLine()}</p>
     <div class="flex flex-wrap gap-x-5 gap-y-2">
+      <button
+        type="button"
+        class="draw foot-write text-ink-2 hover:text-ink"
+        data-contact-open
+      >Write to me</button>
       {
         siteConfig.prints && (
           <a href={PRINTS_PATH} class="draw text-ink-2 no-underline hover:text-ink">
@@ -42,3 +43,13 @@ const instagram = instagramUrl();
     </div>
   </div>
 </footer>
+
+<style>
+  .foot-write {
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    cursor: pointer;
+  }
+</style>

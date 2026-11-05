@@ -47,7 +47,8 @@ infra/
     ├── domain.bicep          # www CNAME in the DNS zone the domain purchase created
     ├── monitoring.bicep      # optional Log Analytics workspace
     ├── ai.bicep              # optional Azure OpenAI model for photo captions and descriptions
-    └── scheduler.bicep       # optional timer that starts the Instagram and photo workflows
+    ├── scheduler.bicep       # optional timer that starts the Instagram and photo workflows
+    └── email.bicep           # optional Communication Services email for contact form copies
 ```
 
 ### Why a separate `subscription.bicep`
@@ -168,7 +169,23 @@ when `enableSocialScheduler=true`. A consumption Logic App that starts
 - `timeZone`, `postingHours` and `pipelineHour` set when it fires.
 - About 1,000 runs a month: a few cents at most.
 
-### 12. Outputs
+### 12. Optional contact email: `acs-photography-<env>-<suffix>`
+
+Created by [`modules/email.bicep`](../infra/modules/email.bicep) only when
+`enableContactEmail=true`. Three resources: an Email Communication Service
+`email-photography-<env>-<suffix>`, its Azure-managed sending domain
+(`AzureManagedDomain`, so there are no DNS records to add), and a Communication
+Services resource linked to that domain. The contact function sends a copy of
+each message through it ([docs/azure.md](azure.md#contact-form-email)).
+
+- All three are `global` resources that keep their data in the United States.
+- The `Microsoft.Communication` resource provider has to be registered on the
+  subscription once (`az provider register -n Microsoft.Communication`), or
+  the deploy fails.
+- Open and click tracking are off.
+- A fraction of a cent a message, and the function sends at most ten an hour.
+
+### 13. Outputs
 
 The deployment emits values your scripts/workflows need:
 - `storageAccountName`, `blobEndpoint`
@@ -178,8 +195,10 @@ The deployment emits values your scripts/workflows need:
   is on), the values for the `AZURE_OPENAI_ENDPOINT` and
   `AZURE_OPENAI_DEPLOYMENT` repository variables
 - `schedulerEnabled`: whether the timer found a token and is running
+- `contactEmailResourceId`, `contactEmailSender` (empty unless
+  `enableContactEmail` is on)
 
-The Infra workflow uses these to populate repo secrets (`AZURE_STATIC_WEB_APPS_API_TOKEN`, `AZURE_STORAGE_ACCOUNT`, `AZURE_DEPLOY_CLIENT_ID`) and writes the runtime storage connection, analytics salt, and initial admin directly to SWA app settings.
+The Infra workflow uses these to populate repo secrets (`AZURE_STATIC_WEB_APPS_API_TOKEN`, `AZURE_STORAGE_ACCOUNT`, `AZURE_DEPLOY_CLIENT_ID`) and writes the runtime storage connection, analytics salt, initial admin and the contact email's connection, sender and recipient directly to SWA app settings.
 
 ---
 
