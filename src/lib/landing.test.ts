@@ -150,6 +150,18 @@ function boot(options: {
           style.remove = () => (style.removed = true);
           return style;
         }
+        if (tag === "link") {
+          // Plain, so the tests can compare links as written; what the
+          // script calls on it stays out of sight.
+          const link: Record<string, unknown> = {};
+          Object.defineProperties(link, {
+            setAttribute: {
+              value: (name: string, value: string) => (link[name] = value),
+            },
+            remove: { value: () => (link.removed = true) },
+          });
+          return link;
+        }
         if (tag !== "canvas") return {};
         const canvas: FakeCanvas & Record<string, unknown> = {
           className: "",
@@ -270,6 +282,45 @@ describe("landingBootstrap", () => {
     });
     expect(reduced.classes.size).toBe(0);
     expect(reduced.links).toEqual([]);
+  });
+
+  it("marks a page change that lands prints on their cards or crosses to Things to try", () => {
+    const at = Date.now();
+    const cards = boot({
+      note: { path: "/photographs/", at, kind: "page", cards: true },
+      path: "/photographs/",
+    });
+    expect([...cards.classes].sort()).toEqual([
+      "landing-cards",
+      "landing-page",
+    ]);
+    // The first paint waits for the whole page, so the cards are there to
+    // land on.
+    expect(cards.links).toEqual([
+      { rel: "expect", href: "#site-footer", blocking: "render" },
+      expect.objectContaining({ tag: "style" }),
+    ]);
+    cards.fire(4000);
+    expect(cards.classes.size).toBe(0);
+    expect(cards.links[0].removed).toBe(true);
+
+    const both = boot({
+      note: { path: "/hobbies/", at, kind: "page", cards: true, cross: true },
+      path: "/hobbies/",
+    });
+    expect([...both.classes].sort()).toEqual([
+      "landing-cards",
+      "landing-cross",
+      "landing-page",
+    ]);
+
+    // Only a page change carries them.
+    const photo = boot({
+      note: { path: "/sessions/a/", at, cards: true, cross: true },
+      path: "/sessions/a/",
+    });
+    expect(photo.classes.has("landing-cards")).toBe(false);
+    expect(photo.classes.has("landing-cross")).toBe(false);
   });
 
   it("paints a scene's last dots before the first paint, and keeps the note", () => {

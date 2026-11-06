@@ -62,10 +62,18 @@ const lead: LeadItem[] = buildLeadFrames(sessions).flatMap((frame) => {
     : [];
 });
 
-const newest = sessions.slice(0, 5).flatMap((entry) => {
+const newest = sessions.slice(0, 5).flatMap((entry, index) => {
   const image = imageFor(sessionSlug(entry), coverFileOf(entry));
   return image
-    ? [{ image, label: splitSessionTitle(entry.data.title).label }]
+    ? [
+        {
+          image,
+          label: splitSessionTitle(entry.data.title).label,
+          // The archive gives the same session's card the same name, so the
+          // print moves onto it (global.css, "cards").
+          vt: `print-${index + 1}`,
+        },
+      ]
     : [];
 });
 /* Narrow nature is a daily puzzle; the rest are hobbies. */
@@ -168,7 +176,12 @@ const personSchema = {
       <p class="dintro">{WEEKENDS}</p>
       {lead.length > 0 && <LeadPhoto items={lead} />}
       <div class="doors">
-        <a class="drow" href="/photographs/" data-open="page">
+        <a
+          class="drow"
+          href="/photographs/#sessions"
+          data-open="page"
+          data-land="prints"
+        >
           <span class="drow-h">
             <span class="drow-t"><span class="draw">Photographs</span></span>
             <span class="u-label tabular-nums"
@@ -178,8 +191,8 @@ const personSchema = {
           </span>
           <span class="strip" style={`--n:${newest.length}`}>
             {
-              newest.map(({ image }, i) => (
-                <span class="print">
+              newest.map(({ image, vt }, i) => (
+                <span class="print" style={`--vt-name:${vt}`}>
                   <i class="s1" aria-hidden="true" />
                   <i class="s2" aria-hidden="true" />
                   <Picture
@@ -197,7 +210,7 @@ const personSchema = {
             }
           </span>
         </a>
-        <a class="drow" href="/hobbies/">
+        <a class="drow" href="/hobbies/" data-open="page" data-land="plates">
           <span class="drow-h">
             <span class="drow-t"><span class="draw">Things to try</span></span>
             <span class="u-label"
@@ -207,8 +220,12 @@ const personSchema = {
           </span>
           <span class="strip plates" style={`--n:${hobbies.length}`}>
             {
-              hobbies.map((entry) => (
-                <PlateArt slug={hobbySlug(entry)} size="mini" />
+              hobbies.map((entry, i) => (
+                <PlateArt
+                  slug={hobbySlug(entry)}
+                  size="mini"
+                  vt={`plate-${i + 1}`}
+                />
               ))
             }
           </span>

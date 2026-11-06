@@ -440,20 +440,25 @@ html.landing-dots body::after {
   object-fit: cover;
 }
 
-/* Moving between the front door, the archive and About me (src/lib/open.ts,
-   kind "page"). The pages fade into each other in 200 ms, the top of the
-   rail holds still, and the lead photograph moves to its place on the next
-   page. It's the same photograph on both (LeadPhoto.astro opens on the one
-   it was handed), so this isn't one photo turning into another. The names
-   go on only for this change: page-leaving on the page you leave, and
-   landing-page on a page with a lead or my rail on the page you reach. */
-html.page-leaving .lead .plate,
-html.landing-page:has(.lead) .lead .plate {
+/* Moving between the front door, the archive, About me and Things to try
+   (src/lib/open.ts, kind "page"). The pages fade into each other in 200 ms.
+   The names go on only for this change: classes on the page you leave
+   (page-leaving, plus leaving-cards and leaving-prints or leaving-plates
+   from a row on the front door, and leaving-cross between a page with the
+   side rail and Things to try), and the same from the note on the page you
+   reach (landing-page, landing-cards, landing-cross; src/lib/landing.ts).
+
+   Between the front door and the archive, the top of the rail holds still
+   and the lead photograph moves to its place on the next page. It's the
+   same photograph on both (LeadPhoto.astro opens on the one it was handed),
+   so this isn't one photo turning into another. */
+html.page-leaving:not(.leaving-cards, .leaving-cross) .lead .plate,
+html.landing-page:not(.landing-cards, .landing-cross):has(.lead) .lead .plate {
   view-transition-name: lead-photo;
 }
 @media (min-width: 900px) {
-  html.page-leaving .rail-top,
-  html.landing-page:has(.lead, .me-rail) .rail-top {
+  html.page-leaving:not(.leaving-cross) .rail-top,
+  html.landing-page:not(.landing-cross):has(.lead, .me-rail) .rail-top {
     view-transition-name: rail-top;
   }
 }
@@ -491,6 +496,105 @@ html.landing-page::view-transition-new(root) {
 }
 ::view-transition-new(lead-photo):only-child {
   animation: page-fade-in 200ms var(--ease) both;
+}
+
+/* From a row on the front door, its pictures land on their cards. The five
+   prints in the Photographs row are the five newest session covers, the
+   same photographs as the first five cards in the archive, and the seven
+   drawings in the Things to try row are the seven cards on that page. Each
+   pair carries the same --vt-name (print-1, plate-3), set where it's drawn,
+   and moves from the row to its card while the rest of the page fades. The
+   archive opens at its grid (/photographs/#sessions). */
+html.leaving-prints .drow .print,
+html.leaving-plates .drow .plate,
+html.landing-cards .overview .shotwrap,
+html.landing-cards .things .plate {
+  view-transition-name: var(--vt-name, none);
+  view-transition-class: card;
+}
+::view-transition-group(*.card) {
+  animation-duration: 320ms;
+  animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+}
+::view-transition-old(*.card) {
+  animation: page-fade-out 160ms var(--ease) both;
+}
+::view-transition-new(*.card) {
+  animation: page-fade-in 160ms var(--ease) both;
+}
+/* The prints follow each other by 20 ms, left to right. */
+::view-transition-group(print-2) {
+  animation-delay: 20ms;
+}
+::view-transition-group(print-3) {
+  animation-delay: 40ms;
+}
+::view-transition-group(print-4) {
+  animation-delay: 60ms;
+}
+::view-transition-group(print-5) {
+  animation-delay: 80ms;
+}
+
+/* Things to try has a header where the other pages have the side rail.
+   Going there, the rail steps out to the left and the header drops in from
+   the top; coming back, the header lifts away and the rail steps in. */
+@media (min-width: 900px) {
+  html.page-leaving.leaving-cross #page-shell > .rail,
+  html.landing-cross #page-shell > .rail {
+    view-transition-name: side-rail;
+  }
+}
+html.page-leaving.leaving-cross .site-header,
+html.landing-cross .site-header {
+  view-transition-name: masthead;
+}
+::view-transition-old(side-rail):only-child {
+  animation: rail-out 260ms var(--ease) both;
+}
+::view-transition-new(side-rail):only-child {
+  animation: rail-in 260ms var(--ease) both;
+}
+::view-transition-old(masthead):only-child {
+  animation: masthead-out 200ms var(--ease) both;
+}
+::view-transition-new(masthead):only-child {
+  animation: masthead-in 260ms var(--ease) both;
+}
+/* The page that arrives rises 8 px into place, as a session page does. The
+   pictures that land on their cards don't. */
+html.landing-cross .things > header > *,
+html.landing-cross .things .hcard > :not(.plate),
+html.landing-page:is(.landing-cards, .landing-cross) .overview > .ohead {
+  animation: page-rise 280ms var(--ease) backwards;
+}
+@keyframes rail-out {
+  to {
+    transform: translateX(-100%);
+  }
+}
+@keyframes rail-in {
+  from {
+    transform: translateX(-100%);
+  }
+}
+@keyframes masthead-out {
+  to {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+}
+@keyframes masthead-in {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+}
+@keyframes page-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
 }
 @keyframes page-fade-out {
   to {

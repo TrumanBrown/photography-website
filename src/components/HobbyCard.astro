@@ -5,15 +5,17 @@ import { hobbySlug } from "@/lib/hobbies";
 
 interface Props {
   entry: CollectionEntry<"hobbies">;
+  /** The name its plate moves under in a page change (PlateArt). */
+  vt?: string;
 }
 
-const { entry } = Astro.props;
+const { entry, vt } = Astro.props;
 const slug = hobbySlug(entry);
 const { title, summary, plateNote } = entry.data;
 ---
 
 <a href={`/hobbies/${slug}/`} class="hcard" data-open="hobby">
-  <PlateArt slug={slug} size="card" />
+  <PlateArt slug={slug} size="card" vt={vt} />
   <h2 class="t"><span class="draw">{title}</span></h2>
   {plateNote && <span class="m">{plateNote}</span>}
   <p class="d">{summary}</p>

@@ -7,18 +7,18 @@ description: 'The front door at / and About me: the Weekends and Weekdays switch
 
 `/` is the front door. It has the archive's frame (a 212px rail and a main column) with me in the rail instead of the sessions, and one switch at the top between **Weekends** (the lead photo, then rows into Photographs and Things to try) and **Weekdays** (the resume and the side projects). The archive itself is `/photographs/`. The full write-up is in [docs/product-experience.md](../../../docs/product-experience.md#a-front-door-with-me-in-it-november-2026). The mocks it came from are `mocks/portfolio/` ([design-mocks](../design-mocks/SKILL.md)).
 
-| Path                                                          | What's there                                                                                                            |
-| ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `src/pages/index.astro`                                       | the switch, both sides, the person structured data, the script that reads `#weekdays`                                   |
-| `src/components/about/MeRail.astro`                           | the rail: name, nav, the portrait, where I live, links, "Write to me", Resume (PDF). A block above the page under 900px |
-| `src/lib/about.ts`                                            | every word on the Weekdays side: my two lines, the summary, jobs, school, skills, the three projects, the video         |
-| `src/components/about/Resume.astro`                           | work, school and skills as ruled rows, every line showing (no "N more")                                                 |
-| `src/components/about/Projects.astro`                         | each project beside its live piece                                                                                      |
-| `src/lib/radar.ts`, `src/lib/led-radar.ts`                    | the balcFlights-LED radar: maths, text, font and layout (tested), then the canvas driver                                |
-| `src/assets/about/`                                           | `me-everest.jpg` (the portrait), `cozy-critter.jpg` (the video's poster)                                                |
-| `public/Truman-Brown-Resume.pdf`                              | the public resume, without my phone number or personal email                                                            |
-| `src/lib/open.ts` `openPage`, `LeadPhoto.astro`, `global.css` | the page change between the front door, the archive and About me (`data-open="page"`)                                   |
-| `src/components/ContactForm.astro`, `api/contact/notify.js`   | "Write to me" and the email copy of each message ([azure-ops](../azure-ops/SKILL.md))                                   |
+| Path                                                          | What's there                                                                                                                                                             |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `src/pages/index.astro`                                       | the switch, both sides, the person structured data, the script that reads `#weekdays`                                                                                    |
+| `src/components/about/MeRail.astro`                           | the rail: name, nav, the portrait, where I live, links, "Write to me", Resume (PDF). A block above the page under 900px                                                  |
+| `src/lib/about.ts`                                            | every word on the Weekdays side: my two lines, the summary, jobs, school, skills, the three projects, the video                                                          |
+| `src/components/about/Resume.astro`                           | work, school and skills as ruled rows, every line showing (no "N more")                                                                                                  |
+| `src/components/about/Projects.astro`                         | each project beside its live piece                                                                                                                                       |
+| `src/lib/radar.ts`, `src/lib/led-radar.ts`                    | the balcFlights-LED radar: maths, text, font and layout (tested), then the canvas driver                                                                                 |
+| `src/assets/about/`                                           | `me-everest.jpg` (the portrait), `cozy-critter.jpg` (the video's poster)                                                                                                 |
+| `public/Truman-Brown-Resume.pdf`                              | the public resume, without my phone number or personal email                                                                                                             |
+| `src/lib/open.ts` `openPage`, `LeadPhoto.astro`, `global.css` | the page change between the front door, the archive, About me and Things to try (`data-open="page"`); the rows' prints and drawings landing on their cards (`data-land`) |
+| `src/components/ContactForm.astro`, `api/contact/notify.js`   | "Write to me" and the email copy of each message ([azure-ops](../azure-ops/SKILL.md))                                                                                    |
 
 ## Rules
 
@@ -65,10 +65,12 @@ If it says NO DATA, `curl -s https://seattlebalc.com/api/v1/flights | head` firs
 
 - 2026-11-05: "mt baker led panel is the winner." And "don't shorten the experience sections by default. keep it full length. it's easy to miss that expand button, just get rid of it."
 
+- 2026-11-05, on the page-change mocks: "lands on their cards for both looks best." The rows' prints and drawings now land on their cards (site-motion).
+
 ## Hard-won lessons
 
 1. **The Windows `az` under WSL crashes printing Bicep** that has a `→` in it (`'charmap' codec can't encode`). Build with `--outfile` and a `wslpath -w` path instead of `--stdout`.
-2. **A hidden VS Code browser panel skips view transitions** (`document.visibilityState` is `hidden`), and headless Chromium never paints after one. Check the handover by reading `.lead[data-current]` on both pages, and see the fade in a visible browser.
+2. **A hidden VS Code browser panel skips view transitions** (`document.visibilityState` is `hidden`), and headless Chromium in WSL never paints after one. Check the handover by reading `.lead[data-current]` on both pages, and see the change in Windows Edge headless (site-motion lesson 13) or a visible browser.
 3. **Local sessions have no `showcase` picks or captions,** so the lead photo is empty and the site project has no caption on a local build. Copy `src/content/sessions/*.json` aside, add picks for a look, and put them back.
 4. **The first deploy failed on a duplicate route.** `/about` and `/about/` were both redirects, and Static Web Apps treats them as one route and refuses the whole config, which nothing local checked. One rule, `/about`, covers both, and `scripts/swa-config.test.mjs` fails on a repeat.
 5. **The resume went missing by fixing a style.** Two Resume buttons in two styles drew "why is one off color", so the page's one was removed and only the rail's bottom-corner button stayed, which he then couldn't find. Fix a mismatch by matching the styles or demoting the duplicate to a link, not by removing the one in the obvious place.

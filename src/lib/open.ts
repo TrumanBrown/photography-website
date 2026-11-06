@@ -151,11 +151,20 @@ function openSession(link: HTMLAnchorElement): void {
 export const LEAD_KEY = "lead-handover";
 
 /**
- * Move between the front door, the archive and About me (`data-open="page"`).
- * The same plain page change a session gets, plus two things that stay put:
- * the top of the rail, and the lead photograph, which the next page opens on
- * (LeadPhoto.astro reads it) and which moves to its place there. It's the
- * same photograph on both pages, never a different one.
+ * Move between the front door, the archive, About me and Things to try
+ * (`data-open="page"`). The same plain page change a session gets, plus:
+ *
+ * - Between the front door and the archive, the top of the rail stays put,
+ *   and the lead photograph, which the next page opens on (LeadPhoto.astro
+ *   reads it), moves to its place there. It's the same photograph on both
+ *   pages, never a different one.
+ * - From a row on the front door (`data-land`), the row's prints or drawings
+ *   move onto their cards instead, and the archive opens at its grid.
+ * - Between a page with the side rail and Things to try, which has a header
+ *   instead, the rail steps aside and the header drops in.
+ *
+ * The CSS for all of it is in global.css; the classes here name what moves
+ * on this page, and the note does the same on the next.
  */
 function openPage(link: HTMLAnchorElement): void {
   if (link.pathname === window.location.pathname) return;
@@ -169,14 +178,26 @@ function openPage(link: HTMLAnchorElement): void {
   } catch {
     // Without storage the next page just picks its own photograph.
   }
+  const land = link.dataset.land;
+  const cards = Boolean(land);
+  // Things to try is the one part of the site without the side rail.
+  const railHere = Boolean(document.querySelector("#page-shell > .rail"));
+  const railThere = !link.pathname.startsWith("/hobbies/");
+  const cross = railHere !== railThere;
+  const marks = ["page-leaving"];
+  if (land) marks.push("leaving-cards", `leaving-${land}`);
+  if (cross) marks.push("leaving-cross");
   const root = document.documentElement;
-  root.classList.add("page-leaving");
+  root.classList.add(...marks);
   const optIn = document.createElement("style");
   optIn.textContent = "@view-transition { navigation: auto; }";
   document.head.append(optIn);
   window.addEventListener("pagehide", () => optIn.remove(), { once: true });
-  onReturn(() => root.classList.remove("page-leaving"));
-  noteArrival(link.href, "page");
+  onReturn(() => root.classList.remove(...marks));
+  noteArrival(link.href, "page", {
+    ...(cards ? { cards } : {}),
+    ...(cross ? { cross } : {}),
+  });
 }
 
 /* -------------------------------------------------------------- hobbies */

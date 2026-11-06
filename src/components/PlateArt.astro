@@ -4,9 +4,13 @@ import { plateFor, type PlateSize } from "@/lib/plates";
 interface Props {
   slug: string;
   size: PlateSize;
+  /**
+   * The name it moves under when a page change carries it onto another
+   * plate (global.css, "cards"). Unused otherwise.
+   */
+  vt?: string;
 }
-
-const { slug, size } = Astro.props;
+const { slug, size, vt } = Astro.props;
 const plate = plateFor(slug, size);
 // The card plate, finer, is what a hobby's opening scene is drawn from, even
 // from the home page's mini plates (src/lib/scenes/).
@@ -15,7 +19,7 @@ const card = size === "card" ? plate : plateFor(slug, "card");
 
 {
   plate && (
-    <span class="plate" data-plate>
+    <span class="plate" data-plate style={vt ? `--vt-name:${vt}` : undefined}>
       <img
         data-ink="light"
         data-frames={JSON.stringify(plate.light)}

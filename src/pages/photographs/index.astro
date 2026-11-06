@@ -84,13 +84,14 @@ const firstCover = first?.data.images.find(
           </p>
         </div>
       ) : (
-        <div class="grid">
+        <div class="grid" id="sessions">
           <div class="cards">
             {sessions.map((entry, index) => (
               <SessionCard
                 entry={entry}
                 cover={resolveImage(sessionSlug(entry), coverFileOf(entry))}
                 priority={index < 3}
+                vt={index < 5 ? `print-${index + 1}` : undefined}
               />
             ))}
           </div>

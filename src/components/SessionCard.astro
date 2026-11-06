@@ -17,9 +17,14 @@ interface Props {
   cover: ImageMetadata;
   /** Reserve eager loading for the cards above the fold. */
   priority?: boolean;
+  /**
+   * The name its photograph moves under when a print on the front door
+   * lands on this card (global.css, "cards").
+   */
+  vt?: string;
 }
 
-const { entry, cover, priority = false } = Astro.props;
+const { entry, cover, priority = false, vt } = Astro.props;
 const slug = sessionSlug(entry);
 const { title, location, images } = entry.data;
 const count = images.length;
@@ -57,7 +62,7 @@ const skim = (
   data-note={`${count} photograph${count === 1 ? "" : "s"}`}
   data-skim={skim.length > 1 ? JSON.stringify(skim) : undefined}
 >
-  <span class="shotwrap">
+  <span class="shotwrap" style={vt ? `--vt-name:${vt}` : undefined}>
     <i class="s1" aria-hidden="true"></i>
     <i class="s2" aria-hidden="true"></i>
     <span class="shot">

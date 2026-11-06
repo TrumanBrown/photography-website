@@ -12,7 +12,7 @@ const hobbies = sortHobbies(await getCollection("hobbies"));
   description="Some of my hobbies and fun accompanying experiences."
   section="hobbies"
 >
-  <section class="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+  <section class="things mx-auto max-w-6xl px-4 py-10 sm:px-6">
     <header class="mb-8 space-y-2">
       <h1 class="text-2xl font-light tracking-tight sm:text-[30px]">
         Things to try
@@ -30,9 +30,9 @@ const hobbies = sortHobbies(await getCollection("hobbies"));
         </div>
       ) : (
         <ul class="grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
-          {hobbies.map((entry) => (
+          {hobbies.map((entry, i) => (
             <li>
-              <HobbyCard entry={entry} />
+              <HobbyCard entry={entry} vt={`plate-${i + 1}`} />
             </li>
           ))}
         </ul>

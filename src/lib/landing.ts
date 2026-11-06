@@ -64,6 +64,17 @@ export interface LandingNote {
   at: number;
   /** How it arrives; a photograph unless it says otherwise. */
   kind?: "photo" | "page" | "dots";
+  /**
+   * A page change (kind "page") from a row on the front door: the row's
+   * prints or drawings move onto their cards here (`landing-cards`).
+   */
+  cards?: boolean;
+  /**
+   * A page change between a page with the side rail and Things to try, which
+   * has a header instead: the rail steps aside and the header drops in
+   * (`landing-cross`).
+   */
+  cross?: boolean;
   /** The big dots the scene ended on: x, y, radius, CSS px, in a flat list. */
   dots?: number[];
   /** The viewport those were measured in. */
@@ -164,8 +175,19 @@ export const landingBootstrap = `
     if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     var root = document.documentElement;
     var mark = note.kind === 'dots' ? 'landing-dots' : note.kind === 'page' ? 'landing-page' : 'landing';
+    var marks = [mark];
     var optIn;
+    var hold;
     if (note.kind === 'page') {
+      if (note.cards === true) {
+        marks.push('landing-cards');
+        hold = document.createElement('link');
+        hold.rel = 'expect';
+        hold.href = '#site-footer';
+        hold.setAttribute('blocking', 'render');
+        document.head.appendChild(hold);
+      }
+      if (note.cross === true) marks.push('landing-cross');
       optIn = document.createElement('style');
       optIn.textContent = '@view-transition { navigation: auto; }';
       document.head.appendChild(optIn);
@@ -242,11 +264,12 @@ export const landingBootstrap = `
       }
     }
     window.landingNote = note;
-    root.classList.add(mark);
+    for (var k = 0; k < marks.length; k++) root.classList.add(marks[k]);
     setTimeout(function () {
-      root.classList.remove(mark);
+      for (var k = 0; k < marks.length; k++) root.classList.remove(marks[k]);
       if (frame) frame.remove();
       if (optIn) optIn.remove();
+      if (hold) hold.remove();
       var early = window.landingWorker;
       if (early) {
         window.landingWorker = undefined;
