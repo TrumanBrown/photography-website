@@ -82,7 +82,7 @@ export const WORK: Job[] = [
     from: "2024-02",
     to: "2025-09",
     lines: [
-      "Onboarded 40 private preview customers and launched public preview in Oct 2024, with 73 customers migrating 1,700+ VMs at a 97% success rate, winning an organization Impact Award",
+      "Onboarded 40 private preview customers and launched public preview of Azure Migrate for VMware to Azure Local in Oct 2024, with 73 customers moving 1,700+ VMs at 97% success, winning an organization Impact Award",
       "Shipped static IP retention for Windows and Linux VMs, used on 19,000+ VMs by 422 customers since release",
       "Unblocked a grocery chain's VMware exit with custom disk sector size, critical for SQL Server (1,150+ VMs)",
     ],
