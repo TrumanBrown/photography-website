@@ -225,11 +225,8 @@ const personSchema = {
     >
       <p class="dintro">{WEEKDAYS}</p>
       <p class="dacts">
-        <a
-          class="btn btn-ink resume-phone"
-          href={RESUME_PDF}
-          target="_blank"
-          rel="noopener">Resume (PDF)</a
+        <a class="btn btn-ink" href={RESUME_PDF} target="_blank" rel="noopener"
+          >Resume (PDF)</a
         >
         <button type="button" class="btn" data-contact-open>Write to me</button>
         <a
@@ -412,11 +409,8 @@ const personSchema = {
     aspect-ratio: 1 / 1;
   }
 
-  /* One Resume button on screen at a time: the rail's on a desktop, this one
-     on a phone, where the rail's foot is hidden. */
-  .resume-phone {
-    display: none;
-  }
+  /* The resume is the first thing someone looking for it sees on this side:
+     the page's one filled button, before "Write to me" and LinkedIn. */
   .dacts {
     display: flex;
     flex-wrap: wrap;
@@ -446,9 +440,6 @@ const personSchema = {
     }
     .dcount {
       display: none;
-    }
-    .dacts .resume-phone {
-      display: inline-flex;
     }
     .dintro {
       margin-top: 16px;
@@ -500,6 +491,8 @@ const personSchema = {
 
     /* The new side comes in from the side its tab sits on (Cult UI's
        direction-aware tabs, as the site's underline tabs already are). */
+    const baseTitle = document.title;
+
     function show(side: Side, animate: boolean): void {
       tabs!
         .querySelectorAll<HTMLElement>('[role="radio"]')
@@ -507,6 +500,8 @@ const personSchema = {
           tab.setAttribute("aria-checked", String(tab.dataset.value === side)),
         );
       if (count) count.textContent = count.dataset[side] ?? "";
+      // The tab says which side is showing: "Truman Brown | Work" on weekdays.
+      document.title = side === "weekdays" ? `${baseTitle} | Work` : baseTitle;
       if (side === current && !panels[side]!.hidden) return;
       const dir = side === "weekdays" ? 1 : -1;
       panels[current]!.hidden = true;

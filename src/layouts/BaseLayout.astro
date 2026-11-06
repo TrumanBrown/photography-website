@@ -39,7 +39,7 @@ const {
   section = "photography",
 } = Astro.props;
 const pageTitle = title
-  ? `${title} | ${siteConfig.siteTitle}`
+  ? `${siteConfig.siteTitle} | ${title}`
   : siteConfig.siteTitle;
 const pageDescription = description ?? siteConfig.siteDescription;
 const siteOrigin = Astro.site ?? `https://${siteConfig.domain}`;

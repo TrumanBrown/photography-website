@@ -13,8 +13,11 @@ export const siteConfig = {
   /** First year the site went live. Footer renders e.g. "© 2026–2028 <Owner>". */
   copyrightStartYear: 2026,
 
-  /** Browser tab title and <h1> on the home page. */
-  siteTitle: "Truman Brown Pics and More",
+  /**
+   * The site's name: the front door's tab title, and the first part of every
+   * other tab ("Truman Brown | Photographs"). Also the name link previews show.
+   */
+  siteTitle: "Truman Brown",
 
   /** <meta description> for SEO and link previews. */
   siteDescription:

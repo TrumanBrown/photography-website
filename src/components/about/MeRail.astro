@@ -63,16 +63,13 @@ const links = [
           </a>
         ))
       }
+      <a class="me-link" href={RESUME_PDF} target="_blank" rel="noopener"
+        >Resume (PDF) ↗</a
+      >
       <button type="button" class="me-link" data-contact-open
         >Write to me</button
       >
     </nav>
-  </div>
-
-  <div class="me-foot">
-    <a class="btn btn-ink" href={RESUME_PDF} target="_blank" rel="noopener"
-      >Resume (PDF)</a
-    >
   </div>
 </aside>
 
@@ -180,14 +177,6 @@ const links = [
     color: var(--ink);
     text-decoration: none;
   }
-  .me-foot {
-    margin-top: auto;
-    padding: 14px 16px 16px;
-    border-top: 1px solid var(--rule);
-  }
-  .me-foot .btn {
-    width: 100%;
-  }
 
   /* On a phone the rail is a block above the page: name and theme on top,
      then the photo beside where I live and the links. The page's own tabs
@@ -232,9 +221,6 @@ const links = [
     }
     .me-link {
       min-height: 24px;
-    }
-    .me-foot {
-      display: none;
     }
   }
 </style>

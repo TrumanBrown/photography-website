@@ -131,7 +131,7 @@ Full walkthrough with explanations in [docs/azure.md](docs/azure.md) and [docs/c
 
 Edit [site.config.ts](site.config.ts):
 - `ownerName`, your full name (drives the footer, page metadata and structured data; **becomes public when you push**)
-- `siteTitle`, `siteDescription`, taste
+- `siteTitle`, the site's name: the front page's tab title and the start of every other tab ("Jane Doe | Photographs"); `siteDescription`, taste
 - `domain`, apex domain you'll register (e.g. `<yourname>.com`)
 - `copyrightStartYear`, current year on first deploy
 - `prints`, `true` to take print and licensing inquiries: a Prints button on session photos, a `/prints` page in the footer, and licensing data for Google Images. Inquiries arrive through the contact form; there's no shop. Set `false` if you don't sell prints. Details in [docs/product-experience.md](docs/product-experience.md#prints-and-licensing-inquiries).

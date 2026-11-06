@@ -29,7 +29,8 @@ description: 'The front door at / and About me: the Weekends and Weekdays switch
 - **Every "About me" goes to `/#weekdays`.** It works without script through `:target`, and `/about/` redirects there.
 - **Don't link seattlebalc.com.** It's a friend's site that the radar reads from, not his work. The radar's link goes to the balcFlights-LED README, where a video shows the real panel. The privacy page still names the site in words, because visitors' browsers talk to it.
 - **Photos he picked, not the first one.** The site project shows the newest session's header photo, chosen the way the session page chooses its banner (`banner`, then a wide cover, then the widest).
-- **One Resume button on screen.** Filled ink in the rail's foot; on a phone, where that's hidden, the Weekdays row shows it instead.
+- **The resume is on the page, not only in the rail.** Resume (PDF) is the Weekdays side's one filled button, first in the row under his line. The rail lists it as a plain link with the others. Never two Resume buttons in different styles.
+- **Tabs say his name first:** "Truman Brown", "Truman Brown | Work" while Weekdays shows, and "Truman Brown | <page>" everywhere else. He picked this over page-first, which reads better in a crowded tab strip.
 - **Today's layout, sized up.** Round 2's three-column, two-page and projects-first layouts all crowded the page. What fixed the blank space was a wider rail (248px, the archive's stays 212px), one centered column the footer's width, bigger resume type (15px lines, 18px titles) and smaller project pictures (a 320px column, the radar 240px). The work should always take more room than the projects.
 - **Same photo, never a different one,** when moving between pages. The lead photo is handed over by its URL and moves to its place. Nothing else carries over.
 
@@ -58,9 +59,12 @@ If it says NO DATA, `curl -s https://seattlebalc.com/api/v1/flights | head` firs
 
 - 2026-11-05, on round 2: "i think fixed is still better, just make the side bar a bit bigger, and maybe center or make the experience section bigger too. I think anything else overcrowds the page too much." And "the side projects are just a bit too big, the images are quite large. takes up more space than the actual experience imo."
 
+- 2026-11-05, on the live Weekdays side: "I would put a resume button on this page directly. its kind of hidden in bottom left. and if users are going to about me, they expect to see a resume somewhere clearly." And "name first tab looks best." Of the first icon mocks: "i dont really understand them. what is a trig point" (round 2 at `mocks/portfolio/brand.html`, described in plain words).
+
 ## Hard-won lessons
 
 1. **The Windows `az` under WSL crashes printing Bicep** that has a `→` in it (`'charmap' codec can't encode`). Build with `--outfile` and a `wslpath -w` path instead of `--stdout`.
 2. **A hidden VS Code browser panel skips view transitions** (`document.visibilityState` is `hidden`), and headless Chromium never paints after one. Check the handover by reading `.lead[data-current]` on both pages, and see the fade in a visible browser.
 3. **Local sessions have no `showcase` picks or captions,** so the lead photo is empty and the site project has no caption on a local build. Copy `src/content/sessions/*.json` aside, add picks for a look, and put them back.
 4. **The first deploy failed on a duplicate route.** `/about` and `/about/` were both redirects, and Static Web Apps treats them as one route and refuses the whole config, which nothing local checked. One rule, `/about`, covers both, and `scripts/swa-config.test.mjs` fails on a repeat.
+5. **The resume went missing by fixing a style.** Two Resume buttons in two styles drew "why is one off color", so the page's one was removed and only the rail's bottom-corner button stayed, which he then couldn't find. Fix a mismatch by matching the styles or demoting the duplicate to a link, not by removing the one in the obvious place.
