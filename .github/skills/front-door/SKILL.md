@@ -12,7 +12,7 @@ description: 'The front door at / and About me: the Weekends and Weekdays switch
 | `src/pages/index.astro`                                       | the switch, both sides, the person structured data, the script that reads `#weekdays`                                   |
 | `src/components/about/MeRail.astro`                           | the rail: name, nav, the portrait, where I live, links, "Write to me", Resume (PDF). A block above the page under 900px |
 | `src/lib/about.ts`                                            | every word on the Weekdays side: my two lines, the summary, jobs, school, skills, the three projects, the video         |
-| `src/components/about/Resume.astro`                           | work, school and skills as ruled rows, three lines a job and "N more"                                                   |
+| `src/components/about/Resume.astro`                           | work, school and skills as ruled rows, every line showing (no "N more")                                                 |
 | `src/components/about/Projects.astro`                         | each project beside its live piece                                                                                      |
 | `src/lib/radar.ts`, `src/lib/led-radar.ts`                    | the balcFlights-LED radar: maths, text, font and layout (tested), then the canvas driver                                |
 | `src/assets/about/`                                           | `me-everest.jpg` (the portrait), `cozy-critter.jpg` (the video's poster)                                                |
@@ -30,6 +30,8 @@ description: 'The front door at / and About me: the Weekends and Weekdays switch
 - **Don't link seattlebalc.com.** It's a friend's site that the radar reads from, not his work. The radar's link goes to the balcFlights-LED README, where a video shows the real panel. The privacy page still names the site in words, because visitors' browsers talk to it.
 - **Photos he picked, not the first one.** The site project shows the newest session's header photo, chosen the way the session page chooses its banner (`banner`, then a wide cover, then the widest).
 - **The resume is on the page, not only in the rail.** Resume (PDF) is the Weekdays side's one filled button, first in the row under his line. The rail lists it as a plain link with the others. Never two Resume buttons in different styles.
+- **Every resume line shows.** No collapsing a job behind "N more": he found the button easy to miss.
+- **The icon is Mount Baker on the LED panel** (`public/favicon.svg`), picked from round 2 of the icon mocks (`mocks/portfolio/brand2.html`). Rules for it are in site-design.instructions.md.
 - **Tabs say his name first:** "Truman Brown", "Truman Brown | Work" while Weekdays shows, and "Truman Brown | <page>" everywhere else. He picked this over page-first, which reads better in a crowded tab strip.
 - **Today's layout, sized up.** Round 2's three-column, two-page and projects-first layouts all crowded the page. What fixed the blank space was a wider rail (248px, the archive's stays 212px), one centered column the footer's width, bigger resume type (15px lines, 18px titles) and smaller project pictures (a 320px column, the radar 240px). The work should always take more room than the projects.
 - **Same photo, never a different one,** when moving between pages. The lead photo is handed over by its URL and moves to its place. Nothing else carries over.
@@ -60,6 +62,8 @@ If it says NO DATA, `curl -s https://seattlebalc.com/api/v1/flights | head` firs
 - 2026-11-05, on round 2: "i think fixed is still better, just make the side bar a bit bigger, and maybe center or make the experience section bigger too. I think anything else overcrowds the page too much." And "the side projects are just a bit too big, the images are quite large. takes up more space than the actual experience imo."
 
 - 2026-11-05, on the live Weekdays side: "I would put a resume button on this page directly. its kind of hidden in bottom left. and if users are going to about me, they expect to see a resume somewhere clearly." And "name first tab looks best." Of the first icon mocks: "i dont really understand them. what is a trig point" (round 2 at `mocks/portfolio/brand.html`, described in plain words).
+
+- 2026-11-05: "mt baker led panel is the winner." And "don't shorten the experience sections by default. keep it full length. it's easy to miss that expand button, just get rid of it."
 
 ## Hard-won lessons
 

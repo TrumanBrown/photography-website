@@ -23,8 +23,11 @@ look. Everything below is about the public pages.
   so token classes need no `dark:` variants.
 - `ink` for titles, `ink-3` for prose, `ink-2` for labels and quiet links (4.5:1 in both themes).
   Color comes from the photographs, not from accent colors.
-- The favicon (`public/favicon.svg`, a sunset mountain) is colorful on purpose. He asked for a
-  logo that's "clean and maybe somewhat colorful" (2026-10-07), so don't recolor it to the tokens.
+- The favicon (`public/favicon.svg`, with `public/apple-touch-icon.png` for phone home screens)
+  is Mount Baker drawn in lit dots on a dark LED panel, the way his balcFlights-LED panel draws,
+  with one amber dot for the sun. It's drawn on the 16 by 16 grid a tab icon uses, one dot per
+  pixel, so keep any change on that grid. He picked it over a dozen others (2026-11-05) because it
+  joins the mountains in his photos with the things he builds. It keeps its own colors.
 
 ## Type
 

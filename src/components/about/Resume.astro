@@ -1,8 +1,8 @@
 ---
 /**
  * The resume on the front door's Weekdays side: work, school and skills, in
- * ruled rows. Each job shows its first three lines; "N more" opens the rest.
- * The lines are the ones on my PDF (src/lib/about.ts).
+ * ruled rows, every line showing. The lines are the ones on my PDF
+ * (src/lib/about.ts).
  */
 import {
   firstYear,
@@ -13,8 +13,6 @@ import {
   WORK,
   monthLabel,
 } from "@/lib/about";
-
-const SHOW = 3;
 ---
 
 <section class="wsec" aria-labelledby="work-h">
@@ -27,43 +25,25 @@ const SHOW = 3;
   <p class="summary">{SUMMARY}</p>
   <ul class="jobs">
     {
-      WORK.map((job) => {
-        const more = job.lines.length - SHOW;
-        return (
-          <li class="job">
-            <span class="u-label tabular-nums job-when">
-              {periodLabel(job.from, job.to)}
-            </span>
-            <div class="job-body" data-job>
-              <h3 class="job-role">{job.role}</h3>
-              <p class="job-org">
-                {job.org} · {job.where}
-                {job.note && ` · ${job.note}`}
-              </p>
-              <ul class="job-lines">
-                {job.lines.map((line, i) => (
-                  <li
-                    hidden={i >= SHOW ? true : undefined}
-                    data-more={i >= SHOW ? "" : undefined}
-                  >
-                    {line}
-                  </li>
-                ))}
-              </ul>
-              {more > 0 && (
-                <button
-                  type="button"
-                  class="linkbtn draw job-more"
-                  aria-expanded="false"
-                  data-more-toggle={`${more} more`}
-                >
-                  <span>{more} more</span>
-                </button>
-              )}
-            </div>
-          </li>
-        );
-      })
+      WORK.map((job) => (
+        <li class="job">
+          <span class="u-label tabular-nums job-when">
+            {periodLabel(job.from, job.to)}
+          </span>
+          <div class="job-body">
+            <h3 class="job-role">{job.role}</h3>
+            <p class="job-org">
+              {job.org} · {job.where}
+              {job.note && ` · ${job.note}`}
+            </p>
+            <ul class="job-lines">
+              {job.lines.map((line) => (
+                <li>{line}</li>
+              ))}
+            </ul>
+          </div>
+        </li>
+      ))
     }
   </ul>
 </section>
@@ -160,17 +140,6 @@ const SHOW = 3;
   .job-lines li::marker {
     color: var(--ink-2);
   }
-  .job-lines li[hidden] {
-    display: none;
-  }
-  .job-more {
-    margin-top: 4px;
-    font-size: 13px;
-    color: var(--ink-2);
-  }
-  .job-more:hover {
-    color: var(--ink);
-  }
   .skills {
     margin: 0;
     padding-top: 16px;
@@ -201,22 +170,3 @@ const SHOW = 3;
     }
   }
 </style>
-
-<script>
-  /* "N more" opens the rest of a job's lines, and "Fewer" puts them away. */
-  document
-    .querySelectorAll<HTMLButtonElement>("[data-more-toggle]")
-    .forEach((button) => {
-      const label = button.querySelector("span");
-      const lines = button
-        .closest("[data-job]")
-        ?.querySelectorAll<HTMLElement>("[data-more]");
-      if (!label || !lines) return;
-      button.addEventListener("click", () => {
-        const open = button.getAttribute("aria-expanded") !== "true";
-        button.setAttribute("aria-expanded", String(open));
-        lines.forEach((line) => (line.hidden = !open));
-        label.textContent = open ? "Fewer" : (button.dataset.moreToggle ?? "");
-      });
-    });
-</script>
