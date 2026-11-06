@@ -38,7 +38,7 @@ description: 'The front door at / and About me: the Weekends and Weekdays switch
 
 ## Update the resume
 
-1. Edit `WORK`, `SUMMARY`, `SCHOOL` or `SKILLS` in `src/lib/about.ts`, newest job first, months as `YYYY-MM`.
+1. Edit `WORK`, `SUMMARY`, `SCHOOL` or `SKILLS` in `src/lib/about.ts`, newest job first, months as `YYYY-MM`. His `WEEKDAYS` line quotes the migrated VM count ("over 47,000 VMs migrated today"), so when the first resume line's count changes, change that number too and nothing else in his line.
 2. Replace the PDF. Open his new PDF with PyMuPDF (`pip install --target` a scratch folder) and read the contact line with `page.get_text()`. Since 2026-11-05 his own copy has no phone or email (`Seattle, WA | linkedin.com/in/trumanbrown | trumanbrown.com`). If one ever comes back, redact those spans and write the line back in the PDF's own embedded Cambria (`doc.extract_font`), keeping the links. Either way, clear `creator` and `producer`, drop the XMP block (`del_xml_metadata`), check with `get_text()` and `strings` that no number or email is left, and save it as `public/Truman-Brown-Resume.pdf`. If the text didn't change, `about.ts` doesn't need to: check each line is in the PDF word for word.
 3. `npx vitest run src/lib/about.test.ts`, then look at `/#weekdays` at 1440×900 and 390×844.
 

@@ -38,10 +38,10 @@ export const WEEKENDS =
 
 /** The line under the Weekdays tab, in my own words. */
 export const WEEKDAYS =
-  "During the week, I'm a product manager on Azure Local, Microsoft's distributed hybrid infrastructure solution. I own Azure Migrate for Azure Local, scaling the solution from near zero VM migrations in 2024 to over 46,000 VMs migrated today. I also own various features for Azure Local VM management.";
+  "During the week, I'm a product manager on Azure Local, Microsoft's distributed hybrid infrastructure solution. I own Azure Migrate for Azure Local, scaling the solution from near zero VM migrations in 2024 to over 47,000 VMs migrated today. I also own various features for Azure Local VM management.";
 
 export const SUMMARY =
-  "Product manager with 3+ years at Microsoft, owning migration and virtual machine features for Azure Local, its hybrid cloud platform. Scaled migration to 880 customers (55+ Fortune 500 and Global 500) running 300,000+ cores.";
+  "Product manager with 3+ years at Microsoft, owning migration and virtual machine features for Azure Local, its hybrid cloud platform. Scaled migration to 885 customers (57 Fortune 500 or Global 500) running 300,000+ cores.";
 
 export const RESUME_PDF = "/Truman-Brown-Resume.pdf";
 
@@ -63,13 +63,13 @@ export const WORK: Job[] = [
     from: "2025-09",
     to: null,
     lines: [
-      "Grew VMware and Hyper-V migrations to Azure Local from 114 virtual machines (VMs) in Feb 2024 to 46,000+, making migration the source of 3 in 10 new customer Azure Local VMs since 2025",
-      "Launched general availability of Azure Migrate for VMware to Azure Local migrations in Oct 2025, writing the exit criteria and a three-option proposal that avoided a 6-month wait, with 31,000+ VMs migrated since",
+      "Grew VMware and Hyper-V migrations to Azure Local from 114 virtual machines (VMs) in Feb 2024 to 47,000+, making migration the source of 3 in 10 new customer Azure Local VMs since 2025",
+      "Launched general availability of Azure Migrate for VMware to Azure Local migrations in Oct 2025, writing the exit criteria and a three-option proposal that avoided a 6-month wait, with 32,000+ VMs migrated since",
       "Cut customer-reported incidents nearly 40%, from 6.9 to 4.2 per 1,000 migrated VMs in 2026, with new validation checks, safeguards and retry fixes, while holding a 97.5% migration success rate",
       "Ran 18 monthly releases since Mar 2025 with no release manager, using AI agents to mock up features from approved UX assets for engineering, without a designer, and to write or update 25 Learn articles",
-      "Shipped SAN migration support, unblocking a dental insurer that has moved 1,800+ of a planned 5,500 VMs",
+      "Shipped SAN migration support, unblocking a dental insurer that has moved 1,900+ of a planned 5,500 VMs",
       "Proposed and shipped Azure Arc reuse during migration, so Arc-managed VMs keep their configuration, monitoring and extensions with no re-onboarding, unblocking enterprises with hundreds to 10,000 Arc VMs",
-      "Shipped Secure Boot retention (8,800+ VMs, 370 customers), PowerShell, CLI and Terraform automation (PowerShell alone moved 2,000 VMs for 15 customers) and migration support for Trusted Launch VMs",
+      "Shipped Secure Boot retention (9,300+ VMs, 377 customers), PowerShell, CLI and Terraform automation (PowerShell alone moved 2,000 VMs for 15 customers) and migration support for Trusted Launch VMs",
       "Partnered with five enterprises (17,000+ cores) before, during and after migration, unblocking hundreds of SQL Server VMs with fast analysis, proposed fixes and release coordination, and gave 4 executive briefings",
       "Delivered a private preview of a new VMware migration path to six large enterprises two months after a third-party licensing change halted new migrations, leading the impact analysis, options and execution",
       "Shipped VM Connect console access for Azure Local VMs and designed live migration of VMs across clusters",
@@ -83,7 +83,7 @@ export const WORK: Job[] = [
     to: "2025-09",
     lines: [
       "Onboarded 40 private preview customers and launched public preview in Oct 2024, with 73 customers migrating 1,700+ VMs at a 97% success rate, winning an organization Impact Award",
-      "Shipped static IP retention for Windows and Linux VMs, used on 19,000+ VMs by 400+ customers since release",
+      "Shipped static IP retention for Windows and Linux VMs, used on 19,000+ VMs by 422 customers since release",
       "Unblocked a grocery chain's VMware exit with custom disk sector size, critical for SQL Server (1,150+ VMs)",
     ],
   },
@@ -125,7 +125,7 @@ export const SCHOOL = {
   degree: "Bachelor of computer engineering",
   when: "2022-12",
   lines: [
-    "GPA 3.95, Honors Program, Dean's List all seven semesters, Presidential and three Roger Nordby scholarships",
+    "GPA 3.95, Honors Program, Dean's List all eight semesters, Presidential and three Roger Nordby scholarships",
     "Volunteer emergency medical technician (EMT), University of Minnesota EMS, 2018 to 2022",
   ],
 };
