@@ -143,7 +143,14 @@ function createGeo({ download, openReader, now = Date.now, log = () => {} }) {
     }
   }
 
-  return { lookup };
+  // Loads (or re-checks) without a lookup, for the warm-up ping.
+  async function warm() {
+    const pending = ensureLoaded();
+    if (pending) await pending;
+    return Boolean(readers);
+  }
+
+  return { lookup, warm };
 }
 
 module.exports = { createGeo, describeRecords, isPublicIp, POINTER };

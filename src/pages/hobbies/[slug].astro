@@ -51,9 +51,21 @@ const galleryItems = [
   ...(media?.gallery ?? []),
 ];
 const facts = hobbyFacts(entry);
+const slug = hobbySlug(entry);
+// The link preview is the hobby's own stipple drawing (src/pages/og/[slug].jpg.ts).
+const hasPlate =
+  Object.keys(
+    import.meta.glob("/src/assets/plates/*-card.webp"),
+  ).includes(`/src/assets/plates/${slug}-card.webp`);
 ---
 
-<BaseLayout title={title} description={summary} section="hobbies">
+<BaseLayout
+  title={title}
+  description={summary}
+  section="hobbies"
+  ogImage={hasPlate ? `/og/${slug}.jpg` : undefined}
+  ogImageAlt={hasPlate ? `${title}, drawn in ink dots` : undefined}
+>
   <article class="mx-auto max-w-6xl px-4 py-10 sm:px-6">
     <header class="hobby-head">
       <a href="/hobbies/" class="hobby-back"
@@ -64,14 +76,17 @@ const facts = hobbyFacts(entry);
       {intro && <p class="hobby-intro">{intro}</p>}
     </header>
 
-    {interactive === "aquarium" && <AquariumTank moments={video?.moments} />}
-    {interactive === "tidepool" && <TidePool />}
-    {interactive === "fishing" && <Fishing />}
-    {interactive === "birding" && <Birding />}
-    {interactive === "roadcruise" && <HerpingNight />}
-    {interactive === "pixel-hike" && <PixelHike />}
+    {/* data-toy: the first press inside counts as playing (src/lib/analytics.ts). */}
+    <div class="toy" data-toy={slug}>
+      {interactive === "aquarium" && <AquariumTank moments={video?.moments} />}
+      {interactive === "tidepool" && <TidePool />}
+      {interactive === "fishing" && <Fishing />}
+      {interactive === "birding" && <Birding />}
+      {interactive === "roadcruise" && <HerpingNight />}
+      {interactive === "pixel-hike" && <PixelHike />}
 
-    {dayList && <DayList heading={dayList.heading} />}
+      {dayList && <DayList heading={dayList.heading} />}
+    </div>
 
     {
       spark && (
@@ -210,6 +225,10 @@ const facts = hobbyFacts(entry);
 </BaseLayout>
 
 <style>
+  /* Only a marker for analytics: it mustn't change the layout. */
+  .toy {
+    display: contents;
+  }
   /* The archive's heading voice: light weight, sentence case, one tracked
      line of facts. */
   .hobby-head {

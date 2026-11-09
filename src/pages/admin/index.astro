@@ -120,7 +120,7 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
         <div id="analytics-content" class="hidden space-y-8">
           <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h2 class="text-lg font-semibold">Traffic overview</h2>
+              <h2 class="text-lg font-semibold">Analytics</h2>
               <p id="analytics-period" class="mt-1 text-sm text-neutral-500 dark:text-neutral-400"></p>
             </div>
             <label class="text-sm text-neutral-500 dark:text-neutral-400">
@@ -133,6 +133,19 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
             </label>
           </div>
 
+          <div
+            class="flex flex-wrap gap-1 border-b border-neutral-200 dark:border-neutral-800"
+            role="tablist"
+            aria-label="Analytics views"
+            data-subtabs
+          >
+            <button type="button" role="tab" data-subtab="jobhunt" aria-selected="true" aria-controls="sub-jobhunt" class="border-b-2 border-neutral-900 px-3 py-1.5 text-sm font-medium dark:border-white">Job hunt</button>
+            <button type="button" role="tab" data-subtab="traffic" aria-selected="false" aria-controls="sub-traffic" tabindex="-1" class="border-b-2 border-transparent px-3 py-1.5 text-sm font-medium text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200">Traffic</button>
+            <button type="button" role="tab" data-subtab="health" aria-selected="false" aria-controls="sub-health" tabindex="-1" class="border-b-2 border-transparent px-3 py-1.5 text-sm font-medium text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200">Site health</button>
+            <button type="button" role="tab" data-subtab="play" aria-selected="false" aria-controls="sub-play" tabindex="-1" class="border-b-2 border-transparent px-3 py-1.5 text-sm font-medium text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200">Photos and hobbies</button>
+          </div>
+
+          <div id="sub-jobhunt" role="tabpanel" data-subpanel="jobhunt" class="space-y-8">
           <section aria-labelledby="weekdays-title" class="space-y-4">
             <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
@@ -167,6 +180,90 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
             </p>
           </section>
 
+          <section aria-labelledby="companies-title" class="space-y-3">
+            <div>
+              <h3 id="companies-title" class="text-sm font-semibold">Companies coming back</h3>
+              <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">Company networks that visited in this range, with how many visits and on how many days. Several days in a row often means a hiring loop is moving.</p>
+            </div>
+            <div class="overflow-x-auto rounded border border-neutral-200 dark:border-neutral-700">
+              <table class="w-full min-w-[44rem] text-left text-sm">
+                <thead class="bg-neutral-50 text-xs text-neutral-500 dark:bg-neutral-900 dark:text-neutral-400">
+                  <tr>
+                    <th scope="col" class="px-3 py-2 font-medium">Network</th>
+                    <th scope="col" class="px-3 py-2 font-medium">Usual place</th>
+                    <th scope="col" class="px-3 py-2 text-right font-medium">Visits</th>
+                    <th scope="col" class="px-3 py-2 text-right font-medium">Days</th>
+                    <th scope="col" class="px-3 py-2 text-right font-medium">From the resume</th>
+                    <th scope="col" class="px-3 py-2 text-right font-medium">Time on Weekdays</th>
+                    <th scope="col" class="px-3 py-2 font-medium">Last seen</th>
+                  </tr>
+                </thead>
+                <tbody id="companies-rows" class="divide-y divide-neutral-200 dark:divide-neutral-800"></tbody>
+              </table>
+            </div>
+          </section>
+          <section aria-labelledby="read-title" class="space-y-3">
+            <div>
+              <h3 id="read-title" class="text-sm font-semibold">What gets read</h3>
+              <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">How long each part of Weekdays spent across the middle of the screen, added up over every visit.</p>
+            </div>
+            <div class="overflow-x-auto rounded border border-neutral-200 dark:border-neutral-700">
+              <table class="w-full min-w-[32rem] text-left text-sm">
+                <thead class="bg-neutral-50 text-xs text-neutral-500 dark:bg-neutral-900 dark:text-neutral-400">
+                  <tr>
+                    <th scope="col" class="px-3 py-2 font-medium">Section</th>
+                    <th scope="col" class="px-3 py-2 text-right font-medium">Visits</th>
+                    <th scope="col" class="px-3 py-2 text-right font-medium">Total</th>
+                    <th scope="col" class="px-3 py-2 text-right font-medium">Median</th>
+                  </tr>
+                </thead>
+                <tbody id="read-rows" class="divide-y divide-neutral-200 dark:divide-neutral-800"></tbody>
+              </table>
+            </div>
+          </section>
+          <section aria-labelledby="shares-title" class="space-y-3">
+            <div>
+              <h3 id="shares-title" class="text-sm font-semibold">Link shares</h3>
+              <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">When someone pastes a link to the site into Slack, Teams, LinkedIn or a messaging app, the app fetches its preview. Apps keep previews for a while, so repeat shares may not show.</p>
+            </div>
+            <p id="shares-summary" class="text-sm text-neutral-600 dark:text-neutral-300"></p>
+            <div class="overflow-x-auto rounded border border-neutral-200 dark:border-neutral-700">
+              <table class="w-full min-w-[28rem] text-left text-sm">
+                <thead class="bg-neutral-50 text-xs text-neutral-500 dark:bg-neutral-900 dark:text-neutral-400">
+                  <tr>
+                    <th scope="col" class="px-3 py-2 font-medium">When</th>
+                    <th scope="col" class="px-3 py-2 font-medium">App</th>
+                    <th scope="col" class="px-3 py-2 font-medium">Page</th>
+                  </tr>
+                </thead>
+                <tbody id="shares-rows" class="divide-y divide-neutral-200 dark:divide-neutral-800"></tbody>
+              </table>
+            </div>
+          </section>
+          <section aria-labelledby="pdf-title" class="space-y-3">
+            <div>
+              <h3 id="pdf-title" class="text-sm font-semibold">Resume PDF opens</h3>
+              <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">Every open of the resume PDF, from the site or a link anywhere else. Opens from a server with no referrer are likely email link scanners and are greyed.</p>
+            </div>
+            <div id="pdf-cards" class="grid grid-cols-2 gap-3 lg:grid-cols-4"></div>
+            <div class="overflow-x-auto rounded border border-neutral-200 dark:border-neutral-700">
+              <table class="w-full min-w-[44rem] text-left text-sm">
+                <thead class="bg-neutral-50 text-xs text-neutral-500 dark:bg-neutral-900 dark:text-neutral-400">
+                  <tr>
+                    <th scope="col" class="px-3 py-2 font-medium">When</th>
+                    <th scope="col" class="px-3 py-2 font-medium">From</th>
+                    <th scope="col" class="px-3 py-2 font-medium">Network</th>
+                    <th scope="col" class="px-3 py-2 font-medium">Place</th>
+                    <th scope="col" class="px-3 py-2 font-medium">Device</th>
+                  </tr>
+                </thead>
+                <tbody id="pdf-rows" class="divide-y divide-neutral-200 dark:divide-neutral-800"></tbody>
+              </table>
+            </div>
+          </section>
+          </div>
+
+          <div id="sub-traffic" role="tabpanel" data-subpanel="traffic" class="hidden space-y-8">
           <div id="analytics-cards" class="grid grid-cols-2 gap-3 lg:grid-cols-4"></div>
 
           <section aria-labelledby="analytics-trend-title">
@@ -230,6 +327,129 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
               </table>
             </div>
           </section>
+          </div>
+
+          <div id="sub-health" role="tabpanel" data-subpanel="health" class="hidden space-y-8">
+          <section aria-labelledby="speed-title" class="space-y-3">
+            <div>
+              <h3 id="speed-title" class="text-sm font-semibold">Speed for real visitors</h3>
+              <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">Core Web Vitals from visitors' own browsers, at the 75th percentile: three in four visits were at least this fast. Green is good, amber needs work and red is poor by Google's thresholds.</p>
+            </div>
+            <div class="overflow-x-auto rounded border border-neutral-200 dark:border-neutral-700">
+              <table class="w-full min-w-[48rem] text-left text-sm">
+                <thead class="bg-neutral-50 text-xs text-neutral-500 dark:bg-neutral-900 dark:text-neutral-400">
+                  <tr>
+                    <th scope="col" class="px-3 py-2 font-medium">Pages</th>
+                    <th scope="col" class="px-3 py-2 font-medium">Device</th>
+                    <th scope="col" class="px-3 py-2 text-right font-medium">Pageviews</th>
+                    <th scope="col" class="px-3 py-2 text-right font-medium">LCP (load)</th>
+                    <th scope="col" class="px-3 py-2 text-right font-medium">INP (response)</th>
+                    <th scope="col" class="px-3 py-2 text-right font-medium">CLS (shift)</th>
+                    <th scope="col" class="px-3 py-2 text-right font-medium">FCP</th>
+                    <th scope="col" class="px-3 py-2 text-right font-medium">TTFB</th>
+                  </tr>
+                </thead>
+                <tbody id="speed-rows" class="divide-y divide-neutral-200 dark:divide-neutral-800"></tbody>
+              </table>
+            </div>
+          </section>
+          <section aria-labelledby="errors-title" class="space-y-3">
+            <div>
+              <h3 id="errors-title" class="text-sm font-semibold">Errors visitors hit</h3>
+              <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">JavaScript errors from this site's own files, grouped. Errors from browser extensions are left out.</p>
+            </div>
+            <div class="overflow-x-auto rounded border border-neutral-200 dark:border-neutral-700">
+              <table class="w-full min-w-[48rem] text-left text-sm">
+                <thead class="bg-neutral-50 text-xs text-neutral-500 dark:bg-neutral-900 dark:text-neutral-400">
+                  <tr>
+                    <th scope="col" class="px-3 py-2 font-medium">Error</th>
+                    <th scope="col" class="px-3 py-2 font-medium">File</th>
+                    <th scope="col" class="px-3 py-2 text-right font-medium">Count</th>
+                    <th scope="col" class="px-3 py-2 font-medium">Pages</th>
+                    <th scope="col" class="px-3 py-2 font-medium">Browsers</th>
+                    <th scope="col" class="px-3 py-2 font-medium">Last seen</th>
+                  </tr>
+                </thead>
+                <tbody id="errors-rows" class="divide-y divide-neutral-200 dark:divide-neutral-800"></tbody>
+              </table>
+            </div>
+          </section>
+          <section aria-labelledby="looks-title" class="space-y-3">
+            <div>
+              <h3 id="looks-title" class="text-sm font-semibold">Light, dark and screens</h3>
+              <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">By visit. "Set by the device" means the visitor never pressed the toggle.</p>
+            </div>
+            <div id="looks" class="grid grid-cols-1 gap-3 md:grid-cols-3"></div>
+          </section>
+          </div>
+
+          <div id="sub-play" role="tabpanel" data-subpanel="play" class="hidden space-y-8">
+          <section aria-labelledby="photos-title" class="space-y-3">
+            <div>
+              <h3 id="photos-title" class="text-sm font-semibold">Photos opened</h3>
+              <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">The photographs opened most in the lightbox, with time on screen and zooms.</p>
+            </div>
+            <div class="overflow-x-auto rounded border border-neutral-200 dark:border-neutral-700">
+              <table class="w-full min-w-[32rem] text-left text-sm">
+                <thead class="bg-neutral-50 text-xs text-neutral-500 dark:bg-neutral-900 dark:text-neutral-400">
+                  <tr>
+                    <th scope="col" class="px-3 py-2 font-medium">Photo</th>
+                    <th scope="col" class="px-3 py-2 text-right font-medium">Opens</th>
+                    <th scope="col" class="px-3 py-2 text-right font-medium">Time</th>
+                    <th scope="col" class="px-3 py-2 text-right font-medium">Zoomed</th>
+                  </tr>
+                </thead>
+                <tbody id="photos-rows" class="divide-y divide-neutral-200 dark:divide-neutral-800"></tbody>
+              </table>
+            </div>
+          </section>
+          <section aria-labelledby="galleries-title" class="space-y-3">
+            <div>
+              <h3 id="galleries-title" class="text-sm font-semibold">By gallery</h3>
+              <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">Lightbox opens per session or hobby gallery.</p>
+            </div>
+            <div class="overflow-x-auto rounded border border-neutral-200 dark:border-neutral-700">
+              <table class="w-full min-w-[32rem] text-left text-sm">
+                <thead class="bg-neutral-50 text-xs text-neutral-500 dark:bg-neutral-900 dark:text-neutral-400">
+                  <tr>
+                    <th scope="col" class="px-3 py-2 font-medium">Gallery</th>
+                    <th scope="col" class="px-3 py-2 text-right font-medium">Opens</th>
+                    <th scope="col" class="px-3 py-2 text-right font-medium">Photos</th>
+                    <th scope="col" class="px-3 py-2 text-right font-medium">Time</th>
+                  </tr>
+                </thead>
+                <tbody id="galleries-rows" class="divide-y divide-neutral-200 dark:divide-neutral-800"></tbody>
+              </table>
+            </div>
+          </section>
+          <section aria-labelledby="nn-title" class="space-y-3">
+            <div>
+              <h3 id="nn-title" class="text-sm font-semibold">Narrow nature</h3>
+              <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">Rounds finished, from today's list and from More lists, and the average score.</p>
+            </div>
+            <div id="nn-cards" class="grid grid-cols-2 gap-3 lg:grid-cols-5"></div>
+          </section>
+          <section aria-labelledby="hobbies-title" class="space-y-3">
+            <div>
+              <h3 id="hobbies-title" class="text-sm font-semibold">Things to try</h3>
+              <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">Visits to each hobby page, how many pressed something in its toy, and the median time on the page.</p>
+            </div>
+            <div class="overflow-x-auto rounded border border-neutral-200 dark:border-neutral-700">
+              <table class="w-full min-w-[36rem] text-left text-sm">
+                <thead class="bg-neutral-50 text-xs text-neutral-500 dark:bg-neutral-900 dark:text-neutral-400">
+                  <tr>
+                    <th scope="col" class="px-3 py-2 font-medium">Hobby</th>
+                    <th scope="col" class="px-3 py-2 text-right font-medium">Visits</th>
+                    <th scope="col" class="px-3 py-2 text-right font-medium">Played</th>
+                    <th scope="col" class="px-3 py-2 text-right font-medium">Median time</th>
+                    <th scope="col" class="px-3 py-2 text-right font-medium">Median when played</th>
+                  </tr>
+                </thead>
+                <tbody id="hobbies-rows" class="divide-y divide-neutral-200 dark:divide-neutral-800"></tbody>
+              </table>
+            </div>
+          </section>
+          </div>
         </div>
       </div>
     </div>

@@ -58,3 +58,6 @@ public/birding/wasm/
 # Throwaway concept mocks + their prep scripts (never deployed).
 mocks/
 scripts-local/
+
+# A copy of public/Truman-Brown-Resume.pdf the build puts beside /api/resume.
+api/resume/resume.pdf

@@ -74,6 +74,7 @@ All inside resource group `rg-photography-prod`, except the bootstrap identity (
 | ↳ Federated credentials `github-main`, `github-pull-request` | Trust JWTs from this specific repo + branch. No long-lived secrets. |
 | **Azure OpenAI account** `oai-photography-<env>-<suffix>` | Created only when `enableDescribeModel=true`. One model deployment (`gpt-6.1-sol`, US data zone) that the photo pipeline uses to look at each photo once and write captions and session descriptions ([docs/photos.md](photos.md)). API keys are disabled; workflows reach it through their OIDC login, with inference-only access. |
 | **Communication Services** `acs-photography-<env>-<suffix>` and **Email Communication Service** `email-photography-<env>-<suffix>` | Created only when `enableContactEmail=true`. Emails you a copy of each contact form message from an Azure-managed sending address (`DoNotReply@<id>.azurecomm.net`), so there's no DNS to set up. See [Contact form email](#contact-form-email). |
+| **Logic App** `logic-photography-<env>-warmup` | Created only when `enableApiWarmup=true`. Calls `GET /api/track?warm=1` every five minutes so the analytics network lookup and the resume PDF never wait on a cold start ([docs/analytics.md](analytics.md#warm-up-ping)). No secrets. |
 | **Logic App** `logic-photography-<env>-scheduler` | Created only when `enableSocialScheduler=true`. A timer that starts the Instagram posting and photo workflows on GitHub, because GitHub's own scheduler skips many runs ([docs/social.md](social.md#what-runs-automatically)). Uses the Static Web App's `GITHUB_TOKEN` setting. |
 | **App Service Domain** `yourdomain.com` | `.com` registration. Only created when `domainName` is set; first-time purchase needs `az appservice domain create --accept-terms` once. |
 | **Azure DNS zone** `yourdomain.com` | Holds `A` (apex → SWA), `CNAME` `www`, `TXT` (SWA ownership token). |
@@ -101,8 +102,10 @@ Measured from the bill for September 16 to October 15, 2026, without the build's
 | Azure Monitor alert | One metric alert rule (new contact message), made by hand before the email copy existed | $0.10 |
 | Communication Services email (optional) | $0.00025 a message plus $0.00012 a MB, capped at ten an hour | under $0.01 |
 | Logic App timer (optional) | Consumption, about 1,000 runs a month | $0.01 |
+| Logic App warm-up ping (optional) | Consumption, about 8,600 runs a month, one HTTP action each, past the free allowance | ~$0.35 |
+| Analytics lookup files | DB-IP Lite, about 65 MB in `metadata/geo/`, read once per cold Functions instance | under $0.05 |
 | Bicep deployments | Always free | $0.00 |
-| **Total** | | **~$5.05** |
+| **Total** | | **~$5.45** |
 
 At 10× the traffic and 100 GB stored it would be about $23 a month, mostly egress, and still well inside the $150/mo credits.
 

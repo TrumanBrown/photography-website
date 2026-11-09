@@ -25,6 +25,12 @@ but not zero. What we focus on:
 - **Input is bounded and sanitized** (path/referrer length caps, duration sanity range, bot-UA filtering). Referrers are reduced to hostname only.
 - **Fails silently**: the function always returns 204 and never surfaces errors to the page, so analytics can't break the site.
 - Worst-case abuse is a flood of fake pageview rows in the `pageviews` table (cosmetic, cheap to clear). No data exposure, no write access to anything else.
+- **Event batches are checked field by field** ([api/track/payload.js](../api/track/payload.js)): known kinds only, names matched against a short pattern, numbers capped, at most 20 events a batch. The only free text kept is up to 100 characters copied from the page and browser error messages cut to 200 characters with addresses reduced to their path. The admin panel escapes all of it.
+- **Resume alerts can't be used to spam the inbox**: one per network and city a day, four an hour, ten a day, and never more than six of the hour's shared email count, so the contact form keeps its room ([api/shared/alert.js](../api/shared/alert.js)).
+
+### Preview images and the resume PDF
+
+`/api/og` and `/api/resume` are anonymous GET endpoints. `/api/og` only redirects to an image path on the site or to the site's own Blob account, so it isn't an open redirect, and it writes one small `share` row per fetch. `/api/resume` serves one fixed file bundled with the function and writes one `pdf` row per open. Neither stores an IP address. A flood of requests costs table rows, the same as `/api/track`.
 
 ---
 

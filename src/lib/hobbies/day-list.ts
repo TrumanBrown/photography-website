@@ -1028,6 +1028,12 @@ export function initDayList(root: HTMLElement): void {
     );
     if (mode === "extra") extra.scores[String(round.placeId)] = score;
     persist();
+    // A round just played (not one restored) counts in /admin's Analytics tab.
+    if (animate) {
+      window.dispatchEvent(
+        new CustomEvent("tb:nn", { detail: { mode, score } }),
+      );
+    }
 
     const verdict =
       km === 0
@@ -1286,6 +1292,7 @@ export function initDayList(root: HTMLElement): void {
     extra.played = [...extra.played, id];
     extra.current = { placeId: id, lines: 1, done: false };
     writeStore(EXTRA_KEY, extra);
+    window.dispatchEvent(new CustomEvent("tb:nn", { detail: { mode: "more" } }));
     const next = extraPool.find((r) => r.placeId === id);
     if (!next) return;
     loadRound(next, extra.current);

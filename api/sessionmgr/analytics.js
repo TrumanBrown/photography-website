@@ -1,6 +1,8 @@
 const DAY_MS = 86400000;
 const REVERSE_TIMESTAMP_MAX = 9999999999999;
 const { canonicalHost } = require('../shared/referrer');
+const { sourceName } = require('../shared/hiring-system');
+const insights = require('./insights');
 
 function isoDay(now, offset = 0) {
   const date = new Date(now);
@@ -147,7 +149,12 @@ function summarize(records, durations, days, ownHost) {
       }))
       .sort((a, b) => b.views - a.views || a.path.localeCompare(b.path)),
     referrers: [...sources.entries()]
-      .map(([source, views]) => ({ source, views, sharePct: percentage(views, totalPageviews) }))
+      .map(([source, views]) => ({
+        source,
+        name: source === 'Direct / internal' ? source : sourceName(source),
+        views,
+        sharePct: percentage(views, totalPageviews),
+      }))
       .sort((a, b) => b.views - a.views || a.source.localeCompare(b.source)),
   };
 }
@@ -190,7 +197,7 @@ function median(values) {
 
 // One row per visit that showed the Weekdays side or came in on a tagged link
 // (?via=resume), with who, where, how long, what they did and where they went.
-function buildWeekdays(records, eventsByPageview, days, ownHost) {
+function buildWeekdays(records, eventsByPageview, days, ownHost, out = {}) {
   const daySet = new Set(days);
   const byVisit = new Map();
   for (const record of records) {
@@ -271,6 +278,23 @@ function buildWeekdays(records, eventsByPageview, days, ownHost) {
       steps,
     };
     visit.scanner = isLikelyScanner(visit);
+    // The three sections read longest in this visit.
+    const read = new Map();
+    for (const pv of pageviews) {
+      for (const [name, ms] of insights.dwellByPageview(eventsByPageview.get(pv.pvid))) {
+        read.set(name, Math.max(read.get(name) || 0, ms));
+      }
+    }
+    visit.read = [...read.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([name, ms]) => ({ name, ms }));
+    visit.sourceName = via ? '' : sourceName(visit.source);
+    if (visit.scanner) (out.scannerSids || (out.scannerSids = new Set())).add(pageviews[0].sid);
+    (out.weekdaysMsBySid || (out.weekdaysMsBySid = new Map())).set(pageviews[0].sid, weekdaysMs);
+    if (!visit.scanner && visit.weekdays) {
+      for (const pv of pageviews) (out.readPvids || (out.readPvids = [])).push(pv.pvid);
+    }
     rows.push(visit);
   }
 
@@ -306,6 +330,8 @@ function buildAnalytics(entities, options) {
   const durations = new Map();
   const eventsByPageview = new Map();
   const records = [];
+  const shareRows = [];
+  const pdfRows = [];
 
   for (const entity of entities) {
     if (entity.type === 'dur') {
@@ -320,6 +346,16 @@ function buildAnalytics(entities, options) {
       eventsByPageview.set(entity.pvid, list);
       continue;
     }
+    if (entity.type === 'share' || entity.type === 'pdf') {
+      const day = String(entity.partitionKey || '').replace(/^pv-/, '');
+      (entity.type === 'share' ? shareRows : pdfRows).push({
+        ...entity,
+        day,
+        timestamp: rowTimestamp(entity.rowKey),
+      });
+      continue;
+    }
+    if (entity.type && entity.type !== 'pv') continue;
     records.push({
       day: String(entity.partitionKey || '').replace(/^pv-/, ''),
       path: normalizePath(entity.path),
@@ -337,6 +373,9 @@ function buildAnalytics(entities, options) {
       device: entity.device || '',
       os: entity.os || '',
       browser: entity.browser || '',
+      theme: entity.theme || '',
+      themeFrom: entity.themeFrom || '',
+      vw: entity.vw || '',
     });
   }
 
@@ -360,7 +399,29 @@ function buildAnalytics(entities, options) {
       pagesPerVisit: previousSummary.pagesPerVisit,
       singlePageVisitRatePct: previousSummary.singlePageVisitRatePct,
     },
-    weekdays: buildWeekdays(records, eventsByPageview, current, ownHost),
+    ...buildSections(records, eventsByPageview, durations, shareRows, pdfRows, current, ownHost),
+  };
+}
+
+// Everything on the Job hunt, Site health and Photos and hobbies sub-tabs,
+// for the current period only.
+function buildSections(records, eventsByPageview, durations, shareRows, pdfRows, days, ownHost) {
+  const daySet = new Set(days);
+  const current = records.filter((record) => daySet.has(record.day));
+  const out = { scannerSids: new Set(), weekdaysMsBySid: new Map(), readPvids: [] };
+  const weekdays = buildWeekdays(records, eventsByPageview, days, ownHost, out);
+  weekdays.companies = insights.buildCompanies(current, out);
+  weekdays.read = insights.buildRead(out.readPvids, eventsByPageview);
+  return {
+    weekdays,
+    shares: insights.buildShares(shareRows.filter((row) => daySet.has(row.day))),
+    pdf: insights.buildPdf(pdfRows.filter((row) => daySet.has(row.day))),
+    health: {
+      vitals: insights.buildVitals(current, eventsByPageview),
+      errors: insights.buildErrors(current, eventsByPageview),
+      looks: insights.buildLooks(current, eventsByPageview),
+    },
+    play: insights.buildPlay(current, eventsByPageview, durations),
   };
 }
 

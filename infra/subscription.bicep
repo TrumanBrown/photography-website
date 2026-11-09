@@ -33,6 +33,9 @@ param enableSocialScheduler bool = false
 @description('Deploy Azure Communication Services email so contact form messages are also emailed to the owner. The address is the CONTACT_NOTIFY_TO app setting, set by hand. A fraction of a cent per message. Off by default.')
 param enableContactEmail bool = false
 
+@description('Ping the site\'s API every five minutes so the analytics lookup and the resume PDF never wait on a cold start (docs/analytics.md). Well under a dollar a month.')
+param enableApiWarmup bool = false
+
 var resourceGroupName = 'rg-photography-${environment}'
 var tags = {
   project: 'photography-website'
@@ -61,6 +64,7 @@ module stack 'main.bicep' = {
     enableDescribeModel: enableDescribeModel
     enableSocialScheduler: enableSocialScheduler
     enableContactEmail: enableContactEmail
+    enableApiWarmup: enableApiWarmup
     tags: tags
   }
 }

@@ -58,8 +58,8 @@ describe('analytics aggregation', () => {
   it('classifies historical self-referrals as direct/internal', () => {
     const result = buildAnalytics(entities, { dayKeys, ownHost: 'www.trumanbrown.com' });
     expect(result.referrers).toEqual([
-      { source: 'Direct / internal', views: 3, sharePct: 75 },
-      { source: 'search.brave.com', views: 1, sharePct: 25 },
+      { source: 'Direct / internal', name: 'Direct / internal', views: 3, sharePct: 75 },
+      { source: 'search.brave.com', name: 'search.brave.com', views: 1, sharePct: 25 },
     ]);
   });
 

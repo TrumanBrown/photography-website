@@ -1,89 +1,61 @@
-// Privacy-friendly analytics beacon. Records pageviews, time-on-page and the
-// Weekdays side's events to Table Storage. No IP is ever stored: it's used for
-// a daily-rotating salted hash (so a visitor can't be tracked across days) and
-// for a network and place lookup against a local copy of DB-IP's data
-// (api/shared/geo.js), then dropped. No cookies, no third parties.
+// Privacy-friendly analytics beacon. Records pageviews, time-on-page and page
+// events to Table Storage. No IP is ever stored: it's used for a daily-rotating
+// salted hash (so a visitor can't be tracked across days) and for a network and
+// place lookup against a local copy of DB-IP's data (api/shared/geo.js), then
+// dropped. No cookies, no third parties. A batch of events that shows someone
+// reading the resume can email Truman (api/shared/alert.js).
+//
+// GET /api/track?warm=1 is the warm-up ping from the Logic App timer: it loads
+// the lookup so no visitor waits for it, and records nothing.
 
-const { todayUtc, visitorHash } = require('../shared/visitor-hash');
-const { clientIp } = require('../shared/client-ip');
-const { externalReferrerHost } = require('../shared/referrer');
-const { describeAgent } = require('../shared/user-agent');
-const { createGeo } = require('../shared/geo');
-const { cleanEvents, cleanVia } = require('./payload');
+const { todayUtc, visitorHash } = require("../shared/visitor-hash");
+const { clientIp } = require("../shared/client-ip");
+const { externalReferrerHost } = require("../shared/referrer");
+const { describeAgent } = require("../shared/user-agent");
+const { lookupPlace, warmGeo } = require("../shared/geo-service");
+const { maybeAlert } = require("../shared/alert");
+const { isBot } = require("../shared/bots");
+const {
+  cleanEvents,
+  cleanTheme,
+  cleanThemeFrom,
+  cleanViewport,
+  cleanVia,
+} = require("./payload");
 
 let TableClient;
-let BlobServiceClient;
-const TABLE = 'pageviews';
-const METADATA = 'metadata';
+const TABLE = "pageviews";
 const MAX_PATH = 300;
-const GEO_WAIT_MS = 15000;
-const SALT = process.env.ANALYTICS_SALT || process.env.AZURE_STORAGE_CONNECTION_STRING || '';
+const SALT =
+  process.env.ANALYTICS_SALT ||
+  process.env.AZURE_STORAGE_CONNECTION_STRING ||
+  "";
 
 function getTableClient() {
   const conn = process.env.AZURE_STORAGE_CONNECTION_STRING;
   if (!conn) return null;
   if (!TableClient) {
-    TableClient = require('@azure/data-tables').TableClient;
+    TableClient = require("@azure/data-tables").TableClient;
   }
   return TableClient.fromConnectionString(conn, TABLE);
 }
 
-async function downloadMetadata(name) {
-  const conn = process.env.AZURE_STORAGE_CONNECTION_STRING;
-  if (!conn) return null;
-  if (!BlobServiceClient) {
-    BlobServiceClient = require('@azure/storage-blob').BlobServiceClient;
-  }
-  const blob = BlobServiceClient.fromConnectionString(conn)
-    .getContainerClient(METADATA)
-    .getBlobClient(name);
-  try {
-    return await blob.downloadToBuffer(undefined, undefined, { concurrency: 8 });
-  } catch (err) {
-    if (err.statusCode === 404) return null;
-    throw err;
-  }
-}
-
-let geo;
-function getGeo(context) {
-  if (!geo) {
-    geo = createGeo({
-      download: downloadMetadata,
-      openReader: (buffer) => new (require('mmdb-lib').Reader)(buffer),
-      log: (message) => context.log.warn(message),
-    });
-  }
-  return geo;
-}
-
-// The first beacon on a cold instance waits for the databases to load (a few
-// seconds). Past GEO_WAIT_MS the row is written without them and the load
-// carries on for the next beacon.
-async function lookupPlace(context, ip) {
-  let timer;
-  const timeout = new Promise((resolve) => {
-    timer = setTimeout(() => resolve(null), GEO_WAIT_MS);
-  });
-  try {
-    return await Promise.race([getGeo(context).lookup(ip), timeout]);
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-// Common bot/crawler user-agents we don't want inflating the numbers.
-const BOT_RE = /bot|crawl|spider|slurp|bingpreview|facebookexternalhit|embedly|quora|pinterest|vkshare|whatsapp|telegram|preview|monitor|curl|wget|python-requests|headless/i;
 
 module.exports = async function (context, req) {
   // Always return 204 quickly; analytics must never break the page.
   context.res = { status: 204 };
 
+  if (req.method === "GET") {
+    try {
+      await warmGeo((message) => context.log.warn(message));
+    } catch {}
+    context.res = { status: 204, headers: { "Cache-Control": "no-store" } };
+    return;
+  }
+
   try {
     const ua = req.headers['user-agent'] || '';
-    if (BOT_RE.test(ua)) return; // skip bots
+    if (isBot(ua)) return; // skip bots
 
     const body = req.body || {};
     const type = body.type === 'dur' || body.type === 'ev' ? body.type : 'pv';
@@ -109,7 +81,9 @@ module.exports = async function (context, req) {
         req.headers['host'] || '',
       );
       const ip = clientIp(req);
-      const place = await lookupPlace(context, ip);
+      const place = await lookupPlace(ip, {
+        log: (message) => context.log.warn(message),
+      });
       await client.createEntity({
         partitionKey: `pv-${date}`,
         rowKey,
@@ -122,6 +96,9 @@ module.exports = async function (context, req) {
         pvid,
         ...(place || {}),
         ...describeAgent(ua),
+        theme: cleanTheme(body.theme),
+        themeFrom: cleanThemeFrom(body.themeFrom),
+        vw: cleanViewport(body.vw),
       });
     } else if (type === 'ev') {
       // A random suffix keeps two batches in the same millisecond apart.
@@ -132,6 +109,12 @@ module.exports = async function (context, req) {
         sid,
         pvid,
         evs: JSON.stringify(events),
+      });
+      await maybeAlert({
+        pageviews: client,
+        pvid,
+        events,
+        log: (message) => context.log.warn(message),
       });
     } else {
       const dur = Number(body.dur);

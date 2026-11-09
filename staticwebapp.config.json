@@ -18,6 +18,10 @@
   },
   "routes": [
     {
+      "route": "/Truman-Brown-Resume.pdf",
+      "rewrite": "/api/resume"
+    },
+    {
       "route": "/about",
       "redirect": "/#weekdays",
       "statusCode": 302

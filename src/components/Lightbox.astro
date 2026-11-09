@@ -272,6 +272,55 @@ const { gallerySelector = "#gallery", prints = false } = Astro.props;
     }
   });
 
+  /* Each photograph looked at is counted for the Analytics tab in /admin: how
+     long it was up and whether it was zoomed (src/lib/analytics.ts listens). */
+  let viewing: { key: string; since: number; zoomed: boolean } | null = null;
+  function photoKey(anchor?: HTMLElement): string {
+    if (!anchor) return "";
+    const page =
+      window.location.pathname.split("/").filter(Boolean).pop()?.toLowerCase() ??
+      "";
+    const href = anchor.getAttribute("href") ?? "";
+    let file = anchor.dataset.pswpFilename || href.split("/").pop() || "";
+    try {
+      file = decodeURIComponent(file.split(/[?#]/, 1)[0]);
+    } catch {}
+    return page && file ? `${page}/${file}` : "";
+  }
+  function endView(): void {
+    if (!viewing) return;
+    window.dispatchEvent(
+      new CustomEvent("tb:photo", {
+        detail: {
+          key: viewing.key,
+          ms: Date.now() - viewing.since,
+          zoomed: viewing.zoomed,
+        },
+      }),
+    );
+    viewing = null;
+  }
+  function startView(): void {
+    const slide = lightbox.pswp?.currSlide;
+    const key = photoKey(slide?.data?.element as HTMLElement | undefined);
+    if (viewing?.key === key) return;
+    endView();
+    if (key) viewing = { key, since: Date.now(), zoomed: false };
+  }
+  lightbox.on("afterInit", startView);
+  lightbox.on("change", startView);
+  lightbox.on("zoomPanUpdate", ({ slide }: any) => {
+    if (
+      viewing &&
+      slide === lightbox.pswp?.currSlide &&
+      slide.currZoomLevel > slide.zoomLevels.initial * 1.05
+    ) {
+      viewing.zoomed = true;
+    }
+  });
+  lightbox.on("close", endView);
+  window.addEventListener("pagehide", endView);
+
   lightbox.init();
 
   // A link to one photograph opens the page with it already up.

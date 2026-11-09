@@ -210,6 +210,11 @@ jobs:
           path: .cache/astro
           key: astro-cache-v2-${{ github.run_id }}
 
+      # /api/resume serves the resume PDF so each open is counted, from a copy
+      # beside it; public/ stays the one source (docs/analytics.md).
+      - name: Put the resume PDF beside its function
+        run: cp public/Truman-Brown-Resume.pdf api/resume/resume.pdf
+
       - name: Deploy to Azure Static Web Apps
         if: env.CAN_USE_AZURE == 'true'
         id: swa

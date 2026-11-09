@@ -12,6 +12,7 @@
     "enableDiagnostics": { "value": false },
     "enableDescribeModel": { "value": true },
     "enableSocialScheduler": { "value": true },
-    "enableContactEmail": { "value": true }
+    "enableContactEmail": { "value": true },
+    "enableApiWarmup": { "value": true }
   }
 }

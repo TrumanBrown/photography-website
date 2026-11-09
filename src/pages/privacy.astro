@@ -57,14 +57,31 @@ import BaseLayout from "@/layouts/BaseLayout.astro";
         and which browser, is noted too.
       </p>
       <p>
+        Each page also reports how fast it loaded for you, any script errors it
+        ran into, whether you're in light or dark mode and roughly how wide your
+        screen is. That's how I find a slow or broken page. On photo pages it
+        counts which photos you open full size and for how long, and on the
+        hobby pages whether you had a go and how your Narrow nature rounds went.
+      </p>
+      <p>
         On the weekdays side of the front page, where my resume is, the site
-        notes how far you scroll and which links you press. If you copy some of
-        my text, the first hundred characters are saved too. I use all this to
-        see whether my resume and this site are actually doing their job.
+        notes how far you scroll, how long each part stays on screen and which
+        links you press. If you copy some of my text, the first hundred
+        characters are saved too. I use all this to see whether my resume and
+        this site are actually doing their job.
       </p>
       <p>
         Links in my resume end in ?via=resume so I can tell those visits apart.
-        The page takes it out of the address bar as soon as it loads.
+        The page takes it out of the address bar as soon as it loads. Opening
+        the resume PDF is counted the same way, with the same network lookup.
+        When someone reads the resume side for a while, I get an email saying
+        which network and city it came from, and nothing more.
+      </p>
+      <p>
+        If you paste a link to this site into an app like Slack, Teams or
+        LinkedIn, the app fetches a preview picture, and the site notes which
+        app it was and which page. That request comes from the app's servers, so
+        nothing about you is in it.
       </p>
       <p>
         Network lookups: <a

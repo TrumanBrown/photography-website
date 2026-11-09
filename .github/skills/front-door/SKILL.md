@@ -36,6 +36,7 @@ description: 'The front door at / and About me: the Weekends and Weekdays switch
 - **Today's layout, sized up.** Round 2's three-column, two-page and projects-first layouts all crowded the page. What fixed the blank space was a wider rail (248px, the archive's stays 212px), one centered column the footer's width, bigger resume type (15px lines, 18px titles) and smaller project pictures (a 320px column, the radar 240px). The work should always take more room than the projects.
 - **Same photo, never a different one,** when moving between pages. The lead photo is handed over by its URL and moves to its place. Nothing else carries over.
 - **Weekdays is measured, so new parts get names.** The Analytics tab in `/admin` shows each visit to Weekdays: time on screen, how far down, clicks, copies and where they went next ([docs/analytics.md](../../../docs/analytics.md)). A new section needs `data-track-section`, and a new link or button on Weekdays or in the rail needs `data-track`, both named through `src/lib/track-names.ts`. `index.astro`'s `show()` must keep setting `door.dataset.side` and dispatching `week:side`, or the timer stops.
+- **The PDF is served by a function.** `/Truman-Brown-Resume.pdf` is rewritten to `/api/resume`, which counts each open and serves a copy the build puts beside it. Replace only `public/Truman-Brown-Resume.pdf`; never link a different path to the resume.
 - **The resume's site links carry `?via=resume`** (`https://trumanbrown.com/?via=resume#weekdays` in the contact line, `https://trumanbrown.com/?via=resume` in the skills line). That's how the Analytics tab tells resume visits from typed ones. Keep both whenever the PDF is replaced.
 
 ## Update the resume
@@ -70,6 +71,8 @@ If it says NO DATA, `curl -s https://seattlebalc.com/api/v1/flights | head` firs
 - 2026-11-05, on the page-change mocks: "lands on their cards for both looks best." The rows' prints and drawings now land on their cards (site-motion).
 
 - 2026-11-09: "I want to see if this portfolio site is actualy working on my resume." He wanted the admin panel to show "how long they stayed, if they came from my resume, where they went from my experience page, what they did on the experience page, if they copied anything", and which company from the IP or region. He sends one PDF to everyone: "i am not making a seperate pdf per company appliaction". Built as the Weekdays section of the Analytics tab ([docs/superpowers/specs/2026-11-09-weekdays-analytics-design.md](../../../docs/superpowers/specs/2026-11-09-weekdays-analytics-design.md)).
+
+- 2026-11-09, asked "anything else we can capture about visitors and tracking in analytics for anything?", he picked all ten ideas: email alerts, companies coming back, link shares, PDF opens from anywhere, hiring-system names, time per job, real visitors' speed, errors, light and dark with screen sizes, and photo and hobby use. Alerts "As described" (any engaged resume visit, any engaged company-network visit, Microsoft and the like only from the resume), and every page gets a preview image. Built as four sub-tabs of the Analytics tab ([docs/superpowers/specs/2026-11-09-visitor-insights-design.md](../../../docs/superpowers/specs/2026-11-09-visitor-insights-design.md)).
 
 ## Hard-won lessons
 

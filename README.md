@@ -406,6 +406,9 @@ the domain's yearly fee. About $1.65 is photos sent to visitors, $1.50 is the
 remaining 55 cents is storage space, the caption model, an alert rule and the
 posting timer. Emailing me a copy of each contact message adds a fraction of a
 cent a message, and it sends at most ten an hour, so spam can't run it up.
+Analytics adds about 40 cents: a timer that pings the site every five minutes
+so the resume PDF and the visitor lookup are always ready, and resume alerts,
+which share the contact email's hourly limit.
 Details are in [docs/azure.md](docs/azure.md#monthly-cost).
 
 The line Azure calls Bandwidth is data leaving the storage account. Anything

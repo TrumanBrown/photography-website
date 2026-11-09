@@ -8,6 +8,7 @@ import Footer from "@/components/Footer.astro";
 import ArchiveRail from "@/components/ArchiveRail.astro";
 import MeRail from "@/components/about/MeRail.astro";
 import ContactForm from "@/components/ContactForm.astro";
+import { defaultPreview, previewUrl } from "@/lib/og";
 import ThemeToggle from "@/components/ThemeToggle.astro";
 
 interface Props {
@@ -45,12 +46,14 @@ const pageDescription = description ?? siteConfig.siteDescription;
 const siteOrigin = Astro.site ?? `https://${siteConfig.domain}`;
 const blobOrigin = `https://${siteConfig.blobHost}`;
 const canonical = new URL(Astro.url.pathname, siteOrigin).toString();
-// Open Graph images must be absolute URLs so crawlers can fetch them. Blob
-// URLs already are; resolve any relative local asset path against the site.
-const ogImageAbsolute = ogImage
-  ? ogImage.startsWith("http")
-    ? ogImage
-    : new URL(ogImage, siteOrigin).toString()
+// Every page gets a preview image, the front door's photo when it has none of
+// its own. Apps fetch it through /api/og, which notes the share and redirects
+// to the image (src/lib/og.ts, docs/analytics.md).
+const fallbackPreview = ogImage ? undefined : await defaultPreview();
+const previewImage = ogImage ?? fallbackPreview?.src;
+const previewAlt = ogImage ? ogImageAlt : fallbackPreview?.alt;
+const ogImageAbsolute = previewImage
+  ? previewUrl(siteOrigin, Astro.url.pathname, previewImage)
   : undefined;
 ---
 
@@ -82,7 +85,7 @@ const ogImageAbsolute = ogImage
     {ogImageAbsolute && <meta property="og:image" content={ogImageAbsolute} />}
     {
       ogImageAbsolute && (
-        <meta property="og:image:alt" content={ogImageAlt ?? pageTitle} />
+        <meta property="og:image:alt" content={previewAlt ?? pageTitle} />
       )
     }
     <meta
@@ -94,7 +97,7 @@ const ogImageAbsolute = ogImage
     {ogImageAbsolute && <meta name="twitter:image" content={ogImageAbsolute} />}
     {
       ogImageAbsolute && (
-        <meta name="twitter:image:alt" content={ogImageAlt ?? pageTitle} />
+        <meta name="twitter:image:alt" content={previewAlt ?? pageTitle} />
       )
     }
 

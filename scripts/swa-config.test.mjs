@@ -25,3 +25,11 @@ describe("staticwebapp.config.json", () => {
     expect(about).toMatchObject({ redirect: "/#weekdays" });
   });
 });
+
+describe("resume PDF route", () => {
+  it("sends the PDF's address through /api/resume so opens are counted", () => {
+    const config = JSON.parse(readFileSync(new URL("../staticwebapp.config.json", import.meta.url), "utf8"));
+    const rule = config.routes.find((r) => r.route === "/Truman-Brown-Resume.pdf");
+    expect(rule?.rewrite).toBe("/api/resume");
+  });
+});

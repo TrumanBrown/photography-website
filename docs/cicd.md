@@ -75,8 +75,9 @@ A `concurrency` block cancels older runs on the same branch when a new one arriv
 7. **`npm run build`**: verifies inline CSP hashes and the CSP's storage host, then runs `astro build`. Astro processes images through sharp into WebP/JPEG variants and outputs `dist/`.
 8. **Sign in again and sync variants to Blob (trusted events only)**: `scripts/sync-variants.mjs` uploads generated photos to `variants/`, rewrites HTML URLs, and removes those large files from the SWA payload.
 9. **Stage `staticwebapp.config.json`** and save the Astro asset cache.
-10. **Deploy to SWA (trusted events only)** via `Azure/static-web-apps-deploy@v1` with `skip_app_build: true`. This uses the SWA deploy token, not the Azure sign-in.
-11. **Start the photo pipeline** when prebuild found photos it hasn't seen yet (`new_photos` output). The build never calls a model itself; see the next section.
+10. **Put the resume PDF beside its function**: copies `public/Truman-Brown-Resume.pdf` to `api/resume/resume.pdf`, which `/api/resume` serves so each open is counted ([analytics.md](analytics.md#resume-pdf-opens)).
+11. **Deploy to SWA (trusted events only)** via `Azure/static-web-apps-deploy@v1` with `skip_app_build: true`. This uses the SWA deploy token, not the Azure sign-in.
+12. **Start the photo pipeline** when prebuild found photos it hasn't seen yet (`new_photos` output). The build never calls a model itself; see the next section.
 
 The prebuild cache cleanup is a disk-capacity requirement, not a cache miss. A production run restores about 2 GB of build copies and 1.7 GB of Astro variants. Prebuild copies its cached inputs into `src/content/`, and Astro copies optimized variants into `dist/`; retaining every copy at once can exhaust a GitHub-hosted runner with `ENOSPC` late in image generation. Saving `.cache/prebuild` before deleting the runner's local copy preserves the next run's cache while freeing enough space for Astro and `dist/`.
 

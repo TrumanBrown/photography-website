@@ -181,8 +181,82 @@ interface AnalyticsData extends AnalyticsSummary {
     durationCoveragePct: number;
     sharePct: number;
   }[];
-  referrers: { source: string; views: number; sharePct: number }[];
+  referrers: { source: string; name?: string; views: number; sharePct: number }[];
   weekdays?: WeekdaysData;
+  shares?: SharesData;
+  pdf?: PdfData;
+  health?: HealthData;
+  play?: PlayData;
+}
+
+interface SharesData {
+  total: number;
+  searchFetches: number;
+  byApp: { app: string; count: number }[];
+  rows: { at: string; app: string; page: string; agent: string }[];
+}
+
+interface PdfOpen {
+  at: string;
+  fromSite: boolean;
+  via: string;
+  source: string;
+  sourceName: string;
+  org: string;
+  orgKind: string;
+  city: string;
+  region: string;
+  country: string;
+  device: string;
+  os: string;
+  browser: string;
+  scanner: boolean;
+}
+
+interface PdfData {
+  totals: { opens: number; outside: number; fromSite: number; scanners: number };
+  rows: PdfOpen[];
+}
+
+type VitalName = 'LCP' | 'INP' | 'CLS' | 'FCP' | 'TTFB';
+
+interface HealthData {
+  vitals: {
+    group: string;
+    device: string;
+    pageviews: number;
+    metrics: Record<VitalName, { p75: number | null; samples: number; rating: string }>;
+  }[];
+  errors: {
+    message: string;
+    source: string;
+    line: number | null;
+    count: number;
+    pages: string[];
+    browsers: string[];
+    lastSeen: string;
+  }[];
+  looks: {
+    visits: number;
+    theme: { light: number; dark: number };
+    from: { device: number; choice: number };
+    toggles: { light: number; dark: number };
+    viewports: { band: string; visits: number }[];
+  };
+}
+
+interface PlayData {
+  photos: { key: string; opens: number; totalMs: number; zooms: number }[];
+  galleries: { page: string; opens: number; photos: number; totalMs: number }[];
+  narrowNature: {
+    visits: number;
+    played: number;
+    dailyFinished: number;
+    extraFinished: number;
+    averageScore: number;
+    moreLists: number;
+  };
+  hobbies: { slug: string; visits: number; played: number; medianMs: number; medianPlayedMs: number }[];
 }
 
 interface WeekdaysStep {
@@ -213,6 +287,8 @@ interface WeekdaysVisit {
   next: string;
   scanner: boolean;
   steps: WeekdaysStep[];
+  read?: { name: string; ms: number }[];
+  sourceName?: string;
 }
 
 interface WeekdaysData {
@@ -226,6 +302,17 @@ interface WeekdaysData {
   };
   owners: { org: string; orgKind: string; visits: number }[];
   visits: WeekdaysVisit[];
+  companies?: {
+    org: string;
+    orgKind: string;
+    visits: number;
+    days: number;
+    resumeVisits: number;
+    weekdaysMs: number;
+    lastSeen: string;
+    place: string;
+  }[];
+  read?: { name: string; visits: number; totalMs: number; medianMs: number }[];
 }
 
 function fmtDuration(ms: number): string {
@@ -639,7 +726,7 @@ function renderAnalytics(a: AnalyticsData) {
         .map(
           (r) =>
             `<tr>
-              <th scope="row" class="px-3 py-2 font-normal text-neutral-700 dark:text-neutral-300">${esc(r.source)}</th>
+              <th scope="row" class="px-3 py-2 font-normal text-neutral-700 dark:text-neutral-300">${esc(r.name && r.name !== r.source ? `${r.name} (${r.source})` : r.source)}</th>
               <td class="px-3 py-2 text-right tabular-nums">${r.views.toLocaleString()}</td>
               <td class="px-3 py-2 text-right tabular-nums text-neutral-500 dark:text-neutral-400">${esc(fmtPercent(r.sharePct))}</td>
             </tr>`,
@@ -649,6 +736,300 @@ function renderAnalytics(a: AnalyticsData) {
 
   renderWeekdays(a.weekdays);
   renderOwnerStatus();
+  renderJobHunt(a);
+  renderHealth(a.health);
+  renderPlay(a.play);
+  lastAnalytics = a;
+}
+
+// --- Analytics sub-tabs ------------------------------------------------------
+
+let lastAnalytics: AnalyticsData | undefined;
+const SUBTAB_ON = ['border-neutral-900', 'dark:border-white'];
+const SUBTAB_OFF = [
+  'border-transparent',
+  'text-neutral-500',
+  'hover:text-neutral-700',
+  'dark:text-neutral-400',
+  'dark:hover:text-neutral-200',
+];
+
+function showSubtab(name: string, focus = false) {
+  document.querySelectorAll<HTMLButtonElement>('[data-subtab]').forEach((tab) => {
+    const on = tab.dataset.subtab === name;
+    tab.setAttribute('aria-selected', String(on));
+    tab.tabIndex = on ? 0 : -1;
+    tab.classList.remove(...(on ? SUBTAB_OFF : SUBTAB_ON));
+    tab.classList.add(...(on ? SUBTAB_ON : SUBTAB_OFF));
+    if (on && focus) tab.focus();
+  });
+  document.querySelectorAll<HTMLElement>('[data-subpanel]').forEach((panel) => {
+    panel.classList.toggle('hidden', panel.dataset.subpanel !== name);
+  });
+  // The chart measures its frame, which is zero wide while hidden.
+  if (name === 'traffic' && lastAnalytics) renderTrafficChart(lastAnalytics);
+}
+
+document.querySelector('[data-subtabs]')?.addEventListener('click', (event) => {
+  const tab = (event.target as Element).closest<HTMLButtonElement>('[data-subtab]');
+  if (tab?.dataset.subtab) showSubtab(tab.dataset.subtab);
+});
+document.querySelector('[data-subtabs]')?.addEventListener('keydown', (event) => {
+  const key = (event as KeyboardEvent).key;
+  if (key !== 'ArrowRight' && key !== 'ArrowLeft') return;
+  const tabs = [...document.querySelectorAll<HTMLButtonElement>('[data-subtab]')];
+  const current = tabs.findIndex((tab) => tab.getAttribute('aria-selected') === 'true');
+  const next = tabs[(current + (key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length];
+  if (next?.dataset.subtab) showSubtab(next.dataset.subtab, true);
+  event.preventDefault();
+});
+
+const MUTED = 'text-neutral-500 dark:text-neutral-400';
+
+function emptyRow(columns: number, text: string): string {
+  return `<tr><td colspan="${columns}" class="px-3 py-6 text-center ${MUTED}">${esc(text)}</td></tr>`;
+}
+
+function cell(value: string, right = false, extra = ''): string {
+  return `<td class="px-3 py-2 align-top${right ? ' text-right tabular-nums' : ''}${extra ? ` ${extra}` : ''}">${value}</td>`;
+}
+
+function placeLabel(row: { city: string; region: string; country: string }): string {
+  return [row.city, row.region, row.country].filter(Boolean).join(', ') || '—';
+}
+
+function networkCell(org: string, orgKind: string): string {
+  const kind = ORG_KINDS[orgKind];
+  return org
+    ? `${esc(org)}${kind ? `<span class="block text-xs ${MUTED}">${esc(kind)}</span>` : ''}`
+    : `<span class="${MUTED}">Unknown</span>`;
+}
+
+function renderJobHunt(a: AnalyticsData) {
+  const companies = document.getElementById('companies-rows');
+  if (companies) {
+    const rows = a.weekdays?.companies ?? [];
+    companies.innerHTML = rows.length
+      ? rows
+          .map(
+            (c) => `<tr>
+              ${cell(networkCell(c.org, c.orgKind))}
+              ${cell(esc(c.place || '—'))}
+              ${cell(String(c.visits), true)}
+              ${cell(`${c.days}${c.days > 1 ? ' <span class="text-xs text-teal-700 dark:text-teal-400">came back</span>' : ''}`, true)}
+              ${cell(String(c.resumeVisits), true)}
+              ${cell(esc(fmtDuration(c.weekdaysMs)), true)}
+              ${cell(esc(fmtWhen(c.lastSeen)), false, 'whitespace-nowrap')}
+            </tr>`,
+          )
+          .join('')
+      : emptyRow(7, 'No company networks in this period yet.');
+  }
+
+  const read = document.getElementById('read-rows');
+  if (read) {
+    const rows = a.weekdays?.read ?? [];
+    read.innerHTML = rows.length
+      ? rows
+          .map(
+            (r) => `<tr>
+              ${cell(esc(trackLabel(r.name)))}
+              ${cell(String(r.visits), true)}
+              ${cell(esc(fmtDuration(r.totalMs)), true)}
+              ${cell(esc(fmtDuration(r.medianMs)), true)}
+            </tr>`,
+          )
+          .join('')
+      : emptyRow(4, 'Nothing read long enough to count yet.');
+  }
+
+  const shares = a.shares;
+  const summary = document.getElementById('shares-summary');
+  if (summary) {
+    summary.textContent = shares?.total
+      ? `${shares.total} share${shares.total === 1 ? '' : 's'}: ${shares.byApp.map((x) => `${x.app} ${x.count}`).join(' · ')}`
+      : '';
+  }
+  const shareRows = document.getElementById('shares-rows');
+  if (shareRows) {
+    shareRows.innerHTML = shares?.rows.length
+      ? shares.rows
+          .map(
+            (r) => `<tr>
+              ${cell(esc(fmtWhen(r.at)), false, 'whitespace-nowrap')}
+              ${cell(`${esc(r.app)}${r.agent ? `<span class="block text-xs ${MUTED}">${esc(r.agent)}</span>` : ''}`)}
+              ${cell(`<a href="${esc(r.page)}" target="_blank" rel="noopener" class="underline decoration-neutral-300 underline-offset-2">${esc(r.page)}</a>`)}
+            </tr>`,
+          )
+          .join('')
+      : emptyRow(3, 'No shares seen in this period.');
+  }
+
+  const pdf = a.pdf;
+  const pdfCards = document.getElementById('pdf-cards');
+  if (pdfCards) {
+    pdfCards.innerHTML = pdf
+      ? weekdaysCard('Opens', String(pdf.totals.opens), 'not counting scanners') +
+        weekdaysCard('From elsewhere', String(pdf.totals.outside), 'a link outside the site') +
+        weekdaysCard('From the site', String(pdf.totals.fromSite), 'the Resume (PDF) buttons') +
+        weekdaysCard('Link scanners', String(pdf.totals.scanners), 'greyed, left out')
+      : '';
+  }
+  const pdfRows = document.getElementById('pdf-rows');
+  if (pdfRows) {
+    pdfRows.innerHTML = pdf?.rows.length
+      ? pdf.rows
+          .map(
+            (r) => `<tr class="${r.scanner ? 'opacity-50' : ''}">
+              ${cell(`${esc(fmtWhen(r.at))}${r.scanner ? `<span class="block text-xs ${MUTED}">Likely a link scanner</span>` : ''}`, false, 'whitespace-nowrap')}
+              ${cell(esc(r.fromSite ? 'This site' : r.via === 'resume' ? 'Resume link' : r.sourceName || r.source || 'Direct'))}
+              ${cell(networkCell(r.org, r.orgKind))}
+              ${cell(esc(placeLabel(r)))}
+              ${cell(esc([r.device ? r.device[0].toUpperCase() + r.device.slice(1) : '', r.os, r.browser].filter(Boolean).join(' · ') || '—'), false, 'text-xs')}
+            </tr>`,
+          )
+          .join('')
+      : emptyRow(5, 'No PDF opens in this period.');
+  }
+}
+
+const VITALS: VitalName[] = ['LCP', 'INP', 'CLS', 'FCP', 'TTFB'];
+const RATING_CLASS: Record<string, string> = {
+  good: 'text-emerald-700 dark:text-emerald-400',
+  'needs-improvement': 'text-amber-700 dark:text-amber-400',
+  poor: 'text-red-700 dark:text-red-400',
+};
+
+function fmtVital(name: VitalName, value: number | null): string {
+  if (value === null) return '—';
+  if (name === 'CLS') return value.toFixed(2);
+  return value >= 1000 ? `${(value / 1000).toFixed(1)} s` : `${Math.round(value)} ms`;
+}
+
+function renderHealth(health: HealthData | undefined) {
+  const speed = document.getElementById('speed-rows');
+  if (speed) {
+    speed.innerHTML = health?.vitals.length
+      ? health.vitals
+          .map(
+            (row) => `<tr class="${row.group === 'All pages' ? 'font-medium' : ''}">
+              ${cell(esc(row.group))}
+              ${cell(esc(row.device))}
+              ${cell(String(row.pageviews), true)}
+              ${VITALS.map((name) => {
+                const m = row.metrics[name];
+                const few = m.samples > 0 && m.samples < 5 ? `<span class="block text-xs ${MUTED}">${m.samples} only</span>` : '';
+                return cell(`<span class="${RATING_CLASS[m.rating] ?? ''}">${esc(fmtVital(name, m.p75))}</span>${few}`, true);
+              }).join('')}
+            </tr>`,
+          )
+          .join('')
+      : emptyRow(8, 'No speed reports yet. They arrive as visitors leave a page.');
+  }
+
+  const errors = document.getElementById('errors-rows');
+  if (errors) {
+    errors.innerHTML = health?.errors.length
+      ? health.errors
+          .map(
+            (e) => `<tr>
+              ${cell(esc(e.message), false, 'max-w-md break-words')}
+              ${cell(esc(e.source ? `${e.source}${e.line ? `:${e.line}` : ''}` : '—'), false, 'text-xs')}
+              ${cell(String(e.count), true)}
+              ${cell(esc(e.pages.join(', ')), false, 'text-xs')}
+              ${cell(esc(e.browsers.join(', ') || '—'), false, 'text-xs')}
+              ${cell(esc(fmtWhen(e.lastSeen)), false, 'whitespace-nowrap')}
+            </tr>`,
+          )
+          .join('')
+      : emptyRow(6, 'No errors reported in this period.');
+  }
+
+  const looks = document.getElementById('looks');
+  if (looks) {
+    const l = health?.looks;
+    if (!l || !l.visits) {
+      looks.innerHTML = `<p class="text-sm ${MUTED}">No visits with theme and screen data yet.</p>`;
+    } else {
+      const pct = (n: number) => `${Math.round((n / l.visits) * 100)}%`;
+      const bands = l.viewports
+        .map((v) => `<li class="flex justify-between gap-3"><span>${esc(v.band)} px</span><span class="tabular-nums">${v.visits} · ${pct(v.visits)}</span></li>`)
+        .join('');
+      looks.innerHTML =
+        weekdaysCard('Dark mode', pct(l.theme.dark), `${l.theme.dark} of ${l.visits} visits; light ${pct(l.theme.light)}`) +
+        weekdaysCard('Set by the device', pct(l.from.device), `chosen with the toggle earlier: ${pct(l.from.choice)}`) +
+        weekdaysCard('Toggle presses', String(l.toggles.dark + l.toggles.light), `to dark ${l.toggles.dark}, to light ${l.toggles.light}`) +
+        `<div class="rounded border border-neutral-200 p-3 md:col-span-3 dark:border-neutral-700">
+          <p class="text-xs font-medium ${MUTED}">Screen width</p>
+          <ul class="mt-2 space-y-1 text-sm">${bands}</ul>
+        </div>`;
+    }
+  }
+}
+
+function hobbyName(slug: string): string {
+  return slug.charAt(0).toUpperCase() + slug.slice(1).replace(/-/g, ' ');
+}
+
+function renderPlay(play: PlayData | undefined) {
+  const photos = document.getElementById('photos-rows');
+  if (photos) {
+    photos.innerHTML = play?.photos.length
+      ? play.photos
+          .map((p) => {
+            const [page, file] = p.key.split('/');
+            return `<tr>
+              ${cell(`${esc(file ?? p.key)}<span class="block text-xs ${MUTED}">${esc(page ?? '')}</span>`)}
+              ${cell(String(p.opens), true)}
+              ${cell(esc(fmtDuration(p.totalMs)), true)}
+              ${cell(String(p.zooms), true)}
+            </tr>`;
+          })
+          .join('')
+      : emptyRow(4, 'No photos opened in this period.');
+  }
+  const galleries = document.getElementById('galleries-rows');
+  if (galleries) {
+    galleries.innerHTML = play?.galleries.length
+      ? play.galleries
+          .map(
+            (g) => `<tr>
+              ${cell(esc(g.page))}
+              ${cell(String(g.opens), true)}
+              ${cell(String(g.photos), true)}
+              ${cell(esc(fmtDuration(g.totalMs)), true)}
+            </tr>`,
+          )
+          .join('')
+      : emptyRow(4, 'No galleries opened in this period.');
+  }
+  const nn = document.getElementById('nn-cards');
+  if (nn) {
+    const n = play?.narrowNature;
+    nn.innerHTML = n
+      ? weekdaysCard('Visits', String(n.visits), 'to the puzzle page') +
+        weekdaysCard('Played', String(n.played), 'pressed something on the board') +
+        weekdaysCard('Today\'s list', String(n.dailyFinished), 'rounds finished') +
+        weekdaysCard('More lists', String(n.extraFinished), `finished, ${n.moreLists} dealt`) +
+        weekdaysCard('Average score', n.averageScore ? n.averageScore.toLocaleString() : '—', 'per finished round')
+      : '';
+  }
+  const hobbies = document.getElementById('hobbies-rows');
+  if (hobbies) {
+    hobbies.innerHTML = play?.hobbies.length
+      ? play.hobbies
+          .map(
+            (h) => `<tr>
+              ${cell(`<a href="/hobbies/${esc(h.slug)}/" target="_blank" rel="noopener" class="underline decoration-neutral-300 underline-offset-2">${esc(hobbyName(h.slug))}</a>`)}
+              ${cell(String(h.visits), true)}
+              ${cell(`${h.played}${h.visits ? ` <span class="text-xs ${MUTED}">${Math.round((h.played / h.visits) * 100)}%</span>` : ''}`, true)}
+              ${cell(esc(fmtDuration(h.medianMs)), true)}
+              ${cell(esc(fmtDuration(h.medianPlayedMs)), true)}
+            </tr>`,
+          )
+          .join('')
+      : emptyRow(5, 'No hobby page visits in this period.');
+  }
 }
 
 // --- Weekdays and resume visits --------------------------------------------
@@ -714,7 +1095,7 @@ function fmtWhen(iso: string): string {
 function sourceLabel(visit: WeekdaysVisit): string {
   if (visit.via === 'resume') return 'Resume';
   if (visit.via) return `Link: ${visit.via}`;
-  return visit.source || 'Direct';
+  return visit.sourceName || visit.source || 'Direct';
 }
 
 function deviceLabel(visit: WeekdaysVisit): string {
@@ -797,12 +1178,18 @@ function renderWeekdays(data: WeekdaysData | undefined) {
       const then = visit.weekdays
         ? visit.next || 'Left the site'
         : visit.pages.slice(1).join(', ') || 'Left the site';
-      const steps = visit.steps
-        .map(
-          (step, index) =>
-            `<li class="flex gap-3"><span class="w-12 shrink-0 text-right tabular-nums text-neutral-500 dark:text-neutral-400">${fmtClock(step.at)}</span><span>${esc(stepText(step, index))}</span></li>`,
-        )
-        .join('');
+      const steps =
+        visit.steps
+          .map(
+            (step, index) =>
+              `<li class="flex gap-3"><span class="w-12 shrink-0 text-right tabular-nums text-neutral-500 dark:text-neutral-400">${fmtClock(step.at)}</span><span>${esc(stepText(step, index))}</span></li>`,
+          )
+          .join('') +
+        (visit.read?.length
+          ? `<li class="flex gap-3 pt-2"><span class="w-12 shrink-0"></span><span class="text-neutral-600 dark:text-neutral-300">Read longest: ${esc(
+              visit.read.map((r) => `${trackLabel(r.name)} (${fmtDuration(r.ms)})`).join(', '),
+            )}</span></li>`
+          : '');
       return `<tr class="${visit.scanner ? 'opacity-50' : ''}">
           <td class="whitespace-nowrap px-3 py-2 align-top">
             <button type="button" data-visit-toggle="${i}" aria-expanded="false" aria-controls="visit-steps-${i}" class="text-left underline decoration-neutral-300 underline-offset-2 hover:decoration-neutral-700 dark:decoration-neutral-600">${esc(fmtWhen(visit.start))}</button>

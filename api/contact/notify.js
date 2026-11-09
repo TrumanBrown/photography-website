@@ -125,7 +125,9 @@ module.exports = {
   notify,
   buildNotification,
   readSettings,
+  getClient,
   cleanPage,
   oneLine,
   MAX_PER_HOUR,
+  SEND_TIMEOUT_MS,
 };
