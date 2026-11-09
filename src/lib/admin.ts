@@ -1,4 +1,6 @@
 import { escapeHtml as esc } from './html';
+import { OWNER_KEY } from './beacon';
+import { trackLabel } from './track-names';
 import {
   clampPanelSize,
   clampTileSize,
@@ -56,6 +58,7 @@ fetch('/.auth/me')
     if (user) {
       document.getElementById('admin-user')!.textContent = user.userDetails;
       authedEl.classList.remove('hidden');
+      markOwnerBrowser();
       loadSessions();
     } else {
       signinEl.classList.remove('hidden');
@@ -179,6 +182,50 @@ interface AnalyticsData extends AnalyticsSummary {
     sharePct: number;
   }[];
   referrers: { source: string; views: number; sharePct: number }[];
+  weekdays?: WeekdaysData;
+}
+
+interface WeekdaysStep {
+  at: number;
+  kind: 'page' | 'show' | 'hide' | 'reach' | 'click' | 'copy';
+  value?: string;
+  section?: string;
+}
+
+interface WeekdaysVisit {
+  start: string;
+  via: string;
+  source: string;
+  org: string;
+  orgKind: string;
+  city: string;
+  region: string;
+  country: string;
+  device: string;
+  os: string;
+  browser: string;
+  weekdays: boolean;
+  weekdaysMs: number;
+  furthest: string;
+  clicks: string[];
+  copies: { section: string; text: string }[];
+  pages: string[];
+  next: string;
+  scanner: boolean;
+  steps: WeekdaysStep[];
+}
+
+interface WeekdaysData {
+  totals: {
+    weekdaysVisits: number;
+    resumeVisits: number;
+    scannerVisits: number;
+    medianWeekdaysMs: number;
+    pdfClicks: number;
+    copyVisits: number;
+  };
+  owners: { org: string; orgKind: string; visits: number }[];
+  visits: WeekdaysVisit[];
 }
 
 function fmtDuration(ms: number): string {
@@ -599,7 +646,192 @@ function renderAnalytics(a: AnalyticsData) {
         )
         .join('')
     : '<tr><td colspan="3" class="px-3 py-8 text-center text-neutral-500 dark:text-neutral-400">No acquisition data in this period.</td></tr>';
+
+  renderWeekdays(a.weekdays);
+  renderOwnerStatus();
 }
+
+// --- Weekdays and resume visits --------------------------------------------
+
+// The admin page never counts itself (analytics.ts skips /admin), and from the
+// first sign-in this browser isn't counted on the public pages either. "0"
+// means Truman chose to be counted again, so sign-in doesn't undo it.
+function ownerFlag(): string | null {
+  try {
+    return localStorage.getItem(OWNER_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function setOwnerFlag(value: '1' | '0') {
+  try {
+    localStorage.setItem(OWNER_KEY, value);
+  } catch {}
+}
+
+function markOwnerBrowser() {
+  if (ownerFlag() === null) setOwnerFlag('1');
+}
+
+function renderOwnerStatus() {
+  const el = document.getElementById('owner-status');
+  if (!el) return;
+  const excluded = ownerFlag() === '1';
+  el.innerHTML = `${excluded ? "This browser isn't counted." : 'This browser is counted.'}
+    <button type="button" data-owner-toggle class="ml-1 underline hover:text-neutral-700 dark:hover:text-neutral-200">${excluded ? 'Count it' : "Don't count it"}</button>`;
+}
+
+document.getElementById('owner-status')?.addEventListener('click', (event) => {
+  if (!(event.target as Element).closest('[data-owner-toggle]')) return;
+  setOwnerFlag(ownerFlag() === '1' ? '0' : '1');
+  renderOwnerStatus();
+});
+
+const ORG_KINDS: Record<string, string> = {
+  home: 'home or mobile internet',
+  relay: 'VPN or privacy relay',
+  proxy: 'company proxy, company hidden',
+  scanner: 'email link scanner',
+  cloud: 'server or cloud',
+  mixed: 'also a cloud',
+};
+
+function fmtClock(ms: number): string {
+  const s = Math.max(0, Math.round(ms / 1000));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
+function fmtWhen(iso: string): string {
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(new Date(iso));
+}
+
+function sourceLabel(visit: WeekdaysVisit): string {
+  if (visit.via === 'resume') return 'Resume';
+  if (visit.via) return `Link: ${visit.via}`;
+  return visit.source || 'Direct';
+}
+
+function deviceLabel(visit: WeekdaysVisit): string {
+  const device = visit.device ? visit.device[0].toUpperCase() + visit.device.slice(1) : '';
+  return [device, visit.os, visit.browser].filter(Boolean).join(' · ') || '—';
+}
+
+function stepText(step: WeekdaysStep, index: number): string {
+  switch (step.kind) {
+    case 'page':
+      return `${index === 0 ? 'Arrived on' : 'Opened'} ${step.value ?? ''}`;
+    case 'show':
+      return 'Opened Weekdays';
+    case 'hide':
+      return 'Switched to Weekends';
+    case 'reach':
+      return `Reached ${trackLabel(step.value ?? '')}`;
+    case 'click':
+      return `Clicked ${trackLabel(step.value ?? '')}`;
+    case 'copy':
+      return `Copied “${step.value ?? ''}” from ${trackLabel(step.section ?? 'weekdays')}`;
+    default:
+      return step.kind;
+  }
+}
+
+function weekdaysCard(label: string, value: string, detail: string): string {
+  return `<div class="rounded border border-neutral-200 p-3 dark:border-neutral-700">
+    <p class="text-xs font-medium text-neutral-500 dark:text-neutral-400">${esc(label)}</p>
+    <p class="mt-1 text-xl font-semibold tabular-nums">${esc(value)}</p>
+    <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">${esc(detail)}</p>
+  </div>`;
+}
+
+function renderWeekdays(data: WeekdaysData | undefined) {
+  const cards = document.getElementById('weekdays-cards')!;
+  const owners = document.getElementById('weekdays-owners')!;
+  const body = document.getElementById('weekdays-visits')!;
+  if (!data) {
+    cards.innerHTML = '';
+    owners.textContent = '';
+    body.innerHTML =
+      '<tr><td colspan="9" class="px-3 py-8 text-center text-neutral-500 dark:text-neutral-400">No Weekdays data yet.</td></tr>';
+    return;
+  }
+  const t = data.totals;
+  cards.innerHTML =
+    weekdaysCard('Opened Weekdays', String(t.weekdaysVisits), 'visits') +
+    weekdaysCard('From the resume', String(t.resumeVisits), 'clicked a link in the PDF') +
+    weekdaysCard('Median time', fmtDuration(t.medianWeekdaysMs), 'on Weekdays, on screen') +
+    weekdaysCard('Opened the PDF', String(t.pdfClicks), 'visits that clicked Resume (PDF)') +
+    weekdaysCard('Copied text', String(t.copyVisits), 'visits that copied something') +
+    weekdaysCard('Link scanners', String(t.scannerVisits), 'greyed, left out of the rest');
+
+  owners.innerHTML = data.owners.length
+    ? `<span class="text-neutral-500 dark:text-neutral-400">Networks seen most:</span> ${data.owners
+        .map(
+          (owner) =>
+            `${esc(owner.org)}${ORG_KINDS[owner.orgKind] ? ` <span class="text-neutral-500 dark:text-neutral-400">(${esc(ORG_KINDS[owner.orgKind])})</span>` : ''}: ${owner.visits}`,
+        )
+        .join(' · ')}`
+    : '';
+
+  if (!data.visits.length) {
+    body.innerHTML =
+      '<tr><td colspan="9" class="px-3 py-8 text-center text-neutral-500 dark:text-neutral-400">No Weekdays or resume visits in this period.</td></tr>';
+    return;
+  }
+
+  body.innerHTML = data.visits
+    .map((visit, i) => {
+      const kind = ORG_KINDS[visit.orgKind];
+      const network = visit.org
+        ? `${esc(visit.org)}${kind ? `<span class="block text-xs text-neutral-500 dark:text-neutral-400">${esc(kind)}</span>` : ''}`
+        : '<span class="text-neutral-500 dark:text-neutral-400">Unknown</span>';
+      const did = [
+        ...visit.clicks.map((click) => trackLabel(click)),
+        ...(visit.copies.length ? [`copied ${visit.copies.length}`] : []),
+      ];
+      const then = visit.weekdays
+        ? visit.next || 'Left the site'
+        : visit.pages.slice(1).join(', ') || 'Left the site';
+      const steps = visit.steps
+        .map(
+          (step, index) =>
+            `<li class="flex gap-3"><span class="w-12 shrink-0 text-right tabular-nums text-neutral-500 dark:text-neutral-400">${fmtClock(step.at)}</span><span>${esc(stepText(step, index))}</span></li>`,
+        )
+        .join('');
+      return `<tr class="${visit.scanner ? 'opacity-50' : ''}">
+          <td class="whitespace-nowrap px-3 py-2 align-top">
+            <button type="button" data-visit-toggle="${i}" aria-expanded="false" aria-controls="visit-steps-${i}" class="text-left underline decoration-neutral-300 underline-offset-2 hover:decoration-neutral-700 dark:decoration-neutral-600">${esc(fmtWhen(visit.start))}</button>
+            ${visit.scanner ? '<span class="block text-xs text-neutral-500 dark:text-neutral-400">Likely a link scanner</span>' : ''}
+          </td>
+          <td class="px-3 py-2 align-top">${esc(sourceLabel(visit))}</td>
+          <td class="px-3 py-2 align-top">${network}</td>
+          <td class="px-3 py-2 align-top">${esc([visit.city, visit.region, visit.country].filter(Boolean).join(', ') || '—')}</td>
+          <td class="px-3 py-2 align-top text-xs">${esc(deviceLabel(visit))}</td>
+          <td class="px-3 py-2 text-right align-top tabular-nums">${visit.weekdays ? esc(fmtDuration(visit.weekdaysMs)) : '<span class="text-neutral-500 dark:text-neutral-400">Didn’t open</span>'}</td>
+          <td class="px-3 py-2 align-top">${visit.furthest ? esc(trackLabel(visit.furthest)) : '—'}</td>
+          <td class="px-3 py-2 align-top">${did.length ? esc(did.join(', ')) : '—'}</td>
+          <td class="px-3 py-2 align-top">${esc(then)}</td>
+        </tr>
+        <tr id="visit-steps-${i}" class="hidden bg-neutral-50 dark:bg-neutral-900">
+          <td colspan="9" class="px-3 py-3"><ol class="space-y-1 text-sm">${steps}</ol></td>
+        </tr>`;
+    })
+    .join('');
+}
+
+document.getElementById('weekdays-visits')?.addEventListener('click', (event) => {
+  const button = (event.target as Element).closest<HTMLButtonElement>('[data-visit-toggle]');
+  if (!button) return;
+  const row = document.getElementById(`visit-steps-${button.dataset.visitToggle}`);
+  if (!row) return;
+  const open = row.classList.toggle('hidden') === false;
+  button.setAttribute('aria-expanded', String(open));
+});
 
 interface Message {
   id: string;

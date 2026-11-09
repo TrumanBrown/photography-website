@@ -13,6 +13,7 @@ import {
   WORK,
   monthLabel,
 } from "@/lib/about";
+import { jobSection } from "@/lib/track-names";
 ---
 
 <section class="wsec" aria-labelledby="work-h">
@@ -22,11 +23,11 @@ import {
       >{WORK.length} roles since {firstYear(WORK)}</span
     >
   </div>
-  <p class="summary">{SUMMARY}</p>
+  <p class="summary" data-track-section="summary">{SUMMARY}</p>
   <ul class="jobs">
     {
       WORK.map((job) => (
-        <li class="job">
+        <li class="job" data-track-section={jobSection(job)}>
           <span class="u-label tabular-nums job-when">
             {periodLabel(job.from, job.to)}
           </span>
@@ -50,7 +51,7 @@ import {
 
 <slot />
 
-<section class="wsec" aria-labelledby="school-h">
+<section class="wsec" aria-labelledby="school-h" data-track-section="school">
   <div class="shead"><h2 id="school-h">School</h2></div>
   <ul class="jobs">
     <li class="job">
@@ -66,7 +67,7 @@ import {
   </ul>
 </section>
 
-<section class="wsec" aria-labelledby="skills-h">
+<section class="wsec" aria-labelledby="skills-h" data-track-section="skills">
   <div class="shead"><h2 id="skills-h">Skills</h2></div>
   <dl class="skills">
     {

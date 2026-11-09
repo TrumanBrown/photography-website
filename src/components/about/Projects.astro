@@ -14,6 +14,7 @@ import { Picture } from "astro:assets";
 import type { ImageMetadata } from "astro";
 import poster from "@/assets/about/cozy-critter.jpg";
 import { COZY_VIDEO, monthLabel, PROJECTS } from "@/lib/about";
+import { projectName } from "@/lib/track-names";
 import { sortSessions, sessionSlug, splitSessionTitle } from "@/lib/sessions";
 import { coverFileOf } from "@/lib/archive";
 
@@ -64,20 +65,25 @@ const siteFacts = [
 const watchUrl = `https://www.youtube.com/watch?v=${COZY_VIDEO.youtubeId}`;
 ---
 
-<section class="wsec" aria-labelledby="projects-h">
+<section
+  class="wsec"
+  aria-labelledby="projects-h"
+  data-track-section="projects"
+>
   <div class="shead">
     <h2 id="projects-h">Side projects</h2>
     <a
       class="shead-link draw"
       href="https://github.com/TrumanBrown"
       target="_blank"
-      rel="noopener noreferrer">More on GitHub ↗</a
+      rel="noopener noreferrer"
+      data-track="github-profile">More on GitHub ↗</a
     >
   </div>
   <ul class="projs">
     {
       PROJECTS.map((project) => (
-        <li class="proj">
+        <li class="proj" data-track-section={projectName(project)}>
           <div class="proj-media">
             {project.media === "site" && newest && pickImage && (
               <figure class="site-live">
@@ -85,6 +91,7 @@ const watchUrl = `https://www.youtube.com/watch?v=${COZY_VIDEO.youtubeId}`;
                   class="stack"
                   href={`/sessions/${sessionSlug(newest)}/`}
                   data-open="session"
+                  data-track={projectName(project, "session")}
                   aria-label={`Open ${pickLabel}`}
                 >
                   <i class="s1" aria-hidden="true" />
@@ -125,6 +132,7 @@ const watchUrl = `https://www.youtube.com/watch?v=${COZY_VIDEO.youtubeId}`;
                     target="_blank"
                     rel="noopener noreferrer"
                     data-project-video-play
+                    data-track={projectName(project, "play")}
                     aria-label={`Play ${COZY_VIDEO.title}`}
                   >
                     <Picture
@@ -146,6 +154,7 @@ const watchUrl = `https://www.youtube.com/watch?v=${COZY_VIDEO.youtubeId}`;
                     target="_blank"
                     rel="noopener noreferrer"
                     data-project-video-play
+                    data-track={projectName(project, "play")}
                   >
                     <span>Play</span>
                   </a>
@@ -170,6 +179,7 @@ const watchUrl = `https://www.youtube.com/watch?v=${COZY_VIDEO.youtubeId}`;
                       href={`https://github.com/TrumanBrown/${project.repo}#readme`}
                       target="_blank"
                       rel="noopener noreferrer"
+                      data-track={projectName(project, "readme")}
                     >
                       Watch the real panel on GitHub ↗
                     </a>
@@ -177,6 +187,7 @@ const watchUrl = `https://www.youtube.com/watch?v=${COZY_VIDEO.youtubeId}`;
                       type="button"
                       class="linkbtn radar-pause"
                       data-radar-pause
+                      data-track={projectName(project, "pause")}
                     >
                       Pause
                     </button>
@@ -192,6 +203,7 @@ const watchUrl = `https://www.youtube.com/watch?v=${COZY_VIDEO.youtubeId}`;
                 href={`https://github.com/TrumanBrown/${project.repo}`}
                 target="_blank"
                 rel="noopener noreferrer"
+                data-track={projectName(project, "name")}
               >
                 {project.name}
               </a>
@@ -211,6 +223,7 @@ const watchUrl = `https://www.youtube.com/watch?v=${COZY_VIDEO.youtubeId}`;
                 href={`https://github.com/TrumanBrown/${project.repo}`}
                 target="_blank"
                 rel="noopener noreferrer"
+                data-track={projectName(project, "code")}
               >
                 Code on GitHub →
               </a>
@@ -220,6 +233,7 @@ const watchUrl = `https://www.youtube.com/watch?v=${COZY_VIDEO.youtubeId}`;
                   href={watchUrl}
                   target="_blank"
                   rel="noopener noreferrer"
+                  data-track={projectName(project, "youtube")}
                 >
                   Watch on YouTube ↗
                 </a>

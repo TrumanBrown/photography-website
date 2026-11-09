@@ -132,6 +132,41 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
               </select>
             </label>
           </div>
+
+          <section aria-labelledby="weekdays-title" class="space-y-4">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h3 id="weekdays-title" class="text-sm font-semibold">Weekdays and resume visits</h3>
+                <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">Visits that opened the Weekdays side or came in on a resume link. Open a row to see each step.</p>
+              </div>
+              <p id="owner-status" class="text-xs text-neutral-500 dark:text-neutral-400"></p>
+            </div>
+            <div id="weekdays-cards" class="grid grid-cols-2 gap-3 lg:grid-cols-6"></div>
+            <p id="weekdays-owners" class="text-sm text-neutral-600 dark:text-neutral-300"></p>
+            <div class="overflow-x-auto rounded border border-neutral-200 dark:border-neutral-700">
+              <table class="w-full min-w-[60rem] text-left text-sm">
+                <thead class="bg-neutral-50 text-xs text-neutral-500 dark:bg-neutral-900 dark:text-neutral-400">
+                  <tr>
+                    <th scope="col" class="px-3 py-2 font-medium">When</th>
+                    <th scope="col" class="px-3 py-2 font-medium">From</th>
+                    <th scope="col" class="px-3 py-2 font-medium">Network</th>
+                    <th scope="col" class="px-3 py-2 font-medium">Place</th>
+                    <th scope="col" class="px-3 py-2 font-medium">Device</th>
+                    <th scope="col" class="px-3 py-2 text-right font-medium">On Weekdays</th>
+                    <th scope="col" class="px-3 py-2 font-medium">Got as far as</th>
+                    <th scope="col" class="px-3 py-2 font-medium">Did</th>
+                    <th scope="col" class="px-3 py-2 font-medium">Then</th>
+                  </tr>
+                </thead>
+                <tbody id="weekdays-visits" class="divide-y divide-neutral-200 dark:divide-neutral-800"></tbody>
+              </table>
+            </div>
+            <p class="text-xs text-neutral-500 dark:text-neutral-400">
+              A company shows only when someone browses from a network their company owns. Home wifi, phones, VPNs and company proxies hide it, and "also a cloud" may be an employee, a server or an email link scanner. Places are the network's city, often a nearby hub.
+              Network and place: <a href="https://db-ip.com" target="_blank" rel="noopener" class="underline">IP Geolocation by DB-IP</a>.
+            </p>
+          </section>
+
           <div id="analytics-cards" class="grid grid-cols-2 gap-3 lg:grid-cols-4"></div>
 
           <section aria-labelledby="analytics-trend-title">

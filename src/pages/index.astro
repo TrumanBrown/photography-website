@@ -240,17 +240,27 @@ const personSchema = {
       aria-label="Weekdays"
       hidden
     >
-      <p class="dintro">{WEEKDAYS}</p>
+      <p class="dintro" data-track-section="intro">{WEEKDAYS}</p>
       <p class="dacts">
-        <a class="btn btn-ink" href={RESUME_PDF} target="_blank" rel="noopener"
-          >Resume (PDF)</a
+        <a
+          class="btn btn-ink"
+          href={RESUME_PDF}
+          target="_blank"
+          rel="noopener"
+          data-track="resume-pdf">Resume (PDF)</a
         >
-        <button type="button" class="btn" data-contact-open>Write to me</button>
+        <button
+          type="button"
+          class="btn"
+          data-contact-open
+          data-track="write-to-me">Write to me</button
+        >
         <a
           class="btn"
           href="https://www.linkedin.com/in/trumanbrown/"
           target="_blank"
-          rel="noopener noreferrer">LinkedIn ↗</a
+          rel="noopener noreferrer"
+          data-track="linkedin">LinkedIn ↗</a
         >
       </p>
       <Resume>
@@ -519,6 +529,9 @@ const personSchema = {
       if (count) count.textContent = count.dataset[side] ?? "";
       // The tab says which side is showing: "Truman Brown | Work" on weekdays.
       document.title = side === "weekdays" ? `${baseTitle} | Work` : baseTitle;
+      // The analytics beacon times the Weekdays side (src/lib/analytics.ts).
+      door!.dataset.side = side;
+      document.dispatchEvent(new CustomEvent("week:side", { detail: side }));
       if (side === current && !panels[side]!.hidden) return;
       const dir = side === "weekdays" ? 1 : -1;
       panels[current]!.hidden = true;

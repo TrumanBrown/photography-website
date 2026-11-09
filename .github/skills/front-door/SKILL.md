@@ -16,7 +16,7 @@ description: 'The front door at / and About me: the Weekends and Weekdays switch
 | `src/components/about/Projects.astro`                         | each project beside its live piece                                                                                                                                       |
 | `src/lib/radar.ts`, `src/lib/led-radar.ts`                    | the balcFlights-LED radar: maths, text, font and layout (tested), then the canvas driver                                                                                 |
 | `src/assets/about/`                                           | `me-everest.jpg` (the portrait), `cozy-critter.jpg` (the video's poster)                                                                                                 |
-| `public/Truman-Brown-Resume.pdf`                              | the public resume, without my phone number or personal email                                                                                                             |
+| `public/Truman-Brown-Resume.pdf`                              | the public resume, without my phone number or personal email. Its two site links end in `?via=resume`                                                                    |
 | `src/lib/open.ts` `openPage`, `LeadPhoto.astro`, `global.css` | the page change between the front door, the archive, About me and Things to try (`data-open="page"`); the rows' prints and drawings landing on their cards (`data-land`) |
 | `src/components/ContactForm.astro`, `api/contact/notify.js`   | "Write to me" and the email copy of each message ([azure-ops](../azure-ops/SKILL.md))                                                                                    |
 
@@ -35,11 +35,13 @@ description: 'The front door at / and About me: the Weekends and Weekdays switch
 - **Tabs say his name first:** "Truman Brown", "Truman Brown | Work" while Weekdays shows, and "Truman Brown | <page>" everywhere else. He picked this over page-first, which reads better in a crowded tab strip.
 - **Today's layout, sized up.** Round 2's three-column, two-page and projects-first layouts all crowded the page. What fixed the blank space was a wider rail (248px, the archive's stays 212px), one centered column the footer's width, bigger resume type (15px lines, 18px titles) and smaller project pictures (a 320px column, the radar 240px). The work should always take more room than the projects.
 - **Same photo, never a different one,** when moving between pages. The lead photo is handed over by its URL and moves to its place. Nothing else carries over.
+- **Weekdays is measured, so new parts get names.** The Analytics tab in `/admin` shows each visit to Weekdays: time on screen, how far down, clicks, copies and where they went next ([docs/analytics.md](../../../docs/analytics.md)). A new section needs `data-track-section`, and a new link or button on Weekdays or in the rail needs `data-track`, both named through `src/lib/track-names.ts`. `index.astro`'s `show()` must keep setting `door.dataset.side` and dispatching `week:side`, or the timer stops.
+- **The resume's site links carry `?via=resume`** (`https://trumanbrown.com/?via=resume#weekdays` in the contact line, `https://trumanbrown.com/?via=resume` in the skills line). That's how the Analytics tab tells resume visits from typed ones. Keep both whenever the PDF is replaced.
 
 ## Update the resume
 
 1. Edit `WORK`, `SUMMARY`, `SCHOOL` or `SKILLS` in `src/lib/about.ts`, newest job first, months as `YYYY-MM`. His `WEEKDAYS` line quotes the migrated VM count ("over 47,000 VMs migrated today"), so when the first resume line's count changes, change that number too and nothing else in his line.
-2. Replace the PDF. Open his new PDF with PyMuPDF (`pip install --target` a scratch folder) and read the contact line with `page.get_text()`. Since 2026-11-05 his own copy has no phone or email (`Seattle, WA | linkedin.com/in/trumanbrown | trumanbrown.com`). If one ever comes back, redact those spans and write the line back in the PDF's own embedded Cambria (`doc.extract_font`), keeping the links. Either way, clear `creator` and `producer`, drop the XMP block (`del_xml_metadata`), check with `get_text()` and `strings` that no number or email is left, and save it as `public/Truman-Brown-Resume.pdf`. If the text didn't change, `about.ts` doesn't need to: check each line is in the PDF word for word.
+2. Replace the PDF. Open his new PDF with PyMuPDF (`pip install --target` a scratch folder) and read the contact line with `page.get_text()`. Since 2026-11-05 his own copy has no phone or email (`Seattle, WA | linkedin.com/in/trumanbrown | trumanbrown.com`). If one ever comes back, redact those spans and write the line back in the PDF's own embedded Cambria (`doc.extract_font`), keeping the links. Make sure both `trumanbrown.com` links end in `?via=resume` (`page.get_links()`, then set `link["uri"]` and `page.update_link(link)`), since his own copy may not have them. Either way, clear `creator` and `producer`, drop the XMP block (`del_xml_metadata`), check with `get_text()` and `strings` that no number or email is left, compare a render of the old and new page, and save it as `public/Truman-Brown-Resume.pdf`. If the text didn't change, `about.ts` doesn't need to: check each line is in the PDF word for word.
 3. `npx vitest run src/lib/about.test.ts`, then look at `/#weekdays` at 1440×900 and 390×844.
 
 ## Add or change a side project
@@ -66,6 +68,8 @@ If it says NO DATA, `curl -s https://seattlebalc.com/api/v1/flights | head` firs
 - 2026-11-05: "mt baker led panel is the winner." And "don't shorten the experience sections by default. keep it full length. it's easy to miss that expand button, just get rid of it."
 
 - 2026-11-05, on the page-change mocks: "lands on their cards for both looks best." The rows' prints and drawings now land on their cards (site-motion).
+
+- 2026-11-09: "I want to see if this portfolio site is actualy working on my resume." He wanted the admin panel to show "how long they stayed, if they came from my resume, where they went from my experience page, what they did on the experience page, if they copied anything", and which company from the IP or region. He sends one PDF to everyone: "i am not making a seperate pdf per company appliaction". Built as the Weekdays section of the Analytics tab ([docs/superpowers/specs/2026-11-09-weekdays-analytics-design.md](../../../docs/superpowers/specs/2026-11-09-weekdays-analytics-design.md)).
 
 ## Hard-won lessons
 

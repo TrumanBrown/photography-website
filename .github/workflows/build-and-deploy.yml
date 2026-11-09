@@ -125,6 +125,16 @@ jobs:
           AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
         run: node scripts/prebuild.mjs
 
+      # Keeps this month's DB-IP Lite databases in metadata/geo/ for
+      # /api/track's network and place lookup. Reads one small file when
+      # they're current; never fails the build (docs/analytics.md).
+      - name: Refresh the visitor network lookup files
+        if: env.CAN_USE_AZURE == 'true' && github.event_name != 'pull_request'
+        continue-on-error: true
+        env:
+          AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
+        run: node scripts/sync-geo-db.mjs
+
       - name: Save prebuild cache
         if: always() && env.CAN_USE_AZURE == 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0

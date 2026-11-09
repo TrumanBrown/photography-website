@@ -110,7 +110,8 @@ node scripts/location.mjs blobs                                 # public photos 
 | Your domain registration's WHOIS record | Azure's registrar partner (GoDaddy under the hood). Privacy protection on by default → your real address is hidden from public WHOIS lookups but still on file with the registrar. |
 | The bootstrap managed identity's principal ID | Azure RBAC tables. |
 | Your actual photos | The `originals` + `derivatives` containers in Blob Storage. **Anyone who knows the URL can read individual blobs.** The container itself cannot be listed by anonymous users, there's no directory index, so URLs cannot be enumerated. Every photo is stripped of its GPS position before it's readable, so a photo taken at home doesn't carry the address ([security.md](security.md#photo-locations)). |
-| Site analytics (pageviews) | Custom privacy-friendly pipeline → `pageviews` table in Table Storage. No IP and no cookies stored; unique visitors counted via a daily-rotating salted hash. See [docs/analytics.md](analytics.md). |
+| Site analytics (pageviews) | Custom privacy-friendly pipeline → `pageviews` table in Table Storage. No IP and no cookies stored; unique visitors counted via a daily-rotating salted hash. Each pageview keeps the visitor's network owner and its city from a local copy of DB-IP's Lite data, plus device class and browser. On the Weekdays side it also keeps which sections came up the screen, which named links were pressed and up to 100 characters of copied page text. See [docs/analytics.md](analytics.md). |
+| DB-IP's Lite databases | `metadata/geo/` in the private container, refreshed monthly by the build ([scripts/sync-geo-db.mjs](../scripts/sync-geo-db.mjs)). CC BY 4.0, credited on `/privacy/` and in the Analytics tab. |
 | Contact form submissions | `contactmessages` table in Table Storage (the name, email, and message a sender chose to send you, and the page they sent it from). A copy is emailed to your inbox through Azure Communication Services. Rate limiting uses a separate `contactratelimit` table that stores only a salted hash of the sender's IP plus a count, never the raw IP. |
 | The address those copies go to | The `CONTACT_NOTIFY_TO` app setting on the Static Web App, written by the Infra workflow from the `CONTACT_NOTIFY_EMAIL` GitHub secret. Never in the repo. |
 | Session descriptions and image captions | `_session.json` in the private-to-listing `originals` container. They become public text on the next site build because they describe public photographs. |
@@ -125,7 +126,7 @@ node scripts/location.mjs blobs                                 # public photos 
 | Each photo's camera, lens and exposure settings, and its caption | Under the photo in the lightbox, and in the page's structured data |
 | Roughly where each session was | A globe pin from a hand-kept table of public places, never a photo's GPS ([src/lib/geo.ts](../src/lib/geo.ts)) |
 | Your iNaturalist observations | Hobby pages, at town or region level and on an ~11 km grid |
-| Your job history, side projects and a photo of you | The front door's Weekdays side (`/#weekdays`), from [src/lib/about.ts](../src/lib/about.ts) and [src/assets/about/](../src/assets/about/), and the resume at `/Truman-Brown-Resume.pdf`. The PDF has no phone number or personal email; contact goes through the form |
+| Your job history, side projects and a photo of you | The front door's Weekdays side (`/#weekdays`), from [src/lib/about.ts](../src/lib/about.ts) and [src/assets/about/](../src/assets/about/), and the resume at `/Truman-Brown-Resume.pdf`. The PDF has no phone number or personal email; contact goes through the form. Its two links to the site end in `?via=resume` so the Analytics tab can tell those visits apart |
 | The video of your tank, and so your YouTube channel | The aquarium page plays it in YouTube's privacy-enhanced player and links to it on YouTube (`video` in [aquarium-keeping.json](../src/content/hobbies/aquarium-keeping.json)) |
 | What the site keeps about visitors, in plain words | `/privacy/` ([src/pages/privacy.astro](../src/pages/privacy.astro)), linked from the footer and under the contact form's Send button. Update it, and its "Last updated" date, whenever the contact form, analytics, browser storage or the outside hosts a page loads from change |
 | The site's full set of pages | Indexable by search engines (`robots.txt` allows it) |
@@ -133,8 +134,8 @@ node scripts/location.mjs blobs                                 # public photos 
 ## Specifically NOT collected, exposed, or stored
 
 - No photo locations. GPS is removed from every photo before it's public, and nothing on the site derives a position from one.
-- No visitor IP addresses are stored. The analytics endpoint uses the IP only to compute a daily-salted hash for unique-visitor counting, then discards it; the raw IP is never persisted.
-- No visitor cookies (analytics uses an ephemeral `sessionStorage` id only, cleared when the tab closes).
+- No visitor IP addresses are stored. The analytics endpoint uses the IP to compute a daily-salted hash for unique-visitor counting and to look up the network owner and city in DB-IP's data held in the Function's memory, then discards it; the raw IP is never persisted or sent anywhere.
+- No visitor cookies (analytics uses an ephemeral `sessionStorage` id only, cleared when the tab closes). The `tb_owner` localStorage flag is set only in browsers that sign in to `/admin`, to leave your own visits out.
 - No visitor accounts. The site owner's `/admin` access uses SWA GitHub OAuth and a server-side allowlist.
 - No third-party analytics scripts: analytics is self-hosted in your own Azure Table Storage, and nothing leaves your tenant.
 - No third-party ad networks. The one outside player, the YouTube video on the aquarium page, uses YouTube's privacy-enhanced mode, where views don't personalize ads or recommendations, and it loads only when a visitor scrolls to it.

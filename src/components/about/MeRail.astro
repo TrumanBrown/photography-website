@@ -10,6 +10,7 @@ import me from "@/assets/about/me-everest.jpg";
 import ThemeToggle from "@/components/ThemeToggle.astro";
 import { LINKS, RESUME_PDF } from "@/lib/about";
 import { instagramUrl } from "@/lib/instagram";
+import { railName } from "@/lib/track-names";
 import { siteConfig } from "../../../site.config";
 
 const instagram = instagramUrl();
@@ -21,11 +22,28 @@ const links = [
 
 <aside class="rail me-rail" aria-label="About me">
   <div class="rail-top">
-    <a class="me" href="/" aria-current="page">{siteConfig.ownerName}</a>
+    <a class="me" href="/" aria-current="page" data-track="rail:name"
+      >{siteConfig.ownerName}</a
+    >
     <nav class="rail-nav u-label" aria-label="Primary">
-      <a class="rail-link" href="/photographs/" data-open="page">Photographs</a>
-      <a class="rail-link" href="/hobbies/" data-open="page">Things to try</a>
-      <a class="rail-link" href="/#weekdays" data-week-link>About me</a>
+      <a
+        class="rail-link"
+        href="/photographs/"
+        data-open="page"
+        data-track="rail:photographs">Photographs</a
+      >
+      <a
+        class="rail-link"
+        href="/hobbies/"
+        data-open="page"
+        data-track="rail:things-to-try">Things to try</a
+      >
+      <a
+        class="rail-link"
+        href="/#weekdays"
+        data-week-link
+        data-track="rail:about-me">About me</a
+      >
     </nav>
     <span class="rail-theme"><ThemeToggle /></span>
   </div>
@@ -42,8 +60,10 @@ const links = [
       class="me-img"
     />
     <figcaption>
-      <a href="/sessions/mt-everest-may-2026/" data-open="session"
-        >Everest north face, Tibet</a
+      <a
+        href="/sessions/mt-everest-may-2026/"
+        data-open="session"
+        data-track="rail:everest-photo">Everest north face, Tibet</a
       >
     </figcaption>
   </figure>
@@ -58,16 +78,24 @@ const links = [
             href={link.href}
             target="_blank"
             rel="me noopener noreferrer"
+            data-track={railName(link.label)}
           >
             {link.label} ↗
           </a>
         ))
       }
-      <a class="me-link" href={RESUME_PDF} target="_blank" rel="noopener"
-        >Resume (PDF) ↗</a
+      <a
+        class="me-link"
+        href={RESUME_PDF}
+        target="_blank"
+        rel="noopener"
+        data-track="rail:resume-pdf">Resume (PDF) ↗</a
       >
-      <button type="button" class="me-link" data-contact-open
-        >Write to me</button
+      <button
+        type="button"
+        class="me-link"
+        data-contact-open
+        data-track="rail:write-to-me">Write to me</button
       >
     </nav>
   </div>
