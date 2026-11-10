@@ -193,6 +193,7 @@ It writes one or two short sentences, under about 240 characters, with the place
 - no forced-casual stand-ins for "I love" ("I dig", "I'm a fan of", "got a kick out of", "I was struck by"): real people repeat their words
 - no run of six words copied from another session's description (sessions that share photos tend to)
 - no more than three of the session's animals named, and no "There were also..." or "along with..." tacked on
+- not opening on what you did ("Saw", "Spotted", "Got to see", "I came across", "I love") unless your notes say what you did: the model swapped one of those for another on every page, which read as generated
 - nothing about how an animal was shown to the camera ("rested in hands", "in clear containers", "on a thumbnail")
 - under 320 characters
 

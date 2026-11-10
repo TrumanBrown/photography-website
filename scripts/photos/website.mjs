@@ -853,6 +853,7 @@ How to write it:
 - Keep it short: one or two sentences, under ${DESCRIPTION_TARGET} characters. The caption under each photo already names what's in it, so this only says what the trip was.
 - The first sentence is what search results show: name the place and the main subjects in it ("Mount Baker and the tarns at Yellow Aster Butte", "Hummingbirds and red-eyed tree frogs in Bijagua").
 - ${shapeFor(session.slug)} Don't walk through the photos one by one.
+- Start with the place or the animals, the way a search result reads, not with what he did ("Saw", "Spotted", "Found", "Visited", "I photographed", "Got to see", "I love"). Swapping one of those for another on every page reads as generated.${notes ? " His notes can open it when they say what he did." : ""}
 - Name two or three animals at most: the ones there were the most of, or the one that stood out. Never a list of everything, and no "There were also..." or "along with..." tacked on the end.
 - Never say where an animal sat or what it was on or in ("perched on branches", "clung to leaves", "rested in hands", "in clear containers"). That's the picture, not the trip.${notes ? "\n- His notes are the best second sentence. Keep close to his words." : ""}
 - Plain and natural, in the words people search with ("tarn" for a small mountain lake, "fall colors", "wildflowers", "tide pools"). First person is fine but not needed. At most one short reaction of his ("such a cool spot", "it's crazy how blue the water is"), never a quip, wordplay or a punchline. No "lol" on the website.
@@ -902,6 +903,11 @@ const PHOTO_TALK =
 const EXTRA_BANNED =
   /\b(?:boasts?|nestled|dive in|serene|picturesque|myriad|plethora|teeming|bustling|a testament)\b/i;
 
+// Opening on what he did, which the model swaps synonyms for page to page:
+// "Saw", "Spotted", "Got to see", "I came across", "Had a look at".
+const DID_OPENER =
+  /^(?:i\s+)?(?:saw|spotted|found|came across|ran into|checked out|visited|went|got to \w+|got a (?:close )?look at|had a look at|photographed|captured|noticed|loved|love|was at|could see|took|shot|caught|enjoyed)\b/i;
+
 // The end of an inventory: "There were also...", "along with a starry flounder".
 const TACKED_ON = /\bthere (?:was|were|are|is) also\b|\balong with\b/i;
 
@@ -941,6 +947,11 @@ export function descriptionProblems(
   if (text.length > DESCRIPTION_MAX)
     problems.push(
       `It's over ${DESCRIPTION_MAX} characters. Keep it to one or two short sentences.`,
+    );
+  const did = notes ? null : DID_OPENER.exec(text)?.[0];
+  if (did)
+    problems.push(
+      `It opens with what he did ("${did}"). Start with the place or the animals, the way a search result reads.`,
     );
   const tacked = TACKED_ON.exec(text)?.[0];
   if (tacked)

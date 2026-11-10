@@ -134,7 +134,7 @@ import { CROP_VERSION, placeCrop } from "../social/render.mjs";
 import { info, redact, warn } from "./redact.mjs";
 
 /** Bump when the description prompt changes enough that every session should be redone. */
-const DESCRIPTION_VERSION = 7;
+const DESCRIPTION_VERSION = 8;
 
 /** Bump to read converted photos' originals again (those still without a capture time). */
 const CAPTURE_VERSION = 2;

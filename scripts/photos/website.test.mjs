@@ -629,6 +629,30 @@ describe("session descriptions", () => {
     ).toMatch(/doesn't say where it was.*Guayacán/);
   });
 
+  it("opens on the place or the animals, unless his notes say what he did", () => {
+    for (const text of [
+      "Saw Sylvia's tree frogs at night in Guayacán.",
+      "Got to see Sylvia's tree frogs at night in Guayacán.",
+      "I came across Sylvia's tree frogs at night in Guayacán.",
+      "Had a look at the Sylvia's tree frogs at night in Guayacán.",
+      "I love the Sylvia's tree frogs at night in Guayacán.",
+    ])
+      expect(check(text).join(" ")).toMatch(/opens with what he did/);
+    expect(
+      check(
+        "Sylvia's tree frogs at night in Guayacán, and a heron by the canal. Such a cool spot.",
+      ),
+    ).toEqual([]);
+    expect(
+      check(
+        "Went snorkeling off the bank in Guayacán and found a heron by the canal.",
+        {
+          notes: "Snorkeled the reef in the afternoon.",
+        },
+      ),
+    ).toEqual([]);
+  });
+
   it("stays short and never turns into an inventory", () => {
     const long = `Sylvia's tree frogs at night in Guayacán. ${"The stream ran fast and cold under the trees. ".repeat(7)}`;
     expect(check(long).join(" ")).toMatch(/over 320 characters/);
@@ -879,7 +903,7 @@ describe("session descriptions", () => {
   it("doesn't count a shared species name as copied wording", () => {
     expect(
       check(
-        "Found a Sylvia's tree frog on a thin twig at night in Guayacán, and a heron by the canal.",
+        "A Sylvia's tree frog on a thin twig at night in Guayacán, and a heron by the canal.",
         {
           others: [
             "Elsewhere there was a Sylvia's tree frog on a thin twig after dark.",
