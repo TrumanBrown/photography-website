@@ -17,6 +17,14 @@ describe("coarsePlace", () => {
     expect(coarsePlace("Costa Rica")).toBe("Costa Rica");
   });
 
+  it("spells out the codes iNaturalist sometimes saves instead of names", () => {
+    expect(coarsePlace("US-WA, US")).toBe("Washington, USA");
+    expect(coarsePlace("Seattle, US-WA, US")).toBe("Washington, USA");
+    expect(coarsePlace("Tortuguero, Costa Rica")).toBe(
+      "Tortuguero, Costa Rica",
+    );
+  });
+
   it("returns nothing for nothing", () => {
     expect(coarsePlace(null)).toBe("");
     expect(coarsePlace(undefined)).toBe("");

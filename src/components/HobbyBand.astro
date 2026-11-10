@@ -32,7 +32,7 @@ const VERBS: Record<string, string> = {
               <a class="tcard" href={`/hobbies/${slug}/`} data-open="hobby">
                 <PlateArt slug={slug} size="mini" />
                 <span class="tn">{entry.data.title}</span>
-                <span class="tv">{VERBS[slug] ?? "Have a go"} →</span>
+                <span class="tv">{VERBS[slug] ?? "Try it"} →</span>
               </a>
             );
           })}

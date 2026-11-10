@@ -341,7 +341,7 @@ Take or upload a selfie and the page turns you into a **bird-person hybrid**: it
 
 **Files**
 
-- [src/components/hobbies/Birding.astro](../src/components/hobbies/Birding.astro), the markup (choose / camera / busy / error / result states + privacy note) and the mounting `<script>`.
+- [src/components/hobbies/Birding.astro](../src/components/hobbies/Birding.astro), the markup (choose / camera / busy / error / result states) and the mounting `<script>`. The page says once, in the intro, that the photo stays on the device, and the facts line under the title says "Selfie · nothing uploads". It used to describe the toy a second time and add a privacy paragraph under it; both came out in November 2026 as repetition.
 - [src/lib/hobbies/birding.ts](../src/lib/hobbies/birding.ts), the engine: camera and file input, lazy-loading the landmark model, turning landmarks into normalized features, and sampling the palette (hair, accent, skin, and iris colours). This is the only file that touches MediaPipe or the DOM.
 - [src/lib/hobbies/birding-bird.ts](../src/lib/hobbies/birding-bird.ts), the **pure** feature mapping + style picker (`makeHybridStyle`, unit-tested) and the browser-only compositing renderer (`renderHybrid`) that draws the bill + feathers onto the selfie. Split out the same way `stocking.ts` is split from the aquarium.
 - [src/lib/hobbies/bird-ink.ts](../src/lib/hobbies/bird-ink.ts), the ink-in: once the bird is drawn it's rebuilt as stipple, dot by dot and darkest first in its own colours (`stippleDots`, unit-tested), then the finished picture comes up through the dots. The canvas ends identical to the finished bird, and Download finishes the ink-in first.
@@ -748,7 +748,7 @@ The birding page reuses the same live-iNaturalist approach in two richer forms. 
   }
   ```
 
-  It calls `/observations/species_counts` for the full list, sorts by the species' **global** iNaturalist `observations_count` (fewer records worldwide = more unique), features the `featured` rarest as cards, and batch-fetches `/taxa/<ids>` for their Wikipedia summaries to use as the fun-fact/range blurb. It also pages `/observations` (most-faved first) to show one of the author's **own** photos per species rather than a generic representative one. The rest are grouped by **taxonomic family** (largest family first) into a compact list. "Rarity" here is global record count, not a formal conservation status.
+  It calls `/observations/species_counts` for the full list, sorts by the species' **global** iNaturalist `observations_count` (fewer records worldwide = more unique), features the `featured` rarest as cards (with a link to Wikipedia, but no quote from it: the summaries' first lines, "is a species of bird in the sparrow family", read as filler and were dropped in November 2026). It also pages `/observations` (most-faved first) to show one of the author's **own** photos per species rather than a generic representative one. The rest are grouped by **taxonomic family** (largest family first) into a compact list. "Rarity" here is global record count, not a formal conservation status.
 
   The family grouping needs no extra API calls: `species_counts` already returns each species' `ancestor_ids`, and [src/lib/hobbies/bird-families.json](../src/lib/hobbies/bird-families.json) maps every iNaturalist bird-family taxon id to its name, so the grouping is computed client-side and stays live. Regenerate that file with `node scripts/fetch-bird-families.mjs` if iNat ever adds or renames a family.
 

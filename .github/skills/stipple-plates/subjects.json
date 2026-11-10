@@ -66,7 +66,7 @@
     "rim": 0.7
   },
   "birding": {
-    "note": "Black Oystercatcher · Olympic coast, February 2026",
+    "note": "Black oystercatcher · Olympic coast, February 2026",
     "src": "olympic-winter-2026/DSC03599.JPEG",
     "crop": [0.12, 0.08, 0.92, 0.95],
     "fill": [0.74, 0.6],
@@ -80,7 +80,7 @@
     ]
   },
   "herping": {
-    "note": "Oregon Ensatina · near Portland, November 2025",
+    "note": "Oregon ensatina · near Portland, November 2025",
     "src": "~/.cache/stipple-plates/sources/originals/ensatina-DSC08626.jpg",
     "crop": [0.0, 0.0, 0.82, 1.0],
     "fill": [0.88, 0.62],

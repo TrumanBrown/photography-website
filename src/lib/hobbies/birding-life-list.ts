@@ -5,13 +5,14 @@
  * under the site's strict CSP (the API host + iNat photo CDNs are allow-listed
  * in staticwebapp.config.json).
  *
- * Three passes:
+ * Two passes:
  *   1. /observations/species_counts — every distinct species the user has
  *      logged, with how many times they logged it (the life list itself).
  *   2. /observations — the user's own photos, so each species shows one of
  *      their best (most-faved) shots rather than a generic representative one.
- *   3. /taxa/<ids> — for the handful of globally-rarest species, pull the
- *      Wikipedia summary to use as a fun-fact/range blurb on the featured cards.
+ *   The featured cards show the globally rarest species with a link to
+ *   Wikipedia. They don't quote it: a summary's first line ("is a species of
+ *   bird in the sparrow family") read as filler.
  *
  * "Rarity" here is the global iNaturalist observation count for the species
  * (fewer records worldwide = more unique), not a formal conservation status.
@@ -30,7 +31,6 @@ const BIRD_FAMILIES = birdFamiliesRaw as Record<string, FamilyInfo>;
 const SPECIES_COUNTS =
   "https://api.inaturalist.org/v1/observations/species_counts";
 const OBSERVATIONS = "https://api.inaturalist.org/v1/observations";
-const TAXA = "https://api.inaturalist.org/v1/taxa";
 // Each request gives up after this long, so a hung one can't leave the list
 // on its loading line forever.
 const FETCH_TIMEOUT_MS = 15_000;
@@ -54,9 +54,6 @@ interface INatTaxon {
 interface SpeciesCount {
   count: number;
   taxon?: INatTaxon | null;
-}
-interface TaxonDetail extends INatTaxon {
-  wikipedia_summary?: string;
 }
 
 interface Species {
@@ -97,17 +94,6 @@ function safePhoto(url: string | undefined | null): string | null {
   if (!url) return null;
   const up = upgrade(url);
   return allowedHost(up) ? up : null;
-}
-
-/** iNat wikipedia summaries are HTML; flatten to a trimmed plain-text sentence-ish blurb. */
-function plainSummary(html: string | undefined, max = 240): string {
-  if (!html) return "";
-  const doc = new DOMParser().parseFromString(html, "text/html");
-  const text = (doc.body.textContent || "").replace(/\s+/g, " ").trim();
-  if (text.length <= max) return text;
-  const clipped = text.slice(0, max);
-  const lastSpace = clipped.lastIndexOf(" ");
-  return `${clipped.slice(0, lastSpace > 0 ? lastSpace : max).trimEnd()}…`;
 }
 
 function el<K extends keyof HTMLElementTagNameMap>(
@@ -158,22 +144,6 @@ async function fetchSpecies(
     });
   }
   return out;
-}
-
-async function fetchSummaries(ids: number[]): Promise<Map<number, string>> {
-  const map = new Map<number, string>();
-  if (ids.length === 0) return map;
-  const res = await fetch(`${TAXA}/${ids.join(",")}?locale=en`, {
-    headers: { Accept: "application/json" },
-    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-  }).catch(() => null);
-  if (!res?.ok) return map;
-  const data = (await res.json()) as { results?: TaxonDetail[] };
-  for (const t of data.results ?? []) {
-    const blurb = plainSummary(t.wikipedia_summary);
-    if (blurb) map.set(t.id, blurb);
-  }
-  return map;
 }
 
 interface INatObservation {
@@ -251,11 +221,7 @@ async function fetchMyObservationData(
   return mine;
 }
 
-function renderFeaturedCard(
-  s: Species,
-  userId: string,
-  blurb: string,
-): HTMLElement {
+function renderFeaturedCard(s: Species, userId: string): HTMLElement {
   const card = el("div", "flex flex-col overflow-hidden border border-rule");
 
   if (s.photo) {
@@ -295,9 +261,6 @@ function renderFeaturedCard(
       `Globally uncommon · ~${s.globalCount.toLocaleString()} records on iNaturalist`,
     ),
   );
-
-  if (blurb)
-    body.appendChild(el("p", "text-xs leading-relaxed text-ink-3", blurb));
 
   const links = el("div", "mt-auto flex flex-wrap gap-3 pt-1 text-xs");
   const obs = el("a", "draw self-start text-ink", "My sighting →");
@@ -576,12 +539,8 @@ export function initBirdingLifeList(root: HTMLElement): void {
         (a, b) => a.globalCount - b.globalCount,
       );
       const featured = byRarity.slice(0, featuredN);
-      const summaries = await fetchSummaries(featured.map((s) => s.id));
-
       featuredWrap.replaceChildren(
-        ...featured.map((s) =>
-          renderFeaturedCard(s, userId, summaries.get(s.id) ?? ""),
-        ),
+        ...featured.map((s) => renderFeaturedCard(s, userId)),
       );
 
       // Reveal search + sort now that the data is here, and keep the list in

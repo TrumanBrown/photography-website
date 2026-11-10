@@ -36,9 +36,10 @@ const places = new Set(
   sessions.map((entry) => entry.data.location?.trim()).filter(Boolean),
 );
 
+const fmt = (n: number) => n.toLocaleString("en-US");
 const summary = [
-  `${sessions.length} session${sessions.length === 1 ? "" : "s"}`,
-  `${totalPhotos} photograph${totalPhotos === 1 ? "" : "s"}`,
+  `${fmt(sessions.length)} session${sessions.length === 1 ? "" : "s"}`,
+  `${fmt(totalPhotos)} photograph${totalPhotos === 1 ? "" : "s"}`,
   places.size > 1 ? `${places.size} places` : null,
 ]
   .filter(Boolean)
@@ -51,8 +52,7 @@ const lead: LeadItem[] = buildLeadFrames(sessions).map((frame) => ({
   title: frame.title,
   location: frame.location,
   image: resolveImage(frame.slug, frame.file),
-  alt:
-    frame.caption ?? `Photograph from ${splitSessionTitle(frame.title).label}`,
+  alt: frame.alt ?? `Photograph from ${splitSessionTitle(frame.title).label}`,
 }));
 
 const first = sessions[0];

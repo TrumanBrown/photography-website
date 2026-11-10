@@ -16,7 +16,7 @@ import Resume from "@/components/about/Resume.astro";
 import Projects from "@/components/about/Projects.astro";
 import { sortSessions, sessionSlug, splitSessionTitle } from "@/lib/sessions";
 import { buildLeadFrames, coverFileOf, type LeadItem } from "@/lib/archive";
-import { sortHobbies, hobbySlug } from "@/lib/hobbies";
+import { sortHobbies, hobbySlug, thingsToTryLine } from "@/lib/hobbies";
 import { jsonForScript } from "@/lib/html";
 import { instagramUrl } from "@/lib/instagram";
 import {
@@ -55,7 +55,7 @@ const lead: LeadItem[] = buildLeadFrames(sessions).flatMap((frame) => {
           location: frame.location,
           image,
           alt:
-            frame.caption ??
+            frame.alt ??
             `Photograph from ${splitSessionTitle(frame.title).label}`,
         },
       ]
@@ -76,10 +76,6 @@ const newest = sessions.slice(0, 5).flatMap((entry, index) => {
       ]
     : [];
 });
-/* Narrow nature is a daily puzzle; the rest are hobbies. */
-const hobbyCount = hobbies.filter(
-  (h) => hobbySlug(h) !== "narrow-nature",
-).length;
 
 const counts = {
   weekends: [
@@ -213,10 +209,8 @@ const personSchema = {
         <a class="drow" href="/hobbies/" data-open="page" data-land="plates">
           <span class="drow-h">
             <span class="drow-t"><span class="draw">Things to try</span></span>
-            <span class="u-label"
-              >{hobbyCount} hobbies · a new puzzle daily</span
-            >
-            <span class="drow-go">Have a go →</span>
+            <span class="u-label">{thingsToTryLine(hobbies)}</span>
+            <span class="drow-go">Try one →</span>
           </span>
           <span class="strip plates" style={`--n:${hobbies.length}`}>
             {

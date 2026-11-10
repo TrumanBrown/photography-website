@@ -1,8 +1,8 @@
 {
   "title": "Birding",
-  "summary": "Take or upload a selfie and the page draws a little pixel bird based on your face. It all runs in your browser.",
-  "intro": "Across the world, I've been spending more time looking for birds, photographing them, and learning about them. This page turns you into a pixel bird based on your selfie. It's based on your facial features, so for example, a rounder face gives a rounder bird, and your colors become its feathers. Your photo stays on your device. Nothing is uploaded, so feel free to snap away",
-  "plateNote": "Black Oystercatcher · Olympic coast, February 2026",
+  "summary": "Take or upload a selfie and the page turns you into a bird.",
+  "intro": "Across the world, I've been spending more time looking for birds, photographing them, and learning about them. Take a selfie and this page turns you into a bird: your own face with a beak and feathers picked from your features and colors. Your photo stays on your device, so feel free to snap away",
+  "plateNote": "Black oystercatcher · Olympic coast, February 2026",
   "accent": "#0ea5e9",
   "order": 4,
   "interactive": "birding",
@@ -10,7 +10,7 @@
     "userId": "trumanbrown",
     "taxonId": 4838,
     "heading": "My spark bird",
-    "species": "Black Oystercatcher",
+    "species": "Black oystercatcher",
     "scientificName": "Haematopus bachmani",
     "story": [
       "I was at the Seattle Aquarium on a date with my girlfriend. We were looking at the coastal bird section, and we couldn't get over how silly the oystercatcher looked with its big orange beak and bright eyes. We thought it was so cool, and we were surprised it actually lived in Washington. That's really what made me realize how interesting birds could be.",
@@ -21,7 +21,7 @@
     "userId": "trumanbrown",
     "url": "https://www.inaturalist.org/observations?user_id=trumanbrown&iconic_taxa=Aves&verifiable=any",
     "heading": "My birding life list",
-    "blurb": "Every bird species I've logged on iNaturalist, each shown with one of my own photos, pulled live. The most globally uncommon ones I've found are featured up top, with a fact about each.",
+    "blurb": "Every bird species I've logged on iNaturalist, each shown with one of my own photos, pulled live. The rarest ones I've found are up top.",
     "iconicTaxa": "Aves",
     "featured": 6
   }

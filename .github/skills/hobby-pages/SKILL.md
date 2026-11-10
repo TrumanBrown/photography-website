@@ -81,6 +81,7 @@ Day list became Narrow nature in two commits: the title and copy first (`dfca9e4
 - Aquarium: a new fish "flies and transforms from the color sprite to the actual fish and jumps into the tank, with water droplets... if they spam, it should just have multiple jump in"; clearing the tank should "tip the tank over" (2026-10-14). For the video of his tank he picked a muted hero that starts at the time of day and "seen in my tank" links from the fish, and turned down self-hosting the footage: "can't use just embed youtube somehow" (2026-10-25).
 - Fishing: "remove the chinook salmon entry entirely, and remove the river name from the coho... just say small river" (2026-10-13).
 - Tide pooling and herping: the first-find stamp off the animal, and a pass over older facts with the new copy rules: "it's good to get a pass on these older components" (2026-10-15).
+- Birding, after a review of what read as AI on the site: "fix the birding page ai issues with wording, and definitely does not need all the privacy stuff" (2026-11-09). The intro now says what the toy does (his face with a beak and feathers, not the old "pixel bird"), the second description and the privacy paragraph under the toy are gone, the six rarest birds lost their Wikipedia first lines, and card and spark names are sentence case.
 
 ## Hard-won lessons
 
@@ -94,6 +95,7 @@ Day list became Narrow nature in two commits: the title and copy first (`dfca9e4
 8. **The first-find stamp went across the picture** (`df1b5d7`) until it got its own grid row beside it (`bd89c84`).
 9. **Herping eyeshine was backwards.** It vanished when the light hit the animal, and the beam was drawn as flat trapezoids. Eyeshine is brightest when lit, with a radial beam (`f777a73`).
 10. **Facts read like AI and some were wrong** (the leather star and swimming anemone mix-up, a chorus frog's colour change taking weeks, a rubber boa's lifespan). A copy pass and a second fact check fixed them, and `species-facts.test.ts` checks the mechanics (`e705d25`).
+11. **Copy piled up around a toy as it was rebuilt.** Birding was redone nine times, and each rebuild added a line under the toy without removing the old intro, so the page described a "pixel bird" and a face-morph "bird-person" one above the other and promised privacy three times, once as "the site owner". When a toy changes, rewrite the intro and delete what it replaces. Say privacy once, where the visitor decides (2026-11-09). Text fetched live (Wikipedia summaries) needs the same read as written copy: a summary's first line is usually filler.
 
 ## Gotchas
 
@@ -105,6 +107,5 @@ Day list became Narrow nature in two commits: the title and copy first (`dfca9e4
 - `[slug].astro` must keep calling `settleDots()`, or a page reached through a scene stays covered for up to 8 seconds.
 - `npm run check` needs at least one session JSON; CI runs `node scripts/generate-fixtures.mjs` first.
 - The dev server uses `trailingSlash: 'always'`, so `/hobbies` without the slash 404s there. Restart it after changing `tailwind.config.mjs` or the content schema.
-- The birding intro still says "pixel bird" although the island makes a photo hybrid. That copy is Truman's own, so ask before changing it.
 
 Add new verdicts and lessons here, dated, in the commit that acts on them.

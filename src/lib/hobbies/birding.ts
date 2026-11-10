@@ -291,7 +291,7 @@ export function initBirding(root: HTMLElement): void {
       const lm = faces[0];
       const sctx = source.getContext('2d');
       if (!sctx) {
-        fail('Could not read the image.');
+        fail("Couldn't read the image.");
         return;
       }
       const data = sctx.getImageData(0, 0, source.width, source.height);
@@ -317,7 +317,7 @@ export function initBirding(root: HTMLElement): void {
     };
     img.onerror = () => {
       URL.revokeObjectURL(url);
-      fail('That file could not be read as an image.');
+      fail("That file couldn't be read as an image.");
     };
     img.src = url;
   }
@@ -351,7 +351,7 @@ export function initBirding(root: HTMLElement): void {
 
   function shoot(): void {
     if (!video || !video.videoWidth) {
-      fail('The camera was not ready. Please try again.');
+      fail("The camera wasn't ready. Please try again.");
       return;
     }
     drawSource(video, video.videoWidth, video.videoHeight);

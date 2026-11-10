@@ -68,7 +68,7 @@ const skim = (
     <span class="shot">
       <Picture
         src={cover}
-        alt={`${label} — cover photograph`}
+        alt={`${label}, cover photograph`}
         widths={[320, 480, 640, 960]}
         sizes="(min-width: 1300px) 24vw, (min-width: 900px) 30vw, 44vw"
         formats={["webp"]}
@@ -87,7 +87,6 @@ const skim = (
           </>
         )
       }
-      <span class="n">{count}</span>
     </span>
   </span>
   <span class="t">{label}</span>
@@ -176,17 +175,6 @@ const skim = (
     transform: scaleX(0);
     transform-origin: left;
   }
-  .n {
-    position: absolute;
-    right: 0;
-    bottom: 0;
-    background: var(--ink);
-    color: var(--paper);
-    font-size: 10px;
-    letter-spacing: 0.14em;
-    padding: 4px 8px;
-  }
-
   .t {
     display: block;
     margin-top: 11px;

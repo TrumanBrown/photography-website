@@ -2,8 +2,8 @@
 /**
  * The three side projects on the front door's Weekdays side, each beside
  * something live rather than a screenshot:
- * - trumanbrown.com: the newest photograph with a caption from the photo
- *   pipeline, and counts the build reads from the archive.
+ * - trumanbrown.com: the newest session's header photograph with its
+ *   caption, and counts the build reads from the archive.
  * - cozy-vibe-vids: one of the videos, which loads from YouTube's
  *   privacy-enhanced player only when someone presses play.
  * - balcFlights-LED: the panel's radar, drawn live from the same flight API
@@ -16,6 +16,7 @@ import poster from "@/assets/about/cozy-critter.jpg";
 import { COZY_VIDEO, monthLabel, PROJECTS } from "@/lib/about";
 import { projectName } from "@/lib/track-names";
 import { sortSessions, sessionSlug, splitSessionTitle } from "@/lib/sessions";
+import { thingsToTryLine } from "@/lib/hobbies";
 import { coverFileOf } from "@/lib/archive";
 
 const images = import.meta.glob<{ default: ImageMetadata }>(
@@ -26,10 +27,6 @@ const images = import.meta.glob<{ default: ImageMetadata }>(
 const sessions = sortSessions(await getCollection("sessions"));
 const hobbies = await getCollection("hobbies");
 const photos = sessions.reduce((n, s) => n + s.data.images.length, 0);
-const captioned = sessions.reduce(
-  (n, s) => n + s.data.images.filter((image) => image.caption?.trim()).length,
-  0,
-);
 
 /* The newest session's header photograph, chosen the way its page chooses
    its banner: the header picked in the admin panel, else the cover when it's
@@ -56,10 +53,8 @@ const pickLabel = newest ? splitSessionTitle(newest.data.title).label : "";
 const fmt = (n: number) => n.toLocaleString("en-US");
 const siteFacts = [
   `${fmt(sessions.length)} sessions`,
-  captioned && captioned === photos
-    ? `${fmt(photos)} photographs, every one captioned`
-    : `${fmt(photos)} photographs`,
-  `${hobbies.length} things to try`,
+  `${fmt(photos)} photographs`,
+  thingsToTryLine(hobbies),
 ];
 
 const watchUrl = `https://www.youtube.com/watch?v=${COZY_VIDEO.youtubeId}`;
@@ -98,7 +93,11 @@ const watchUrl = `https://www.youtube.com/watch?v=${COZY_VIDEO.youtubeId}`;
                   <i class="s2" aria-hidden="true" />
                   <Picture
                     src={pickImage}
-                    alt={pick?.caption ?? `${pickLabel} header photograph`}
+                    alt={
+                      pick?.alt ||
+                      pick?.caption ||
+                      `${pickLabel} header photograph`
+                    }
                     widths={[480, 720, 960, 1280]}
                     sizes="(min-width: 900px) 320px, 92vw"
                     formats={["webp"]}

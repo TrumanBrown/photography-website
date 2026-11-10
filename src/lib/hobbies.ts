@@ -23,3 +23,15 @@ export function sortHobbies(entries: Hobby[]): Hobby[] {
   });
   return list;
 }
+
+/**
+ * What's in Things to try, said the same way everywhere it's counted: "6
+ * hobbies and a daily puzzle". Narrow nature is the puzzle; the rest are
+ * hobbies.
+ */
+export function thingsToTryLine(entries: Hobby[]): string {
+  const hobbies = entries.filter((h) => hobbySlug(h) !== 'narrow-nature').length;
+  const puzzle = hobbies < entries.length;
+  const noun = hobbies === 1 ? 'hobby' : 'hobbies';
+  return puzzle ? `${hobbies} ${noun} and a daily puzzle` : `${hobbies} ${noun}`;
+}

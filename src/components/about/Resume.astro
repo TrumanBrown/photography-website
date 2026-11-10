@@ -5,7 +5,6 @@
  * (src/lib/about.ts).
  */
 import {
-  firstYear,
   periodLabel,
   SCHOOL,
   SKILLS,
@@ -17,12 +16,7 @@ import { jobSection } from "@/lib/track-names";
 ---
 
 <section class="wsec" aria-labelledby="work-h">
-  <div class="shead">
-    <h2 id="work-h">Work</h2>
-    <span class="u-label tabular-nums"
-      >{WORK.length} roles since {firstYear(WORK)}</span
-    >
-  </div>
+  <div class="shead"><h2 id="work-h">Work</h2></div>
   <p class="summary" data-track-section="summary">{SUMMARY}</p>
   <ul class="jobs">
     {
