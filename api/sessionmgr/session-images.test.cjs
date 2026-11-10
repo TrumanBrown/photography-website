@@ -2,10 +2,33 @@ const {
   MAX_CAPTION,
   captionsFromImages,
   fullUrls,
+  keepAlts,
   normalizeSessionImages,
 } = require("./session-images");
 
 describe("session image metadata", () => {
+  it("keeps the pipeline's alt text when the admin panel saves", () => {
+    expect(
+      keepAlts(
+        [{ file: "one.jpg", caption: "My caption" }, "two.jpg", "three.jpg"],
+        [
+          { file: "one.jpg", caption: "Old", alt: "Heron on a post, Tortuguero" },
+          { file: "two.jpg", alt: "Caiman at the waterline, Tortuguero" },
+          "three.jpg",
+        ],
+      ),
+    ).toEqual([
+      {
+        file: "one.jpg",
+        caption: "My caption",
+        alt: "Heron on a post, Tortuguero",
+      },
+      { file: "two.jpg", alt: "Caiman at the waterline, Tortuguero" },
+      "three.jpg",
+    ]);
+    expect(keepAlts(["one.jpg"], undefined)).toEqual(["one.jpg"]);
+  });
+
   it("normalizes empty captions to filenames while preserving order", () => {
     expect(
       normalizeSessionImages([

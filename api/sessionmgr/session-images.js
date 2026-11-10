@@ -128,9 +128,38 @@ function captionsFromImages(images) {
   return captions;
 }
 
+/**
+ * Carry each photo's alt text over from the stored sidecar. The admin panel
+ * edits captions and order only, and the captions pipeline writes `alt`
+ * beside the caption, so a save mustn't drop it.
+ */
+function keepAlts(images, previous) {
+  if (!Array.isArray(images) || !Array.isArray(previous)) return images;
+  const alts = new Map();
+  for (const item of previous) {
+    if (
+      item &&
+      typeof item === "object" &&
+      typeof item.file === "string" &&
+      typeof item.alt === "string" &&
+      item.alt
+    ) {
+      alts.set(item.file, item.alt);
+    }
+  }
+  if (!alts.size) return images;
+  return images.map((item) => {
+    const file = typeof item === "string" ? item : item.file;
+    const alt = alts.get(file);
+    if (!alt) return item;
+    return typeof item === "string" ? { file, alt } : { ...item, alt };
+  });
+}
+
 module.exports = {
   MAX_CAPTION,
   captionsFromImages,
+  keepAlts,
   fullUrls,
   normalizeSessionImages,
 };

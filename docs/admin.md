@@ -40,8 +40,9 @@ does, and the grid is drawn in the shape that slot actually uses on the site:
   it **Not in rotation**. With nothing picked anywhere, the home page has no lead photo. Every visit
   opens on a random frame from the pool and then rotates on from there, so the home page shows a
   different photograph each time rather than always the same one.
-- **Captions**: a list view with a thumbnail per row. Captions become the alt text in the lightbox
-  and the line under each photograph.
+- **Captions**: a list view with a thumbnail per row. A caption is the line under the photograph
+  in the lightbox. The fuller alt text the captions pipeline writes beside it (`alt` in
+  `_session.json`) isn't shown here and survives a save; without one, the caption is the alt text.
 
 Every tile carries badges for the roles it already holds (Cover, Header, Rotation, Caption) and its
 aspect ratio, so the state of a session is readable without switching modes. The **Size** slider

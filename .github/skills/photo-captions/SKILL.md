@@ -14,7 +14,7 @@ Every photo gets looked at once by a vision model, matched to Truman's own iNatu
 | group                  | files become shots (camera, clock and subsecond); bursts are the same session within 60 s                                                                                                 |
 | iNaturalist            | refresh the index of his observations, match frames by fingerprint, then by time (±5 min, research grade), learning each session's clock offset                                           |
 | analyse                | one vision call per shot that needs it (`analyse.mjs`)                                                                                                                                    |
-| lines, website         | caption first lines (`lines.mjs`), captions by code and a description per session once every photo is analysed (`website.mjs`), merged into `_session.json` with an ETag (`sidecars.mjs`) |
+| lines, website         | caption first lines (`lines.mjs`), alt text (`captionFor`) and the shorter visible caption (`shortCaptionFor`) by code, and a description per session once every photo is analysed (`website.mjs`), merged into `_session.json` as `alt`, `caption` and `description` with an ETag (`sidecars.mjs`) |
 | save, then Instagram   | the record is saved before the Instagram stage, so a failure there can't lose website work. Instagram planning is in the [instagram-posting](../instagram-posting/SKILL.md) skill         |
 
 State is private in Blob under `metadata/photos/` (`catalog.json`, `inat-index.json`, `taxa.json`, `facts.json`). The website text lands in `originals/<prefix>/_session.json`, the same file /admin edits. Wording belongs to [truman-voice](../truman-voice/SKILL.md), [caption-voice](../caption-voice/SKILL.md), [humanizer](../humanizer/SKILL.md) and [site-copy](../../instructions/site-copy.instructions.md); this skill is about how the text gets made and shipped.
@@ -87,6 +87,7 @@ A run handles 300 photos by default (`limit`); the archive was about 1,250 in Oc
 - 2026-10-11: "tell me how this caption had a typo in oregon?? fix that issue."
 - 2026-10-13: Kauai photos "not pulling the actual species names. I put them on inaturalist", and "make sure instagram caption pipeline doesn't have this same issue."
 - 2026-10-13: website copy search-first, Instagram in his voice (`1ccb015`); "Looks good deploy those changes" after reviewing drafts (2026-10-14).
+- 2026-11-09, after an audit of what read as AI: captions "yes make a good balance for captions, but use animal species name when available" (the visible caption is the name and place plus real behavior, the long line moved to `alt`); descriptions "no, just cut to more natural sounding, shorter descriptions" instead of writing trip notes (one or two sentences, `DESCRIPTION_VERSION` 7).
 
 ## Hard-won lessons
 
@@ -102,6 +103,7 @@ A run handles 300 photos by default (`limit`); the archive was about 1,250 in Oc
 10. **27 hummingbirds got 27 pose-only lines.** Photos may share a line; poses never make one (`483f387`).
 11. **A description stuck on old text** because the copy check matched a species name both shared. Species names are stripped before that check (`eb81fee`).
 12. **Every documented setting must be wired into the workflow.** Three documented variables did nothing because the workflow never passed them (`1ea824a`).
+13. **One line can't be both alt text and a caption.** The literal line search and screen readers want ("perched on a branch among green leaves") read as alt text under all 1,252 photos, 88% in one shape. The visible caption is now its own shorter line and the long one is `alt`. Descriptions written from those captions became species inventories (rotating "Spotted", "Came across", "Found" openers, "rested in hands", "There were also..."), so they're one or two sentences with three animals at most, and checks reject the tells (2026-11-09).
 
 ## Gotchas
 

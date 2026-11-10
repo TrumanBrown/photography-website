@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   allowedNames,
   backdropIn,
+  beforeScene,
   captionFor,
   descriptionProblems,
+  doingOf,
   openerOf,
   placeAfter,
   placeLabel,
@@ -12,6 +14,7 @@ import {
   sessionDigest,
   shapeFor,
   sharedPhrase,
+  shortCaptionFor,
   slugPlace,
   speciesSubject,
   withoutBackdrop,
@@ -58,6 +61,91 @@ const look = (over = {}) => ({
 });
 
 describe("website captions", () => {
+  it("shows a visitor the name and place, and keeps what it's on for the alt text", () => {
+    const base = { analysis: look(), taxon: frog, session: crarc };
+    const perched = { ...base, line: { action: "clinging to a fern frond" } };
+    expect(captionFor(perched)).toBe(
+      "Sylvia's tree frog (Cruziohyla sylviae) clinging to a fern frond, Guayacán",
+    );
+    expect(shortCaptionFor(perched)).toBe(
+      "Sylvia's tree frog (Cruziohyla sylviae), Guayacán",
+    );
+    // What it's doing stays, where it's doing it goes.
+    expect(
+      shortCaptionFor({
+        ...base,
+        line: { action: "with an insect in its mouth on a leaf" },
+      }),
+    ).toBe("Sylvia's tree frog (Cruziohyla sylviae) with an insect, Guayacán");
+    expect(
+      shortCaptionFor({
+        ...base,
+        analysis: look({ count: 2 }),
+        line: { action: "as embryos in jelly beneath a leaf" },
+      }),
+    ).toBe("Two Sylvia's tree frogs (Cruziohyla sylviae) as embryos, Guayacán");
+    // Built from the notes when there's no written line.
+    expect(
+      shortCaptionFor({
+        ...base,
+        analysis: look({ scene: "perched on a bare branch" }),
+      }),
+    ).toBe("Sylvia's tree frog (Cruziohyla sylviae), Guayacán");
+  });
+
+  it("keeps an unidentified animal's own description and a landscape's whole line", () => {
+    expect(
+      shortCaptionFor({
+        analysis: look({ group: "beetle", subject: "Beetle" }),
+        session: crarc,
+        line: { text: "A beetle with yellow spots resting on a finger" },
+      }),
+    ).toBe("A beetle with yellow spots, Guayacán");
+    expect(
+      shortCaptionFor({
+        analysis: look({ group: "spider", subject: "Spider" }),
+        session: crarc,
+        line: { text: "A hairy spider on leaf litter beside mossy wood" },
+      }),
+    ).toBe("A hairy spider, Guayacán");
+    const peak = {
+      analysis: look({ group: "mountain", subject: "Mount Baker" }),
+      session: baker,
+      line: { text: "Mount Baker above dark forested ridges" },
+    };
+    expect(shortCaptionFor(peak)).toBe(captionFor(peak));
+  });
+
+  it("tells doing from sitting", () => {
+    expect(doingOf("holding a bee on a lichen-covered twig")).toBe(
+      "holding a bee",
+    );
+    expect(doingOf("feeding on a purple flower")).toBe(
+      "feeding on a purple flower",
+    );
+    expect(doingOf("grazing on sparsely grassy ground")).toBe("grazing");
+    expect(doingOf("in flight over the marsh")).toBe("in flight");
+    expect(doingOf("emerging from a shell on a green leaf")).toBe(
+      "emerging from a shell",
+    );
+    expect(doingOf("larva on bare soil among dry stems")).toBe("larva");
+    for (const sitting of [
+      "perched on a bare branch",
+      "on a fern frond",
+      "resting on coarse sand",
+      "clinging to weathered wooden boards",
+      "held between fingers",
+      "floating on green water",
+      "with its mouth open among fallen leaves",
+    ])
+      expect(doingOf(sitting)).toBe("");
+    expect(beforeScene("An insect on rough rock")).toBe("An insect");
+    expect(beforeScene("Fish held above a boat")).toBe("Fish");
+    expect(
+      beforeScene("A silver-gray insect with long antennae and tail filaments"),
+    ).toBe("A silver-gray insect with long antennae and tail filaments");
+  });
+
   it("leads with the iNaturalist species and ends on the most specific place", () => {
     expect(captionFor({ analysis: look(), taxon: frog, session: crarc })).toBe(
       "Sylvia's tree frog (Cruziohyla sylviae) on a thin twig at night, Guayacán",
@@ -539,6 +627,54 @@ describe("session descriptions", () => {
         "Sylvia's tree frogs at night on thin twigs above the stream, and a heron by the canal.",
       ).join(" "),
     ).toMatch(/doesn't say where it was.*Guayacán/);
+  });
+
+  it("stays short and never turns into an inventory", () => {
+    const long = `Sylvia's tree frogs at night in Guayacán. ${"The stream ran fast and cold under the trees. ".repeat(7)}`;
+    expect(check(long).join(" ")).toMatch(/over 320 characters/);
+    expect(
+      check(
+        "Sylvia's tree frogs at night in Guayacán. There were also herons by the canal.",
+      ).join(" "),
+    ).toMatch(/tacks on a list/);
+    expect(
+      check(
+        "Sylvia's tree frogs in Guayacán, along with a heron by the canal.",
+      ).join(" "),
+    ).toMatch(/tacks on a list/);
+    for (const text of [
+      "Sylvia's tree frogs in Guayacán, and one rested in hands for a moment.",
+      "Sylvia's tree frogs in Guayacán, and a heron in clear containers.",
+      "Sylvia's tree frogs in Guayacán, and a caterpillar on a thumbnail.",
+    ])
+      expect(check(text).join(" ")).toMatch(/put or held/);
+    const many = {
+      ...digest,
+      species: [
+        "boat-billed heron",
+        "green ibis",
+        "anhinga",
+        "northern jacana",
+      ].map((name) => ({ name, count: 1, scientific: "", kind: "" })),
+    };
+    expect(
+      descriptionProblems(
+        {
+          description:
+            "A boat-billed heron, a green ibis, an anhinga and a northern jacana in Guayacán.",
+        },
+        { session: crarc, digest: many },
+      ).join(" "),
+    ).toMatch(/names 4 animals/);
+    expect(
+      descriptionProblems(
+        {
+          description:
+            "Boat-billed herons and green ibises along the canals in Guayacán, and one anhinga.",
+        },
+        { session: crarc, digest: many },
+      ),
+    ).toEqual([]);
   });
 
   it("says nothing he didn't say happened", () => {

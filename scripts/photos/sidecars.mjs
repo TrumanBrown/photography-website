@@ -63,6 +63,9 @@ export function targetOf(file, targets) {
  * @param slug      the session's URL slug, to recognise an untitled session
  * @param order     the session's photos in display order (published filenames)
  * @param captions  Map of published filename -> caption
+ * @param alts      Map of published filename -> alt text, the fuller line
+ *                  screen readers and image search get. Written beside the
+ *                  caption, and left out where it says the same thing.
  * @param text      { description, title, location }; title and location only
  *                  fill blanks, never replace
  * @param written   what the pipeline last wrote here
@@ -75,6 +78,7 @@ export function mergeWebsiteText({
   slug,
   order = [],
   captions = new Map(),
+  alts = new Map(),
   text = {},
   written = {},
   overwrite = false,
@@ -118,6 +122,15 @@ export function mergeWebsiteText({
     now.captions[file] = caption;
     return caption;
   };
+  // An entry with its caption, and the alt text when it adds anything.
+  const entryFor = (entry, target, caption) => {
+    const base = typeof entry === "string" ? { file: entry } : { ...entry };
+    const alt = alts.get(target);
+    if (caption) base.caption = caption;
+    if (alt && alt !== base.caption) base.alt = alt;
+    else if (alts.has(target)) delete base.alt;
+    return base.caption || base.alt ? base : base.file;
+  };
   if (Array.isArray(next.images)) {
     const covered = new Set();
     next.images = next.images.map((entry) => {
@@ -127,25 +140,19 @@ export function mergeWebsiteText({
       covered.add(target);
       const current = typeof entry === "string" ? "" : (entry.caption ?? "");
       const caption = place(target, current);
-      if (!caption) return entry;
-      return typeof entry === "string"
-        ? { file: entry, caption }
-        : { ...entry, caption };
+      if (!caption && !alts.has(target)) return entry;
+      return entryFor(entry, target, caption);
     });
     // Photos the list doesn't mention are shown after it, in `order`'s order.
     // Once any of them is listed, all of them are, so none changes place.
     const rest = order.filter((file) => !covered.has(file));
     if (rest.some((file) => captions.has(file))) {
       for (const file of rest) {
-        const caption = place(file, "");
-        next.images.push(caption ? { file, caption } : file);
+        next.images.push(entryFor(file, file, place(file, "")));
       }
     }
   } else if (order.some((file) => captions.has(file))) {
-    next.images = order.map((file) => {
-      const caption = place(file, "");
-      return caption ? { file, caption } : file;
-    });
+    next.images = order.map((file) => entryFor(file, file, place(file, "")));
   }
 
   const changed = JSON.stringify(next) !== JSON.stringify(sidecar ?? {});

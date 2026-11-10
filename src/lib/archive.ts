@@ -64,6 +64,8 @@ export interface LeadFrame {
   width: number;
   height: number;
   caption?: string;
+  /** Alt text: the fuller line when the pipeline wrote one, else the caption. */
+  alt?: string;
 }
 
 /**
@@ -101,6 +103,7 @@ export function buildLeadFrames(sessions: Session[]): LeadFrame[] {
         width: image.width,
         height: image.height,
         caption: image.caption,
+        alt: image.alt || image.caption,
       })),
     });
   }

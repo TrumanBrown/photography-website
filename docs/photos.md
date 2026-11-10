@@ -24,8 +24,9 @@ Each photograph is looked at **once** by a vision model. What it sees is stored 
 
 | Output | Written by | Example |
 |---|---|---|
-| **Photo caption** (alt text, lightbox caption, image search) | Code, from the record, opening with a first line written once per photo (text only) | `Mount Baker reflected in a tarn, Yellow Aster Butte`, `Snowcap (Microchera albocoronata) feeding on a flower, Bijagua` |
-| **Session description** (top of the session page, search snippet) | One text-only model call per session, from every photo's caption and your trip notes: what and where first, a light touch of your voice | `Mount Baker and the tarns at Yellow Aster Butte, with fall colors along the trail...` |
+| **Photo caption** (under the photo in the lightbox) | Code, from the record: an animal's name and the place, plus what it's doing when it's doing something | `Snowcap (Microchera albocoronata) feeding on a flower, Bijagua`, `Slaty-tailed trogon (Trogon massena), El Zota Biological Station` |
+| **Alt text** (screen readers, image search, structured data) | Code, from the record, opening with a first line written once per photo (text only) | `Mount Baker reflected in a tarn, Yellow Aster Butte`, `Slaty-tailed trogon (Trogon massena) perched on a branch, El Zota Biological Station` |
+| **Session description** (top of the session page, search snippet) | One text-only model call per session, from every photo's caption and your trip notes: one or two short sentences, what and where first | `Mount Baker and the tarns at Yellow Aster Butte, with fall colors along the trail.` |
 | **Instagram posts** (optional, [docs/social.md](social.md)) | Code, plus a few facts per species or place written once from Wikipedia, and one text-only call per ten posts for the opening in your voice | An opening the way you'd tell it, one emoji, the place on its own line, a fun fact, gear, five hashtags |
 
 Because the photo is only ever looked at once, changing how captions or descriptions are worded never means paying to analyse the archive again.
@@ -153,7 +154,15 @@ To rewrite every first line (after changing the prompt, say), bump `LINE_VERSION
 - **At most 125 characters,** the length screen readers and image search handle best. The place is dropped first when it's too long.
 - **No hashtags, no trailing period, none of the words the site's voice rules ban.**
 
-The caption is used as the photo's `alt` text, its lightbox caption, and the `caption` in the page's structured data.
+That line is the photo's alt text: its `alt`, the name of its link, and the `caption` in the page's structured data. It's written to `_session.json` as `alt`.
+
+The caption a visitor reads under the photo is shorter (`shortCaptionFor`), written as `caption`. Under every photo, "perched on a branch among green leaves" read as alt text, so:
+
+- **An identified animal** gets its name and the place, plus what it's doing only when it's doing something: holding, eating or carrying something, flying, swimming, grazing, preening, a life stage ("as embryos", "larva"). Where it sits ("perched on a bare branch", "on a fern frond", "resting on coarse sand", "held between fingers") stays in the alt text.
+- **An unidentified animal** keeps the words that describe it and loses where it is: "A beetle with yellow spots resting on a finger" becomes "A beetle with yellow spots".
+- **Landscapes, plants and places** keep the whole line, since there the scene is the subject.
+
+Where the two would say the same thing, only `caption` is written. The site falls back to the caption for alt text when there's no `alt`, and an `/admin` save keeps each photo's `alt` (`keepAlts` in `api/sessionmgr/session-images.js`).
 
 ## Session descriptions
 
@@ -169,7 +178,7 @@ One text-only call per session ([website.mjs](../scripts/photos/website.mjs)) ge
 - how you write (the truman-voice skill) and the site's voice rules from [site-copy.instructions.md](../.github/instructions/site-copy.instructions.md)
 - the other sessions' descriptions written so far, so it doesn't echo them
 
-It writes 2 to 4 sentences with the place and the main subjects in the first one (that's what search results show), then what else turned up and what the place was like, in searchable words ("tarn", "fall colors", "tide pools"). Each session is given one of five shapes, picked from its folder name (lead with the place and the subjects, lead with what the place was like, two sentences only, and so on), so the archive doesn't read as one template sixty times. Before a description is used, it has to pass these checks (`descriptionProblems`):
+It writes one or two short sentences, under about 240 characters, with the place and the main subjects first (that's what search results show), in searchable words ("tarn", "fall colors", "tide pools"). The captions already name everything in the photos, so the description names two or three animals at most and never lists the rest. Your notes, when there are any, make the second sentence. Each session is given one of four shapes, picked from its folder name (one sentence, or the place and subjects then one standout, or what the place was like then the standout, or a short fragment then one sentence), so the archive doesn't read as one template sixty times. Until November 2026 descriptions ran two to four sentences and turned into an inventory of every photo ("A ruby-throated hummingbird perched on a feeder, and northern leopard frogs rested in hands. There were also..."). Before a description is used, it has to pass these checks (`descriptionProblems`):
 
 - no em dashes, emoji, exclamation marks, questions (a hedging "(?)" is fine), or banned marketing words
 - nothing that describes the photo rather than the moment: the background, the blur, the framing, a pose, which way something faces, the flash ("against a dark background", "facing left", "its tail curled beside its body")
@@ -183,7 +192,9 @@ It writes 2 to 4 sentences with the place and the main subjects in the first one
 - no "lol": that's for Instagram
 - no forced-casual stand-ins for "I love" ("I dig", "I'm a fan of", "got a kick out of", "I was struck by"): real people repeat their words
 - no run of six words copied from another session's description (sessions that share photos tend to)
-- under 700 characters
+- no more than three of the session's animals named, and no "There were also..." or "along with..." tacked on
+- nothing about how an animal was shown to the camera ("rested in hands", "in clear containers", "on a thumbnail")
+- under 320 characters
 
 A draft that fails goes back with the reasons, up to three times. If it still fails, the old description stays and `npm run photos -- status` says why.
 

@@ -30,6 +30,40 @@ describe("writing website copy into _session.json", () => {
     expect(written.captions["A.jpg"]).toBe("Heron on a post, Tortuguero");
   });
 
+  it("writes the fuller alt text beside each caption, unless it says the same", () => {
+    const { sidecar } = mergeWebsiteText({
+      sidecar: {
+        images: [
+          { file: "A.jpg", caption: "Old heron", alt: "Old heron alt" },
+          "B.jpg",
+          { file: "C.jpg", alt: "Stale alt" },
+        ],
+      },
+      slug: "tortuguero",
+      order,
+      captions: new Map([
+        ["A.jpg", "Heron (Ardea), Tortuguero"],
+        ["B.jpg", "Caiman, Tortuguero"],
+        ["C.jpg", "Anhinga, Tortuguero"],
+      ]),
+      alts: new Map([
+        ["A.jpg", "Heron (Ardea) on a post by the canal, Tortuguero"],
+        ["B.jpg", "Caiman, Tortuguero"],
+        ["C.jpg", "Anhinga, Tortuguero"],
+      ]),
+      written: { captions: { "A.jpg": "Old heron" } },
+    });
+    expect(sidecar.images).toEqual([
+      {
+        file: "A.jpg",
+        caption: "Heron (Ardea), Tortuguero",
+        alt: "Heron (Ardea) on a post by the canal, Tortuguero",
+      },
+      { file: "B.jpg", caption: "Caiman, Tortuguero" },
+      { file: "C.jpg", caption: "Anhinga, Tortuguero" },
+    ]);
+  });
+
   it("keeps a hand-set order and matches RAW sources to their published JPEGs", () => {
     expect(targetOf("B.ARW", new Set(order))).toBe("B.jpg");
     const { sidecar } = mergeWebsiteText({

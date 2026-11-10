@@ -61,7 +61,10 @@ const allImages = import.meta.glob<{ default: ImageMetadata }>(
 type Resolved = {
   src: ImageMetadata;
   file: string;
+  /** What a visitor reads under the photo in the lightbox. */
   caption?: string;
+  /** Alt text, link names and search data: the fuller line when there is one. */
+  alt?: string;
   exif: string;
   fullUrl: string;
   // The original's size. src is prebuild's 2400 px build copy, so the
@@ -107,6 +110,7 @@ const resolved: Resolved[] = await Promise.all(
       src: mod.default,
       file: img.file,
       caption: img.caption,
+      alt: img.alt || img.caption,
       exif: formatExif(img.exif),
       fullUrl,
       fullWidth: img.width,
@@ -216,8 +220,8 @@ const structuredData = {
         "@type": "ImageObject",
         contentUrl: img.fullUrl,
         representativeOfPage: img.file === coverFile,
-        ...(img.caption
-          ? { caption: img.caption, name: img.caption }
+        ...(img.alt
+          ? { caption: img.alt, name: img.alt }
           : { name: fallbackAlt }),
         creator: { "@type": "Person", name: siteConfig.ownerName },
         creditText: siteConfig.ownerName,
@@ -232,7 +236,7 @@ const structuredData = {
   title={title}
   description={pageDescription}
   ogImage={ogImage}
-  ogImageAlt={coverResolved?.caption ?? `${title} cover photograph`}
+  ogImageAlt={coverResolved?.alt ?? `${title} cover photograph`}
   activeSlug={slug}
 >
   <script
@@ -251,7 +255,7 @@ const structuredData = {
       }
       <Picture
         src={bannerImage.src}
-        alt={bannerImage.caption || fallbackAlt}
+        alt={bannerImage.alt || fallbackAlt}
         widths={[600, 1000, 1600, 2000]}
         width={Math.min(2000, bannerImage.src.width)}
         sizes="(min-width: 900px) 78vw, 100vw"
@@ -304,13 +308,13 @@ const structuredData = {
                         data-pswp-filename={img.file}
                         class="frame"
                         aria-label={
-                          img.caption ??
+                          img.alt ??
                           `${title}, photo ${index + 1} of ${resolved.length}`
                         }
                       >
                         <Picture
                           src={img.src}
-                          alt={img.caption || fallbackAlt}
+                          alt={img.alt || fallbackAlt}
                           widths={[480, 800, 1200, 1600]}
                           width={Math.min(1600, img.src.width)}
                           sizes="(min-width: 900px) 26vw, 100vw"

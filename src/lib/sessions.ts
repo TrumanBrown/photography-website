@@ -68,14 +68,33 @@ export function formatDate(iso: string, locale = siteConfig.defaultLocale): stri
 
 type ImageExif = NonNullable<Session['data']['images'][number]['exif']>;
 
+const ROMAN = ['', '', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'];
+
+/**
+ * A camera as people call it. Sony writes its model codes into EXIF
+ * ("ILCE-6700", "ILCE-7M4", "ZV-E10"); everyone else says "Sony a6700",
+ * "Sony a7 IV", "Sony ZV-E10". Other makers' names are already readable.
+ */
+export function cameraName(raw: string | undefined): string {
+  const model = (raw ?? '').trim();
+  const alpha = /^ILCE-(\d+)([A-Z]*?)(?:M(\d))?$/.exec(model);
+  if (alpha) {
+    const [, number, letters, mark] = alpha;
+    const generation = mark ? ` ${ROMAN[Number(mark)] ?? `Mark ${mark}`}` : '';
+    return `Sony a${number}${letters}${generation}`;
+  }
+  if (/^(?:ZV|DSC|NEX)-/.test(model)) return `Sony ${model}`;
+  return model;
+}
+
 /**
  * Join the present EXIF capture-setting fields into a single line for display,
- * e.g. "ILCE-7M4 · FE 70-200mm · 135mm · f/2.8 · 1/500s · ISO 200". Returns an
- * empty string when no fields are present.
+ * e.g. "Sony a7 IV · FE 70-200mm · 135mm · f/2.8 · 1/500s · ISO 200". Returns
+ * an empty string when no fields are present.
  */
 export function formatExif(exif: ImageExif | undefined): string {
   if (!exif) return '';
-  return [exif.camera, exif.lens, exif.focalLength, exif.aperture, exif.shutter, exif.iso]
+  return [cameraName(exif.camera), exif.lens, exif.focalLength, exif.aperture, exif.shutter, exif.iso]
     .filter((v): v is string => Boolean(v))
     .join(' · ');
 }

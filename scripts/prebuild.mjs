@@ -1187,10 +1187,12 @@ export function validateSessionSidecar(value, source = '_session.json') {
         if (typeof item.file !== 'string' || !item.file) {
           problems.push(`images[${index}].file must be a non-empty string`);
         }
-        if (item.caption !== undefined && typeof item.caption !== 'string') {
-          problems.push(`images[${index}].caption must be a string`);
-        } else if (typeof item.caption === 'string' && item.caption.length > MAX_CAPTION) {
-          problems.push(`images[${index}].caption must be at most ${MAX_CAPTION} characters`);
+        for (const field of ['caption', 'alt']) {
+          if (item[field] !== undefined && typeof item[field] !== 'string') {
+            problems.push(`images[${index}].${field} must be a string`);
+          } else if (typeof item[field] === 'string' && item[field].length > MAX_CAPTION) {
+            problems.push(`images[${index}].${field} must be at most ${MAX_CAPTION} characters`);
+          }
         }
       });
     }
@@ -1432,6 +1434,10 @@ export function reorderByList(images, listed, targetBySource = new Map()) {
     if (found) {
       if (item && typeof item === 'object' && typeof item.caption === 'string' && item.caption) {
         found.caption = item.caption;
+      }
+      // Fuller alt text from the captions pipeline; the caption stands in without it.
+      if (item && typeof item === 'object' && typeof item.alt === 'string' && item.alt) {
+        found.alt = item.alt;
       }
       ordered.push(found);
       map.delete(file);

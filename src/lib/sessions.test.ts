@@ -6,6 +6,7 @@ import {
   formatDate,
   isIsoDate,
   formatExif,
+  cameraName,
   splitSessionTitle,
   copyrightLine,
 } from "./sessions";
@@ -67,7 +68,16 @@ describe("formatExif", () => {
       lens: "FE 70-200",
       focalLength: "135mm",
     } as unknown as Parameters<typeof formatExif>[0];
-    expect(formatExif(exif)).toBe("ILCE-7M4 · FE 70-200 · 135mm");
+    expect(formatExif(exif)).toBe("Sony a7 IV · FE 70-200 · 135mm");
+  });
+
+  it("names cameras the way people do, not by Sony's model code", () => {
+    expect(cameraName("ILCE-6700")).toBe("Sony a6700");
+    expect(cameraName("ILCE-7M4")).toBe("Sony a7 IV");
+    expect(cameraName("ILCE-7RM5")).toBe("Sony a7R V");
+    expect(cameraName("ZV-E10")).toBe("Sony ZV-E10");
+    expect(cameraName("iPhone 16 Pro")).toBe("iPhone 16 Pro");
+    expect(cameraName("Canon EOS R100")).toBe("Canon EOS R100");
   });
 
   it("returns an empty string when there is no exif", () => {

@@ -126,7 +126,10 @@ voice with one emoji, the place on its own line, and a `Fun fact: ` label on the
 writes in general is in the [truman-voice skill](../skills/truman-voice/SKILL.md); it's being
 used in full on Instagram. On the site, photo captions and session descriptions are written for
 search first (specific, plain, the place and the species by name) with at most a light touch of
-it ([website.mjs](../../scripts/photos/website.mjs) `descriptionPrompt`).
+it ([website.mjs](../../scripts/photos/website.mjs) `descriptionPrompt`). The caption under a
+photo is the animal's name and the place, plus what it's doing when it's doing something. Where
+it sits goes in the alt text, never the caption. A session description is one or two short
+sentences that name two or three animals at most, never a list of everything in the photos.
 
 - Two or three facts per species, one picked at random. Give one ID/field-mark tip and one
   behavior or story fact.

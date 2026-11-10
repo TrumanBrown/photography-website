@@ -84,7 +84,13 @@ describe("prebuild image targets", () => {
     const images = [{ file: "other.jpg" }, { file: "DSC0123.jpg" }];
     const ordered = reorderByList(
       images,
-      [{ file: "DSC0123.ARW", caption: "Converted RAW" }],
+      [
+        {
+          file: "DSC0123.ARW",
+          caption: "Converted RAW",
+          alt: "Converted RAW on a rock",
+        },
+      ],
       new Map([["DSC0123.ARW", "DSC0123.jpg"]]),
     );
 
@@ -93,6 +99,7 @@ describe("prebuild image targets", () => {
       "other.jpg",
     ]);
     expect(ordered[0].caption).toBe("Converted RAW");
+    expect(ordered[0].alt).toBe("Converted RAW on a rock");
   });
 });
 

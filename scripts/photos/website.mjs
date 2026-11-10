@@ -4,20 +4,26 @@
  *   captionFor          one line per photo, built by code:
  *                       "<subject> <scene> <conditions>, <place>"
  *                       e.g. "Northwestern garter snake (Thamnophis ordinoides)
- *                       coiled on a mossy log, Sauk Mountain"
+ *                       coiled on a mossy log, Sauk Mountain". This is the
+ *                       photo's alt text and structured-data caption.
+ *   shortCaptionFor     the caption a visitor reads under the photo: an
+ *                       animal's name and the place, plus what it's doing
+ *                       when it's doing something ("Northwestern garter
+ *                       snake (Thamnophis ordinoides), Sauk Mountain")
  *   sessionDigest       everything known about a session's photos, condensed
  *   descriptionPrompt   one text-only call per session turns the digest into
  *                       the session description, in Truman's own voice
  *                       (.github/skills/truman-voice)
  *   descriptionProblems the checks a description has to pass before it's used
  *
- * The caption is the photo's alt text, lightbox caption and structured-data
- * caption all at once, so it stays short, literal and free of hashtags: the
- * name, what it's doing when that's the point, and the place. Photos of the
- * same thing can share a caption; telling them apart by pose is what a
- * machine does, not a photographer.
+ * The alt text stays literal and free of hashtags: the name, what it's doing
+ * and where, and the place. The visible caption drops where it sits, because
+ * "perched on a branch among green leaves" under every photo reads as alt
+ * text. Photos of the same thing can share a caption; telling them apart by
+ * pose is what a machine does, not a photographer.
  */
 import { idLevel } from "./analyse.mjs";
+import { ORGANISM_GROUPS } from "./groups.mjs";
 import { fixPlaceWord } from "./placenames.mjs";
 import {
   displayName,
@@ -30,7 +36,12 @@ import { stockIn, unbackedClaim } from "./claims.mjs";
 
 /** Screen readers and image search both favour alt text around this length. */
 export const CAPTION_MAX = 125;
-export const DESCRIPTION_MAX = 700;
+/**
+ * A description is one or two short sentences. The prompt asks for this many
+ * characters at most, and the check allows a little over.
+ */
+export const DESCRIPTION_TARGET = 240;
+export const DESCRIPTION_MAX = 320;
 
 const MONTHS = [
   "January",
@@ -373,34 +384,12 @@ export function captionFor({
   strict = false,
 }) {
   const a = analysis ?? {};
-  const level = a.idCheck === "conflict" ? null : idLevel(taxon);
-  const usedTaxon = level ? taxon : null;
-  const allowed = groundingText(session, usedTaxon);
-  const taxonText = usedTaxon ? groundingText({}, usedTaxon) : "";
-  const ctx = { allowed, lexicon, taxonText };
-
-  let subject;
-  if (level === "species") {
-    // The model's plain word for it ("Jumping spider") stands in for a missing
-    // English name, unless it just repeats the scientific one.
-    const plain =
-      clean(a.subject, { ...ctx, first: true }) &&
-      !norm(a.subject).includes(norm(taxon.name))
-        ? a.subject
-        : (FALLBACK[a.group] ?? "");
-    subject = speciesSubject(taxon, a.count, plain);
-  } else {
-    subject = clean(a.subject, { ...ctx, first: true })
-      ? a.subject
-      : (FALLBACK[a.group] ?? "Photograph");
-    if (
-      level === "group" &&
-      BRACKETED_RANKS.has(taxon.rank) &&
-      !subject.includes(taxon.name)
-    ) {
-      subject = `${subject} (${taxon.name})`;
-    }
-  }
+  const { level, ctx, subject } = subjectParts({
+    analysis: a,
+    taxon,
+    session,
+    lexicon,
+  });
   let phrase = "";
   let after = "";
   // A pose in a stored line comes out rather than costing the line.
@@ -470,6 +459,144 @@ export function captionFor({
   return build(["", "", ""])
     .slice(0, max)
     .replace(/\s+\S*$/, "");
+}
+
+/** What a caption leads with, and the names it may use. */
+function subjectParts({ analysis: a, taxon, session, lexicon }) {
+  const level = a.idCheck === "conflict" ? null : idLevel(taxon);
+  const usedTaxon = level ? taxon : null;
+  const allowed = groundingText(session, usedTaxon);
+  const taxonText = usedTaxon ? groundingText({}, usedTaxon) : "";
+  const ctx = { allowed, lexicon, taxonText };
+
+  let subject;
+  if (level === "species") {
+    // The model's plain word for it ("Jumping spider") stands in for a missing
+    // English name, unless it just repeats the scientific one.
+    const plain =
+      clean(a.subject, { ...ctx, first: true }) &&
+      !norm(a.subject).includes(norm(taxon.name))
+        ? a.subject
+        : (FALLBACK[a.group] ?? "");
+    subject = speciesSubject(taxon, a.count, plain);
+  } else {
+    subject = clean(a.subject, { ...ctx, first: true })
+      ? a.subject
+      : (FALLBACK[a.group] ?? "Photograph");
+    if (
+      level === "group" &&
+      BRACKETED_RANKS.has(taxon.rank) &&
+      !subject.includes(taxon.name)
+    ) {
+      subject = `${subject} (${taxon.name})`;
+    }
+  }
+  return { level, ctx, subject };
+}
+
+/**
+ * The caption a visitor reads under a photo. An animal gets its name and the
+ * place, plus what it's doing when it's doing something ("holding a bee",
+ * "in flight", "as embryos"); where it sits ("perched on a bare branch", "on
+ * a fern frond") stays in the alt text, which is `captionFor`. An animal with
+ * no identification keeps the words that describe it ("A beetle with yellow
+ * spots") and loses the rest. Landscapes, plants and places keep the whole
+ * line, since there the scene is the subject.
+ */
+export function shortCaptionFor(opts) {
+  const full = captionFor(opts);
+  const a = opts.analysis ?? {};
+  const { session, max = CAPTION_MAX, place = placeLabel(session) } = opts;
+  const { level, ctx, subject } = subjectParts({
+    analysis: a,
+    taxon: opts.taxon ?? null,
+    session,
+    lexicon: opts.lexicon ?? [],
+  });
+  const finish = (phrase, said) => {
+    const after = placeAfter(said, place, level ? subject : "").replace(
+      /^Near\b/,
+      "near",
+    );
+    const text = tidy(after ? `${phrase}, ${after}` : phrase);
+    return text.length <= max ? text : tidy(phrase);
+  };
+
+  if (level) {
+    const written =
+      typeof opts.line?.action === "string"
+        ? withoutPose(opts.line.action)
+        : "";
+    const noted = withoutPose(a.scene ?? "");
+    const action = [written, noted].find(
+      (x) => x && clean(x, ctx) && !backdropIn(x),
+    );
+    let doing = doingOf(action ?? "");
+    // "Two otters with its fish" -> "with their fish".
+    if (doing && (a.count ?? 1) > 1) doing = doing.replace(/\bits\b/g, "their");
+    return finish(doing ? `${subject} ${doing}` : subject, doing);
+  }
+  if (!ANIMALS.has(a.group)) return full;
+  const line = opts.line?.text ? withoutPose(opts.line.text) : "";
+  const described =
+    line && clean(line, { ...ctx, first: true }) && !backdropIn(line)
+      ? line
+      : subject;
+  const brief = beforeScene(described);
+  return brief ? finish(brief, brief) : full;
+}
+
+/** Groups that are animals, whose captions lead with the animal. */
+const ANIMALS = new Set(
+  [...ORGANISM_GROUPS].filter(
+    (g) => !["plant", "flower", "fungus"].includes(g),
+  ),
+);
+
+/** An action that's something the animal is doing, rather than where it is. */
+const DOING =
+  /^(?:in flight\b|(?:holding|carrying|eating|feeding|preying|swallowing|catching|hunting|stalking|grazing|browsing|foraging|drinking|preening|bathing|calling|singing|displaying|courting|mating|fighting|chasing|flying|swimming|diving|running|walking|climbing|jumping|leaping|emerging|molting|moulting|shedding|hatching|nursing|peering|digging|building|spinning|guarding|probing|pecking|wading|soaring|hovering|spawning|sipping|munching|chewing)\b|with (?:a|an|some|two|three|four|five|several) |as (?:a |an )?(?:embryos?|eggs?|larvae?|tadpoles?|nymphs?|juveniles?|chicks?|caterpillars?)\b|(?:larvae?|nymphs?|juveniles?|tadpoles?|eggs?|chicks?|caterpillars?|egg mass)\b)/i;
+
+/** Where the scene starts in a phrase: "holding a bee| on a lichen-covered twig". */
+const SCENE_START =
+  /\s(?:on|onto|in|into|among|amid|amongst|beside|above|below|beneath|under|underneath|over|against|near|by|at|across|along|around|between|behind|through|inside|within|atop|while)\s/i;
+const AT_REST =
+  /\s(?:resting|rested|perched|sitting|standing|clinging|lying|hanging|gripping|crouched|crouching|coiled|curled|draped|suspended|clustered|floating|reflected|held|cupped|partly|half|basking|nestled|tucked)\b/i;
+
+/**
+ * What an animal is doing, without where: "holding a bee on a twig" ->
+ * "holding a bee", "feeding on a purple flower" stays (what it eats), "perched
+ * on a bare branch" -> "". Empty when the action is only where it is.
+ */
+export function doingOf(action) {
+  const text = String(action ?? "").trim();
+  if (!DOING.test(text)) return "";
+  if (/^in flight\b/i.test(text)) return "in flight";
+  // "feeding on" names the food, so the scene starts after it.
+  const lead = /^(?:feeding|preying|munching|chewing)\s+on\s/i.exec(text);
+  const from = lead ? lead[0].length - 1 : text.search(/\s/);
+  if (from < 0) return text;
+  const tail = text.slice(from);
+  const cut = tail.search(new RegExp(`${SCENE_START.source}|\\swith\\s`, "i"));
+  return (cut < 0 ? text : text.slice(0, from + cut)).trim();
+}
+
+/**
+ * An unidentified animal's words for itself, without where it is: "A hairy
+ * spider on leaf litter" -> "A hairy spider", "A beetle with yellow spots
+ * resting on a finger" -> "A beetle with yellow spots".
+ */
+export function beforeScene(phrase) {
+  const text = String(phrase ?? "").trim();
+  const first = text.search(/\s/);
+  if (first < 0) return text;
+  const tail = text.slice(first);
+  const cuts = [SCENE_START, AT_REST]
+    .map((re) => tail.search(re))
+    .filter((i) => i >= 0);
+  return (cuts.length ? text.slice(0, first + Math.min(...cuts)) : text)
+    .replace(/[,\s]+$/, "")
+    .trim();
 }
 
 /**
@@ -630,11 +757,10 @@ const monthYear = (date) => {
  * so sixty descriptions don't all walk the same steps.
  */
 export const SHAPES = [
-  "Open with the place and the main subjects by name, then say what else turned up.",
-  "Open with what the place was like (the landmark, the season, the weather), then name the main animals or sights.",
-  "Open with what there was the most of and where, then single out one standout.",
-  "Two sentences only: the place and the main subjects, then one standout.",
-  'Open with a short fragment naming the place and the main subject ("Mount Baker and tarns at Yellow Aster Butte."), then one or two longer sentences.',
+  "One sentence: the place and the main subjects.",
+  "Two sentences: the place and the main subjects, then the one thing that stood out.",
+  "Two sentences: what the place was like (the landmark, the season, the weather), then the animal or sight that stood out.",
+  'A short fragment naming the place and the main subject ("Mount Baker and tarns at Yellow Aster Butte."), then one short sentence.',
 ];
 
 export function shapeFor(slug) {
@@ -700,7 +826,7 @@ export function descriptionPrompt({
     `Light and weather that stood out: ${list(digest.conditions, (c) => c.name)}`,
   ];
   const shape = [
-    `"description": "2 to 4 sentences, under ${DESCRIPTION_MAX - 150} characters"`,
+    `"description": "1 or 2 short sentences, under ${DESCRIPTION_TARGET} characters"`,
     needTitle
       ? `"title": "Place, Region, Month Year, e.g. \\"Sauk Mountain, Washington, June 2026\\". Take the place from the folder name (${session.slug}) and the month from ${monthYear(session.date) || "the photos"}."`
       : "",
@@ -724,10 +850,12 @@ ${facts.join("\n")}
 ${notes ? `His own notes about this trip, the only source for what he was doing, who with, or how it went: "${notes}"` : "He hasn't left notes about this trip, so say nothing about what he was doing beyond what the trip name and the captions show."}
 
 How to write it:
+- Keep it short: one or two sentences, under ${DESCRIPTION_TARGET} characters. The caption under each photo already names what's in it, so this only says what the trip was.
 - The first sentence is what search results show: name the place and the main subjects in it ("Mount Baker and the tarns at Yellow Aster Butte", "Hummingbirds and red-eyed tree frogs in Bijagua").
 - ${shapeFor(session.slug)} Don't walk through the photos one by one.
-- Then what else is there: other animals by common name and what they were doing, what the place was like, in the words people search with ("tarn" for a small mountain lake, "fall colors", "wildflowers", "tide pools").
-- Plain and natural. First person is fine but not needed. At most one short reaction of his ("such a cool spot", "it's crazy how blue the water is"), never a quip, wordplay or a punchline. No "lol" on the website.
+- Name two or three animals at most: the ones there were the most of, or the one that stood out. Never a list of everything, and no "There were also..." or "along with..." tacked on the end.
+- Never say where an animal sat or what it was on or in ("perched on branches", "clung to leaves", "rested in hands", "in clear containers"). That's the picture, not the trip.${notes ? "\n- His notes are the best second sentence. Keep close to his words." : ""}
+- Plain and natural, in the words people search with ("tarn" for a small mountain lake, "fall colors", "wildflowers", "tide pools"). First person is fine but not needed. At most one short reaction of his ("such a cool spot", "it's crazy how blue the water is"), never a quip, wordplay or a punchline. No "lol" on the website.
 - Don't talk about photos as photos: no "these photos", "this session", "frames", "shots", "images", "the rest". Never describe a picture: not the background, the blur, the framing, which way something faces, poses ("with its bill raised"), the flash or the light.
 - Common names only, no scientific names in brackets (the caption under each photo has those). Mid-sentence they're lowercase except proper nouns: "a turquoise-browed motmot", "an Ecuadorian hermit crab". Name species only from the identified list. Anything else gets plain words ("a heron", "a small toad").
 - One paragraph. No place line at the end like an Instagram post.
@@ -744,8 +872,8 @@ ${
 }
 
 Two examples of the shape, from made-up trips (don't copy their wording):
-- "Red-eyed tree frogs and glass frogs along a rainforest stream at night in Guayacán. The red-eyed tree frogs were under the leaves, and a glass frog sat right over the water, such a cool find."
-- "Granite spires and tarns at Gunn Peak in the Central Cascades, with snow still in the gullies in June. A gray-crowned rosy-finch flew over the snowfields."
+- "Red-eyed tree frogs and glass frogs along a rainforest stream at night in Guayacán. Such a cool spot for frogs."
+- "Granite spires and tarns at Gunn Peak in the Central Cascades, with snow still in the gullies in June."
 
 ${voiceGuide ? `How Truman writes (follow it):\n${voiceGuide}\n\n` : ""}${voiceRules ? `The site's copy rules (follow them too):\n${voiceRules}\n\n` : ""}Reply with JSON only: { ${shape.join(", ")} }${feedback ? `\n\nYour previous draft was rejected: ${feedback} Fix that.` : ""}`;
 }
@@ -773,6 +901,13 @@ const PHOTO_TALK =
 
 const EXTRA_BANNED =
   /\b(?:boasts?|nestled|dive in|serene|picturesque|myriad|plethora|teeming|bustling|a testament)\b/i;
+
+// The end of an inventory: "There were also...", "along with a starry flounder".
+const TACKED_ON = /\bthere (?:was|were|are|is) also\b|\balong with\b/i;
+
+// How an animal was shown to the camera, which only the photo knows.
+const HANDLED =
+  /\b(?:rested|resting|held|sat|sitting|curled|lay|lying)\s+(?:in|on|between|above|over)\s+(?:an?\s+|his\s+|my\s+)?(?:open\s+)?(?:hands?|palms?|fingers?|fingertips?|thumbnail|boat deck)\b|\bin clear containers?\b|\bon a thumbnail\b/i;
 
 /** Capitalised words that aren't sentence starts and aren't in `allowedText`. */
 export function ungroundedInProse(text, allowedText) {
@@ -804,7 +939,19 @@ export function descriptionProblems(
   const text = String(description ?? "").trim();
   if (text.length < 60) problems.push("It's too short.");
   if (text.length > DESCRIPTION_MAX)
-    problems.push(`It's over ${DESCRIPTION_MAX} characters.`);
+    problems.push(
+      `It's over ${DESCRIPTION_MAX} characters. Keep it to one or two short sentences.`,
+    );
+  const tacked = TACKED_ON.exec(text)?.[0];
+  if (tacked)
+    problems.push(
+      `It tacks on a list ("${tacked}"). Name two or three animals and stop.`,
+    );
+  const handled = HANDLED.exec(text)?.[0];
+  if (handled)
+    problems.push(
+      `It says where an animal was put or held ("${handled}"). That's the picture, not the trip.`,
+    );
   const found = lint(text);
   if (found.length) problems.push(`It ${found.join(", ")}.`);
   if (EXTRA_BANNED.test(text))
@@ -884,6 +1031,14 @@ export function descriptionProblems(
   if (named.length)
     problems.push(
       `It names ${named.slice(0, 3).join(", ")}, which isn't identified in this session.`,
+    );
+  const listed = [
+    ...digest.species.map((s) => s.name),
+    ...digest.groups.map((g) => String(g.name).replace(/\s*\(.*\)$/, "")),
+  ].filter((n) => n && norm(text).includes(norm(n))).length;
+  if (listed > 3)
+    problems.push(
+      `It names ${listed} animals. Pick the two or three that stood out; the captions have the rest.`,
     );
   const allowed = [
     session.title,

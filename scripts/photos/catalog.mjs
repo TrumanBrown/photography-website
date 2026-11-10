@@ -77,6 +77,7 @@ import {
   openerOf,
   placeLabel,
   sessionDigest,
+  shortCaptionFor,
   speciesSubject,
   telling,
   withoutBackdrop,
@@ -133,7 +134,7 @@ import { CROP_VERSION, placeCrop } from "../social/render.mjs";
 import { info, redact, warn } from "./redact.mjs";
 
 /** Bump when the description prompt changes enough that every session should be redone. */
-const DESCRIPTION_VERSION = 6;
+const DESCRIPTION_VERSION = 7;
 
 /** Bump to read converted photos' originals again (those still without a capture time). */
 const CAPTURE_VERSION = 2;
@@ -726,7 +727,9 @@ async function main() {
   for (const session of sessions) {
     if (!inScope(session.slug)) continue;
     const rec = (catalog.sessions[session.slug] ??= {});
+    // What a visitor reads under each photo, and the fuller line for alt text.
     const captions = new Map();
+    const alts = new Map();
     const sessionShots = new Map();
     for (const p of session.photos) {
       const key = fileShot.get(p.id);
@@ -735,17 +738,16 @@ async function main() {
       sessionShots.set(key, s);
       const taxon = taxonOf(s);
       if (!s.analysis && !(gaveUp(s) && idLevel(taxon) === "species")) continue;
-      captions.set(
-        p.file,
-        captionFor({
-          // A photo the model never saw can still be named by its iNaturalist ID.
-          analysis: s.analysis ?? { group: "other", count: 1, idCheck: "fits" },
-          taxon,
-          session,
-          lexicon,
-          line: s.line,
-        }),
-      );
+      const look = {
+        // A photo the model never saw can still be named by its iNaturalist ID.
+        analysis: s.analysis ?? { group: "other", count: 1, idCheck: "fits" },
+        taxon,
+        session,
+        lexicon,
+        line: s.line,
+      };
+      captions.set(p.file, shortCaptionFor(look));
+      alts.set(p.file, captionFor(look));
     }
     site.captions += captions.size;
     const list = [...sessionShots.values()];
@@ -805,6 +807,7 @@ async function main() {
       session,
       rec,
       captions,
+      alts,
       digest,
       facts,
       redo,
@@ -907,8 +910,9 @@ async function main() {
   }
 
   for (const plan of plans) {
-    const { session, rec, captions } = plan;
+    const { session, rec, captions, alts } = plan;
     rec.captions = Object.fromEntries(captions);
+    rec.alts = Object.fromEntries(alts);
     if (!sidecars) continue;
     const text = {
       description: rec.description,
@@ -923,6 +927,7 @@ async function main() {
           slug: session.slug,
           order: session.photos.map((p) => p.file),
           captions,
+          alts,
           text,
           written: rec.written,
           overwrite: args.overwrite,

@@ -1,7 +1,7 @@
 let BlobServiceClient;
 let TableClient;
 const { allowedUsers, principalUserId } = require('./auth');
-const { captionsFromImages, fullUrls, normalizeSessionImages } = require('./session-images');
+const { captionsFromImages, fullUrls, keepAlts, normalizeSessionImages } = require('./session-images');
 const { analyticsDayKeys, buildAnalytics } = require('./analytics');
 
 const CONTAINER = 'originals';
@@ -331,7 +331,9 @@ async function handlePut(context, req) {
   }
   if (location !== undefined) sidecar.location = location;
   if (description !== undefined) sidecar.description = description;
-  if (normalizedImages.images !== undefined) sidecar.images = normalizedImages.images;
+  if (normalizedImages.images !== undefined) {
+    sidecar.images = keepAlts(normalizedImages.images, sidecar.images);
+  }
   if (showcase !== undefined) {
     if (showcase.length) sidecar.showcase = showcase;
     else delete sidecar.showcase;
