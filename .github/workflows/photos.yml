@@ -106,6 +106,25 @@ jobs:
           fi
           node scripts/photos/catalog.mjs --limit "$LIMIT" $OVERWRITE $DRY_RUN
 
+      # While the website copy is held (or on a dry run), leave the drafts as a
+      # page to download, so they can be read without signing in to Azure:
+      # gh run download <run id> -n captions-preview. It holds the draft
+      # captions and descriptions and links to the public originals, nothing else.
+      - name: Write the preview page
+        id: preview
+        if: ${{ !cancelled() && (inputs.dry_run || vars.PHOTOS_HOLD_WEBSITE == 'true') }}
+        env:
+          AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
+        run: node scripts/photos/cli.mjs preview --no-open
+
+      - name: Upload the preview page
+        if: ${{ !cancelled() && steps.preview.outcome == 'success' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: captions-preview
+          path: .cache/photos/preview.html
+          retention-days: 7
+
       # Runs even when the Instagram stage failed the step, so new website
       # copy always goes live.
       - name: Redeploy the site with the new copy

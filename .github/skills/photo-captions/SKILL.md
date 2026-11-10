@@ -56,7 +56,7 @@ State is private in Blob under `metadata/photos/` (`catalog.json`, `inat-index.j
 1. Record the feedback first: his rewrites go in caption-voice's "His rewrites" and `HIS_STORIES` in `scripts/photos/voice.mjs`; rules for how he writes go in truman-voice.
 2. Hold the website: `gh variable set PHOTOS_HOLD_WEBSITE --body true`. Every run then writes privately only. Posting continues.
 3. Change the prompts or checks (`voice.mjs`, `lines.mjs`, `website.mjs`, `claims.mjs`, `facts.mjs`) with tests, and bump the version that re-runs what changed (below). Push.
-4. `gh workflow run photos.yml`, then `npm run photos -- preview` and `npm run social -- preview`. Give Truman the pages as Windows-openable links (ship-and-ci) and wait for his OK.
+4. `gh workflow run photos.yml`, then `npm run photos -- preview` and `npm run social -- preview`. Without Azure access on this machine (the CLI hangs on credentials), take the page the held run uploads: `gh run download <run id> -n captions-preview`. Give Truman the pages as Windows-openable links (ship-and-ci) and wait for his OK.
 5. After his OK: `gh variable delete PHOTOS_HOLD_WEBSITE` and `gh workflow run photos.yml`, which writes the sidecars and redeploys.
 
 | Constant              | File                         | A bump redoes                                                                                        |

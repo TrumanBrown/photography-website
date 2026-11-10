@@ -253,7 +253,7 @@ The next run is the next scheduled one (twice a day), or start it from **Actions
 | `OPENAI_BASE_URL`, `OPENAI_MODEL`, `ANTHROPIC_MODEL` | variables | OpenAI, `gpt-6.1-sol`, `claude-sonnet-4-5` | Endpoint and model for the API-key route |
 | `PHOTOS_MODEL`, `PHOTOS_PROVIDER` | variables | inferred | Override the model or provider (`azure`, `openai`, `anthropic`, `mock`) |
 | `INATURALIST_USER` | variable | the hobby pages' account | Whose observations count as identifications |
-| `PHOTOS_HOLD_WEBSITE` | variable | off | `true` makes every run a dry run, scheduled ones included: new captions and descriptions are written privately, and `npm run photos -- preview` shows them, but the site isn't touched. For reviewing a change to how copy is written before it goes live. Delete it (or set `false`) and run the workflow to publish |
+| `PHOTOS_HOLD_WEBSITE` | variable | off | `true` makes every run a dry run, scheduled ones included: new captions and descriptions are written privately, and `npm run photos -- preview` shows them, but the site isn't touched. Each held or dry run also uploads that page as a `captions-preview` artifact, kept 7 days (`gh run download <run id> -n captions-preview`), for a machine without Azure access. For reviewing a change to how copy is written before it goes live. Delete it (or set `false`) and run the workflow to publish |
 
 Workflow options (Run workflow): `limit` (photos to analyse, default 300), `overwrite`, `dry_run`.
 
