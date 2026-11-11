@@ -203,7 +203,7 @@ the difference is far smaller than moving Astro's WebP from quality 80 to 75.
 
 HEIC/HEIF and TIFF take the same route through `processConvertBlob`: iPhone HEIC is decoded by [scripts/heic-to-jpeg.py](../scripts/heic-to-jpeg.py) (`pillow-heif`) to a lossless TIFF, TIFF goes straight to sharp, and both get the same single JPEG encode and land in `derivatives/` with the same metadata. Browsers can't display HEIC or RAW, so this one conversion is the only time the site re-encodes a photo at full size; JPEG, PNG and WebP uploads are served exactly as uploaded.
 
-**dcraw_emu** comes from the `libraw-bin` apt package, installed in the build workflow (cached between runs so it's instant after the first install).
+**dcraw_emu** comes from the `libraw-bin` apt package, installed in the build workflow by [.github/actions/image-tools](../.github/actions/image-tools/action.yml), which keeps the package in a GitHub cache so it installs without a download after the first run ([cicd.md](cicd.md#build-and-deployyml-rebuild-and-publish-the-site)).
 
 If you add a new RAW format, just add its lowercase extension to the `RAW_EXTS` set in `scripts/prebuild.mjs`.
 

@@ -1,0 +1,96 @@
+name: Install image tools (cached, with retries)
+description: >-
+  Installs what prebuild needs for photos: libraw-bin (dcraw_emu, for Sony,
+  Nikon and Canon RAW), exiftool (removes the GPS position before a photo is
+  published, scripts/location.mjs) and pillow-heif (iPhone HDR HEIC, which
+  heif-convert and ImageMagick's libheif delegate both fail to decode).
+  The .deb files and Python wheels are kept in a cache folder the runner owns,
+  so a normal build installs them without reaching Ubuntu's mirrors or PyPI.
+  The old cache of /var/cache/apt/archives never saved (its lock file and
+  partial/ are root-only), and a mirror outage stopped the build on
+  2026-08-29, 2026-10-01 and 2026-11-11. Downloads, when needed, try five
+  times over about five minutes. Bump the key to pick up newer versions.
+
+runs:
+  using: composite
+  steps:
+    - id: restore
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/image-tools
+        key: image-tools-ubuntu-24.04-v1
+
+    - id: install
+      shell: bash
+      env:
+        CACHE_HIT: ${{ steps.restore.outputs.cache-hit }}
+      run: |
+        tools="$HOME/.cache/image-tools"
+        shopt -s nullglob
+
+        tools_work() {
+          exiftool -ver >/dev/null &&
+            command -v dcraw_emu >/dev/null &&
+            python3 -c 'import pillow_heif'
+        }
+
+        install_from_folder() {
+          local debs=("$tools"/debs/*.deb)
+          if [ ${#debs[@]} -gt 0 ]; then
+            # The runner image ships apt's package lists, and with them apt
+            # downloads a package from the mirror even when the same version
+            # is sitting in the folder. An empty list leaves it only the
+            # folder, and a missing dependency fails before anything changes.
+            local no_lists
+            no_lists=$(mktemp -d)
+            mkdir -p "$no_lists/partial"
+            sudo apt-get install -y --no-install-recommends \
+              -o Dir::State::Lists="$no_lists/" "${debs[@]}" || return 1
+          fi
+          sudo pip install --break-system-packages --quiet --no-index \
+            --find-links "$tools/wheels" pillow pillow-heif &&
+            tools_work
+        }
+
+        download() {
+          rm -rf "$tools"
+          mkdir -p "$tools/debs/partial" "$tools/wheels"
+          # apt-get update exits 0 when a mirror can't be reached, so the
+          # download is what shows whether it worked. Only packages the
+          # runner image doesn't already have are downloaded.
+          sudo apt-get update &&
+            sudo apt-get install -y --no-install-recommends --download-only \
+              -o Dir::Cache::Archives="$tools/debs/" \
+              libraw-bin libimage-exiftool-perl python3-pip &&
+            sudo pip download --quiet --dest "$tools/wheels" pillow pillow-heif
+        }
+
+        if [ "$CACHE_HIT" = true ] && install_from_folder; then
+          echo "Installed the image tools from the cache"
+        else
+          for attempt in 1 2 3 4 5; do
+            download && break
+            if [ "$attempt" = 5 ]; then
+              echo "::error::Couldn't download the image tools after 5 tries"
+              exit 1
+            fi
+            echo "::warning::Image tools download failed (try $attempt of 5), trying again in $((attempt * 30)) s"
+            sleep $((attempt * 30))
+          done
+          # apt's partial/ and lock are root-only, so the cache save can't
+          # read them.
+          sudo rm -rf "$tools/debs/partial" "$tools/debs/lock"
+          sudo chown -R "$(id -u):$(id -g)" "$tools"
+          install_from_folder
+          echo "save=true" >> "$GITHUB_OUTPUT"
+        fi
+
+        echo "exiftool $(exiftool -ver), $(command -v dcraw_emu)"
+        python3 -c 'import pillow_heif; print("pillow-heif", pillow_heif.__version__)'
+        ls -l "$tools/debs" "$tools/wheels"
+
+    - if: steps.install.outputs.save == 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/image-tools
+        key: image-tools-ubuntu-24.04-v1
