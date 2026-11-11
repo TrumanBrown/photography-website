@@ -69,6 +69,7 @@ The API can't add text, stickers, music, a location or a link to a story, and it
 - A red run can be on purpose: "No post was published yesterday..." is the missed-day alert, and the first failure of a day fails the run so he gets an email (later ones log "already reported").
 - `Media ID is not available` (error 9007) after the container finished: Instagram lag. Publishing retries for about a minute, and the next run publishes a container left in flight (`dc3fc3b`).
 - Token invalid or expired: rotate it (below). Publishing limit used up: wait. A photo that failed twice is left out; `npm run social -- retry <photo>` clears it.
+- A run with no jobs (`startup_failure`, "likely failed because of a workflow file issue") while the runs either side of it on the same commit passed is GitHub, not the workflow. On 2026-11-11 the 12:32 run hit an Actions outage, and the 13:02 run published the 12:30 post and the story. Nothing to redo.
 - No Social post runs at all: check the Logic App's run history. A 401 there means the `GITHUB_TOKEN` app setting (a fine-grained token with Actions write) expired or lost permission: replace it and run Infra again, because the Logic App reads it at deploy time. Meanwhile `gh workflow run social-post.yml` keeps things moving.
 - If Photo captions stops for more than two weeks, the queue runs dry and the missed-day alert goes quiet too.
 
