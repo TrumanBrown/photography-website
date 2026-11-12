@@ -119,28 +119,219 @@ storage, salt, and admin settings. Set `GITHUB_TOKEN` (fine-grained PAT,
 
 ## Setting up on a new machine
 
+A runbook for one of Truman's PCs: Windows with WSL (Ubuntu 24.04) and VS Code connected to WSL. Work
+moved from the laptop to the desktop on 2026-11-12 and switches between them from then on. An agent
+can follow it top to bottom. Run every command inside WSL as your normal Linux user, not `root`.
+The Linux user name may differ from the laptop's, so paths below use `~`.
+
+### What comes over by itself and what doesn't
+
+| What | How it gets to the new PC |
+|---|---|
+| Code, skills, instructions, docs | this repo (step 6) |
+| His always-on Copilot rules, personal skills and hooks | the private repo `TrumanBrown/copilot-home`, checked out as `~/.copilot` (step 4) |
+| Copilot Memory | stored on his GitHub account, nothing to do |
+| `mocks/` and `scripts-local/` (gitignored here) | the private repo `TrumanBrown/photography-website-local`, synced by a hook (step 7) |
+| The laptop's Copilot chats, June to 2026-11-12 | a release asset on that private repo, unpacked into `~/.copilot/session-archive/` (step 8) |
+| Photos, secrets, app settings, infra | already in Blob, GitHub and Azure; nothing is per machine |
+| `.env` (photography tenant and subscription for uploads) | recreate it (step 6) |
+| Sign-ins (GitHub, Azure, VS Code), installed tools | redo them (steps 1 to 5) |
+| `staging/` | not synced. Every zip in it is already a session in Blob (checked 2026-11-12). Copy a folder over only to upload it from this PC |
+| VS Code's own chat history | stays on each PC. The laptop's is in the step 8 archive |
+
+### 1. Windows side
+
+- WSL with Ubuntu 24.04 and a normal default user (`wsl --install -d Ubuntu-24.04` in an admin
+  PowerShell, then pick a user name).
+- VS Code with the WSL and GitHub Copilot extensions, signed in to GitHub as TrumanBrown. Open the
+  checkout through WSL (`code ~/projects/photography-website` from a WSL shell).
+- Files go to Truman as `\\wsl.localhost\Ubuntu\home\<user>\...` paths from `wslpath -w`, servers as
+  `http://localhost:<port>/` links. WSL forwards localhost to Windows.
+
+### 2. Tools inside WSL
+
 ```bash
-git clone <repo-url>
-cd photography-website
+sudo apt-get update
+sudo apt-get install -y git gh xz-utils unzip python3-pip libraw-bin libimage-exiftool-perl
 
-# Install Node 22.23.4+ + Azure CLI + GitHub CLI + Bicep
-# (see README for full install commands)
+# Node 22 through nvm (.nvmrc says 22; 22.23.4 or newer)
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+. ~/.nvm/nvm.sh && nvm install 22 && nvm alias default 22
 
-npm ci
-npm ci --prefix api
-az login --use-device-code
-gh auth login
-gh auth setup-git
-git config --global user.name "<Your Name>"
-git config --global user.email "<id>+<user>@users.noreply.github.com"  # commits are public
+# Azure CLI for Linux, and Bicep
+curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+az bicep install
 
-# Verify (substitute your storage account name + repo)
-az account show --query name
-az storage container list --account-name "$YOUR_STORAGE_ACCOUNT" --auth-mode login --query "[].name" -o table
-gh repo view <owner>/<repo>
+# iPhone HEIC conversion, for prebuild:remote and the fishing catches
+python3 -m pip install --user --break-system-packages pillow pillow-heif
 ```
 
-Photos in Blob, secrets in GH, infra in Azure: none is per-machine state. The only per-machine thing is `~/.config/<project>/contact.json` (WHOIS contact info, gitignored), needed only when updating the domain registration.
+Then open a new shell and check that `which node npm` points into `~/.nvm` and `which az` is
+`/usr/bin/az`. WSL also puts Windows programs on PATH, and a Windows `node` running the tests is a
+known trap (ship-and-ci gotchas). The laptop used the Windows `az` from `/mnt/c`, which works with
+the quirks in the azure-ops skill. The Linux one avoids them.
+
+Optional, for screenshots and browser checks: `npx playwright install chromium`, plus the libraries
+in the design-mocks skill's gotchas if Chromium won't start.
+
+### 3. GitHub sign-in and git identity
+
+```bash
+gh auth login --web --git-protocol https     # as TrumanBrown
+gh auth setup-git
+git config --global user.name "Truman Brown"
+git config --global user.email "trumanbrown@users.noreply.github.com"
+```
+
+WSL can't open a browser, so open https://github.com/login/device on Windows and type the code `gh`
+prints. The email is the author on recent commits to `main`
+(`git log -1 --format='%an <%ae>' origin/main` once the repo is cloned). Never his personal Gmail
+(ship-and-ci lesson 10) and never a work account.
+
+### 4. copilot-home (`~/.copilot`)
+
+VS Code's Copilot may already have created `~/.copilot`. Back up anything personal in it, then turn
+it into a checkout of his private repo (the repo's own README has the long version):
+
+```bash
+mkdir -p ~/.copilot/backups/$(date +%F)
+cp -a ~/.copilot/copilot-instructions.md ~/.copilot/skills ~/.copilot/backups/$(date +%F)/ 2>/dev/null
+cd ~/.copilot
+git init -b main
+git remote add origin https://github.com/TrumanBrown/copilot-home.git
+git fetch origin
+git reset origin/main
+git checkout -- .
+git branch -u origin/main
+git config user.name "Truman Brown"
+git config user.email "70858679+TrumanBrown@users.noreply.github.com"
+bash ~/.copilot/home-sync/sync.sh pull; cat ~/.copilot/logs/copilot-home-sync.log
+```
+
+`git status` should then be clean. This brings `copilot-instructions.md`, the personal skills, and
+`hooks/copilot-home.json` with its scripts in `home-sync/`: `sync.sh` keeps `~/.copilot` itself in
+step, and `photo-local.sh` handles this repo (step 7).
+
+### 5. Azure sign-in
+
+```bash
+az login --tenant <photography tenant id> --use-device-code
+az account set --subscription <photography subscription id>
+az account show --query "{name:name, tenant:tenantId}"
+az storage container list --account-name <account> --auth-mode login --query "[].name" -o tsv
+```
+
+The ids are in the laptop's `.env` (step 6) or the Azure portal. Plain `az login` against that
+tenant failed once with AADSTS50076 (MFA required); `--tenant ... --use-device-code` works. The
+account is the host in `blobHost` in `site.config.ts` without `.blob.core.windows.net`. His account
+already has the Storage Blob Data role on it, so the last command lists `originals`, `incoming`
+and the rest. If `az` is still signed in to a work account, sign in to the photography tenant before
+any Azure command (azure-ops gotchas).
+
+### 6. This repo
+
+```bash
+mkdir -p ~/projects && cd ~/projects
+git clone https://github.com/TrumanBrown/photography-website.git
+cd photography-website
+nvm use
+npm ci && npm ci --prefix api
+node scripts/generate-fixtures.mjs    # npm run check needs a session JSON
+```
+
+Then create `.env` in the checkout (gitignored, never committed), with the same two values as step 5:
+
+```bash
+cat > .env <<'EOF'
+# Azure tenant & subscription for the photography site. Gitignored, never commit.
+AZURE_TENANT_ID=<photography tenant id>
+AZURE_SUBSCRIPTION_ID=<photography subscription id>
+EOF
+```
+
+`scripts/upload-session.sh` reads it and switches `az` to that tenant before uploading. Without it,
+an `az` on another tenant fails with "Issuer validation failed".
+
+### 7. `mocks/` and `scripts-local/`
+
+They're gitignored here, so a second, private repo tracks just those two folders:
+`TrumanBrown/photography-website-local`. Its git directory sits beside the checkout, at
+`~/projects/photography-website-local.git`, and uses the checkout as its work tree, so the folders
+stay at their usual paths and the mock skills and prep scripts work unchanged. This repo never sees
+the git directory or the files.
+
+```bash
+bash ~/.copilot/home-sync/photo-local.sh setup ~/projects/photography-website
+bash ~/.copilot/home-sync/photo-local.sh git status -sb    # "## main...origin/main" and nothing else
+```
+
+`setup` clones the private repo and checks the two folders out. If either folder already exists, it
+first moves it to `~/projects/photography-website-local-backup-<time>/`.
+
+The hook in `~/.copilot/hooks/copilot-home.json` then keeps both PCs in step:
+
+- When a Copilot session starts in the main checkout, it runs `git pull --ff-only` on this repo (at
+  most once a minute), commits any local change to the two folders, pulls the private repo with a
+  rebase, and pushes in the background.
+- When a turn ends, it commits and pushes the two folders in the background.
+- Worktrees and every other folder are skipped. It never holds a session up. Files over 50 MB and
+  `node_modules` stay local, and a change that looks like it holds a key isn't committed. Each
+  problem goes in `~/.copilot/logs/photo-local-sync.log`.
+
+Run git for these folders through the script (`photo-local.sh git <args>`). Plain `git` in the
+checkout talks to this public repo. If the log says the pull failed after the same file changed on
+both PCs, nothing is lost; finish it by hand:
+
+```bash
+S=~/.copilot/home-sync/photo-local.sh
+bash $S git pull --rebase          # stops at the conflict
+# fix the file, then
+bash $S git add <file> && bash $S git rebase --continue && bash $S git push
+```
+
+If the log says the public pull failed, there were local commits or an edit in the way: run
+`git pull --rebase` in the checkout before loading skills.
+
+### 8. The laptop's chats
+
+```bash
+mkdir -p ~/.copilot/session-archive && cd ~/.copilot/session-archive
+gh release download chats-laptop-2026-11-12 --repo TrumanBrown/photography-website-local
+sha256sum -c copilot-chats-laptop-2026-11-12.tar.xz.sha256
+tar -xJf copilot-chats-laptop-2026-11-12.tar.xz && rm copilot-chats-laptop-2026-11-12.tar.xz*
+```
+
+About 470 MB to download and 930 MB unpacked: all 46 Copilot CLI sessions (full event logs,
+checkpoints, plans, small files), `session-store.db`, and VS Code's own chat history for this repo.
+Bulky scratch files (Python environments, node_modules, Chromium libraries, frame dumps, large
+renders) were left out, and keys, tokens, connection strings, SAS signatures and auth cookies were
+replaced with `[REDACTED:<kind>]`. Its `README.md` says how to search it and `INDEX.md` lists every
+session. `~/.copilot/copilot-instructions.md` tells Copilot to search it when he asks about past
+work. Don't move it into `~/.copilot/session-state/`; it's for reading.
+
+### 9. Restart and check
+
+1. Restart VS Code (or run Developer: Reload Window). A running Copilot caches instructions and
+   hooks, so a new chat alone isn't enough the first time.
+2. Start a Copilot chat in `~/projects/photography-website`, then read
+   `~/.copilot/logs/photo-local-sync.log` and `~/.copilot/logs/copilot-home-sync.log`. No new lines
+   means both syncs worked.
+3. `npm test && npm run lint && npm run check`. ESLint errors under `mocks/` are local only.
+4. `gh run list --limit 3` and `az account show` both answer.
+5. Ask Copilot something only the skills know (for example "what did Truman say about the globe
+   spin?") to see the repo's skills load.
+
+### Day to day on two PCs
+
+- Skills, docs and code move only through commits to `main`, so finish and push work before
+  switching PCs (`Finishing a change` in copilot-instructions.md). The next session on the other PC
+  pulls it.
+- Mocks move at the end of every turn. A mock edited outside Copilot moves at the next session
+  start in the checkout, or with `bash ~/.copilot/home-sync/photo-local.sh push ~/projects/photography-website`.
+- `staging/`, `.env`, sign-ins and tools stay per PC. Upload a session from the PC that has its
+  photos.
+- `~/.config/<project>/contact.json` (WHOIS contact info, gitignored) is needed only when updating
+  the domain registration, and only on the PC that does it.
 
 ## Open items (not blocking anything)
 

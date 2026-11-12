@@ -60,6 +60,7 @@ If it says NO DATA, `curl -s https://seattlebalc.com/api/v1/flights | head` firs
 
 ## Truman's verdicts
 
+- 2026-07-14, on the first Analytics tab in /admin: "this graph in admin is pretty pointless. it has no axis and cant hover over a day and see the views and maybe views per page and time spent IDK. make it more professional rich analytics that are actually useful" (`01a7d90`). Charts there get labelled axes and numbers on hover or focus.
 - 2026-11-05: of the portfolio mocks, "A weekends is good." Side projects: "only highlight these three - and I suggest using a photo or live elemtn for each. live site under the website project seems not useful since they are already on the site." The switch: "mak esure the weekends and weekdays tab isn't too hard to miss. it's good, but just want to make sure it isn' tmissed." The portrait: "use whichever looks better and more fiting for the section" of Everest and a boat in Ninh Binh. Everest won, since his own Everest session is in the archive and the photo links to it. "Write to me" should "mention the about me section first and then the print or photo", and every message should reach his email.
 
 - 2026-11-05, on the live page: "a lot of blank space on this page" on the Weekdays side; the newest session should use "either the cover or the header images considering I selected those"; "don't highlight seattlebalc.com with a link to it. I didn't make that so it isn't really impressive. my friend made it"; "maybe the side bar could be a bit bigger?"; "why is one resume button off color while the other isn't". The two Resume buttons were the rail's outlined `.btn` and the Weekdays row's filled `.btn-ink`, two of the same action in two styles. Round 2 mocks (`mocks/portfolio/r2-*.html`) for the space and the rail width.
@@ -68,6 +69,7 @@ If it says NO DATA, `curl -s https://seattlebalc.com/api/v1/flights | head` firs
 
 - 2026-11-05, on the live Weekdays side: "I would put a resume button on this page directly. its kind of hidden in bottom left. and if users are going to about me, they expect to see a resume somewhere clearly." And "name first tab looks best." Of the first icon mocks: "i dont really understand them. what is a trig point" (round 2 at `mocks/portfolio/brand.html`, described in plain words).
 
+- 2026-11-05, on the old camera icon: "the logo should change, it looks generic and the website is no longer just photogrpahy... it needs to be unique, not look like AI, simple, clean icon."
 - 2026-11-05: "mt baker led panel is the winner." And "don't shorten the experience sections by default. keep it full length. it's easy to miss that expand button, just get rid of it."
 
 - 2026-11-05, on the page-change mocks: "lands on their cards for both looks best." The rows' prints and drawings now land on their cards (site-motion).

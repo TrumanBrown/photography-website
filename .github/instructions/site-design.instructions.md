@@ -19,7 +19,8 @@ look. Everything below is about the public pages.
   `neutral-*`, `gray-*`, `white` or `black`: `paper`, `band`, `ink`, `ink-2`, `ink-3`, `rule`,
   `rule-soft`, `hover`. As classes: `text-ink-3`, `border-rule`, `bg-band`. In component CSS:
   `var(--ink)`. Hobby content can have its own colors (fish sprites, map relief, pixel art).
-- Dark mode is `html.dark`, set by the site's toggle rather than the OS. The tokens flip with it,
+- Dark mode is `html.dark`. It follows the device's light or dark setting until the visitor uses
+  the toggle, which is then remembered (`src/lib/theme.ts`). The tokens flip with it,
   so token classes need no `dark:` variants.
 - `ink` for titles, `ink-3` for prose, `ink-2` for labels and quiet links (4.5:1 in both themes).
   Color comes from the photographs, not from accent colors.
@@ -93,6 +94,8 @@ look. Everything below is about the public pages.
 - Controls are at least 24px in both directions (WCAG 2.5.8). For touch, grow the hit area with
   an `::after` instead of moving the layout (`.steps button` in LeadPhoto.astro). Fixed UI (the
   mail button, the phone bar) must never cover content or the focused element.
+- A flex column that holds truncated text needs `min-w-0` at every width. Without it one
+  `nowrap` line widens the column past a phone screen, as the admin cards did (`a3ee96e`).
 
 ## Checking your work
 

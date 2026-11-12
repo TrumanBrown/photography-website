@@ -27,10 +27,35 @@ never restore, stash or reset files you didn't change, and `git pull --rebase` b
 
 ## Working with Truman
 
+- Why the site exists, in his words: "mainly a side project but I wanted to make it to host my
+  photos at full res and share with friends and family easily. I also wanted to learn a new tech
+  stack and get coding again" (2026-06-17). Since 2026-10-25 the repo is also a resume piece, to
+  show "how I took normal "vibe coded" thing and made it into a full flegded prod website", so the
+  README and docs point to trumanbrown.com.
+- He owns the site "like a PM would own a product": "consistent, with a clean theme and story"
+  (2026-11-09). Names, counts and wording agree across pages. Before suggesting a change, read
+  that part's verdicts so a rejected idea doesn't come back.
 - He works from Windows into this WSL checkout, on more than one PC, and the Linux user name
   differs between them. Give files as Windows paths from `wslpath -w <file>`
   (`\\wsl.localhost\Ubuntu\home\<user>\projects\photography-website\...`) and servers as
-  `http://localhost:<port>/` links, never bare Linux paths.
+  `http://localhost:<port>/` links, never bare Linux paths. It stays in WSL on every PC: a dev
+  container or native Windows came up and "contairized is interesting but don't want to do that
+  yet" (2026-10-25).
+- He switches between a laptop and a desktop and wants "the same prompt to produce the same
+  results on both machines" (2026-10-25). His copilot-home hook pulls this checkout
+  (`git pull --ff-only`) and syncs the gitignored `mocks/` and `scripts-local/` through a private
+  repo when a session starts here, and pushes those two folders when a turn ends
+  ([docs/session-handoff.md](../docs/session-handoff.md#setting-up-on-a-new-machine)). If
+  `~/.copilot/logs/photo-local-sync.log` says the pull failed, pull by hand before loading skills.
+- When you report a change, say what a visitor sees differently, before and after, with
+  screenshots for anything visual: "explain more from the customer perspective for each change"
+  (2026-06-10). Check the before state yourself. A guessed "before" once had to be corrected with
+  his screenshot.
+- A small dependency is fine when it makes the result meaningfully better: "if some minimal
+  dependencies results in a meaningfully better experience, graphics, accuracy, etc. then use
+  those and just make sure to doucment exactly what you do" (2026-06-23). Component libraries are
+  still ported by hand ([site-motion](skills/site-motion/SKILL.md)), and tools on his machine stay
+  few ([azure-ops](skills/azure-ops/SKILL.md)).
 - Update the docs a change touches in the same commit, in plain words someone rebuilding the site
   could follow.
 - The repo is public. No secrets, Azure ids, personal email or the Instagram account in code,
@@ -40,7 +65,7 @@ never restore, stash or reset files you didn't change, and `git pull --rebase` b
   is a paid call a visitor can trigger ([azure-ops](skills/azure-ops/SKILL.md)).
 - When he says he's walking away, make the calls yourself from his prompts and the docs, write
   each assumption down and keep going: "if any decisions needed make them on your best judgement"
-  (2026-06-27). While he's around, ask about meaningful changes and play a sound when you need
+  (2026-07-08). While he's around, ask about meaningful changes and play a sound when you need
   him: `powershell.exe -NoProfile -Command "[System.Media.SystemSounds]::Exclamation.Play()"`
   (2026-10-11).
 - On long work, tell him where it stands and what's blocking it without being asked: "youve been

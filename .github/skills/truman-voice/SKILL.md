@@ -105,6 +105,7 @@ What he never writes:
 | Website photo captions | Not his voice: they're the alt text and what image search reads. Specific and plain: the name, what it's doing and what it's on, what's in front of a view, in searchable words ("reflected in a tarn", "fall colors"). No poses or background blur ([lines.mjs](../../../scripts/photos/lines.mjs)) |
 | Session descriptions | Search first: the place, landmarks and main animals by name in the first sentence, in plain words. A light touch of his voice at most (one short reaction, first person optional), never "lol" or emoji ([website.mjs](../../../scripts/photos/website.mjs) `descriptionPrompt`). "The website first-party voice isn't as important" (his words) |
 | Hobby intros and longer site prose | First person, contractions, underselling: [site-copy.instructions.md](../../instructions/site-copy.instructions.md). No "lol", no emoji |
+| His own story retold on the site (the spark bird) | His words, order and speech style, with grammar and punctuation corrected: "make it similar to my speech style but corrected grammar and punctuation" (2026-06-29). No "lol", no emoji |
 | Buttons, labels, errors | [site-copy.instructions.md](../../instructions/site-copy.instructions.md) only |
 
 ## Procedure

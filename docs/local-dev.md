@@ -132,7 +132,7 @@ to remove them. Collection schemas and JSON glob loaders live in
 - `src/content/sessions/*`, populated by `npm run fixtures` or `npm run prebuild:*`
 - `staging/*`, photos waiting to be uploaded (only `staging/README.md` is tracked)
 - `public/birding/wasm/`, the MediaPipe runtime copied from `node_modules` by `npm run dev`/`build`
-- `mocks/`, `scripts-local/`, throwaway design mocks and their prep scripts
+- `mocks/`, `scripts-local/`, throwaway design mocks and their prep scripts. They sync between Truman's PCs through a separate private repo ([session-handoff.md](session-handoff.md#7-mocks-and-scripts-local))
 - `contact.json`, domain registration contact info (only relevant on the deploy machine)
 - `.env*`, read by `scripts/upload-session.sh` for local Azure tenant/subscription/account overrides
 

@@ -94,6 +94,7 @@ Instagram's API can only turn comments on or off and delete. To change a live ca
 - 2026-10-13: "don't pause any image posting, i just want to see the drafts."
 - 2026-10-13: some emoji "are too much, like the heart eyes"; stick to the animal or the scene.
 - 2026-10-14: frames that don't fit get a slight crop instead of a border.
+- 2026-10-14: a second daily story that shares his own feed post. The API can't do that, and of the workarounds offered he said "none of these, not worth it." Don't offer them again.
 - 2026-10-26: asked whether the README should name the account: keep it private, "on the repo itself don't post the handle, but highlight the automated instagram pipeline it has, that's still pretty cool". He did want the site's footer to link the account, and a real number for visits it sends.
 
 ## Hard-won lessons
@@ -104,6 +105,7 @@ Instagram's API can only turn comments on or off and delete. To change a live ca
 4. **Borders read as bars** on the portraits that were a third of the queue, in both themes. Crop by default, placed once per photo with its own fingerprint so it can't post twice (`e510b08`).
 5. **A test broke at 10:05 one morning and blocked every deploy**, including his admin edits. `runPost` stamped the real clock while the test faked only `now`. Tests fake `Date` and run at several dates (`a52ccd6`). Image tests got smaller fixtures and 20 s timeouts after timing out on CI (`e00b520`).
 6. **Heart-eye emoji and quips didn't sound like him.** One emoji at the end, of the animal or the scene (`55d3d5b`).
+7. **Setup steps lost him on Meta's site** (2026-10-10). The steps didn't say which site or account each one happened on ("where is the api setup page, is it on the developers.facebook.com or on the instagram account"), and an "Add account" button they named wasn't there. Group setup steps by where they happen (the Instagram app, developers.facebook.com, the tester invite) and check Meta's current page before naming a button. The developer account can be a different account from the Instagram one.
 
 ## Gotchas
 

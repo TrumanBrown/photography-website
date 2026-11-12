@@ -22,6 +22,7 @@ Astro writes the page variants into `dist/_astro/`, and `scripts/sync-variants.m
 - **Full resolution, every time, for everyone.** The current slide always ends on the original. No Save-Data exception, no slow-network exception, no quality switch (`a810c65`). A speed fix that leaves a smaller copy in the lightbox is a regression, however fast it is.
 - **Cut cost only where no visitor can see it.** Truman's gate for the build copies was "if no visible difference to customers, then implement this change" (2026-10-15). Prove it before proposing a change: flip between the two on the hardest photos and measure (SSIMULACRA2 was used), then explain the impact very simply.
 - **Performance over cost.** He has a monthly Azure credit and has said many times not to hold features back to save it. The exception is waste nobody sees, like the build's own downloads.
+- **Performance over build time too.** "website performance is highest priority. if build times have to be a bit slower i am ok with that" (2026-06-09). Page variants are WebP and JPEG. AVIF was left out on 2026-06-08 only to keep builds short ("no i think we didn't do avif to save on build time", 2026-06-17), so a slower build alone isn't a reason to turn down something visitors would notice.
 - **A caption never covers its photo** at any size, in the lightbox or anywhere else. The photo gets smaller to make room ([site-design rules](../../instructions/site-design.instructions.md)).
 
 ## Files
@@ -63,6 +64,7 @@ Truman checks against the iCloud original, so check the same way.
 
 ## Truman's verdicts
 
+- 2026-06-17: "do the download full res option per image but not the download all zip. the exif is good too." The lightbox downloads the original one photo at a time and shows the capture settings under the caption.
 - 2026-10-07: "look at icloud (right) vs website clicked image (left). That is very noticeable degrade in quality. That is unacceptable. I need full res images if user clicks on them."
 - 2026-10-07: "dannys photos load so much quicker than mine when clicking through photos", which led to the bridge, the placeholder and the decode-then-swap. Speed came from loading order, not smaller files.
 - 2026-10-07: "is the full res image always being shown when user clicks on it". The Save-Data exception came out; the answer has to be a plain yes.
@@ -84,9 +86,11 @@ Truman checks against the iCloud original, so check the same way.
 9. **Rotation frames 404'd only in production.** The variant rewriter's pattern ran past `&#34;`-escaped URLs inside JSON data attributes (`35f9a71`). URLs in `data-*` JSON go through the rewriter, so check them live.
 10. **The build's own downloads were most of the Azure bill** ($21 of $26 in a month, about 1,300 GB). The 9 GB full-size cache plus the Astro cache passed GitHub's 10 GB, eviction made builds re-download every original, and runners are Azure VMs in other regions. Build copies fixed it: OAuth egress went from 124 GB in 23 hours to 0.06 GB in 15 (`9c88d92`, `f89f353`).
 11. **The build ran out of disk** with the prebuild cache, the content and `dist/` on one runner. The workflow saves the cache, then deletes it before Astro runs (`18ea907`).
+12. **"Fast" got quoted as the first pixel** (2026-10-07). Answers said a clicked photo showed in 100 ms, which was the placeholder, while the original takes about 1.5 s on a fast line and 10 s on slow 4G. He asked "there has to be some tradeoffs right?" and then "idk why this is so long". When asked about speed or full resolution, answer yes or no first, quote the time to the original, and name the cost.
 
 ## Gotchas
 
+- Skimming fetches the original of every slide passed, not only the one he stops on: 15 fast arrow presses pulled about 160 MB of originals (2026-10-16). Waiting about half a second on a slide before fetching its original would stop that with no visible change. It was offered and not built, so ask before adding it, and never delay the upgrade of a photo he stays on.
 - The comment above `getImage` in `[slug].astro` says the original loads only once a photo is shown larger than the bridge. The code always upgrades the current slide; trust the code.
 - Local `dist/` is gigabytes because sync-variants doesn't run locally. It says nothing about the deploy size.
 - `npm run prebuild:remote` downloads build copies over the internet and is billed (a test run cost about $0.35). It also writes to production containers.

@@ -103,9 +103,13 @@ Then run `gh workflow run build-and-deploy.yml`. A run cancelled by a newer push
 
 ## Truman's verdicts
 
+- 2026-06-08: "keep in mind I want to do this from phone if needed." /admin is his "one stop shop" because the Azure portal can't show the storage files on his phone (2026-06-09), so check every admin change at phone width.
+- 2026-06-09: Save and Rebuild Site stay separate buttons. Offered a Save that also builds, he said "having the rebuild option available in the site today is good for other scenarios."
+- 2026-06-09: contact messages in /admin are "read only. no deleting or writing, etc." Deleting one stays in the Azure portal.
 - 2026-10-06: session cards must look like collections, all one fixed size and easy to click. The home page shows the overview of every session and never opens one by itself.
 - 2026-10-06: titles shaped like "location - geo - time", not "journey across tibet"; descriptions only inside the session.
 - 2026-10-07: "I need full res images if user clicks on them."
+- 2026-10-07: on a pro photographer's site, "the large clean grid view under sessions is slightly better than the 1 image per area." The session page stays a grid of justified rows.
 - 2026-10-07: let him choose the session header instead of using the first photo (`9e01670`).
 - 2026-10-08: in the admin panel the "images are way too small to see, the session panel thing isn't sizeable" (`eef0377`, `af0b6c9`).
 - 2026-10-09: the lead photo starts on a random pick at each page load.
@@ -126,6 +130,8 @@ Then run `gh workflow run build-and-deploy.yml`. A run cancelled by a newer push
 9. **A prebuild path that only runs against Blob broke a deploy** (`ReferenceError: sessionCoords`, `0cf49ff`). `prebuild:local` never runs that code, so ESLint's `no-undef` and a careful read of the diff are the only checks before CI.
 10. **The first build after a split downloads every moved photo again**, and the old derivatives, thumbnails and copies stay behind. That's cheap, but nothing cleans them up.
 11. **Staged photos arrived corrupted in an agent worktree** (2026-06-28). The worktree had no `staging/`, because it's gitignored, and all 17 photos he copied into it had about two thirds of their bytes replaced by `EF BF BD`, the UTF-8 replacement character, which can't be undone. Read `staging/` from the main checkout, check each staged photo decodes before using it, and if one is full of `EF BF BD`, ask him to copy it again directly or as a zip.
+12. **Admin thumbnails came out sideways** (2026-06-11). The thumbnail step resized with sharp and dropped EXIF without applying its orientation, so portraits lay on their side. Every sharp path calls `.rotate()` before resizing. Existing thumbnails are skipped, so after a fix like this delete `variants/thumbs/` (or bump its version) so the next build remakes them.
+13. **Session dates showed a day early** (`6ebab18`, 2026-07-14). A date-only `2026-04-18` parses as UTC midnight, so it printed as April 17 in Pacific time. Dates are calendar values: format them with `timeZone: 'UTC'` (`src/lib/sessions.ts`, `src/lib/admin.ts`).
 
 ## Gotchas
 
@@ -135,5 +141,8 @@ Then run `gh workflow run build-and-deploy.yml`. A run cancelled by a newer push
 - The uploader doesn't lower-case folder names. Re-uploading identical files gives them new ETags, so they're downloaded and copied again.
 - `places/<region>/` hubs exist only for regions with two or more sessions, and nothing links to them except the sitemap.
 - The hourly cron is best effort, so upload with `--build` rather than waiting for it.
+- The uploader reads the photography tenant and subscription from the gitignored `.env` (`AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`) and switches `az` to them. `.env` doesn't move with git, so recreate it on a new machine from `az account show` while signed in to that tenant. Without it, an `az` still on his work tenant fails with "Issuer validation failed" (2026-06-07).
+- iPhone-edited photos: stage iCloud's "Highest Resolution" download, which keeps his edits at full pixel size. It's about half the size of the camera file because Apple re-encodes at roughly q95, which measured visually lossless (2026-08-16). "Unmodified Original" loses his edits. iCloud is his archive ("i can download full res unmodified whenever"), so don't suggest a backup step and never offer a smaller re-encode.
+- Files dragged in from Windows Explorer bring twins named `<file>:Zone.Identifier` (Windows alternate data streams written out as files through `\\wsl.localhost`). They're harmless, and the uploader skips them because the name doesn't end in `.zip` or an image extension (2026-09-15).
 
 Add new verdicts and lessons here, dated, in the commit that acts on them.

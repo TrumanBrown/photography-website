@@ -104,6 +104,7 @@ A run handles 300 photos by default (`limit`); the archive was about 1,250 in Oc
 11. **A description stuck on old text** because the copy check matched a species name both shared. Species names are stripped before that check (`eb81fee`).
 12. **Every documented setting must be wired into the workflow.** Three documented variables did nothing because the workflow never passed them (`1ea824a`).
 13. **One line can't be both alt text and a caption.** The literal line search and screen readers want ("perched on a branch among green leaves") read as alt text under all 1,252 photos, 88% in one shape. The visible caption is now its own shorter line and the long one is `alt`. Descriptions written from those captions became species inventories (rotating "Spotted", "Came across", "Found" openers, "rested in hands", "There were also..."), so they're one or two sentences with three animals at most, open on the place or the animals, and checks reject the tells (2026-11-09). Banning an opener once it's used three times is what made the model hop synonyms; banning the whole family of "I did" openers is what stops it.
+14. **The model tier was picked on his photos** (2026-10-10). On the Tapir Valley session the budget tier got 3 to 4 of 10 wrong (the tapir as "a large mammal", a frog as "a salamander", a mossy rock as "a stone wall"), and the top tier was no better than the middle one at five times the price. The middle tier (`gpt-6.1-sol`) stays. Test any switch on a real session before rolling it out.
 
 ## Gotchas
 

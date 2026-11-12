@@ -28,7 +28,9 @@ Secrets and settings are listed in the [secrets cheat sheet](../../../docs/cicd.
 - **Performance and quality first; he has a monthly Azure credit.** "I want performance over cost efficiency always" (2026-06-27); "dont limit or bottleneck these possible features or tools based on that. I get $150 a month in azure credits and I use basically 0" (2026-09-27). Upgrading the SWA tier is on the table if it helps.
 - **But cut waste nobody sees.** The build's own downloads were most of the bill, and he approved the fix because it made "no visible difference to customers" (2026-10-15). Explain any cost change very simply, in the README too.
 - **No paid call a visitor can trigger.** He turned down a cloud model for the birding selfie because "a couple users could spam that and immedaitely eat my credits" (2026-06-28).
+- **Pay through Azure only.** The credit covers Azure, so anything the site pays for goes on the Azure bill. When a contact inbox needed Microsoft 365 he said "I don't want to purchase anything outside of it. confine it to that if possible in anyway" (2026-06-03), and the messages went to Table Storage.
 - **Nothing secret in the public repo**: no tokens, subscription, tenant or identity ids, personal email, or the Instagram account. He asked for scrubs twice (2026-10-10, 2026-10-12). Docs use placeholders for ids.
+- **New secrets are yours to make, and to explain.** Create a GitHub secret or app setting a change needs without asking, then tell him its name, where it lives and what it can reach ("eplain al the secrets you've created", 2026-06-03). Add it to the secrets cheat sheet and never print the value.
 - **Ask before account-level changes**: deleting resources, moving workflows to a different identity, rotating storage keys, rewriting git history.
 
 ## Change infra
@@ -69,7 +71,7 @@ Secrets and settings are listed in the [secrets cheat sheet](../../../docs/cicd.
 ## Hard-won lessons
 
 1. **OIDC subjects are literal strings.** A job with `environment: prod` signs in as `...:environment:prod`, not as the branch, and each subject needs its own federated credential. Azure also rejects two federated-credential writes on one identity at the same time, so they're chained with `dependsOn`.
-2. **Owner isn't data access.** Reading blobs needs a Storage Blob Data role on the account, even for the subscription owner.
+2. **Owner isn't data access.** Reading blobs needs a Storage Blob Data role on the account, even for the subscription owner. The portal's Storage browser showed the contact table only after his own account got Storage Table Data Reader (2026-06-03). A new role takes about five minutes to apply.
 3. **Domain bindings and Bicep deadlock**: the apex TXT token only exists after the binding starts. `scripts/bind-domain.sh` does it afterwards.
 4. **SWA managed Functions can't use the OIDC identity**, so they get a storage connection string as an app setting, never in git or a GitHub secret.
 5. **`skip_app_build` makes `app_location` the deploy root**, so the workflow deploys `dist` directly.
@@ -79,9 +81,12 @@ Secrets and settings are listed in the [secrets cheat sheet](../../../docs/cicd.
 9. **The Windows `az` CLI under WSL appends `\r`** to its output, which broke string comparisons in scripts until it was stripped.
 10. **Re-running `scripts/bind-domain.sh` would have removed Google's Search Console verification.** It deleted the whole apex TXT record set before writing the Static Web Apps token, and Google's value lives in the same set. It now adds the token beside what's there (2026-10-25). Never delete the apex TXT set.
 11. **"Failed to fetch federated token from GitHub" doesn't always mean a missing `id-token: write`.** It's what `azure/login` says about any failure to get GitHub's OIDC token, including GitHub's token service not answering. On 2026-10-26 it failed the hourly build's second sign-in while the first, five minutes earlier, had worked. Every workflow now signs in through `.github/actions/azure-login`, which retries twice. If all three tries fail, then check the permission and the federated credential's subject.
+12. **A security scan reported a secret that was never committed** (2026-06-25). A subagent read the gitignored local `.env` and called it a leak in the repo. Before reporting one, run `git ls-files <file>` and `git log --all -- <file>`: only what's tracked or in history is exposed.
 
 ## Gotchas
 
+- Check `az account show` before the first Azure call. The CLI on his machines is often signed in to his work account, and he stopped a session that was "trying a diff accou nt": "anything with azure I need to login to my personal account. et me do that first" (2026-07-14). If the site's subscription isn't there, ask him to sign in. Don't switch accounts yourself.
+- Never set Static Web Apps' `"trailingSlash"` to `"never"`. It breaks nested directory indexes (Azure/static-web-apps issue 1262) and would have 404'd every session page, and the SWA CLI emulator ignores the setting, so only production shows it. SWA stays on `"auto"` and Astro on `trailingSlash: 'always'` (2026-10-06).
 - SWA runs in West US 2 while the resource group and storage are in westus3; the module maps it.
 - `ANALYTICS_SALT` is derived from the storage connection string, so rotating storage keys and running Infra splits that day's unique visitors.
 - `az costmanagement` needs an extension that prompts to install; Cost Management in the portal is simpler.

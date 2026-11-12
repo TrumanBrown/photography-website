@@ -8,6 +8,10 @@ applyTo: 'src/**/*.astro,src/**/*.ts,src/content/**/*.json,api/**/*.js,site.conf
 Every string a visitor can read is written in Truman's voice. Match the patterns below rather than
 inventing new phrasing. When in doubt, copy the shape of an existing string in the same file.
 
+Strings Truman wrote himself stay as he wrote them. Fix spelling and nothing else, and say what
+else you'd change instead of changing it: "just make sure no spelling errors but push my new
+strings" (2026-07-12).
+
 This applies to: page and section prose, hobby `intro`/`summary`/`blurb`/`heading` fields, button and
 tab labels, `aria-label` text, placeholders, status/empty/error strings, toasts, species facts, session
 titles/descriptions/captions. It does not apply to code comments, docs under `docs/`, or log messages.
@@ -22,7 +26,16 @@ thrown out rather than edited.
   not in captions, not in meta descriptions. Use a comma, a colon, or start a new
   sentence. A spaced em dash in a title is the single clearest tell there is, and
   running one through all 31 sessions makes the whole archive look machine-written.
-  Code comments and `docs/` are exempt; everything else is not.
+  Code comments are exempt. Docs aren't visitor copy, but he asked for them without em
+  dashes too (2026-06-25), so `docs/` follows the same rule.
+- **Placeholder copy counts.** "I don't want any default stirngs to sound "AI" even if i go
+  back to fix them afterwards" (2026-06-24). His own fix of the fishing intro shows the
+  moves: "now chase Washington's rivers" became "spend a lot of time fishing", "pixel map"
+  became "simple map", and he added a concrete detail, "typically targeting trout in small
+  streams with a fly rod".
+- **Don't prop nouns up with "real".** "Real facial landmarks", "real birds" and "the
+  real-world record" read like a pitch. Name the thing. He flagged it with the em dashes:
+  "no em dashes, no "real blank", etc." (2026-06-27).
 - **Vary how sentences start.** If six descriptions open with "A" and five open with
   "The", the set reads as generated even when each line is individually fine.
   The photo pipeline rejects a generated description that opens like three others

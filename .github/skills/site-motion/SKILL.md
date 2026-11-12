@@ -72,7 +72,7 @@ When he sends a reel or a video, get the video itself, transcribe the audio, sam
 
 ## Truman's verdicts
 
-- 2026-10-07: the rotator "seems to be broken and doesn't automatically slide... on mobile, allow user to slide with their finger"; the lead meta line "switches position. that looks bad and not smooth when scrolling."
+- 2026-10-07: the rotator "seems to be broken and doesn't automatically slide... on mobile, allow user to slide with their finger"; the lead meta line "switches position. that looks bad and not smooth when scrolling. Keep it always below the session name even if short and reudce the margin a bit."
 - 2026-10-12: "what about all those components like watermelon UI, cult UI, etc etc for animations and such within the site?" Of the eight ideas in mock F: "idea 1 is good. idea 2 is alright but i don't think it should become the header, i chose the header specifically, so dont do that. 3 is good. 4 is good. 5 is good. 6 is good. 7 and 8 is good."
 - 2026-10-14: the globe flight, "i like that alot". For Narrow nature, a "-X points" stamp "slamming first like a stamp and slowly drifting down and away"; for the aquarium, a fish that "jumps into the tank, with water droplets"; "maybe tip the tank over" on Start over. On sessions, "or simply zooms into the cover image", which shipped and was later rejected.
 - 2026-10-15: the first-find stamp, "don't put this directly over the animal image, put it elsewhere."
