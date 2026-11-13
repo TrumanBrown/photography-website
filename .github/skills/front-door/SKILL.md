@@ -25,6 +25,8 @@ description: 'The front door at / and About me: the Weekends and Weekdays switch
 - **His words stay his.** The Weekends and Weekdays lines are what he wrote, with only typos fixed. Don't polish them. Resume lines are the PDF's, with job titles in sentence case.
 - **No phone number or personal email** anywhere on the site, in `about.ts`, in the PDF or in the repo. `about.test.ts` checks the text. Contact is "Write to me", LinkedIn and GitHub.
 - **Side projects are the three pinned on his GitHub**: this site, cozy-vibe-vids, balcFlights-LED. Each has a photo or a live element, never a link to something already on the site.
+- **Say what it is and what it does.** The site, the README and the resume describe what he built and what it does. They don't credit AI agents, explain how AI was used to build it, or quote his messages to agents. Those messages stay in the skills' verdicts (2026-11-12).
+- **Never change his resume.** Its words are his, so a new `public/Truman-Brown-Resume.pdf` only ever comes from a PDF he exported himself. The only edits to that file are the privacy and `?via=resume` fixes in "Update the resume", never its wording (2026-11-12).
 - **The switch can't be missed.** Heading-size words, a tracked line under each saying what's behind it, a 2px bar.
 - **Every "About me" goes to `/#weekdays`.** It works without script through `:target`, and `/about/` redirects there.
 - **Don't link seattlebalc.com.** It's a friend's site that the radar reads from, not his work. The radar's link goes to the balcFlights-LED README, where a video shows the real panel. The privacy page still names the site in words, because visitors' browsers talk to it.
@@ -81,6 +83,8 @@ If it says NO DATA, `curl -s https://seattlebalc.com/api/v1/flights | head` firs
 - 2026-11-09, asked "anything else we can capture about visitors and tracking in analytics for anything?", he picked all ten ideas: email alerts, companies coming back, link shares, PDF opens from anywhere, hiring-system names, time per job, real visitors' speed, errors, light and dark with screen sizes, and photo and hobby use. Alerts "As described" (any engaged resume visit, any engaged company-network visit, Microsoft and the like only from the resume), and every page gets a preview image. Built as four sub-tabs of the Analytics tab ([docs/analytics.md](../../../docs/analytics.md#why-its-built-this-way)).
 
 - 2026-11-12, asked after the site review whether to keep the real-time resume email or drop it and keep only the company counts in /admin: "keep". It stays, with counts only and nothing the browser sent ([docs/analytics.md](../../../docs/analytics.md#email-alerts)).
+
+- 2026-11-12, on the site review's "say how it was built" changes (a How I built this page quoting his prompts, AI wording in the Weekdays blurbs and the README, and a retyped projects line in the resume PDF): "why are you including my prompts in "what i asked for" and why are you giving credit to ai agents everywhere", "did you change my resume??? ABSOLUTELY DO NOT DO THAT" and "the website and everything should not focus on "how i used ai" it should be simply what i built and what it does". None of it had been pushed, and all of it was removed.
 
 ## Hard-won lessons
 
