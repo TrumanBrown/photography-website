@@ -152,7 +152,7 @@ The Linux user name may differ from the laptop's, so paths below use `~`.
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y git gh xz-utils unzip python3-pip libraw-bin libimage-exiftool-perl
+sudo apt-get install -y git gh xz-utils unzip python3-pip libraw-bin libimage-exiftool-perl ripgrep sqlite3
 
 # Node 22 through nvm (.nvmrc says 22; 22.23.4 or newer)
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
@@ -169,7 +169,13 @@ python3 -m pip install --user --break-system-packages pillow pillow-heif
 Then open a new shell and check that `which node npm` points into `~/.nvm` and `which az` is
 `/usr/bin/az`. WSL also puts Windows programs on PATH, and a Windows `node` running the tests is a
 known trap (ship-and-ci gotchas). The laptop used the Windows `az` from `/mnt/c`, which works with
-the quirks in the azure-ops skill. The Linux one avoids them.
+the quirks in the azure-ops skill. The Linux one avoids them. The desktop already had NodeSource's
+Node 22 in `/usr/bin`. Leave it: a new shell still finds nvm's first, and it keeps the Windows `node`
+from being found where nvm isn't loaded.
+
+`ripgrep` and `sqlite3` are for searching the laptop's chats (step 8). If `sudo` asks for a password,
+ask Truman. He can type it, or approve running the one command as root with
+`wsl.exe -u root -- <command>`, which is how the desktop got `ripgrep`, `sqlite3` and the step 6 fix.
 
 Optional, for screenshots and browser checks: `npx playwright install chromium`, plus the libraries
 in the design-mocks skill's gotchas if Chromium won't start.
@@ -177,7 +183,7 @@ in the design-mocks skill's gotchas if Chromium won't start.
 ### 3. GitHub sign-in and git identity
 
 ```bash
-gh auth login --web --git-protocol https     # as TrumanBrown
+gh auth login --web --git-protocol https --scopes workflow     # as TrumanBrown
 gh auth setup-git
 git config --global user.name "Truman Brown"
 git config --global user.email "trumanbrown@users.noreply.github.com"
@@ -187,6 +193,11 @@ WSL can't open a browser, so open https://github.com/login/device on Windows and
 prints. The email is the author on recent commits to `main`
 (`git log -1 --format='%an <%ae>' origin/main` once the repo is cloned). Never his personal Gmail
 (ship-and-ci lesson 10) and never a work account.
+
+The `workflow` scope lets `git push` change `.github/workflows/`, which happens most weeks. Without
+it the push is refused ("refusing to allow an OAuth App to create or update workflow"). If `gh` is
+already signed in as TrumanBrown, `gh auth status` lists its scopes, and
+`gh auth refresh -h github.com -s workflow` adds a missing one with another code.
 
 ### 4. copilot-home (`~/.copilot`)
 
@@ -205,12 +216,21 @@ git checkout -- .
 git branch -u origin/main
 git config user.name "Truman Brown"
 git config user.email "70858679+TrumanBrown@users.noreply.github.com"
-bash ~/.copilot/home-sync/sync.sh pull; cat ~/.copilot/logs/copilot-home-sync.log
+sleep 60    # sync.sh skips a pull within a minute of the last fetch
+bash ~/.copilot/home-sync/sync.sh pull && bash ~/.copilot/home-sync/sync.sh push
+cat ~/.copilot/logs/copilot-home-sync.log 2>/dev/null || echo "no log, so no errors"
 ```
 
 `git status` should then be clean. This brings `copilot-instructions.md`, the personal skills, and
 `hooks/copilot-home.json` with its scripts in `home-sync/`: `sync.sh` keeps `~/.copilot` itself in
-step, and `photo-local.sh` handles this repo (step 7).
+step, and `photo-local.sh` handles this repo (step 7). The log is only written when something goes
+wrong.
+
+If Copilot also runs on Windows itself (VS Code without WSL, or the Copilot CLI or app), do the same
+in `%USERPROFILE%\.copilot` with the README's Windows steps: Git for Windows' `git.exe`, the
+repo-level Git Credential Manager settings for TrumanBrown (the desktop's global Windows git
+identity is his work one), and `sync.ps1` instead of `sync.sh`. Back up and delete a
+`skills\truman-voice` left by the October voice pack. It's `email-voice` now.
 
 ### 5. Azure sign-in
 
@@ -228,7 +248,23 @@ already has the Storage Blob Data role on it, so the last command lists `origina
 and the rest. If `az` is still signed in to a work account, sign in to the photography tenant before
 any Azure command (azure-ops gotchas).
 
+Without the laptop's `.env`, the storage account names its own tenant:
+`curl -s -o /dev/null -D - -H 'Authorization: Bearer x' "https://<account>.blob.core.windows.net/?comp=list" | grep -i www-authenticate`
+shows `login.microsoftonline.com/<tenant id>`. After signing in, the subscription is the one where
+`az storage account list --subscription <id> --query "[?name=='<account>']"` isn't empty.
+
 ### 6. This repo
+
+If the PC had a checkout before (the desktop had one from June), save what isn't on GitHub, then
+delete it: uncommitted changes (`git status`), commits on no remote as `git format-patch` files
+(`git log --branches --not --remotes`, and `git log --reflog --not --remotes` for ones a rebase left
+behind), `git stash list`, and the gitignored `staging/`, `mocks/`, `scripts-local/` and `.env`.
+Check `~/projects/photography-website.worktrees/` and `~/projects/photography-website-local.git`
+too. The desktop's went to `~/backups/photography-website-2026-11-12/`.
+
+If `ls -ld ~/projects` shows `root` (the desktop's did, from when WSL ran as root), run
+`sudo chown "$USER": ~/projects` first. Otherwise the clone, `photo-local.sh setup` (step 7 puts its
+git directory beside the checkout) and worktrees all fail.
 
 ```bash
 mkdir -p ~/projects && cd ~/projects
@@ -306,7 +342,8 @@ checkpoints, plans, small files), `session-store.db`, and VS Code's own chat his
 Bulky scratch files (Python environments, node_modules, Chromium libraries, frame dumps, large
 renders) were left out, and keys, tokens, connection strings, SAS signatures and auth cookies were
 replaced with `[REDACTED:<kind>]`. Its `README.md` says how to search it and `INDEX.md` lists every
-session. `~/.copilot/copilot-instructions.md` tells Copilot to search it when he asks about past
+session. Search with `rg` over the folder: the bundled `session-store.db` indexes only 6 of the 46
+sessions, so `sqlite3` finds far less. `~/.copilot/copilot-instructions.md` tells Copilot to search it when he asks about past
 work. Don't move it into `~/.copilot/session-state/`; it's for reading.
 
 ### 9. Restart and check
@@ -317,6 +354,7 @@ work. Don't move it into `~/.copilot/session-state/`; it's for reading.
    `~/.copilot/logs/photo-local-sync.log` and `~/.copilot/logs/copilot-home-sync.log`. No new lines
    means both syncs worked.
 3. `npm test && npm run lint && npm run check`. ESLint errors under `mocks/` are local only.
+   `npx eslint . --ignore-pattern 'mocks/**'` shows what CI sees.
 4. `gh run list --limit 3` and `az account show` both answer.
 5. Ask Copilot something only the skills know (for example "what did Truman say about the globe
    spin?") to see the repo's skills load.
@@ -331,7 +369,8 @@ work. Don't move it into `~/.copilot/session-state/`; it's for reading.
 - `staging/`, `.env`, sign-ins and tools stay per PC. Upload a session from the PC that has its
   photos.
 - `~/.config/<project>/contact.json` (WHOIS contact info, gitignored) is needed only when updating
-  the domain registration, and only on the PC that does it.
+  the domain registration, and only on the PC that does it. The desktop's is in
+  `~/.config/photography-website/`, copied from root's home on 2026-11-12.
 
 ## Open items (not blocking anything)
 

@@ -23,13 +23,14 @@ npm ci --prefix api
 ### Ubuntu / WSL
 
 Work as your normal Linux user, not `root`, and make sure that user owns the
-checkout before installing dependencies. Do not use `sudo npm`.
+checkout and the folder it sits in before installing dependencies. Do not use
+`sudo npm`.
 
 ```bash
 sudo apt-get update
 sudo apt-get upgrade
 sudo apt-get install --no-install-recommends libraw-bin libimage-exiftool-perl python3-venv
-gh auth login --web
+gh auth login --web --scopes workflow    # workflow: lets git push .github/workflows changes
 gh auth setup-git
 git config --global user.name "<Your Name>"
 git config --global user.email "<id>+<user>@users.noreply.github.com"
