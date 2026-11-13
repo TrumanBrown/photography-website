@@ -80,6 +80,8 @@ If it says NO DATA, `curl -s https://seattlebalc.com/api/v1/flights | head` firs
 
 - 2026-11-09, asked "anything else we can capture about visitors and tracking in analytics for anything?", he picked all ten ideas: email alerts, companies coming back, link shares, PDF opens from anywhere, hiring-system names, time per job, real visitors' speed, errors, light and dark with screen sizes, and photo and hobby use. Alerts "As described" (any engaged resume visit, any engaged company-network visit, Microsoft and the like only from the resume), and every page gets a preview image. Built as four sub-tabs of the Analytics tab ([docs/superpowers/specs/2026-11-09-visitor-insights-design.md](../../../docs/superpowers/specs/2026-11-09-visitor-insights-design.md)).
 
+- 2026-11-12, asked after the site review whether to keep the real-time resume email or drop it and keep only the company counts in /admin: "keep". It stays, with counts only and nothing the browser sent ([docs/analytics.md](../../../docs/analytics.md#email-alerts)).
+
 ## Hard-won lessons
 
 1. **The Windows `az` under WSL crashes printing Bicep** that has a `→` in it (`'charmap' codec can't encode`). Build with `--outfile` and a `wslpath -w` path instead of `--stdout`.

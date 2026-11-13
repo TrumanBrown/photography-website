@@ -136,8 +136,9 @@ describe("resume alerts", () => {
     );
     expect(email.content.plainText).toContain("Place: Redmond, Washington, US");
     expect(email.content.plainText).toContain(
-      'So far: 16s on Weekdays, clicked Resume (PDF), copied "Grew migrations"',
+      "So far: 16s on Weekdays, clicked 1 link, copied 1 thing",
     );
+    expect(email.content.plainText).not.toContain("Grew migrations");
     expect(email.content.plainText).not.toMatch(/\n\n\n/);
     expect(email.recipients.to[0].address).toBe("me@example.com");
   });
@@ -153,14 +154,26 @@ describe("resume alerts", () => {
     );
   });
 
-  it("reads engagement from a batch", () => {
+  it("names a hiring system from its own list, not the referrer", () => {
+    const from = (ref) =>
+      /^From: .*$/m.exec(
+        buildAlert({ ...company, ref }, reading, { from: "a", to: "b" }).content
+          .plainText,
+      )[0];
+    expect(from("boards.greenhouse.io")).toBe("From: Greenhouse");
+    expect(from("")).toBe("From: typed in, or a link that doesn't say");
+  });
+
+  it("reads engagement from a batch as counts", () => {
     expect(
       engagement([
         { k: "wd", v: 5 },
         { k: "wd", v: 9 },
         { k: "click", v: "x" },
+        { k: "click", v: "x" },
+        { k: "copy", v: "Led migrations" },
       ]),
-    ).toEqual({ weekdaysMs: 9, clicks: ["x"], copies: [] });
+    ).toEqual({ weekdaysMs: 9, clicks: 1, copies: 1 });
   });
 
   it("claims one slot per key a day and stops at the caps", async () => {

@@ -45,6 +45,8 @@ analytics.ts (in BaseLayout) fires a beacon:
   ↓
 /api/track function (anonymous):
   - skips bots and /admin
+  - takes the IP from the X-Forwarded-For entry Static Web Apps added, never
+    one the browser sent (api/shared/client-ip.js, docs/security.md)
   - computes a daily-salted visitor hash (NO raw IP stored)
   - looks the IP up in DB-IP's City and ASN Lite databases, held in memory
     (network owner, its kind, city, region, country), then drops the IP
@@ -138,7 +140,9 @@ Any link to the site can carry `?via=<tag>` (lowercase letters, digits and dashe
 - the visit came from the resume link (`via=resume`), on any network except a mail scanner's, or
 - the network is a company's own (`orgKind` `org`), with or without the tag.
 
-`mixed` owners (Microsoft, Google, Amazon, Oracle, IBM) only count through the resume rule, so coworkers browsing don't set it off. The email says the source, network and its kind, place, device and what they've done so far, and links to `/admin`.
+`mixed` owners (Microsoft, Google, Amazon, Oracle, IBM) only count through the resume rule, so coworkers browsing don't set it off. The email says where the visit came from, the network and its kind, the place, the device and what they've done so far, and links to `/admin`.
+
+Anyone can send `/api/track` a beacon, including one that claims `via=resume`, so the email never prints anything the browser sent. What they've done is counts: "16s on Weekdays, clicked 2 links, copied 1 thing". Where they came from is "a link in your resume", "a tagged link", a hiring system's name from [hiring-system.js](../api/shared/hiring-system.js), "another site", or "typed in, or a link that doesn't say". The copied text, link names, tags and referrer hosts are only in the Analytics tab, which escapes them. [api/track/index.test.cjs](../api/track/index.test.cjs) sends beacons through the endpoint with a copied link, a URL-like link name, a referrer and a tag, and checks none of them reach the email.
 
 Limits, kept in the `contactratelimit` table: one email per network owner and city a day (`alert-YYYY-MM-DD` rows keyed by a hash), four an hour, ten a day, and never more than six of the hour's shared `notify-all` count. The contact form allows ten an hour on that count, so a visitor's message always has room. It sends through the contact form's Communication Services settings (`CONTACT_EMAIL_CONNECTION_STRING`, `CONTACT_EMAIL_FROM`, `CONTACT_NOTIFY_TO`); without them nothing is sent.
 
@@ -186,7 +190,7 @@ This follows the **cookieless, no-PII** approach used by privacy-first analytics
 - **Weekdays events are about the page, not the person.** Which sections came up the screen and for how long, which named links were pressed, and up to 100 characters of text copied from the page. Nothing typed by the visitor is recorded.
 - **Site health is about the page too.** Load and response times, the browser's own error messages (cut to 200 characters, addresses reduced to their path), light or dark mode and a viewport band, never an exact screen size.
 - **Shares come from apps, not people.** A preview fetch is the app's server; it carries no visitor data.
-- **Alerts go to one inbox.** The email holds what the panel shows for that visit: source, network, place, device and what was done. Nothing else.
+- **Alerts go to one inbox, as counts.** The email holds where the visit came from, the network, place and device, the time on Weekdays, and how many links were clicked and how many times text was copied. It never holds the copied text, link names, tags or referrer hosts.
 - **No cross-day tracking.** The hash includes the current date, so the same visitor produces a *different* hash tomorrow, by design. This means "unique visitors" is counted per-day; a visitor returning on a later day counts again. This is the privacy feature, not a bug.
 - **No cookies / no localStorage identifiers.** The only client state is an ephemeral `sessionStorage` session id used to correlate a pageview with its duration beacon and events; it's cleared when the tab closes. The `tb_owner` flag exists only in browsers that have signed in to `/admin`, and it turns tracking off rather than identifying anyone.
 - **Referrers stored as hostname only** (e.g. `google.com`, capped at 100 characters), never full URLs with query strings.

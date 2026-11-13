@@ -12,9 +12,15 @@
 // Limits: one email per network owner and city a day, four an hour, ten a
 // day, and never more than six of the hour's shared email budget, so a
 // visitor's contact message always gets through (api/contact/notify.js).
+//
+// Anyone can send /api/track a beacon, so the email never prints anything the
+// browser wrote: no copied text, link names, ?via tags or referrer hosts. It
+// says what was done as counts ("copied 2 things") and where the visit came
+// from in its own words. The admin panel keeps the full detail.
 
 const crypto = require("node:crypto");
 const { consumeRateLimit, hasStatus } = require("../contact/rate-limit");
+const { hiringSystem } = require("./hiring-system");
 const {
   readSettings,
   getClient,
@@ -38,37 +44,29 @@ const KIND_WORDS = {
   cloud: "server or cloud",
 };
 
-const CLICK_WORDS = {
-  "resume-pdf": "Resume (PDF)",
-  "rail:resume-pdf": "Resume (PDF)",
-  linkedin: "LinkedIn",
-  "rail:linkedin": "LinkedIn",
-  "rail:github": "GitHub",
-  "github-profile": "GitHub",
-  "write-to-me": "Write to me",
-  "rail:write-to-me": "Write to me",
-};
-
-/** What a batch of events says about how engaged the reader is. */
+/**
+ * What a batch of events says about how engaged the reader is, as numbers
+ * only: time on Weekdays, how many different links were clicked and how many
+ * times text was copied. The text itself never leaves this function.
+ */
 function engagement(events) {
   let weekdaysMs = 0;
-  const clicks = [];
-  const copies = [];
+  const clicked = new Set();
+  let copies = 0;
   for (const event of events || []) {
     if (event.k === "wd")
       weekdaysMs = Math.max(weekdaysMs, Number(event.v) || 0);
-    if (event.k === "click") clicks.push(String(event.v));
-    if (event.k === "copy") copies.push(String(event.v));
+    if (event.k === "click") clicked.add(String(event.v));
+    if (event.k === "copy") copies += 1;
   }
-  return { weekdaysMs, clicks, copies };
+  return { weekdaysMs, clicks: clicked.size, copies };
 }
 
 /** Whether this pageview and batch should email Truman. */
 function shouldAlert(pageview, events) {
   if (!pageview) return false;
   const { weekdaysMs, clicks, copies } = engagement(events);
-  const engaged =
-    weekdaysMs >= ENGAGED_MS || clicks.length > 0 || copies.length > 0;
+  const engaged = weekdaysMs >= ENGAGED_MS || clicks > 0 || copies > 0;
   if (!engaged) return false;
   if (pageview.via === "resume") return pageview.orgKind !== "scanner";
   return pageview.orgKind === "org";
@@ -92,6 +90,19 @@ function deviceOf(pageview) {
   return [device, pageview.os, pageview.browser].filter(Boolean).join(" · ");
 }
 
+/** Where the visit came from, in our own words. The browser sends both the
+    tag and the referrer, so neither is printed. */
+function sourceOf(pageview) {
+  if (pageview.via === "resume") return "a link in your resume";
+  if (pageview.via) return "a tagged link";
+  if (pageview.ref) return hiringSystem(pageview.ref) || "another site";
+  return "typed in, or a link that doesn't say";
+}
+
+function counted(count, one, many) {
+  return `${count} ${count === 1 ? one : many}`;
+}
+
 function buildAlert(pageview, events, { from, to }) {
   const { weekdaysMs, clicks, copies } = engagement(events);
   const org = oneLine(pageview.org, 80);
@@ -102,20 +113,12 @@ function buildAlert(pageview, events, { from, to }) {
       : `Someone from your resume is reading it${pageview.city ? ` in ${oneLine(pageview.city, 60)}` : ""}`;
   const done = [
     weekdaysMs ? `${Math.round(weekdaysMs / 1000)}s on Weekdays` : "",
-    ...[...new Set(clicks)].map(
-      (click) => `clicked ${CLICK_WORDS[click] || click}`,
-    ),
-    ...copies.map((text) => `copied "${oneLine(text, 100)}"`),
+    clicks ? `clicked ${counted(clicks, "link", "links")}` : "",
+    copies ? `copied ${counted(copies, "thing", "things")}` : "",
   ].filter(Boolean);
   const kind = KIND_WORDS[pageview.orgKind];
-  const source =
-    pageview.via === "resume"
-      ? "a link in your resume"
-      : pageview.via
-        ? `a link tagged ${pageview.via}`
-        : pageview.ref || "typed in, or a link that doesn't say";
   const details = [
-    `From: ${source}`,
+    `From: ${sourceOf(pageview)}`,
     `Network: ${org || "unknown"}${kind ? ` (${kind})` : ""}`,
     place ? `Place: ${oneLine(place, 120)}` : "",
     deviceOf(pageview) ? `Device: ${deviceOf(pageview)}` : "",
@@ -204,8 +207,7 @@ async function maybeAlert({
   try {
     if (!/^[a-z0-9]{1,40}$/.test(pvid) || decided.has(pvid)) return "skipped";
     const { weekdaysMs, clicks, copies } = engagement(events);
-    if (weekdaysMs < ENGAGED_MS && !clicks.length && !copies.length)
-      return "skipped";
+    if (weekdaysMs < ENGAGED_MS && !clicks && !copies) return "skipped";
     const settings = readSettings(env);
     if (!settings) return "skipped";
 
