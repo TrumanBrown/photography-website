@@ -9,9 +9,13 @@ import {
   mockVoice,
   normaliseStory,
   normaliseVoice,
+  personIn,
   pickEmoji,
+  pickShape,
+  pickStart,
   storyOpener,
   voicePrompt,
+  wantsEmoji,
 } from "./voice.mjs";
 import { compileLexicon } from "./text.mjs";
 
@@ -253,13 +257,25 @@ describe("post voice", () => {
       storyOpener("Saw this {name}"),
     );
     // He starts with "I" or a verb: "I" on two posts in a row is fine,
-    // as long as the words after it differ.
+    // as long as the words after it differ...
     expect(
       normaliseStory(
         "I spotted this {name} munching on some insect in Bijagua. Such a goofy beak, almost looks like a horn",
-        { ...ani, recent: ["I found this tiny frog on a leaf. So cool"] },
+        { ...ani, recent: ["I love how this frog sits on a leaf. So cool"] },
       ),
     ).not.toBe("");
+    // ...but "Saw this", "I found this", "Got this view of" is how the
+    // first hundred posts all started: one post in three at most.
+    for (const recent of [
+      ["I found this tiny frog on a leaf. So cool"],
+      ["Got this view of the lake. So cool", "Gunn Peak from the lake"],
+    ])
+      expect(
+        normaliseStory(
+          "I spotted this {name} munching on some insect in Bijagua. Such a goofy beak, almost looks like a horn",
+          { ...ani, recent },
+        ),
+      ).toBe("");
     // Opening a sentence with "Such a" is for one post in four...
     expect(
       normaliseStory(
@@ -337,8 +353,9 @@ describe("post voice", () => {
       text: "she seemed to be teaching them how to hunt!",
       emoji: "🦦",
     });
+    // Without an emoji his words stay exactly as typed, full stop and all.
     expect(ownOpening("Looks like he just finished a big meal.")).toEqual({
-      text: "Looks like he just finished a big meal",
+      text: "Looks like he just finished a big meal.",
       emoji: "",
     });
   });
@@ -392,7 +409,10 @@ describe("post voice", () => {
       text: "Caught this {name} mid-snack on a mossy post in Bijagua. Such a goofy beak, almost looks like a horn",
       emoji: "🦏",
     });
-    expect(normaliseVoice({ options: [{ text: "Nice." }] }, ani)).toEqual({});
+    // None passes: why, so the preview can say what it's waiting on.
+    expect(normaliseVoice({ options: [{ text: "Nice." }] }, ani)).toEqual({
+      problems: ["needs {name} once"],
+    });
   });
 
   it("carries both skills into the prompt, not their maintainer notes", () => {
@@ -426,6 +446,324 @@ describe("post voice", () => {
     expect(prompt).toContain(`fun fact "${fact}"`);
     expect(prompt).toContain(HIS_STORIES.at(-1));
     expect(HIS_EMOJI).toHaveLength(HIS_STORIES.length);
+  });
+
+  it("writes each post in the shape it was given", () => {
+    const view = {
+      allowed: "Edinburgh Scotland",
+      grounding: "Edinburgh Scotland city buildings lit up at night",
+    };
+    // A few words: no reaction needed, but no "I" and no "Saw this".
+    expect(
+      normaliseStory("Edinburgh at night", { ...view, shape: "short" }),
+    ).toBe("Edinburgh at night");
+    expect(
+      normaliseStory("A {name} in Bijagua", { ...ani, shape: "short" }),
+    ).toBe("A {name} in Bijagua");
+    for (const text of [
+      "I love Edinburgh at night",
+      "Got Edinburgh at night",
+      "Edinburgh at night. So cool up there",
+    ])
+      expect(normaliseStory(text, { ...view, shape: "short" })).toBe("");
+    // Not "Iceland at sunset" right after "Edinburgh at night".
+    expect(
+      normaliseStory("Edinburgh at night", {
+        ...view,
+        shape: "short",
+        recent: ["Reykjavik at sunset"],
+      }),
+    ).toBe("");
+    // One sentence with his reaction, and a story is two or three.
+    expect(
+      normaliseStory("I love how the old town lights up in Edinburgh", {
+        ...view,
+        shape: "line",
+      }),
+    ).not.toBe("");
+    expect(
+      normaliseStory("I love the old town in Edinburgh. So cool at night", {
+        ...view,
+        shape: "line",
+      }),
+    ).toBe("");
+    expect(
+      normaliseStory(
+        "Saw this {name} munching on some insect in Bijagua, such a goofy beak on it lol",
+        ani,
+      ),
+    ).toBe("");
+  });
+
+  it("spreads out the tics the model reached for next", () => {
+    const frog = {
+      named: true,
+      name: "lemur leaf frog (Agalychnis lemur)",
+      allowed: "Guayacán Costa Rica",
+      grounding: "Guayacán frog on a leaf",
+      shape: "line",
+    };
+    for (const [text, recent] of [
+      [
+        "Such a cool {name} in Guayacán, those dark eyes are my favorite part",
+        ["The hair on his face is my favorite part. Pretty wild", "One", "Two"],
+      ],
+      [
+        "Such a weird {name} in Guayacán, his eyes are so good",
+        ["His antennae are so cool, almost like feathers", "One"],
+      ],
+      [
+        "Such a weird {name} in Guayacán, love the colors on him",
+        ["The colors on this spider are wild"],
+      ],
+    ])
+      expect(normaliseStory(text, { ...frog, recent })).toBe("");
+    // "Crazy how", "Pretty wild how", "So cool how" is one start.
+    expect(
+      normaliseStory("Pretty wild how this {name} sits on a leaf", {
+        ...frog,
+        recent: ["Crazy how round the eyes are on this tree frog"],
+      }),
+    ).toBe("");
+    // The same species again isn't copied wording, and the trip's month is
+    // a name he wrote.
+    expect(
+      normaliseStory("A {name} from Guayacán", {
+        ...frog,
+        shape: "short",
+        recent: [
+          "Saw this lemur leaf frog (Agalychnis lemur) on a leaf. Such a weird face",
+        ],
+      }),
+    ).toBe("A {name} from Guayacán");
+    expect(
+      normaliseStory(
+        "Such a weird {name}, Guayacán in August was full of them",
+        {
+          ...frog,
+          grounding: "costa rica amphibian research center august 2026",
+        },
+      ),
+    ).not.toBe("");
+    // One sentence that opens "Saw a..." is the old template squeezed.
+    expect(
+      normaliseStory("Saw a {name} in Guayacán, those eyes are so weird", frog),
+    ).toBe("");
+    expect(
+      normaliseStory("Such a weird {name}, those eyes almost glow", frog),
+    ).not.toBe("");
+  });
+
+  it("keeps wishes, crazy and fur talk to once in a while", () => {
+    const marmot = {
+      named: true,
+      name: "hoary marmot (Marmota caligata)",
+      allowed: "Sauk Mountain",
+      grounding: "Sauk Mountain rock",
+      shape: "line",
+    };
+    const filler = (n) => Array.from({ length: n }, (_, i) => `Post ${i}`);
+    for (const [text, recent] of [
+      [
+        "Would love to see this {name} on Sauk Mountain again",
+        ["I'd love to climb that one day", ...filler(8)],
+      ],
+      [
+        "Such a chill {name} on Sauk Mountain, it's crazy",
+        ["They camouflage so well it's crazy", ...filler(3)],
+      ],
+      [
+        "Such a round {name} on Sauk Mountain, that fur looks really soft",
+        ["He looks so fluffy in the snow", ...filler(6)],
+      ],
+    ])
+      expect(normaliseStory(text, { ...marmot, recent })).toBe("");
+    // An animal's name isn't him talking about fur.
+    expect(
+      normaliseStory(
+        "Such a round {name} on Sauk Mountain, that fur looks really soft",
+        {
+          ...marmot,
+          recent: [
+            "Saw this hairy woodpecker (Dryobates villosus) on a snag. Busy little bird",
+          ],
+        },
+      ),
+    ).not.toBe("");
+  });
+
+  it("names a view instead of describing how it's laid out", () => {
+    const ridge = {
+      allowed: "Olympic National Park Washington",
+      grounding: "ridge snowy basin mountain",
+    };
+    for (const text of [
+      "Managed to capture this ridge rising above a snowy basin. It has such a jagged top, hard to tell where you'd even walk",
+      "I found this trail running along the ridge toward the headland. I love how the grass grows right to the edge",
+      "Got this view of the fjord in the Olympics. I love how the mountains go right down to the water",
+    ])
+      expect(normaliseStory(text, ridge)).toBe("");
+    // The North Cascades are a place, not a description.
+    expect(
+      normaliseStory(
+        "This ridge in the North Cascades is so jagged. Hope to climb that one day",
+        { allowed: "North Cascades Washington", grounding: "ridge" },
+      ),
+    ).not.toBe("");
+  });
+
+  it("never brings up people, and never the person in the frame", () => {
+    const rainier = {
+      allowed: "Mount Rainier Washington",
+      grounding: "Mount Rainier rocky ridge with people on it",
+    };
+    for (const text of [
+      "I got Mount Rainier from this rocky ridge. The people look so small, gives you an idea of how huge it is",
+      "Saw Mount Rainier from the ridge with a hiker on it. So cool to see",
+      "Mount Rainier from the ridge. So cool that everyone was out there",
+    ])
+      expect(normaliseStory(text, rainier)).toBe("");
+    expect(
+      normaliseStory("Man at Mount Rainier", { ...rainier, shape: "short" }),
+    ).toBe("");
+    const person = { ...rainier, person: true, shape: "line" };
+    expect(
+      normaliseStory(
+        "He had such a good view of Mount Rainier up there",
+        person,
+      ),
+    ).toBe("");
+    expect(
+      normaliseStory("Such a good spot to see Mount Rainier from", person),
+    ).not.toBe("");
+    // "On a sunny day" needs the record to show the sun.
+    expect(
+      normaliseStory("At Mount Rainier on a sunny day", {
+        ...person,
+        shape: "short",
+      }),
+    ).toBe("");
+    expect(
+      normaliseStory("At Mount Rainier on a sunny day", {
+        ...person,
+        shape: "short",
+        grounding: `${rainier.grounding} under a clear blue sky`,
+      }),
+    ).toBe("At Mount Rainier on a sunny day");
+    expect(
+      personIn({ subject: "Person with a backpack", scene: "on wet rocks" }),
+    ).toBe(true);
+    expect(personIn({ subject: "Frog", scene: "held between fingers" })).toBe(
+      false,
+    );
+  });
+
+  it("fixes the grammar a model slips on", () => {
+    expect(
+      normaliseStory(
+        "Captured this {name} carrying some stems. Looks like such a awkward thing to carry",
+        { ...ani, grounding: "osprey stems" },
+      ),
+    ).toMatch(/such an awkward thing/);
+    // A herd has no number in front of its name, and still isn't "this".
+    expect(
+      fillName(
+        "Ran into this {name} grazing in Nagqu",
+        "bharals (Pseudois nayaur)",
+        {
+          plural: true,
+        },
+      ),
+    ).toBe("Ran into these bharals (Pseudois nayaur) grazing in Nagqu");
+    for (const text of [
+      "Such a cool looking {name}, so fluffy",
+      "Funny how this {name} looks like it's falling apart at the edges",
+    ])
+      expect(
+        normaliseStory(text, { ...ani, shape: "line", plural: true }),
+      ).toBe("");
+    for (const text of [
+      "Crazy how much of this {name}'s face is beak",
+      "So cool seeing this {name} flock grazing in Bijagua",
+    ])
+      expect(normaliseStory(text, { ...ani, shape: "line" })).toBe("");
+  });
+
+  it("mixes shapes, starts and emoji across a run of posts", () => {
+    const shapes = [];
+    const starts = [];
+    const had = [];
+    for (let i = 0; i < 600; i++) {
+      const seed = `session/DSC${String(i).padStart(5, "0")}.JPG`;
+      const shape = pickShape({ seed, appeal: 7 }, shapes);
+      const start = pickStart({ seed, shape }, starts);
+      const emoji = wantsEmoji({ seed, shape }, had);
+      shapes.push(shape);
+      starts.push(start || "subject");
+      had.push(emoji);
+    }
+    const share = (list, value) =>
+      list.filter((x) => x === value).length / list.length;
+    expect(share(shapes, "short")).toBeGreaterThan(0.25);
+    expect(share(shapes, "short")).toBeLessThan(0.4);
+    expect(share(shapes, "line")).toBeGreaterThan(0.18);
+    expect(share(had, true)).toBeGreaterThan(0.4);
+    expect(share(had, true)).toBeLessThan(0.6);
+    expect(share(starts, "came")).toBeLessThan(0.34);
+    for (let i = 2; i < shapes.length; i++) {
+      expect(shapes[i] === "short" && shapes[i - 1] === "short").toBe(false);
+      expect(had[i] && had[i - 1] && had[i - 2]).toBe(false);
+      expect(
+        starts[i] === "came" &&
+          (starts[i - 1] === "came" || starts[i - 2] === "came"),
+      ).toBe(false);
+    }
+    // The same photo gets the same shape every run.
+    expect(pickShape({ seed: "a/b.JPG", appeal: 7 }, ["story"])).toBe(
+      pickShape({ seed: "a/b.JPG", appeal: 7 }, ["story"]),
+    );
+    // Less striking photos lean short, notes lean to a story.
+    const count = (opts, value) =>
+      Array.from({ length: 400 }, (_, i) =>
+        pickShape({ seed: `x${i}`, ...opts }, ["story"]),
+      ).filter((x) => x === value).length;
+    expect(count({ appeal: 5 }, "short")).toBeGreaterThan(
+      count({ appeal: 8 }, "short") * 2,
+    );
+    expect(count({ appeal: 7, notes: true }, "story")).toBeGreaterThan(
+      count({ appeal: 7 }, "story"),
+    );
+    // A good wildlife photo is never cut down to its name; a view often is.
+    expect(count({ appeal: 7, named: true }, "short")).toBe(0);
+    expect(
+      pickShape({ seed: "a/b.JPG", appeal: 8, named: true }, [
+        "story",
+        "line",
+        "story",
+        "line",
+        "story",
+      ]),
+    ).not.toBe("short");
+    expect(count({ appeal: 5, named: true }, "short")).toBeGreaterThan(0);
+    expect(count({ appeal: 7, scene: true }, "short")).toBeGreaterThan(100);
+  });
+
+  it("leaves the emoji off when code says so", () => {
+    expect(
+      normaliseVoice(
+        {
+          options: [
+            {
+              text: "Caught this {name} mid-snack on a mossy post in Bijagua. Such a goofy beak, almost looks like a horn",
+              emoji: "🐦",
+            },
+          ],
+        },
+        { ...ani, emoji: false },
+      ),
+    ).toEqual({
+      text: "Caught this {name} mid-snack on a mossy post in Bijagua. Such a goofy beak, almost looks like a horn",
+    });
   });
 
   it("has an offline stand-in that passes its own checks", () => {

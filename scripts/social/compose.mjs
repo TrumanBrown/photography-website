@@ -61,6 +61,8 @@ export function placeLine(session, first) {
 export function assembleCaption({
   story,
   emoji = "",
+  shape = "",
+  own = false,
   place = "",
   body,
   iucn,
@@ -69,10 +71,12 @@ export function assembleCaption({
   hashtags,
 }) {
   const opening = String(story ?? "").trim();
-  // An emoji takes the place of the last full stop, the way people type.
+  // An emoji takes the place of the last full stop, the way people type. A
+  // few words ("Edinburgh at night") get no full stop, and his own words
+  // stay exactly as he typed them.
   const end = emoji
     ? ` ${emoji}`
-    : !opening || /(?:[.!?)]|\blol)$/i.test(opening)
+    : !opening || own || shape === "short" || /(?:[.!?)]|\blol)$/i.test(opening)
       ? ""
       : ".";
   const where = String(place ?? "").trim();

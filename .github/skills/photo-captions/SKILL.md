@@ -109,7 +109,7 @@ A run handles 300 photos by default (`limit`); the archive was about 1,250 in Oc
 ## Gotchas
 
 - `scripts/photos/text.mjs` and `voice.mjs` read other files by exact heading: truman-voice from `## How he writes` to `## Where it applies`, caption-voice from `## How a post reads` to `## Procedure`, and site-copy's `Never sound like a language model`, `Voice`, `Sentences` and `Do not write` sections. Renaming one silently empties a prompt.
-- The website hold and `dry_run` stop only `_session.json` writes. Planned Instagram posts are still rewritten, and the live poster publishes them.
+- The website hold and `dry_run` stop only `_session.json` writes. Planned Instagram posts are still rewritten, and the live poster publishes them. To read new post openings before they go out, run the pipeline on a local copy of the state instead (instagram-posting, "Show Truman what's coming").
 - `redo` also redoes the session description. A trip note (`npm run social -- note`) rewrites the description and planned openings too.
 - A caption edited in /admin never updates again, even when the iNaturalist ID changes. Clear it to hand it back.
 - A new session is invisible to the pipeline until a build has written `metadata/admin-index.json`.

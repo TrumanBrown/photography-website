@@ -105,9 +105,14 @@ import {
   loadVoiceGuide,
   mockVoice,
   normaliseVoice,
+  openerFamily,
   ownOpening,
-  pickEmoji,
+  personIn,
+  pickShape,
+  pickStart,
+  shapeOf,
   voicePrompt,
+  wantsEmoji,
 } from "./voice.mjs";
 import {
   FACTS_VERSION,
@@ -1090,27 +1095,29 @@ async function main() {
         ? s.voice
         : null;
     // The opening as it'll be posted: his own words when he's written them
-    // (`npm run social -- opening`), else the one written in his voice.
+    // (`npm run social -- opening`), exactly as typed, else the one written
+    // in his voice.
     const openingOf = (s) => {
       if (s.opening?.text) {
         const mine = ownOpening(s.opening.text);
         return {
           mine: true,
           story: mine.text,
-          emoji:
-            mine.emoji ||
-            pickEmoji(s.voice?.emoji, { group: s.analysis.group }) ||
-            "",
+          emoji: mine.emoji,
+          shape: shapeOf(mine.text),
         };
       }
       const voiced = voicedFor(s);
       return voiced
         ? {
             mine: false,
-            story: fillName(voiced.text, storyNameFor(s)),
+            story: fillName(voiced.text, storyNameFor(s), {
+              plural: (s.analysis.count ?? 1) > 1,
+            }),
             emoji: voiced.emoji ?? "",
+            shape: voiced.shape ?? shapeOf(voiced.text),
           }
-        : { mine: false, story: "", emoji: "" };
+        : { mine: false, story: "", emoji: "", shape: "" };
     };
 
     // Everything in a post besides its fact; all of it decided by code, around
@@ -1138,6 +1145,7 @@ async function main() {
         level,
         story: opening.story,
         emoji: opening.emoji,
+        shape: opening.shape,
         mine: opening.mine,
         place: placeLine(session, placeLabel(session)),
         hashtags,
@@ -1410,24 +1418,63 @@ async function main() {
         .map(([k]) => shots[k]?.post)
         .filter((p) => p?.story);
       const outStories = [...HIS_STORIES, ...postedOrder.map((p) => p.story)];
-      const outEmoji = [
-        ...HIS_EMOJI,
-        ...postedOrder.map((p) => p.emoji).filter(Boolean),
+      // "" where a post went out without an emoji.
+      const outEmoji = [...HIS_EMOJI, ...postedOrder.map((p) => p.emoji ?? "")];
+      const outShapes = [
+        ...HIS_STORIES.map(shapeOf),
+        ...postedOrder.map((p) => p.shape ?? shapeOf(p.story)),
       ];
-      const storyOf = (d) => openingOf(d.s).story;
       const position = new Map(drafts.map((d, i) => [d, i]));
       // What goes out before this post: those already out, then the planned
       // posts ahead of it, including ones written moments ago in this run.
       const before = (d) => {
-        const ahead = drafts.slice(0, position.get(d)).filter(storyOf);
+        const ahead = drafts
+          .slice(0, position.get(d))
+          .map((a) => openingOf(a.s))
+          .filter((o) => o.story);
         return {
-          stories: [...outStories, ...ahead.map(storyOf)],
-          emoji: [
-            ...outEmoji,
-            ...ahead.map((a) => openingOf(a.s).emoji).filter(Boolean),
-          ],
+          stories: [...outStories, ...ahead.map((o) => o.story)],
+          emoji: [...outEmoji, ...ahead.map((o) => o.emoji)].filter(Boolean),
         };
       };
+      // Each post's shape (a few words, one sentence or a story), how it
+      // starts and whether it ends on an emoji, decided in posting order so
+      // the feed mixes them instead of repeating one template.
+      const plans = new Map();
+      {
+        const shapes = [...outShapes];
+        const had = outEmoji.map(Boolean);
+        const starts = outStories.map(openerFamily);
+        for (const d of drafts) {
+          if (needsVoice(d)) {
+            const seed = `${d.key}${d.s.redraft ?? ""}`;
+            const notes = Boolean(notesOf(d.s, d.key));
+            const shape = pickShape(
+              {
+                seed,
+                appeal: d.s.analysis.appeal,
+                notes,
+                person: personIn(d.s.analysis),
+                scene: SCENES.has(d.s.analysis.group) && !namedFor(d.s),
+                named: Boolean(namedFor(d.s)),
+              },
+              shapes,
+            );
+            const start = pickStart({ seed, shape, notes }, starts);
+            const emoji = wantsEmoji({ seed, shape }, had);
+            plans.set(d, { shape, start, emoji });
+            shapes.push(shape);
+            had.push(emoji);
+            starts.push(start || "subject");
+            continue;
+          }
+          const o = openingOf(d.s);
+          if (!o.story) continue;
+          shapes.push(o.shape);
+          had.push(Boolean(o.emoji));
+          starts.push(openerFamily(o.story));
+        }
+      }
       // One batch at a time, in posting order. A post whose options all fail
       // their checks (usually too close to a post next to it) gets one more go
       // in the same run, on its own so the prompt shows the posts right before
@@ -1439,6 +1486,9 @@ async function main() {
         await pool(batches, 1, async (batch) => {
           const notes = batch.map((d, i) => ({
             id: String(i + 1),
+            shape: plans.get(d).shape,
+            start: plans.get(d).start,
+            person: personIn(d.s.analysis),
             named: namedFor(d.s),
             count: d.s.analysis.count ?? 1,
             subject: d.s.analysis.subject,
@@ -1469,9 +1519,11 @@ async function main() {
             batch.forEach((d, i) => {
               const taxon = levelOf(d.s) ? taxonOf(d.s) : null;
               const prior = before(d);
+              const plan = plans.get(d);
               const got = normaliseVoice(byId.get(String(i + 1)), {
                 named: Boolean(notes[i].named),
                 name: storyNameFor(d.s),
+                plural: notes[i].count > 1,
                 fact: d.fact,
                 lexicon,
                 allowed: allowedNames(sessionOf(d.s.session)).join(" "),
@@ -1484,6 +1536,9 @@ async function main() {
                 recentEmoji: prior.emoji,
                 avoid: HIS_STORIES,
                 group: d.s.analysis.group,
+                shape: plan.shape,
+                person: notes[i].person,
+                emoji: plan.emoji,
               });
               const failedBefore =
                 d.s.voice?.v === VOICE_VERSION && !d.s.voice.text
@@ -1495,7 +1550,12 @@ async function main() {
                 written: new Date().toISOString(),
                 notes: sha(notes[i].notes),
                 named: Boolean(notes[i].named),
-                ...(got.text ? got : { tries: failedBefore + 1 }),
+                ...(got.text
+                  ? { ...got, shape: plan.shape }
+                  : {
+                      tries: failedBefore + 1,
+                      problems: (got.problems ?? []).slice(0, 3),
+                    }),
               };
               if (got.text) ig.voiced++;
             });
@@ -1519,7 +1579,11 @@ async function main() {
       if (!parts.story) {
         delete s.post;
         s.status = "new";
-        s.problem = "waiting for its opening";
+        // Why its last options failed, kept privately for the preview.
+        const why = !parts.mine && s.voice?.problems?.[0];
+        s.problem = why
+          ? `waiting for its opening (${why})`
+          : "waiting for its opening";
         continue;
       }
       const basis = sha({
@@ -1538,6 +1602,7 @@ async function main() {
       const caption = assembleCaption({
         story: parts.story,
         emoji: parts.emoji,
+        shape: parts.shape,
         ...(parts.mine ? { own: true } : {}),
         place: parts.place,
         body: fact,
@@ -1562,6 +1627,7 @@ async function main() {
         alt: tidy(s.analysis.description).slice(0, 1000),
         story: parts.story,
         emoji: parts.emoji,
+        shape: parts.shape,
         ...(parts.mine ? { own: true } : {}),
         place: parts.place,
         fact,

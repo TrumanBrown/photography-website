@@ -1,6 +1,6 @@
 ---
 name: caption-voice
-description: "Truman's Instagram captions: a story-style opening in his voice ('Saw this {name} munching on some insect in Bijagua. Such a unique bird...'), exactly one emoji at the end, the place on its own line, then 'Fun fact:', gear, link and hashtags, with his own before-and-after rewrites. Use when writing, rewriting, reviewing or generating Instagram post captions, photo post copy or fun facts; when a caption sounds like AI, alt text, a field guide or a press release; when changing the post-writing prompt in scripts/photos/voice.mjs; or when adding trip notes for captions."
+description: "Truman's Instagram captions: an opening in his voice that changes shape from post to post (a few words like 'Edinburgh at night', one sentence, or a short story like 'Saw this {name} munching on some insect in Bijagua. Such a unique bird...'), an emoji on about half, the place on its own line, then 'Fun fact:', gear, link and hashtags, with his own before-and-after rewrites. Use when writing, rewriting, reviewing or generating Instagram post captions, photo post copy or fun facts; when a caption sounds like AI, alt text, a field guide or a press release; when posts all follow one template or every post has an emoji; when a photo has a person in it; when changing the post-writing prompt in scripts/photos/voice.mjs; or when adding trip notes for captions."
 ---
 
 # Caption voice
@@ -13,7 +13,7 @@ itself and the rules the generator follows.
 ## How a post reads
 
 ```
-<his opening: two or three sentences> <one emoji>
+<his opening: a few words, one sentence, or two or three> <one emoji, on about half>
 <Place, Region, Country>.
 
 Fun fact: <one fact>
@@ -24,17 +24,49 @@ Fun fact: <one fact>
 <five hashtags>
 ```
 
-The opening and its emoji are written for each post
-([voice.mjs](../../../scripts/photos/voice.mjs)). Everything else is built by
+The opening is written for each post
+([voice.mjs](../../../scripts/photos/voice.mjs)), in a shape code picks for it,
+and code decides which posts end on an emoji. Everything else is built by
 code: the place line from the trip, the fact from Wikipedia, the gear line
 from EXIF, the link line and the hashtags.
 
 ## The opening
 
-- Start the way he does, with "I" or a verb: what he was doing or how he came
-  across it, often with the "I" dropped ("Saw this...", "Spotted this...",
-  "Came across this...", "While on a canal tour in Tortuguero, managed to
-  capture this...", "I love how..."). Then "this" and the name.
+The first hundred posts were all one template, "Saw this ridge rising above a
+snowy basin. It has such a jagged top..." with an emoji on the end, and that
+was what gave them away: "there's now a 100 posts that all follow this exact
+same format. it's very clear it's automated just based on the repetitions and
+the emoji" (his words, 2026-11-12). So code picks each post's shape, and the
+feed mixes them:
+
+| Shape | How often | What it is |
+|---|---|---|
+| short | about 1 in 4 | A few words, the way people caption a photo that speaks for itself: "Edinburgh at night" (his example), "Gunn Peak from the lake", "A {name} in Bijagua". 2 to 8 words, no "I", no reaction, no full stop |
+| line | about 1 in 4 | One sentence with his reaction in it: "I love how green everything gets around Arenal" |
+| story | the rest | Two short sentences, three when his notes give more: what it is or how he came across it, then his reaction. His rewrites below are all this shape |
+
+Views lean short, since a landscape says enough in a few words. A wildlife
+photo is short only now and then, and a good one (an appeal score of 7 or
+more from the one look at it) never: "the pygmy lizard its a really good pic
+so don't necessarily shorten that one" (2026-11-13). The less striking photos
+lean short, and anything his notes say something about leans to a story.
+Never two short ones in a row, nor three of anything. While the queue is
+mostly his best shots, that comes to about one post in four or five.
+
+A line or a story starts one of four ways, also picked by code:
+
+- how he came across it, often with the "I" dropped: "Saw this...", "Spotted
+  this...", "Got this view of...", "Managed to capture...". His favourite,
+  and on every post a template: one post in three at most, never two of three
+  in a row.
+- his reaction first: "I love how...", "Such a...".
+- the thing itself, with no verb in front: "This {name} was...", "Mount Baker
+  from...", "These peaks...".
+- what he was doing, only from his notes: "While on a canal tour in
+  Tortuguero, managed to capture this...".
+
+Then:
+
 - An identified species is written `{name}`, once, where the animal first
   comes up, right after "this" or "a". Code puts in the verified name with its
   scientific name, and fixes the words in front of it: "this {name}" becomes
@@ -42,14 +74,22 @@ from EXIF, the link line and the hashtags.
   American river otters (...)", and "a {name}" becomes "an agami heron (...)".
   The generator never types a species name itself, and never tacks it on
   after a comma ("Got this swan, a {name}").
-- Say what it's doing in everyday words: munching on, perched on, peeking out
-  of, hanging off. Only what the notes say is in the photo.
-- Then his reaction: one specific thing he likes, or finds funny or strange,
-  about this animal or this place. A hedge when he can't be sure ("likely (?)",
-  "almost looks like"). A small joke when something's actually funny.
+- Say what an animal is doing in everyday words: munching on, perched on,
+  peeking out of, hanging off. Only what the notes say is in the photo.
+- Name a view, don't describe it: "this ridge in the Olympics", "Mount Baker
+  from Yellow Aster Butte". Never how it's laid out ("rising above a snowy
+  basin", "running along the ridge toward a steep rocky headland", "beside a
+  winding footpath", "the trees grow right down to the water"): the photo
+  already shows that, and narrating it is what reads like a machine describing
+  an image ("don't lean too much into explaining the scene", his words).
+- Then, in a line or a story, his reaction: one specific thing he likes, or
+  finds funny or strange, about this animal or this place, or a hope ("hope to
+  climb that one day"). A hedge when he can't be sure ("likely (?)", "almost
+  looks like"). A small joke when something's actually funny. Not how big one
+  thing looks next to another or how steep it is: that's describing the view
+  again.
 - Mention the place casually if it fits ("in Bijagua", "near the Arenal
   Volcano"). The full place goes on the next line anyway.
-- Two or three sentences, 15 to 60 words.
 
 ### Only what's true
 
@@ -69,13 +109,28 @@ the one posting the lie. So:
 - No numbers, and no facts: the fun fact is underneath, and the opening
   doesn't repeat it.
 
+### People
+
+Never mention a person, even when someone's in the frame: no "man at the
+falls", no hiker on the ridge, no "the people look tiny", no hands holding the
+frog. Anyone who knows him knows he wouldn't caption a photo of himself "man
+at...", and the pipeline can't tell who it is (2026-11-12). With a person in
+the photo there's no "he", "she" or "me" either: write about the place, like
+his "at blank spot on a sunny day", and say sunny only when the photo shows
+it. Photos where an identifiable person is the main subject still aren't
+posted at all (his call, same day).
+
 ### Spread out his habits
 
 Three posts go out a day, so anything on every post becomes a tell:
 
 - No two of any five posts in a row start with the same words ("Saw this"
   twice). Starting with "I" is fine as often as not, with different words
-  after it.
+  after it, but "how he came across it" is one post in three at most however
+  it's worded ("Saw this", "I found this", "Managed to capture this" are one
+  start).
+- No two short ones within six posts put the same way: "Edinburgh at night"
+  and then "Reykjavik at sunset" is one caption with the name swapped.
 - "lol" on one post in four at most, and never twice in one.
 - "such a" on about half the posts (never two in a row), mostly
   mid-sentence like his "cast such a distinct shadow"; a sentence starting
@@ -85,14 +140,33 @@ Three posts go out a day, so anything on every post becomes a tell:
   joke, a surprise) rather than with a fancier word for it: "I dig", "I'm a
   fan of", "got a kick out of", "I was struck by" are a model dodging a
   repeat, not him.
+- The model's ways of describing a view while sounding like a reaction,
+  which ran through the first hundred posts, only every few posts: "compared
+  to", "next to", "looks tiny", "steep", "there's so much", "hard to", "up
+  there", "wasn't expecting", and "That's such a..." or "There's such a...".
+- And what it reached for in the first trials of the mixed shapes, once those
+  were spread out: a body part called cool or good ("his antennae are so
+  cool"), "my favorite part" or "what I like most", "colors" and "mix of",
+  "cool" two posts running, "stands out", and then "strange" or "odd
+  looking" on every other post. Each only every few posts.
+- A wish ("I'd love to", "would like to", "makes me want to", "hope to") on
+  about one post in ten, "crazy", "wild", "Crazy how..." or "Pretty wild
+  seeing..." on one in five or six, and how fur or feathers look or feel
+  ("that fur looks really soft", "he looks so fluffy") hardly ever: "cut down
+  a bit on the 'i would love to' or 'its crazy that' and 'that fur looks
+  really soft'. I don't necessarily talk so much like that" (2026-11-13).
 - Inside one caption, repeat words rather than swapping in synonyms: "this
   waterfall" twice is him, "the cascade" isn't.
 - Never copy a phrase from his rewrites or from a recent post.
 
 ## The emoji
 
+- On about half the posts: "don't always use emojis" (his words, 2026-11-12).
+  Code decides which, more often on stories than on short ones, never three
+  posts in a row with one and never more than three without.
 - Exactly one, at the very end of the opening, in place of the last full stop.
-  One emoji reads like a person; a row of them reads like a bot.
+  One emoji reads like a person; a row of them reads like a bot. Without one,
+  a line or a story ends on a full stop (or "lol") and a short one on nothing.
 - The animal itself (🐊 🐦 🐍 🦦 🦋 🐸) or the scene or thing (⛰️ 🌊 ☁️ 🌋 🚗).
   "Stick to emojis of the animals or scenes" (his words).
 - Never a face, heart or hand: no 😍 😅 😂 🤔 🤯 🥹 💚 🙌. They read as too much.
@@ -119,7 +193,9 @@ On Instagram the label is wanted; the website never uses it.
 What was on each post, then how Truman rewrote it. Some of the "before"
 versions were already his first edits; the second round moved further from a
 label towards a story. Typos are corrected; the emoji were added when he asked
-for one at the end of every caption.
+for one at the end of every caption, before he asked for them on only some.
+They're all the story shape: the short and one-sentence posts are his later
+ask, not something these rewrites rule out.
 
 **Waterfall, Arenal**
 
@@ -239,11 +315,14 @@ When writing or reviewing a caption by hand:
 1. Read what's actually in the photo: the pipeline's notes for it
    (`npm run social -- preview` shows each planned post), or the photo itself,
    and anything he's said about the trip (`npm run social -- notes`).
-2. Write the opening: how he came across it, "this" and the name, what it's
-   doing, then one reaction. Only backstory he gave.
-3. End it with one emoji instead of a full stop.
-4. Put the place on the next line, then the `Fun fact: ` paragraph.
-5. Check it against "When unsure". Read it aloud; if it sounds like a product
+2. Pick a shape that differs from the posts around it: a few words for a
+   photo that speaks for itself, one sentence, or a two-sentence story.
+3. Write it: for a story, how he came across it or what it is, then one
+   reaction. Name a view, don't describe it. Only backstory he gave, and
+   never the person in the frame.
+4. On about half, end with one emoji instead of a full stop.
+5. Put the place on the next line, then the `Fun fact: ` paragraph.
+6. Check it against "When unsure". Read it aloud; if it sounds like a product
    page or a field guide, say it the way you'd tell a friend.
 
 ## For maintainers
@@ -251,9 +330,15 @@ When writing or reviewing a caption by hand:
 - [voice.mjs](../../../scripts/photos/voice.mjs) puts everything from "How a
   post reads" to "When unsure", plus "How he writes" from truman-voice, into
   the prompt that writes each planned post's opening, and checks what comes
-  back: `{name}` exactly once, no invented backstory, no repeated openers or
+  back: the size and sentences its shape asks for, `{name}` exactly once, no
+  invented backstory, no view described, no people, no repeated openers or
   habits, one emoji he'd use. Bump `VOICE_VERSION` there to rewrite posts
   already planned.
+- Code picks each post's shape, start and emoji in posting order
+  (`pickShape`, `pickStart`, `wantsEmoji`), from the photo's appeal, his
+  notes and the posts before it, seeded by the photo so a rerun keeps them and
+  a redraft can change them. The mix is `MIX` and `EMOJI_ODDS`; the shape is
+  kept on the opening (`voice.shape`) and the post (`post.shape`).
 - A post whose opening fails every check isn't posted with a fallback; it waits
   and is tried again on the next run.
 - `HIS_STORIES` in voice.mjs holds his rewrites in posting order: the posts
@@ -262,7 +347,8 @@ When writing or reviewing a caption by hand:
 - Trip notes: `npm run social -- note <trip> "canal boat tour"`, listed with
   `npm run social -- notes`. They're kept privately in `metadata/social/notes.json`.
 - His own words for one planned post: `npm run social -- opening <photo>
-  "..."`. Used exactly as written (end it with an emoji, or the animal's is
-  added), never checked or rewritten; `--clear` goes back to a written one.
+  "..."`. Used exactly as written, emoji or not (no emoji is added since
+  2026-11-12), never checked or rewritten; `--clear` goes back to a written
+  one.
 - Published posts can't be edited through Instagram's API (it only allows
   turning comments on or off and deleting). Edit those in the Instagram app.

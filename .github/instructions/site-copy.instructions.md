@@ -135,7 +135,8 @@ rather than only writing it down here.
 
 Instagram posts are the exception to this section and to first-person-only-where-it-fits: they
 follow the [caption-voice skill](../skills/caption-voice/SKILL.md), which wants an opening in his
-voice with one emoji, the place on its own line, and a `Fun fact: ` label on the fact. How he
+voice (a few words, a sentence or a short story, with one emoji on about half), the place on its
+own line, and a `Fun fact: ` label on the fact. How he
 writes in general is in the [truman-voice skill](../skills/truman-voice/SKILL.md); it's being
 used in full on Instagram. On the site, photo captions and session descriptions are written for
 search first (specific, plain, the place and the species by name) with at most a light touch of

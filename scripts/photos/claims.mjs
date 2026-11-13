@@ -16,7 +16,7 @@
 // animal's posture, attitude or plans. He'd just say "I love" again, and
 // "not everything has to be a quip".
 export const STOCK =
-  /\b(?:stands? out against|catch(?:es)? my eye|caught my eye|hard to look past|can't stop looking|worth a closer look|funny little detail|thoroughly|wins? me over|nature never disappoints|nature at its finest|mother nature|living (?:its|his|her|their) best life|stopped me in my tracks|what a sight|feast for the eyes|in all (?:its|their) glory|never gets old|hidden gem|true gem|picture[- ]perfect|magical|paradise|simply|truly|came upon|happened upon|took in|gaz(?:e|ed|ing) (?:at|out|over)|beheld|marvel(?:l?ed)? at|got a glimpse|i (?:really )?dig|i'm (?:a |a big |such a )?fan of|(?:i'm|i was) (?:really |pretty |so )?into|(?:got|get|getting) a kick out of|soft spot|(?:i was |was )?struck by|there's something about|better posture|made an appointment|supervis\w*|hairstyle|very proper|(?:that much|so much|such) attitude|the right idea|whole arrangement|in charge of|reconsider\w*|takes? (?:it|its|his|her|their) [\w ]{0,20}(?:very )?seriously)\b/i;
+  /\b(?:stands? out against|catch(?:es)? my eye|caught my eye|hard to look past|can't stop looking|worth a closer look|funny little detail|thoroughly|wins? me over|nature never disappoints|nature at its finest|mother nature|living (?:its|his|her|their) best life|stopped me in my tracks|what a sight|feast for the eyes|in all (?:its|their) glory|never gets old|hidden gem|true gem|picture[- ]perfect|magical|paradise|simply|truly|came upon|happened upon|took in|gaz(?:e|ed|ing) (?:at|out|over)|beheld|marvel(?:l?ed)? at|got a glimpse|i (?:really )?dig|i'm (?:a |a big |such a )?fan of|(?:i'm|i was) (?:really |pretty |so )?into|(?:got|get|getting) a kick out of|soft spot|(?:i was |was )?struck by|there's something about|better posture|made an appointment|supervis\w*|hairstyle|very proper|(?:that much|so much|such) attitude|the right idea|whole arrangement|in charge of|reconsider\w*|takes? (?:it|its|his|her|their) [\w ]{0,20}(?:very )?seriously|so much to (?:like|love|see)|always something|my kind of place)\b/i;
 
 // Said as if it happened just now; posts and pages are read months later.
 export const WHEN =
@@ -58,6 +58,10 @@ export const CIRCUMSTANCES = [
   [
     /\b(?:rain\w*|drizzl\w*|storm\w*|snow\w*|fog\w*|mist\w*|hail)\b/i,
     /\b(?:rain\w*|drizzl\w*|storm\w*|snow\w*|fog\w*|mist\w*|hail|wet)\b/i,
+  ],
+  [
+    /\b(?:sunny|sunshine|sunlit|clear (?:day|sky|skies)|blue sk(?:y|ies))\b/i,
+    /\b(?:sun\w*|clear|blue sk(?:y|ies)|bright)\b/i,
   ],
   [
     /\b(?:snorkel\w*|scuba|diving)\b/i,

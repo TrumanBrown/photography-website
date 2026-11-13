@@ -238,7 +238,7 @@ When you want to steer it, these run on your computer (signed in with `az login`
 | `npm run social -- skip DSC01234 [why]` | Never post this shot, as a post or a story |
 | `npm run social -- unskip DSC01234` | Undo a skip |
 | `npm run social -- redraft DSC01234` | On the next Photo captions run, write the photo a new opening and first line (its website caption changes too) and give its post a different fact |
-| `npm run social -- opening DSC01234 "your words"` | Use your own words for the start of a planned post, exactly as written (end with an emoji, or the animal's is added). `--clear` goes back to a written one |
+| `npm run social -- opening DSC01234 "your words"` | Use your own words for the start of a planned post, exactly as written (end with an emoji if you want one; none is added). `--clear` goes back to a written one |
 | `npm run social -- note <trip> "canal boat tour"` | Tell the openings what you were doing on that trip (or, with a photo instead of a trip, at that photo). They only mention things like a hike, a drive or a boat tour when a note or the trip's name says so. `--clear` removes it |
 | `npm run social -- notes` | Every trip with its note and how many photos it has left to post |
 | `npm run social -- approve DSC01234` | Approve this exact caption (only matters with `SOCIAL_REQUIRE_APPROVAL=true`) |
@@ -373,8 +373,10 @@ Full resolution and the rest of this session are on example.com, link in bio
 #groovebilledani #birdsofinstagram #bijagua #birdphotography #sonya6700
 ```
 
-- **Opening**, in your voice: how you came across it, the name with its scientific name, what it's doing, and your reaction, the way you'd tell a friend. Two or three sentences. See below.
-- **One emoji** at the end of the opening, in place of its last full stop.
+Another post might open with only "Edinburgh at night", and the rest of it is built the same way.
+
+- **Opening**, in your voice, in one of three shapes code picks so the feed doesn't repeat one: a few words ("Edinburgh at night"), one sentence with your reaction, or a two-sentence story (how you came across it or what it is, then your reaction), the way you'd tell a friend. See below.
+- **An emoji** at the end of the opening on about half the posts, in place of its last full stop.
 - **Place**, in full, on its own line: places only (no habitat words like "shrub-steppe"), and Washington as "Washington state, USA", the way you wrote it.
 - **Fact:** one of the species' or place's facts, as above, after `Fun fact: `.
 - **Red List line:** added when the global IUCN status is Near Threatened or worse.
@@ -382,16 +384,28 @@ Full resolution and the rest of this session are on example.com, link in bio
 - **Link line:** captions can't hold clickable links, so it sends people to the link in your profile, for the full-resolution photo and the rest of the session. Put the site's address in your bio for it to work. Change the wording with `linkLine` in the [private settings file](#private-settings-file); posts already written are updated with it on the next run.
 - **Alt text:** the record's plain description of the frame, sent with every post. Instagram and Google both read it.
 
-**The voice.** People scroll past posts that read as AI-written, so the opening is written in your voice, from your own rewrites of posts that didn't sound like you. How you write is in the [truman-voice skill](../.github/skills/truman-voice/SKILL.md); the post format, the generator's rules and your rewrites are in the [caption-voice skill](../.github/skills/caption-voice/SKILL.md), with the [humanizer](../.github/skills/humanizer/SKILL.md) skill (blader/humanizer, MIT) for anything they don't settle. [voice.mjs](../scripts/photos/voice.mjs) puts both into one text-only call per ten planned posts, in the order they'll go out, and asks for three versions of each opening with an emoji. An identified species is written as `{name}`, and code fills in the verified name. An opening is kept only if it:
+**The voice.** People scroll past posts that read as AI-written, so the opening is written in your voice, from your own rewrites of posts that didn't sound like you. How you write is in the [truman-voice skill](../.github/skills/truman-voice/SKILL.md); the post format, the generator's rules and your rewrites are in the [caption-voice skill](../.github/skills/caption-voice/SKILL.md), with the [humanizer](../.github/skills/humanizer/SKILL.md) skill (blader/humanizer, MIT) for anything they don't settle. [voice.mjs](../scripts/photos/voice.mjs) puts both into one text-only call per ten planned posts, in the order they'll go out, and asks for three versions of each opening in the shape code picked for it. An identified species is written as `{name}`, and code fills in the verified name.
 
-- has `{name}` exactly once for an identified species, where the animal first comes up (not tacked on after a comma), and no other species name; code fixes the words in front of it ("these two otters", "an agami heron")
-- has an opinion in it (a reaction, a comparison, a joke), not just a description of the photo, and never mentions the background, blur or framing
+**The mix.** The first hundred posts were all one template, "Saw this ridge rising above a snowy basin. It has such a jagged top..." with an emoji on the end, and the sameness gave them away (November 2026). So before anything is written, code picks each planned post's shape, in posting order, from the photo and the posts before it:
+
+- a few words ("Edinburgh at night", "Snow on Mount Baker") on about one post in four or five while the queue is mostly your best shots, and up to one in three later: mostly views and the less striking photos, never a good wildlife photo (an appeal score of 7 or more); about one in four is one sentence; the rest are two-sentence stories, more likely when your notes say something about the trip
+- never two short ones in a row, nor three of any shape
+- a line or a story starts with how you came across it ("Saw this...", "Got this view of..."), your reaction ("I love how..."), the thing itself ("Mount Baker from..."), or what you were doing (only from your notes), and "how you came across it" is one post in three at most
+- about half end on an emoji, more often stories than short ones, never three in a row with one and never more than three without
+
+The choices are seeded by the photo, so a rerun keeps them and a redraft can change them. An opening is kept only if it:
+
+- is the size its shape asks for: 2 to 9 words with no "I" or reaction for a short one, one sentence for a line, two or three for a story
+- has `{name}` exactly once for an identified species, where the animal first comes up (not tacked on after a comma), and no other species name; code fixes the words in front of it ("these two otters", "an agami heron", "these bharals" for a herd), and refuses a singular verb after several ("three shaggy manes looks") or an "'s" or a noun right after the name ("bharals (Pseudois nayaur) herd"), which its brackets can't take
+- has an opinion in it (a reaction, a comparison, a joke) unless it's a short one, and never mentions the background, blur or framing
+- names a view instead of describing how it's laid out: nothing "rising above", "running along", "towering over" or "going right down to the water"
+- never mentions people, even when someone's in the frame (no "man at the falls", no hikers, no "the people look tiny", no hands holding the frog), and with a person in the photo no "he", "she" or "me" either; photos where an identifiable person is the main subject aren't posted at all
 - says nothing about what you were doing, who you were with, the weather or the time of day unless the trip's name, the photo's record or your trip notes back it up: "on a canal tour" needs a trip named for the canals or a note saying so, and waiting, "finally" or company need your notes
 - has no numbers, no "today" or "last week", no questions (a hedging "(?)" is fine), no stock phrases ("nature never disappoints"), no forced-casual stand-ins for "I love" ("I dig", "I'm a fan of", "got a kick out of") and none of the words the voice rules ban
 - doesn't repeat its fun fact, and copies no phrase from your rewrites or another post
-- doesn't start with the same words as any of the four posts before it, and spreads your habits out: "lol" on one post in four at most (it's dropped rather than the post), "such a" never on two posts in a row (and opening a sentence on one post in four), "I love", "I like", "my favorite", "little", "pretty" and "almost" only every few posts
+- doesn't start with the same words as any of the four posts before it, and spreads your habits out: "lol" on one post in four at most (it's dropped rather than the post), "such a" never on two posts in a row (and opening a sentence on one post in four), "I love", "I like", "my favorite", "little", "pretty" and "almost" only every few posts, and the same for the ways a model describes a view while sounding like a reaction ("compared to", "looks tiny", "steep", "hard to", "That's such a...") and the tics it reached for next ("his antennae are so cool", "my favorite part"); a wish ("I'd love to", "makes me want to") on about one post in ten, "crazy" or "pretty wild" on one in five or six, and how fur or feathers look or feel ("that fur looks really soft") hardly ever
 
-The emoji has to be one emoji showing the animal or the scene (🐊 ⛰️ 🐦 🚗), never a face, heart or hand, and not ✨, 🌿, 🔥, 📸 or the like; otherwise the opening's other suggestions or the animal's own emoji take its place. It differs from the post before when there's a choice.
+When a post gets an emoji, it has to be one emoji showing the animal or the scene (🐊 ⛰️ 🐦 🚗), never a face, heart or hand, and not ✨, 🌿, 🔥, 📸 or the like; otherwise the opening's other suggestions or the animal's own emoji take its place. It differs from the last post that had one when there's a choice. Without an emoji, a line or a story ends on a full stop and a short one on nothing.
 
 The generator also mustn't try to be clever: no quips about an animal's posture, attitude or plans ("better posture than me", "supervising the whole slope"), and "looks like he's..." or "I'd..." only every few posts.
 
@@ -399,7 +413,19 @@ A post whose options all fail (usually because it's too close to a post next to 
 
 **Your notes.** The best openings say what you were doing ("Pulled over on the side of the road to capture this canyon view"), and only you know that. `npm run social -- note <trip> "..."` stores a line about a trip, privately in `metadata/social/notes.json`; the openings and the trip's session description on the website draw on it but never post it as is, and both are rewritten with it on the next run. `npm run social -- notes` lists every trip and how many photos it has left to post, so you can start with the big ones.
 
-To change how posts sound, edit the skills; to rewrite the posts already planned, bump `VOICE_VERSION` in voice.mjs. To redo one post, `npm run social -- redraft <photo>` gives it a new opening and fact. To write one yourself, `npm run social -- opening <photo> "..."`: your words go in as they are, and the rest of the post (place, fact, gear, link, hashtags) is built around them.
+To change how posts sound, edit the skills; to rewrite the posts already planned, bump `VOICE_VERSION` in voice.mjs. To redo one post, `npm run social -- redraft <photo>` gives it a new opening and fact. To write one yourself, `npm run social -- opening <photo> "..."`: your words go in exactly as typed, with no emoji added, and the rest of the post (place, fact, gear, link, hashtags) is built around them.
+
+**Trying a change before it goes live.** Pushing a new `VOICE_VERSION` rewrites every planned post on the next Photo captions run, and posting carries on with them. To see them first, copy the private state into `.cache` and run the pipeline against the copy, which never writes to Azure or the site:
+
+```bash
+mkdir -p .cache/photos/state .cache/social/state
+for f in catalog facts taxa inat-index; do az storage blob download --auth-mode login --account-name <account> -c metadata -n photos/$f.json -f .cache/photos/state/$f.json; done
+for f in ledger notes queue; do az storage blob download --auth-mode login --account-name <account> -c metadata -n social/$f.json -f .cache/social/state/$f.json; done
+SOCIAL_ENABLED=true AZURE_OPENAI_ENDPOINT=... AZURE_OPENAI_DEPLOYMENT=... node scripts/photos/catalog.mjs --local-state --no-write --limit 0
+npm run social -- preview 42 --local
+```
+
+`--limit 0` means no photo is looked at again, so it costs only the text calls. The account is the part of `blobHost` in site.config.ts before `.blob.core.windows.net`, and the two model settings are the repository variables of the same names.
 
 A post is only written once its photo is planned for the coming two weeks, so rewording any part never means rewriting the whole archive. A written post keeps its fact while that fact still exists.
 

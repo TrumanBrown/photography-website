@@ -12,7 +12,7 @@ Three photos a day go to Truman's Instagram, each used once, with a caption in h
 | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `scripts/social/plan.mjs`                                         | `planQueue`: two weeks of posts, spacing sessions, species and places, a landscape every third post                                                                  |
 | `scripts/social/render.mjs`                                       | the upload: 4:5 to 1.91:1, at most 1440 px wide, never upscaled, EXIF stripped; `cropPosition` places a crop once per photo; `renderStory` makes the 1080×1920 frame |
-| `scripts/social/compose.mjs`, `hashtags.mjs`                      | the caption: opening plus one emoji, place line, `Fun fact:`, gear, link line, five hashtags, at most 2,200 characters                                               |
+| `scripts/social/compose.mjs`, `hashtags.mjs`                      | the caption: opening (an emoji on about half), place line, `Fun fact:`, gear, link line, five hashtags, at most 2,200 characters                                     |
 | `scripts/social/due.mjs`, `post.mjs`, `story.mjs`, `schedule.mjs` | is anything due (cheap, before `npm ci`), publish exactly once, the daily story, slot times                                                                          |
 | `scripts/social/instagram.mjs`, `token.mjs`, `seal.mjs`           | the Graph API client (single images and stories only), token refresh, AES-256-GCM sealing                                                                            |
 | `scripts/social/settings.mjs`                                     | every `SOCIAL_*` and `IG_*` setting and its default                                                                                                                  |
@@ -49,7 +49,9 @@ Switches (repository variables): `SOCIAL_ENABLED` (planning), `SOCIAL_LIVE` (onl
 
 ## Show Truman what's coming
 
-`npm run social -- preview` (or `preview 42` for two weeks), then give him the page as a Windows link (ship-and-ci). For a pending change, hold the website and generate drafts first (photo-captions, "Roll out a wording or rules change"), show both previews, wait for his OK, and keep posting live the whole time.
+`npm run social -- preview` (or `preview 42` for two weeks), then put the page's full Windows path (`wslpath -w`) in the reply itself, in a code block, never only in a command's output (ship-and-ci, step 3 of "Let Truman try it first"). For a pending change, hold the website and generate drafts first (photo-captions, "Roll out a wording or rules change"), show both previews, wait for his OK, and keep posting live the whole time.
+
+The website hold doesn't hold planned posts: a pushed `VOICE_VERSION` rewrites them all on the next run, and they post. For a change to the openings, commit it on a branch, run the pipeline on a local copy of the state (`catalog.mjs --local-state --no-write --limit 0`, then `npm run social -- preview 42 --local`; the steps are in docs/social.md under "Trying a change before it goes live"), show him that page, and push after his OK. It needs `az login` to his own tenant: the work tenant can't read the storage account ("Issuer did not match").
 
 ## Change the cadence
 
@@ -96,6 +98,8 @@ Instagram's API can only turn comments on or off and delete. To change a live ca
 - 2026-10-14: frames that don't fit get a slight crop instead of a border.
 - 2026-10-14: a second daily story that shares his own feed post. The API can't do that, and of the workarounds offered he said "none of these, not worth it." Don't offer them again.
 - 2026-10-26: asked whether the README should name the account: keep it private, "on the repo itself don't post the handle, but highlight the automated instagram pipeline it has, that's still pretty cool". He did want the site's footer to link the account, and a real number for visits it sends.
+- 2026-11-12: "there's now a 100 posts that all follow this exact same format. it's very clear it's automated just based on the repetitions and the emoji." He wants "wayyyy more variability": not always an emoji, not always "verb this <noun>", way shorter captions for less striking photos ("edinburgh at night"), less explaining the scene, some stories about what he loved, and the fun fact and place line on every post. He picked capitalized short captions, about 1 in 3 short, 1 in 4 one sentence and an emoji on about half, and left gear, link line and hashtags as they are. People: "dont ever say 'man at blank'", write "at blank spot on a sunny day"; photos of identifiable people stay skipped.
+- 2026-11-13, reviewing the drafts of the mixed shapes: "looks fine, but the pygmy lizard its a really good pic so don't necessarily shorten that one. and cut down a bit on the 'i would love to' or 'its crazy that' and 'that fur looks really soft'. I don't necessarily talk so much like that." Good wildlife photos are never short now, and wishes, "crazy" and fur or feather talk are spread far apart.
 
 ## Hard-won lessons
 
@@ -104,8 +108,9 @@ Instagram's API can only turn comments on or off and delete. To change a live ca
 3. **His first preview failed with `AZURE_STORAGE_ACCOUNT is required`.** The CLIs read the account from `blobHost` in `site.config.ts` and say "az login" when that's missing (`cbb5bde`).
 4. **Borders read as bars** on the portraits that were a third of the queue, in both themes. Crop by default, placed once per photo with its own fingerprint so it can't post twice (`e510b08`).
 5. **A test broke at 10:05 one morning and blocked every deploy**, including his admin edits. `runPost` stamped the real clock while the test faked only `now`. Tests fake `Date` and run at several dates (`a52ccd6`). Image tests got smaller fixtures and 20 s timeouts after timing out on CI (`e00b520`).
-6. **Heart-eye emoji and quips didn't sound like him.** One emoji at the end, of the animal or the scene (`55d3d5b`).
+6. **Heart-eye emoji and quips didn't sound like him.** One emoji at the end, of the animal or the scene (`55d3d5b`), and since lesson 8 on about half the posts.
 7. **Setup steps lost him on Meta's site** (2026-10-10). The steps didn't say which site or account each one happened on ("where is the api setup page, is it on the developers.facebook.com or on the instagram account"), and an "Add account" button they named wasn't there. Group setup steps by where they happen (the Instagram app, developers.facebook.com, the tester invite) and check Meta's current page before naming a button. The developer account can be a different account from the Instagram one.
+8. **A hundred posts in one template read as automated** (2026-11-12). Every opening was asked for in the same shape, how he came across it, "this" and the name, then one reaction, with an emoji on every post. The opener check compared only the first two words, so "Saw this", "I captured" and "Managed to capture" all passed while the shape never changed, and the reactions drifted into describing the view ("rising above a snowy basin", "the people look tiny compared to the mountain"). Now code picks each post's shape, start and emoji (`pickShape`, `pickStart`, `wantsEmoji` in voice.mjs), "how he came across it" counts as one start however it's worded, a view is named and never described, and people never come up. Judge sameness by reading 20 posts in a row, not by comparing words. The same queue had "this bharals" for a herd and "such a awkward"; plural names and "a"/"an" are fixed in code now.
 
 ## Gotchas
 

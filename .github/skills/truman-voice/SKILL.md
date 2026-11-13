@@ -26,6 +26,11 @@ His six rewrites, with what the pipeline wrote first, are in
    - "While on a canal tour in Tortuguero, managed to capture this..."
    - "Spotted this...", "Saw this...", "A fun pic of this...", "I love how..."
    - "capture" is a favourite: "captured this", "managed to capture this".
+
+   That's how his stories start, not every post. A hundred Instagram posts
+   that all opened "Saw this..." or "Managed to capture this..." read as
+   automated (2026-11-12), so some start with his reaction or with the thing
+   itself, and some are only a few words (13).
 2. **He points at it.** "this waterfall", "this katydid", "this canyon view".
    It's his phone and he's holding it out.
 3. **Names stay exact.** The species gets its common name with the scientific
@@ -75,9 +80,11 @@ His six rewrites, with what the pipeline wrote first, are in
     line of its own ("Bijagua, Alajuela Province, Costa Rica."). The line is
     places only, said so anyone can place it: he changed "shrub-steppe,
     Eastern Washington" to "Eastern Washington state, USA".
-13. **Short.** Usually two sentences, roughly 15 to 45 words.
-14. **One emoji at the end of a post: the animal or the scene.** 🐊 ⛰️ 🐦 🚗,
-    never a face or a heart.
+13. **Short, sometimes very short.** A story is usually two sentences,
+    roughly 15 to 45 words. A photo that speaks for itself gets a few words,
+    "edinburgh at night" (his example, 2026-11-12), or one sentence.
+14. **An emoji at the end of some posts: the animal or the scene.** 🐊 ⛰️ 🐦
+    🚗, never a face or a heart, and "don't always use emojis" (2026-11-12).
 
 What he never writes:
 
@@ -96,12 +103,15 @@ What he never writes:
   favorite", "almost looks like", "can't get over". Once in a while, fine.
 - Questions to the reader, "Did you know", morals, sign-offs, lists of three,
   exclamation marks, em dashes.
+- The person in a photo: "man at the falls", "a hiker on the ridge", "the
+  people look tiny". It might be him, and he'd never caption himself that way;
+  he'd write about the place, "at blank spot on a sunny day" (2026-11-12).
 
 ## Where it applies
 
 | Where | How much of the voice |
 |---|---|
-| Instagram captions | All of it, plus one emoji at the end. Format and generator rules: [caption-voice](../caption-voice/SKILL.md) |
+| Instagram captions | All of it, in a mix of shapes, with one emoji at the end of about half. Format and generator rules: [caption-voice](../caption-voice/SKILL.md) |
 | Website photo captions | Not his voice: they're the alt text and what image search reads. Specific and plain: the name, what it's doing and what it's on, what's in front of a view, in searchable words ("reflected in a tarn", "fall colors"). No poses or background blur ([lines.mjs](../../../scripts/photos/lines.mjs)) |
 | Session descriptions | Search first: the place, landmarks and main animals by name in the first sentence, in plain words. A light touch of his voice at most (one short reaction, first person optional), never "lol" or emoji ([website.mjs](../../../scripts/photos/website.mjs) `descriptionPrompt`). "The website first-party voice isn't as important" (his words) |
 | Hobby intros and longer site prose | First person, contractions, underselling: [site-copy.instructions.md](../../instructions/site-copy.instructions.md). No "lol", no emoji |

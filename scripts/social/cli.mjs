@@ -10,7 +10,7 @@
  *   npm run social -- redraft <photo>     new opening and a different fact on the next Photo captions run
  *   npm run social -- opening <photo> <text...>
  *                                         your own words for the start of a planned post, used exactly as
- *                                         written (end it with an emoji, or one is added); --clear goes back
+ *                                         written (end it with an emoji if you want one); --clear goes back
  *   npm run social -- note <trip|photo> <text...>
  *                                         what you were doing there ("canal boat tour", "pulled over on the
  *                                         drive up"), for the post openings and the trip's session
@@ -182,9 +182,12 @@ async function preview({ social, photos }, count) {
   const card = (key, i) => {
     const s = catalog.shots[key];
     const f = catalog.files[s.pick];
-    const src = local
-      ? `file://${join(ROOT, "src/content/sessions", f.session, "images", f.file)}`
-      : f.url;
+    // A trial run on real sessions (catalog.mjs --local-state) keeps their
+    // web addresses; only fixture sessions are files on disk.
+    const src =
+      local && !/^https?:/.test(f.url ?? "")
+        ? `file://${join(ROOT, "src/content/sessions", f.session, "images", f.file)}`
+        : f.url;
     const id = s.inat
       ? `iNaturalist ${s.speciesOk ? "species" : "group-level"} ID`
       : "no iNaturalist match";
@@ -226,7 +229,7 @@ async function preview({ social, photos }, count) {
     day: localParts(new Date(), settings.timezone).day,
   });
   const storySrc = story
-    ? local
+    ? local && !/^https?:/.test(story.file.url ?? "")
       ? `file://${join(ROOT, "src/content/sessions", story.file.session, "images", story.file.file)}`
       : story.file.url
     : "";

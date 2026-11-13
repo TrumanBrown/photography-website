@@ -201,6 +201,18 @@ describe("caption text", () => {
     expect(
       assembleCaption({ story: "Such a goofy face lol", hashtags: [] }),
     ).toBe("Such a goofy face lol");
+    // A few words get no full stop, and his own words stay as he typed them.
+    expect(
+      assembleCaption({
+        story: "Edinburgh at night",
+        shape: "short",
+        place: "Edinburgh, Scotland",
+        hashtags: [],
+      }),
+    ).toBe("Edinburgh at night\nEdinburgh, Scotland.");
+    expect(
+      assembleCaption({ story: "Gunn Peak again", own: true, hashtags: [] }),
+    ).toBe("Gunn Peak again");
   });
 
   it("keeps place names and people's names inside species names", () => {
