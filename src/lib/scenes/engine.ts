@@ -42,14 +42,26 @@ import {
  *
  * A second click, tap, Enter or Space hurries the rest along; Escape puts
  * the page back.
+ *
+ * Times in the scenes are scene time, at the pace they were first approved
+ * at; a scene's clock runs PACE times faster than that.
  */
+
+/** Scenes play this much faster than they're written. */
+export const PACE = 1.2;
+/** How much faster again the rest plays once you click a second time... */
+export const HURRY = 4;
+/** ...which makes the clock's rate this. */
+export const HURRIED = PACE * HURRY;
 
 /** How long the plate takes to rise from its card to the middle of the screen. */
 export const LIFT_MS = 450;
 /** Scenes that carry on over the hobby page change page as the lift ends... */
 export const LEAVE = LIFT_MS;
-/** ...hold while it loads... */
-export const HOLD = 420;
+/**
+ * ...hold a beat, and longer if the hobby page needs it to come up...
+ */
+export const HOLD = 150;
 /** ...and start moving here. */
 export const ACT = LEAVE + HOLD;
 /**
@@ -70,8 +82,6 @@ export function pushZoom(ms: number): number {
 }
 /** How long the paper takes to cover the page behind. */
 const PAPER_MS = 320;
-/** How much faster the rest of a scene plays once you click again. */
-export const HURRY = 2.8;
 /** The mini plate a home-page card shows hands over to the finer card plate. */
 const SWAP_FROM = 60;
 const SWAP_MS = 300;
@@ -458,10 +468,10 @@ export function show(o: ShowOptions, className: string): Show {
 }
 
 /**
- * A clock that can be hurried: ms since it started, running `HURRY` times
- * faster from whenever `hurry()` was called.
+ * A scene's clock: scene time since it started, at `speed` (PACE), and at
+ * HURRIED from whenever `hurry()` was called.
  */
-export function clock(speed = 1) {
+export function clock(speed = PACE) {
   const start = performance.now();
   let at = -1;
   let from = 0;
@@ -474,11 +484,11 @@ export function clock(speed = 1) {
       return rate;
     },
     hurry() {
-      if (rate >= HURRY) return;
+      if (rate >= HURRIED) return;
       const when = performance.now();
       from = now(when);
       at = when;
-      rate = HURRY;
+      rate = HURRIED;
     },
   };
 }

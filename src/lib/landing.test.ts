@@ -29,6 +29,17 @@ interface FakeCanvas {
   context?: [string, unknown];
 }
 
+/** An input event, and whether the head script kept it from the page. */
+interface FakeEvent {
+  type: string;
+  key?: string;
+  cancelable: boolean;
+  prevented: boolean;
+  stopped: boolean;
+  preventDefault(): void;
+  stopPropagation(): void;
+}
+
 /** What the head script painted on a 2D canvas: each fill, and how. */
 interface Painted {
   fills: Array<{ style: string; alpha: number; dots: number[][] }>;
@@ -48,8 +59,10 @@ function boot(options: {
   carried?: string;
   /** Whether a 2D canvas can be had. */
   no2d?: boolean;
+  /** Anything else already in sessionStorage. */
+  stored?: Record<string, string>;
 }) {
-  const store = new Map<string, string>();
+  const store = new Map<string, string>(Object.entries(options.stored ?? {}));
   if (options.note !== undefined)
     store.set(LANDING_KEY, JSON.stringify(options.note));
   if (options.carried !== undefined)
@@ -60,6 +73,11 @@ function boot(options: {
   const canvases: FakeCanvas[] = [];
   const appended: unknown[] = [];
   const dispatched: string[] = [];
+  const listeners: Array<{
+    type: string;
+    fn: (event: FakeEvent) => void;
+    capture: unknown;
+  }> = [];
   const painted: Painted = { fills: [], rects: [], scale: [] };
   const offscreen = { offscreen: true };
   let dots: number[][] = [];
@@ -111,6 +129,11 @@ function boot(options: {
     innerWidth: 1280,
     innerHeight: 800,
     devicePixelRatio: 3,
+    addEventListener: (
+      type: string,
+      fn: (event: FakeEvent) => void,
+      capture: unknown,
+    ) => listeners.push({ type, fn, capture }),
     ...(options.workers ? { Worker, OffscreenCanvas: class {} } : {}),
   };
   const timers: Array<{ ms: number; fn: () => void }> = [];
@@ -129,6 +152,7 @@ function boot(options: {
   run(
     {
       getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => store.set(key, value),
       removeItem: (key: string) => store.delete(key),
     },
     { pathname: options.path, search: options.search ?? "" },
@@ -203,11 +227,35 @@ function boot(options: {
     landing: classes.has("landing"),
     dots: classes.has("landing-dots"),
     left: store.has(LANDING_KEY),
+    store,
     timers: timers.map((timer) => timer.ms),
     /** Run the timers set for `ms`, as if that long had passed. */
     fire(ms: number) {
       for (const timer of timers) if (timer.ms === ms) timer.fn();
     },
+    /**
+     * Press on the page, click, or a key, as the visitor would: what the
+     * page's own handlers would get, if anything.
+     */
+    press(type: string, key?: string) {
+      const event: FakeEvent = {
+        type,
+        key,
+        cancelable: true,
+        prevented: false,
+        stopped: false,
+        preventDefault() {
+          event.prevented = true;
+        },
+        stopPropagation() {
+          event.stopped = true;
+        },
+      };
+      for (const listener of listeners)
+        if (listener.type === type) listener.fn(event);
+      return event;
+    },
+    listeners,
     classes,
     art: props.get("--landing-dots"),
     props,
@@ -476,6 +524,10 @@ describe("landingBootstrap", () => {
     expect(result.workers[0].terminated).toBe(true);
     expect(result.canvases[0].removed).toBe(true);
     expect(result.win.landingWorker).toBeUndefined();
+    // No scene is coming: the page can move, and take clicks again.
+    expect(result.classes.has("landing-scene")).toBe(false);
+    expect(result.dispatched).toEqual(["landing:uncovered"]);
+    expect(result.press("click")).toMatchObject({ prevented: false });
   });
 
   it("leaves a worker the page took on to the page", () => {
@@ -488,6 +540,173 @@ describe("landingBootstrap", () => {
     result.fire(4000);
     expect(result.workers[0].terminated).toBe(false);
     expect(result.canvases[0].removed).toBe(false);
+  });
+
+  it("shows the scene as soon as its worker has it up, without waiting for the page's scripts", () => {
+    const result = boot({
+      note: { ...sceneNote(), frame: held },
+      path: "/hobbies/birding/",
+      workers: true,
+      carried: "carried-dots",
+    });
+    const [worker] = result.workers;
+    const frame = result.canvases.find((c) => c.className === "landing-frame")!;
+    worker.onmessage!({ data: { type: "shown" } });
+    expect(result.classes.has("landing-dots")).toBe(false);
+    expect(frame.removed).toBe(true);
+    expect(result.store.has("globe-landing-data")).toBe(false);
+    expect(worker.posted.at(-1)!.message).toEqual({ type: "uncovered" });
+    expect(result.win.landingWorker).toMatchObject({ shown: true });
+    // Its fades go on its canvas until the page takes it over.
+    const canvas = result.canvases[0];
+    worker.onmessage!({ data: { type: "look", opacity: 0.4, blur: 3 } });
+    expect(canvas.style).toMatchObject({
+      opacity: "0.4",
+      filter: "blur(3.00px)",
+    });
+    worker.onmessage!({ data: { type: "look", opacity: 1, blur: 0 } });
+    expect(canvas.style).toMatchObject({ opacity: "", filter: "" });
+    // A scene that's up plays on past four seconds.
+    result.fire(4000);
+    expect(worker.terminated).toBe(false);
+    expect(canvas.removed).toBe(false);
+    expect(result.classes.has("landing-scene")).toBe(true);
+    expect(result.dispatched).toEqual([]);
+  });
+
+  it("clears away a scene that ends before the page takes it on", () => {
+    const result = boot({
+      note: sceneNote(),
+      path: "/hobbies/birding/",
+      workers: true,
+    });
+    const [worker] = result.workers;
+    worker.onmessage!({ data: { type: "shown" } });
+    worker.onmessage!({ data: { type: "done" } });
+    expect(worker.terminated).toBe(true);
+    expect(result.canvases[0].removed).toBe(true);
+    expect(result.win.landingWorker).toBeUndefined();
+    expect(result.classes.has("landing-scene")).toBe(false);
+    result.fire(8000);
+    expect(result.dispatched).toEqual(["landing:uncovered"]);
+  });
+
+  it("leaves a scene that never came up to the page", () => {
+    const result = boot({
+      note: sceneNote(),
+      path: "/hobbies/birding/",
+      workers: true,
+    });
+    const [worker] = result.workers;
+    worker.onmessage!({ data: { type: "failed" } });
+    expect(worker.terminated).toBe(false);
+    expect(result.classes.has("landing-dots")).toBe(true);
+    expect(result.classes.has("landing-scene")).toBe(true);
+  });
+
+  it("lays the scene out at the size the last page had it", () => {
+    const result = boot({
+      note: sceneNote({ w: 1265, h: 790 }),
+      path: "/hobbies/birding/",
+      workers: true,
+    });
+    expect(result.workers[0].posted[1].message.view).toEqual({
+      w: 1265,
+      h: 790,
+      dpr: 2,
+    });
+  });
+
+  it("hurries the scene for a click or key here, or one the last page noted", () => {
+    const note = sceneNote();
+    const hurried = (result: ReturnType<typeof boot>) =>
+      result.workers[0].posted.filter((p) => p.message.type === "hurry").length;
+    const noted = boot({
+      note,
+      path: "/hobbies/birding/",
+      workers: true,
+      stored: { "globe-landing-hurry": String(note.at) },
+    });
+    expect(hurried(noted)).toBe(1);
+    expect(noted.store.has("globe-landing-hurry")).toBe(false);
+    // Hurried before the page plays it itself, too.
+    expect(noted.note).toMatchObject({ hurried: true });
+
+    const other = boot({
+      note: sceneNote(),
+      path: "/hobbies/birding/",
+      workers: true,
+      stored: { "globe-landing-hurry": "12345" },
+    });
+    expect(hurried(other)).toBe(0);
+    expect(other.store.has("globe-landing-hurry")).toBe(false);
+
+    const result = boot({
+      note: sceneNote(),
+      path: "/hobbies/birding/",
+      workers: true,
+    });
+    result.press("pointerdown");
+    result.press("keydown", "Enter");
+    result.press("keydown", " ");
+    result.press("keydown", "Escape");
+    result.press("keydown", "a");
+    expect(hurried(result)).toBe(4);
+    // Once the scene's over, a click is just a click.
+    result.classes.delete("landing-scene");
+    result.press("pointerdown");
+    expect(hurried(result)).toBe(4);
+  });
+
+  it("keeps clicks and keys meant for the scene off the page under it", () => {
+    const result = boot({
+      note: sceneNote(),
+      path: "/hobbies/birding/",
+      workers: true,
+    });
+    for (const event of [
+      result.press("pointerdown"),
+      result.press("click"),
+      result.press("keydown", " "),
+    ])
+      expect(event).toMatchObject({ prevented: true, stopped: true });
+    expect(result.press("keydown", "Tab")).toMatchObject({
+      prevented: false,
+      stopped: false,
+    });
+    result.classes.delete("landing-scene");
+    for (const event of [
+      result.press("pointerdown"),
+      result.press("click"),
+      result.press("keydown", " "),
+    ])
+      expect(event).toMatchObject({ prevented: false, stopped: false });
+  });
+
+  it("ends a scene the visitor leaves in the middle of, so the page takes input when it's back", () => {
+    const own = boot({
+      note: { ...sceneNote(), frame: held },
+      path: "/hobbies/birding/",
+      workers: true,
+    });
+    own.press("pagehide");
+    expect(own.workers[0].terminated).toBe(true);
+    expect(own.canvases.every((c) => c.removed)).toBe(true);
+    expect(own.classes.has("landing-dots")).toBe(false);
+    expect(own.classes.has("landing-scene")).toBe(false);
+    expect(own.dispatched).toEqual(["landing:uncovered"]);
+    expect(own.press("click")).toMatchObject({ prevented: false });
+
+    // A worker the page took on is the page's to stop.
+    const taken = boot({
+      note: sceneNote(),
+      path: "/hobbies/birding/",
+      workers: true,
+    });
+    taken.win.landingWorker = undefined;
+    taken.press("pagehide");
+    expect(taken.workers[0].terminated).toBe(false);
+    expect(taken.classes.has("landing-scene")).toBe(false);
   });
 
   it("fetches the scenes module instead where there's no worker to start", () => {

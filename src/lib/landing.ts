@@ -35,6 +35,11 @@ import {
 
 /** sessionStorage key the old page leaves for the page it lands on. */
 export const LANDING_KEY = "globe-landing";
+/**
+ * Where the old page notes a click that came after its scene handed over
+ * (the note's `at`), for the head script to hurry the scene on.
+ */
+export const HURRY_KEY = "globe-landing-hurry";
 
 /**
  * Where a page opens from through its dots: a point on screen (fractions of
@@ -90,6 +95,12 @@ export interface LandingNote {
   /** A scene's frame, for the head script to paint before anything else. */
   frame?: HeldFrame;
   reveal?: Reveal;
+  /**
+   * Set by the head script: the visitor clicked again, on the last page
+   * after it handed over or here before the scene was taken on, so the rest
+   * plays hurried.
+   */
+  hurried?: boolean;
   /** A scene that carries on over this page (src/lib/scenes/index.ts). */
   scene?: {
     /** Where it left off, ms into the scene. */
@@ -103,7 +114,7 @@ export interface LandingNote {
     /** The plate image it was drawn from. */
     plate: string;
     dark: boolean;
-    /** 1, or faster if it was hurried along. */
+    /** Its clock's rate: PACE, or HURRIED if it was hurried along. */
     speed: number;
     /** The hold it left in: how long it lasts, wall-clock ms, and how far it eases in. */
     hold: number;
@@ -127,6 +138,11 @@ export interface EarlyWorker {
   canvas: HTMLCanvasElement;
   /** What the worker said before anything was listening. */
   inbox: unknown[];
+  /**
+   * The head script has shown the scene: the worker had its frame up, so it
+   * took the page's own frame down and let the scene move on.
+   */
+  shown: boolean;
 }
 
 declare global {
@@ -150,13 +166,20 @@ declare global {
  * scene needs the GPU to start up), and the CSS eases it in from the moment
  * it left, timed off the note, while the page loads. Where the browser can,
  * the scene worker starts right here on a canvas under that frame and picks
- * the scene up with the data the last page carried (carryOn() takes it over
- * once the page's scripts run); otherwise the scenes module is fetched
- * straight away. While the scene
- * plays, `landing-scene` on <html> keeps the page's own animations still
- * (src/lib/covered.ts). If nothing takes over, the page shows itself after
- * four seconds anyway (and stops a worker the page never took on), and its
- * animations start after eight at the latest.
+ * the scene up with the data the last page carried; otherwise the scenes
+ * module is fetched straight away. As soon as the worker has the scene up,
+ * this script takes the frame down and lets the scene move on, rather than
+ * waiting for the page's own scripts, which come last and can take a while
+ * on a first visit; it passes on the scene's fades, and clears the scene
+ * away if it ends before carryOn() takes it over. A click or key here, or
+ * one on the last page after it handed over (`globe-landing-hurry`, the
+ * note's time), hurries the scene, and is kept off the page under it. While
+ * the scene plays, `landing-scene` on <html> keeps the page's own animations
+ * still (src/lib/covered.ts). If nothing has the scene up after four
+ * seconds, the page shows itself anyway and its animations start (stopping
+ * a worker the page never took on); otherwise they start when the scene
+ * ends, after eight seconds at the latest. Leaving mid-scene ends it, so a
+ * page the browser brings back from its cache takes input again.
  *
  * Keep it free of backslashes and template placeholders: scripts/csp-hash.mjs
  * hashes this source text as written, and the hash has to match the string
@@ -194,13 +217,16 @@ export const landingBootstrap = `
     }
     if (typeof note.art === 'string') root.style.setProperty('--landing-dots', note.art);
     var scene = note.scene;
+    var early;
+    var frame;
     if (scene) {
       root.classList.add('landing-scene');
-      setTimeout(function () {
+      var uncover = function () {
         if (!root.classList.contains('landing-scene')) return;
         root.classList.remove('landing-scene');
         document.dispatchEvent(new Event('landing:uncovered'));
-      }, 8000);
+      };
+      setTimeout(uncover, 8000);
       root.style.setProperty('--landing-zoom', String(scene.zoom || 1));
       root.style.setProperty('--landing-hold', (scene.hold || 0) + 'ms');
       root.style.setProperty('--landing-delay', (note.at - Date.now()) + 'ms');
@@ -212,8 +238,27 @@ export const landingBootstrap = `
         root.appendChild(canvas);
         var worker = new Worker(scene.worker, { type: 'module' });
         var inbox = [];
-        worker.onmessage = function (event) { inbox.push(event.data); };
-        worker.onerror = function () { inbox.push({ type: 'failed' }); };
+        early = { worker: worker, canvas: canvas, inbox: inbox, shown: false };
+        worker.onmessage = function (event) {
+          var m = event.data || {};
+          inbox.push(event.data);
+          if (m.type === 'shown' && !early.shown && root.classList.contains('landing-dots')) {
+            early.shown = true;
+            root.classList.remove('landing-dots');
+            if (frame) frame.remove();
+            sessionStorage.removeItem('globe-landing-data');
+            worker.postMessage({ type: 'uncovered' });
+          } else if (m.type === 'look') {
+            canvas.style.opacity = m.opacity < 0.999 ? String(Math.max(0, m.opacity)) : '';
+            canvas.style.filter = m.blur > 0.05 ? 'blur(' + m.blur.toFixed(2) + 'px)' : '';
+          } else if ((m.type === 'done' || m.type === 'failed') && early.shown) {
+            window.landingWorker = undefined;
+            worker.terminate();
+            canvas.remove();
+            uncover();
+          }
+        };
+        worker.onerror = function () { worker.onmessage({ data: { type: 'failed' } }); };
         var offscreen = canvas.transferControlToOffscreen();
         worker.postMessage({ type: 'init', canvas: offscreen, software: flags.indexOf('scene-gl') >= 0, gl: flags.indexOf('scene-2d') < 0 }, [offscreen]);
         worker.postMessage({
@@ -221,21 +266,50 @@ export const landingBootstrap = `
           slug: here.split('/').filter(Boolean).pop(),
           note: { path: note.path, at: note.at, kind: note.kind, ink: note.ink, scene: scene },
           carried: sessionStorage.getItem('globe-landing-data'),
-          view: { w: window.innerWidth, h: window.innerHeight, dpr: Math.min(window.devicePixelRatio || 1, 2) },
+          view: { w: scene.w || window.innerWidth, h: scene.h || window.innerHeight, dpr: Math.min(window.devicePixelRatio || 1, 2) },
           red: scene.red,
           paper: scene.paper
         });
-        window.landingWorker = { worker: worker, canvas: canvas, inbox: inbox };
+        window.landingWorker = early;
       } else if (typeof scene.module === 'string') {
         var link = document.createElement('link');
         link.rel = 'modulepreload';
         link.href = scene.module;
         document.head.appendChild(link);
       }
+      var hurry = function (event) {
+        if (!root.classList.contains('landing-scene')) return;
+        if (event && event.cancelable) event.preventDefault();
+        if (event) event.stopPropagation();
+        note.hurried = true;
+        if (early) early.worker.postMessage({ type: 'hurry' });
+      };
+      if (sessionStorage.getItem('globe-landing-hurry') === String(note.at)) hurry();
+      sessionStorage.removeItem('globe-landing-hurry');
+      window.addEventListener('pointerdown', hurry, true);
+      window.addEventListener('click', function (event) {
+        if (!root.classList.contains('landing-scene')) return;
+        event.preventDefault();
+        event.stopPropagation();
+      }, true);
+      window.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter' || event.key === ' ' || event.key === 'Escape') hurry(event);
+      }, true);
+      window.addEventListener('pagehide', function () {
+        if (!root.classList.contains('landing-scene')) return;
+        if (early && window.landingWorker === early) {
+          window.landingWorker = undefined;
+          early.worker.terminate();
+          early.canvas.remove();
+        }
+        if (frame) frame.remove();
+        root.classList.remove('landing-dots');
+        uncover();
+      });
       var held = note.frame;
       if (held && held.ops && held.w > 0 && held.h > 0) {
         var dpr = Math.min(window.devicePixelRatio || 1, 2);
-        var frame = document.createElement('canvas');
+        frame = document.createElement('canvas');
         frame.width = Math.round(held.w * dpr);
         frame.height = Math.round(held.h * dpr);
         var pen = frame.getContext('2d', { alpha: false, willReadFrequently: true });
@@ -266,16 +340,17 @@ export const landingBootstrap = `
     window.landingNote = note;
     for (var k = 0; k < marks.length; k++) root.classList.add(marks[k]);
     setTimeout(function () {
+      var stalled = root.classList.contains('landing-dots');
       for (var k = 0; k < marks.length; k++) root.classList.remove(marks[k]);
       if (frame) frame.remove();
       if (optIn) optIn.remove();
       if (hold) hold.remove();
-      var early = window.landingWorker;
-      if (early) {
+      if (early && !early.shown && window.landingWorker === early) {
         window.landingWorker = undefined;
         early.worker.terminate();
         early.canvas.remove();
       }
+      if (stalled && uncover) uncover();
     }, 4000);
   } catch (_) {}
 })();
@@ -434,10 +509,15 @@ export function holeRadius(reach: number, ms: number, step: number): number {
  */
 export function settleDots(): void {
   const root = document.documentElement;
-  // Not landing here; or the head script's fallback showed the page before
-  // this ran, and its animations can start.
-  if (!root.classList.contains("landing-dots")) return uncover();
   const note = window.landingNote;
+  // The head script has the scene up in its worker already: take it on.
+  if (note?.scene && window.landingWorker?.shown) {
+    carryOn(root, note);
+    return;
+  }
+  // Not landing here; or the head script showed the page before this ran
+  // (its fallback, or a scene that's over), and its animations can start.
+  if (!root.classList.contains("landing-dots")) return uncover();
   if (note?.scene) {
     carryOn(root, note);
     return;
@@ -530,6 +610,9 @@ const RESUME_WAIT = 2500;
  * scenes won't load, or take too long), the frame it left on fades away.
  */
 function carryOn(root: HTMLElement, note: LandingNote) {
+  // The head script may have started the scene in a worker already, and
+  // may have shown it too.
+  const early = window.landingWorker;
   let settled = false;
   let playing: Playing | undefined;
   const giveUp = () => {
@@ -546,7 +629,7 @@ function carryOn(root: HTMLElement, note: LandingNote) {
   const claim = () => {
     if (settled) return false;
     // The head script's fallback showed the page already.
-    if (!root.classList.contains("landing-dots")) {
+    if (!root.classList.contains("landing-dots") && !early?.shown) {
       giveUp();
       return false;
     }
@@ -579,8 +662,6 @@ function carryOn(root: HTMLElement, note: LandingNote) {
     },
   };
 
-  // The head script may have started the scene in a worker already.
-  const early = window.landingWorker;
   if (early) {
     window.landingWorker = undefined;
     const adopted = adoptResume(early, events);
@@ -609,6 +690,8 @@ function carryOn(root: HTMLElement, note: LandingNote) {
     events,
   );
   playing = resumed;
+  // Clicked again before this page took the scene on.
+  if (note.hurried) resumed.hurry();
   window.addEventListener(
     "pageshow",
     (event) => {

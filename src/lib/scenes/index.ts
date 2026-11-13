@@ -141,6 +141,8 @@ export async function resume(
     if (!time) {
       t0 = sceneNow();
       time = clock(s.speed);
+      // Clicked again before this page took the scene on.
+      if (note.hurried) time.hurry();
       shown.draw(t0);
       document.body.append(canvas);
       landed(root);

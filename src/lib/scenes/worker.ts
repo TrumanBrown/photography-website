@@ -4,7 +4,7 @@ import { pack, unpack } from "./carry";
 import {
   clock,
   HOLD_ZOOM,
-  HURRY,
+  HURRIED,
   type Look,
   PUSH_MS,
   pushZoom,
@@ -202,6 +202,11 @@ interface Running {
 }
 let current: Running | null = null;
 let generation = 0;
+/**
+ * A second click that came in while the scene was still being set up (or,
+ * on the hobby page, before it was up): it plays hurried from the start.
+ */
+let rush = false;
 
 function stopCurrent() {
   current?.stop();
@@ -352,7 +357,10 @@ async function play(m: PlayRequest, mine: number) {
     }
     // The scene's clock starts on its first frame, so it never jumps ahead.
     const first = !time;
-    time ??= clock();
+    if (!time) {
+      time = clock();
+      if (rush) time.hurry();
+    }
     try {
       if (!left) {
         const t = Math.min(stage.leave, time.now());
@@ -466,7 +474,7 @@ function resume(m: ResumeRequest, mine: number) {
   }
   const end = stage.run.duration;
   let t = 0;
-  let rate = s.speed;
+  let rate = rush ? Math.max(s.speed, HURRIED) : s.speed;
   let last = 0;
   let stopped = false;
   let id = 0;
@@ -511,7 +519,7 @@ function resume(m: ResumeRequest, mine: number) {
       blank();
     },
     hurry() {
-      rate = Math.max(rate, HURRY);
+      rate = Math.max(rate, HURRIED);
     },
     uncover() {
       uncovered = true;
@@ -553,6 +561,7 @@ scope.onmessage = ({ data }: MessageEvent<ToWorker>) => {
       hold(false);
       return;
     case "hurry":
+      rush = true;
       current?.hurry();
       return;
     case "uncovered":
@@ -562,6 +571,8 @@ scope.onmessage = ({ data }: MessageEvent<ToWorker>) => {
   // The rest need the canvas set up, and stay in order; a stop that comes
   // in meanwhile still calls off a scene that hasn't started.
   const mine = data.type === "warm" ? generation : ++generation;
+  // A new scene starts at its own pace, until it's clicked again.
+  if (data.type !== "warm") rush = false;
   initialized = initialized.then(() => {
     switch (data.type) {
       case "warm":

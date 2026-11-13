@@ -4,6 +4,7 @@ import {
   type DrawOpts,
   HOLD_ZOOM,
   LEAVE,
+  PACE,
   type Painter,
   PUSH_EASE,
   PUSH_MS,
@@ -242,7 +243,7 @@ describe("the push in", () => {
   });
 
   it("is still moving when the action is due, so a slow page never stops it dead", () => {
-    const at = ACT - LEAVE;
+    const at = (ACT - LEAVE) / PACE;
     expect(pushZoom(at + 50) - pushZoom(at)).toBeGreaterThan(0.0005);
     expect(pushZoom(at + 300)).toBeLessThan(HOLD_ZOOM);
   });
@@ -255,8 +256,9 @@ describe.each(Object.keys(SCENES))("the %s scene", (slug) => {
   ]) {
     it(`plays through (${w}×${h})`, () => {
       const { run, painter } = begin(slug, w, h, dots);
-      expect(run.duration).toBeGreaterThan(1800);
-      expect(run.duration).toBeLessThan(3400);
+      // Played at PACE: under two and a half seconds, start to finish.
+      expect(run.duration / PACE).toBeGreaterThan(1500);
+      expect(run.duration / PACE).toBeLessThan(2600);
       for (let t = 0; t < run.duration; t += 40) {
         frame(run, painter, t);
         expect(painter.calls.length).toBeGreaterThan(0);

@@ -57,6 +57,7 @@ Pick one model for repeated presses and say which:
 2. The newest replaces the last: `stampFind` clears its stamp, `rollTo` cancels a running roll.
 3. Re-aim instead of stacking: a pressed-again globe spin re-plans from where it is.
 4. Block re-entry while a page change is under way (`busy` in `open.ts`).
+5. Hurry what's playing: a second press during a hobby scene plays the rest four times faster, on either page, and never skips it ([hobby-scenes](../hobby-scenes/SKILL.md); "should still go through the animation", 2026-11-12). Anything long that a click starts plays every time; make it shorter rather than playing it only once.
 
 Count work in flight against limits (`fish.length + jumps.pending`), and give "Start over" a way to clear what's in the air. Never animate the first frame: place things before first paint (`.utabs.no-anim` with a double rAF). Use a clock with capped steps rather than `setInterval`, and stop on `visibilitychange` or offscreen. Under reduced motion a stamp appears and fades in place, fish appear at once, the lead photo stops (its timer and Pause hide), the lightbox fades, and a session opens with a plain load. In JS, call `prefersReducedMotion()` when the event happens; in CSS, give each component a reduced-motion block. Gate JS hover on `pointerType === "mouse"` or `(hover: hover) and (pointer: fine)`, and give keyboards the same through focus.
 

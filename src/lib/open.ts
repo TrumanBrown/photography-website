@@ -1,5 +1,5 @@
 import { loadBanner } from "./flight";
-import { dotsArt, LANDING_KEY, type LandingNote } from "./landing";
+import { dotsArt, HURRY_KEY, LANDING_KEY, type LandingNote } from "./landing";
 import { CARRY_KEY, leaveData } from "./scenes/carry";
 import {
   canPlayInWorker,
@@ -642,7 +642,7 @@ function openHobby(link: HTMLAnchorElement): boolean {
               },
             });
           }
-          stayPut(playing);
+          stayPut(playing, final.kind === "scene" ? final.at : undefined);
         },
         cancelled: () => {
           busy = false;
@@ -752,12 +752,15 @@ function playInWorker(
             paper,
           },
         });
-        stayPut({
-          dispose: () => {
-            playing.stop();
-            putBack();
+        stayPut(
+          {
+            dispose: () => {
+              playing.stop();
+              putBack();
+            },
           },
-        });
+          m.at,
+        );
       },
       final: (m) => {
         handed = true;
@@ -806,33 +809,51 @@ function withSceneFlags(href: string): string {
 
 /**
  * The scene has handed over and the next page is loading. Escape still
- * calls it off; and if the page never changes (the browser stopped it),
- * put this one back.
+ * calls it off, and a click or Enter or Space is noted for the next page
+ * (HURRY_KEY), which plays the rest hurried; and if the page never changes
+ * (the browser stopped it), put this one back. `at` is the note's time, for
+ * a scene that carries on over the next page.
  */
-function stayPut(playing: { dispose(): void }) {
+function stayPut(playing: { dispose(): void }, at?: number) {
   const back = () => {
     window.removeEventListener("keydown", onKey, true);
+    window.removeEventListener("pointerdown", hurry, true);
     window.clearTimeout(timer);
     try {
       sessionStorage.removeItem(LANDING_KEY);
       sessionStorage.removeItem(CARRY_KEY);
+      sessionStorage.removeItem(HURRY_KEY);
     } catch {
       // Nothing to clear.
     }
     playing.dispose();
     busy = false;
   };
+  const hurry = () => {
+    if (at === undefined) return;
+    try {
+      sessionStorage.setItem(HURRY_KEY, String(at));
+    } catch {
+      // Then it plays at its own pace.
+    }
+  };
   const onKey = (event: KeyboardEvent) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      hurry();
+    }
     if (event.key !== "Escape") return;
     window.stop();
     back();
   };
   window.addEventListener("keydown", onKey, true);
+  window.addEventListener("pointerdown", hurry, true);
   const timer = window.setTimeout(back, 10000);
   window.addEventListener(
     "pagehide",
     () => {
       window.removeEventListener("keydown", onKey, true);
+      window.removeEventListener("pointerdown", hurry, true);
       window.clearTimeout(timer);
     },
     { once: true },
