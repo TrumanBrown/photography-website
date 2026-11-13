@@ -8,8 +8,15 @@
  * drawn into the catch-gallery thumbnails. Self-contained: all geometry + data
  * are baked/committed, no runtime fetch. Pauses offscreen / honors reduced motion.
  *
+ * The pixel art keeps its own land and water colours, a step darker in dark
+ * mode, and sits on the page's paper: the canvas leaves everything outside the
+ * state clear. What goes on top of the art follows the page: the Twin Cities
+ * box is a 1px ink rule with a tracked caption, names sit on paper tags in
+ * Libre Franklin 400, and the only ring is round the fish the arrow keys are on.
+ *
  * Mounted by src/components/hobbies/Fishing.astro via [data-fish-*] hooks.
  */
+import { canvasFont, canvasFontIsReady, canvasFontReady } from '../canvas-font';
 import { covered, whenUncovered } from '../covered';
 import geo from './fishing-geo.json';
 import watersJson from './fishing-waters.json';
@@ -26,12 +33,30 @@ const WATERS = Object.fromEntries(
   (watersJson.waters as unknown as Water[]).map((w) => [w.id, w]),
 ) as Record<string, Water>;
 
-const BAKE = 3; // bitmap px per map cell (CSS scales the canvas; pixels stay crisp)
-const C = {
+const BAKE = 3; // art px per map cell; the art is scaled onto the screen with smoothing off
+type Pal = { land: string; land2: string; edge: string; lake: string; lake2: string; river: string; sound: string };
+// The maps' own pixel colours. Dark mode takes them a step down so the land
+// doesn't glow on the dark page.
+const LIGHT: Pal = {
   land: '#869a6a', land2: '#90a274', edge: '#6c7f55',
-  lake: '#4f9fc4', lake2: '#82c2da', river: '#5aa6cc', sound: '#3f86b0', bg: '#e9eff0',
+  lake: '#4f9fc4', lake2: '#82c2da', river: '#5aa6cc', sound: '#3f86b0',
+};
+const DARK: Pal = {
+  land: '#6b7b55', land2: '#73825d', edge: '#566644',
+  lake: '#3f7f9d', lake2: '#689bae', river: '#4885a3', sound: '#326b8d',
 };
 const KIND_LABEL: Record<string, string> = { lake: 'Lake', river: 'River / stream', sound: 'Saltwater' };
+
+/** The page tokens for what's drawn on top of the art. */
+type Ink = { paper: string; ink: string; ink2: string };
+type Theme = { pal: Pal; ink: Ink; key: string };
+function readTheme(): Theme {
+  const css = getComputedStyle(document.documentElement);
+  const get = (name: string, fallback: string) => css.getPropertyValue(name).trim() || fallback;
+  const ink = { paper: get('--paper', '#fbfaf8'), ink: get('--ink', '#16150f'), ink2: get('--ink-2', '#706c63') };
+  const dark = document.documentElement.classList.contains('dark');
+  return { pal: dark ? DARK : LIGHT, ink, key: `${dark}${ink.paper}${ink.ink}${ink.ink2}` };
+}
 
 type Ctx = CanvasRenderingContext2D;
 
@@ -98,11 +123,42 @@ export function initFishing(root: HTMLElement): void {
   const announce = (text: string) => {
     if (live) live.textContent = text;
   };
-  const views: Array<{ frame: (now: number) => void }> = [];
+  let theme = readTheme();
+  const views: Array<ReturnType<typeof makeView>> = [];
   root.querySelectorAll<HTMLCanvasElement>('[data-fish-canvas]').forEach((cv) => {
     const key = cv.dataset.fishCanvas ?? '';
-    if (REGIONS[key]) views.push(makeView(key, cv, openPanel, reduce, key in INSET_KEYS, announce));
+    if (REGIONS[key]) views.push(makeView(key, cv, openPanel, reduce, key in INSET_KEYS, announce, () => theme));
   });
+  const paintAll = () => {
+    const now = performance.now();
+    for (const v of views) v.frame(now);
+  };
+
+  // Sharp at any width: each canvas matches its box in device pixels. The
+  // phone's hidden state has no width until its tab shows it, and showing it
+  // always repaints, since with reduced motion no loop would catch a theme
+  // that changed while it was hidden. A hidden canvas skips the paint.
+  const ro = new ResizeObserver(() => {
+    const now = performance.now();
+    for (const v of views) {
+      v.fit();
+      v.frame(now);
+    }
+  });
+  for (const v of views) ro.observe(v.canvas);
+
+  // The theme toggle swaps a class on <html>: rebake the art in the other
+  // theme's colours and redraw what sits on top of it.
+  new MutationObserver(() => {
+    const next = readTheme();
+    if (next.key === theme.key) return;
+    theme = next;
+    for (const v of views) v.retheme();
+    paintAll();
+  }).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+
+  // The names wait for Libre Franklin, then every map draws again with them.
+  void canvasFontReady().then(paintAll);
 
   // mobile MN/WA toggle
   root.querySelectorAll<HTMLButtonElement>('[data-fish-tab]').forEach((btn) => {
@@ -150,16 +206,44 @@ function makeView(
   reduce: boolean,
   alwaysLabel: boolean,
   announce: (text: string) => void,
+  theme: () => Theme,
 ) {
   const s = REGIONS[key];
   const ctx = canvas.getContext('2d')!;
   const W = s.gw * BAKE, Hpx = s.gh * BAKE;
+  // The art's own size until the first fit, so the box has the map's shape.
   canvas.width = W; canvas.height = Hpx;
-  ctx.imageSmoothingEnabled = false;
 
+  // The pixel art is drawn at its own size and scaled onto the screen with
+  // smoothing off. The names, the Twin Cities rule and the focus ring go on
+  // top at the screen's resolution, so they stay sharp at any width.
+  const art = document.createElement('canvas');
+  art.width = W; art.height = Hpx;
+  const actx = art.getContext('2d')!;
+  actx.imageSmoothingEnabled = false;
   const base = document.createElement('canvas');
   base.width = W; base.height = Hpx;
-  bake(base.getContext('2d')!, s);
+  const bctx = base.getContext('2d')!;
+  function retheme(): void {
+    bctx.clearRect(0, 0, W, Hpx);
+    bake(bctx, s, theme().pal);
+  }
+  retheme();
+
+  let cssW = 0, cssH = 0, dpr = 1;
+  function fit(): boolean {
+    const w = canvas.clientWidth;
+    if (!w) return false;
+    const d = Math.min(window.devicePixelRatio || 1, 2);
+    if (w === cssW && d === dpr) return false;
+    cssW = w;
+    cssH = (w * Hpx) / W;
+    dpr = d;
+    canvas.style.height = `${cssH}px`;
+    canvas.width = Math.round(cssW * dpr);
+    canvas.height = Math.round(cssH * dpr);
+    return true;
+  }
 
   const water: Array<{ gx: number; gy: number }> = [];
   for (let gy = 0; gy < s.gh; gy++) {
@@ -179,9 +263,9 @@ function makeView(
     .filter((m): m is NonNullable<typeof m> => !!m && !!m.sp);
 
   let hover: (typeof marks)[number] | null = null;
-  const toBmp = (e: MouseEvent) => {
+  const toArt = (e: MouseEvent) => {
     const r = canvas.getBoundingClientRect();
-    return { x: (e.clientX - r.left) * (canvas.width / r.width), y: (e.clientY - r.top) * (canvas.height / r.height) };
+    return { x: (e.clientX - r.left) * (W / r.width), y: (e.clientY - r.top) * (Hpx / r.height) };
   };
   const pick = (p: { x: number; y: number }) => {
     let best: (typeof marks)[number] | null = null, bd = Infinity;
@@ -194,15 +278,23 @@ function makeView(
   };
   canvas.addEventListener('pointermove', (e) => {
     if (e.pointerType === 'touch') return;
-    hover = pick(toBmp(e));
-    canvas.style.cursor = hover ? 'pointer' : 'default';
+    const next = pick(toArt(e));
+    canvas.style.cursor = next ? 'pointer' : 'default';
+    if (next === hover) return;
+    hover = next;
+    // With reduced motion there's no loop to show the name.
+    if (reduce) frame(performance.now());
   });
-  canvas.addEventListener('pointerleave', () => { hover = null; });
+  canvas.addEventListener('pointerleave', () => {
+    if (!hover) return;
+    hover = null;
+    if (reduce) frame(performance.now());
+  });
   // Open on click, not pointerdown. The panel opens over the map, so a tap's
   // click would land on its scrim and close it again, and the mousedown that
   // follows a pointerdown would pull focus off the panel's button.
   canvas.addEventListener('click', (e) => {
-    const hit = pick(toBmp(e));
+    const hit = pick(toArt(e));
     if (hit) onPick(hit.id);
   });
 
@@ -244,72 +336,121 @@ function makeView(
     });
   }
 
-  function labelAt(text: string, cx: number, cy: number): void {
-    ctx.font = 'bold 10px system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    const tw = ctx.measureText(text).width;
-    ctx.fillStyle = 'rgba(0,0,0,0.72)';
-    ctx.fillRect(Math.round(cx - tw / 2 - 4), Math.round(cy - 10), Math.round(tw + 8), 14);
-    ctx.fillStyle = '#fff';
-    ctx.fillText(text, Math.round(cx), Math.round(cy));
-    ctx.textAlign = 'left';
+  /**
+   * A name on a paper tag, centred on x with its baseline at y (CSS px).
+   * Caps are the site's .u-label: 10px, tracked, upper case, in ink-2. Given
+   * more spots, it takes the first that keeps clear of every fish.
+   */
+  function tag(text: string, x: number, y: number, caps = false, spots: Array<(w: number) => [number, number]> = []): void {
+    if (!canvasFontIsReady()) return;
+    const { ink } = theme();
+    ctx.save();
+    ctx.font = canvasFont(caps ? 10 : 11);
+    if (caps && 'letterSpacing' in ctx) ctx.letterSpacing = '1.6px';
+    const t = caps ? text.toUpperCase() : text;
+    const w = ctx.measureText(t).width;
+    const k = cssW / W;
+    const place = ([cx, cy]: [number, number]) => {
+      const left = Math.round(Math.max(4, Math.min(cssW - 4 - w, cx - w / 2)));
+      return { left, base: Math.round(Math.max(12, Math.min(cssH - 5, cy))) };
+    };
+    const clear = ({ left, base }: { left: number; base: number }) =>
+      marks.every((m) => {
+        const u = (1.05 + m.r * 1.05) * k;
+        const x0 = m.px * k - u * 10, x1 = m.px * k + u * 10, y0 = m.py * k - u * 5, y1 = m.py * k + u * 5;
+        return x1 < left - 4 || x0 > left + w + 4 || y1 < base - 10 || y0 > base + 4;
+      });
+    const all = [place([x, y]), ...spots.map((spot) => place(spot(w)))];
+    const at = all.find(clear) ?? all[0];
+    ctx.fillStyle = ink.paper;
+    ctx.fillRect(at.left - 4, at.base - 10, Math.ceil(w) + 8, 14);
+    ctx.fillStyle = caps ? ink.ink2 : ink.ink;
+    ctx.fillText(t, at.left, at.base);
+    ctx.restore();
   }
 
   function frame(now: number): void {
     if (canvas.offsetParent === null) return; // hidden (mobile inactive map)
-    ctx.clearRect(0, 0, W, Hpx);
-    ctx.drawImage(base, 0, 0);
+    if (!cssW) fit();
+    if (!cssW) return;
+    const { pal, ink } = theme();
+
+    // The art, at its own size.
+    actx.clearRect(0, 0, W, Hpx);
+    actx.drawImage(base, 0, 0);
     if (!reduce) {
       const band = (now / 45) % (s.gw + s.gh);
-      ctx.fillStyle = C.lake2;
-      for (const w of water) if (Math.abs(w.gx + w.gy - band) < 2.2) ctx.fillRect(w.gx * BAKE, w.gy * BAKE, BAKE, BAKE);
+      actx.fillStyle = pal.lake2;
+      for (const w of water) if (Math.abs(w.gx + w.gy - band) < 2.2) actx.fillRect(w.gx * BAKE, w.gy * BAKE, BAKE, BAKE);
     }
+    const bobs = new Map<(typeof marks)[number], number>();
     for (const m of marks) {
       const bob = reduce ? 0 : Math.sin(now / 520 + m.px) * 1.3;
+      bobs.set(m, bob);
       const u = 1.05 + m.r * 1.05;
       const big = hover === m;
-      ctx.fillStyle = 'rgba(190,228,242,0.5)';
-      ctx.beginPath();
-      ctx.arc(m.px, m.py + bob, u * 6.5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = 'rgba(15,30,45,0.16)';
-      ctx.fillRect(Math.round(m.px - u * 5), Math.round(m.py + u * 2.6 + bob), Math.round(u * 10), Math.round(Math.max(1, u)));
-      drawFish(ctx, m.sp.category, m.px, m.py + bob, big ? u * 1.3 : u, m.sp.color, m.sp.accent, -1);
-      if (alwaysLabel) labelAt(WATERS[m.id].name, m.px, m.py + bob + u * 4 + 12);
+      actx.fillStyle = 'rgba(15,30,45,0.16)';
+      actx.fillRect(Math.round(m.px - u * 5), Math.round(m.py + u * 2.6 + bob), Math.round(u * 10), Math.round(Math.max(1, u)));
+      drawFish(actx, m.sp.category, m.px, m.py + bob, big ? u * 1.3 : u, m.sp.color, m.sp.accent, -1);
     }
+
+    // Onto the screen, pixels kept square.
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(art, 0, 0, canvas.width, canvas.height);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const k = cssW / W;
+
     if (s.inset) {
-      const rx = (s.inset.x / 100) * W, ry = (s.inset.y / s.H) * Hpx, rw = (s.inset.w / 100) * W, rh = (s.inset.h / s.H) * Hpx;
-      ctx.strokeStyle = 'rgba(37,99,235,0.95)';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(Math.round(rx) + 1, Math.round(ry) + 1, Math.round(rw), Math.round(rh));
-      labelAt('Twin Cities', rx + rw / 2, ry + rh + 12);
+      // A 1px ink rule round the area the metro map blows up, on whole
+      // device pixels so it stays one line.
+      const snap = (v: number) => Math.round(v * dpr) / dpr;
+      const half = Math.round(dpr) % 2 ? 0.5 / dpr : 0;
+      const rx = snap((s.inset.x / 100) * cssW), ry = snap((s.inset.y / s.H) * cssH);
+      const rw = snap((s.inset.w / 100) * cssW), rh = snap((s.inset.h / s.H) * cssH);
+      ctx.strokeStyle = ink.ink;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(rx + half, ry + half, rw, rh);
+      // Under the box, or beside or over it when a fish is in the way.
+      tag('Twin Cities', rx + rw / 2, ry + rh + 14, true, [
+        (w) => [rx - 8 - w / 2, ry + rh / 2 + 4],
+        () => [rx + rw / 2, ry - 6],
+        (w) => [rx + rw + 8 + w / 2, ry + rh / 2 + 4],
+      ]);
     }
-    if (!alwaysLabel && hover) {
+    if (alwaysLabel) {
+      for (const m of marks) {
+        const u = 1.05 + m.r * 1.05;
+        tag(WATERS[m.id].name, m.px * k, (m.py + (bobs.get(m) ?? 0) + u * 4) * k + 13);
+      }
+    } else if (hover) {
+      // Above where the focus ring would be, so the two never cross.
       const u = 1.05 + hover.r * 1.05;
-      labelAt(WATERS[hover.id].name, hover.px, hover.py - u * 4 - 7);
+      tag(WATERS[hover.id].name, hover.px * k, (hover.py - u * 6.5) * k - 10);
     }
-    // Dark and light rings around the water the arrow keys are on.
+    // The one ring: round the fish the arrow keys are on, ink outside and
+    // paper inside so it reads on land and water in both themes.
     if (chosen && keyboardFocused()) {
-      const k = canvas.width / (canvas.clientWidth || canvas.width);
-      const rad = (1.05 + chosen.r * 1.05) * 6.5 + 3 * k;
-      ctx.lineWidth = 2 * k;
-      ctx.strokeStyle = '#16150f';
+      const u = 1.05 + chosen.r * 1.05;
+      const rad = u * 6.5 * k + 3;
+      const x = chosen.px * k, y = chosen.py * k;
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = ink.ink;
       ctx.beginPath();
-      ctx.arc(chosen.px, chosen.py, rad + 2 * k, 0, Math.PI * 2);
+      ctx.arc(x, y, rad + 2, 0, Math.PI * 2);
       ctx.stroke();
-      ctx.strokeStyle = '#fbfaf8';
+      ctx.strokeStyle = ink.paper;
       ctx.beginPath();
-      ctx.arc(chosen.px, chosen.py, rad, 0, Math.PI * 2);
+      ctx.arc(x, y, rad, 0, Math.PI * 2);
       ctx.stroke();
     }
   }
-  return { frame };
+  return { canvas, frame, fit, retheme };
 }
 
-function bake(b: Ctx, s: StateGeo): void {
-  const W = s.gw * BAKE, Hpx = s.gh * BAKE;
-  b.fillStyle = C.bg;
-  b.fillRect(0, 0, W, Hpx);
+/** The map from its cells. Outside the state stays clear, so the page shows. */
+function bake(b: Ctx, s: StateGeo, C: Pal): void {
   const at = (gx: number, gy: number) => (gx < 0 || gy < 0 || gx >= s.gw || gy >= s.gh ? '0' : s.cells[gy * s.gw + gx]);
   for (let gy = 0; gy < s.gh; gy++) {
     for (let gx = 0; gx < s.gw; gx++) {

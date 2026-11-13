@@ -83,45 +83,42 @@ const groups = [
   <div class="grid gap-4 md:grid-cols-2 md:items-start">
     <div data-fish-map="mn" class="is-active space-y-3">
       <div>
-        <div class="u-label mb-1">Minnesota</div>
+        <div class="u-label mb-1 hidden md:block">Minnesota</div>
         <div
-          class="overflow-hidden border border-rule bg-[#e9eff0]"
+          class="overflow-hidden border border-rule bg-paper"
           tabindex="0"
           role="application"
           aria-label="Pixel map of Minnesota fishing waters. Tap a fish to see its species. Arrow keys pick a water, Enter opens it.">
           <canvas
             data-fish-canvas="mn"
             class="block w-full"
-            style="image-rendering: pixelated"
             aria-hidden="true"></canvas>
         </div>
       </div>
       <div>
         <div class="u-label mb-1">Twin Cities metro</div>
         <div
-          class="overflow-hidden border border-rule bg-[#e9eff0]"
+          class="overflow-hidden border border-rule bg-paper"
           tabindex="0"
           role="application"
           aria-label="Zoomed pixel map of the Twin Cities metro lakes. Tap a fish to see its species. Arrow keys pick a lake, Enter opens it.">
           <canvas
             data-fish-canvas="metro"
             class="block w-full"
-            style="image-rendering: pixelated"
             aria-hidden="true"></canvas>
         </div>
       </div>
     </div>
     <div data-fish-map="wa">
-      <div class="u-label mb-1">Washington</div>
+      <div class="u-label mb-1 hidden md:block">Washington</div>
       <div
-        class="overflow-hidden border border-rule bg-[#e9eff0]"
+        class="overflow-hidden border border-rule bg-paper"
         tabindex="0"
         role="application"
         aria-label="Pixel map of Washington fishing waters. Tap a fish to see its species. Arrow keys pick a water, Enter opens it.">
         <canvas
           data-fish-canvas="wa"
           class="block w-full"
-          style="image-rendering: pixelated"
           aria-hidden="true"></canvas>
       </div>
     </div>

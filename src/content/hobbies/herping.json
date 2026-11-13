@@ -10,7 +10,7 @@
     "userId": "trumanbrown",
     "url": "https://www.inaturalist.org/observations?user_id=trumanbrown&iconic_taxa=Reptilia,Amphibia&subview=map&verifiable=any",
     "heading": "My reptiles & amphibians, mapped",
-    "blurb": "Every reptile and amphibian I've logged on iNaturalist, heat-mapped by where I found them. Toggle reptiles vs. amphibians, then tap a country (or the US, then a state) to zoom in and see each observation.",
+    "blurb": "Every reptile and amphibian I've logged on iNaturalist, shaded by how many I found there.",
     "limit": 300
   }
 }

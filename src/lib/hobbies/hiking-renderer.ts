@@ -1,3 +1,4 @@
+import { canvasFont, type CanvasFontWeight } from "../canvas-font";
 import {
   baseTerrainElevationAt,
   biomeById,
@@ -3378,7 +3379,7 @@ function drawFeatureHandle(
       feature.type === "lake"
         ? "Alpine lake"
         : feature.type[0].toUpperCase() + feature.type.slice(1);
-    ctx.font = "600 12px sans-serif";
+    ctx.font = canvasFont(12);
     const labelWidth = ctx.measureText(label).width + 16;
     const x = clamp(point.x - labelWidth / 2, 4, width - labelWidth - 4);
     const y = point.y - 32;
@@ -3585,15 +3586,20 @@ function fitText(
   text: string,
   maxWidth: number,
   initialSize: number,
-  weight = 700,
+  weight: CanvasFontWeight = 300,
 ): number {
   let size = initialSize;
   do {
-    ctx.font = `${weight} ${size}px Georgia, serif`;
+    ctx.font = canvasFont(size, weight);
     if (ctx.measureText(text).width <= maxWidth) return size;
     size -= 2;
   } while (size > 36);
   return size;
+}
+
+/** Tracked capitals, like the site's .u-label: 0.16em between letters. */
+function tracked(ctx: CanvasRenderingContext2D, size: number): void {
+  if ("letterSpacing" in ctx) ctx.letterSpacing = `${size * 0.16}px`;
 }
 
 function drawPostcardType(
@@ -3615,28 +3621,36 @@ function drawPostcardType(
   const bottom = height * 0.91;
   ctx.textBaseline = "alphabetic";
   ctx.fillStyle = "rgba(255,250,239,0.9)";
-  ctx.font = `600 ${Math.round(width * 0.016)}px Arial, sans-serif`;
+  const kicker = Math.round(width * 0.016);
+  ctx.font = canvasFont(kicker);
+  ctx.save();
+  tracked(ctx, kicker);
   ctx.fillText(
     `AN IMAGINED TRAIL / ${biome.postcardLabel}`,
     left,
     bottom - height * 0.14,
   );
+  ctx.restore();
 
   const titleSize = fitText(ctx, state.routeName, width * 0.76, width * 0.047);
   ctx.fillStyle = "#fffaf0";
   ctx.shadowColor = "rgba(0,0,0,0.28)";
   ctx.shadowBlur = 10;
-  ctx.font = `700 ${titleSize}px Georgia, serif`;
+  ctx.font = canvasFont(titleSize, 300);
   ctx.fillText(state.routeName, left, bottom - height * 0.058);
   ctx.shadowBlur = 0;
 
   ctx.fillStyle = "rgba(255,250,239,0.88)";
-  ctx.font = `600 ${Math.round(width * 0.014)}px Arial, sans-serif`;
+  const line = Math.round(width * 0.014);
+  ctx.font = canvasFont(line);
+  ctx.save();
+  tracked(ctx, line);
   ctx.fillText(
     `${stats.distanceMiles.toFixed(1)} MILES / ${stats.elevationFeet.toLocaleString("en-US")} FT UP / ${stats.effort.toUpperCase()}`,
     left,
     bottom,
   );
+  ctx.restore();
 
   const stampX = width * 0.91;
   const stampY = height * 0.82;
@@ -3777,7 +3791,7 @@ export function makePostmark(
   // The trail's name round the top, between the rings.
   const label = name.toUpperCase().slice(0, 28);
   const textR = r * 0.81;
-  ctx.font = `600 ${Math.round(r * 0.2)}px Arial, sans-serif`;
+  ctx.font = canvasFont(Math.round(r * 0.2));
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   const widths = Array.from(
@@ -3799,17 +3813,18 @@ export function makePostmark(
     angle += step / 2;
   }
 
-  // Stars either side at the bottom, and the day in the middle.
-  ctx.font = `600 ${Math.round(r * 0.17)}px Arial, sans-serif`;
+  // Stars either side at the bottom (a glyph Libre Franklin doesn't carry, so
+  // the fallback draws it), and the day in the middle.
+  ctx.font = canvasFont(Math.round(r * 0.17));
   ctx.fillText("\u2605", cx - textR * 0.92, cy + textR * 0.4);
   ctx.fillText("\u2605", cx + textR * 0.92, cy + textR * 0.4);
-  ctx.font = `700 ${Math.round(r * 0.3)}px Georgia, serif`;
+  ctx.font = canvasFont(Math.round(r * 0.3));
   ctx.fillText(
     `${MONTHS_SHORT[day.getMonth()]} ${day.getDate()}`,
     cx,
     cy - r * 0.1,
   );
-  ctx.font = `600 ${Math.round(r * 0.19)}px Arial, sans-serif`;
+  ctx.font = canvasFont(Math.round(r * 0.19));
   ctx.fillText(String(day.getFullYear()), cx, cy + r * 0.24);
 
   // Cancellation bars.

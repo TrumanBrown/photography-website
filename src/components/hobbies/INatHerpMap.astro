@@ -1,9 +1,11 @@
 ---
 /**
- * A live US map of a user's iNaturalist reptile + amphibian observations,
- * bucketed by state. Server-renders the shell, toggle, and link; the (CSP-safe,
- * Astro-processed) script fetches the public iNat API when scrolled into view,
- * shades the state tiles by count, and fills the per-state thumbnail strip.
+ * My reptile and amphibian finds from iNaturalist on a real map, drawn in the
+ * page's ink and paper: the world, the US and its states, or one state or
+ * country with its finds listed below. Server-renders the shell, the filter
+ * and the zoom buttons; the (CSP-safe, Astro-processed) script fetches the
+ * public iNat API when the map scrolls near and shades the finds as a heat map.
+ * The frame is the keyboard stop (role="application", the keys in its label).
  * Behaviour lives in @/lib/hobbies/inat-herp-map, bound via [data-herpmap-*].
  */
 interface Props {
@@ -75,50 +77,85 @@ const {
     >
   </div>
 
-  <div class="relative overflow-hidden border border-rule bg-[#0b1220]">
-    <canvas
-      data-herpmap-canvas
-      class="block w-full"
-      style="touch-action: pan-y"
-      role="img"
-      aria-label="A world map showing a heat map of my reptile and amphibian observations. Tap a highlighted country (or the US, then a state) to zoom in and see individual observation pins. Pinch, scroll, or use the buttons to zoom, and drag to pan."
-    ></canvas>
+  <div class="relative">
+    <div
+      class="overflow-hidden border border-rule bg-paper"
+      tabindex="0"
+      role="application"
+      aria-label="Map of my reptile and amphibian finds, shaded by how many I found in each spot. Tap a shaded spot to see what I found there. Arrow keys move the ring and the map under it, plus and minus zoom, Enter opens the place in the ring and Escape goes back out."
+      data-herpmap-frame
+    >
+      <canvas
+        data-herpmap-canvas
+        class="block w-full"
+        style="touch-action: pan-y"
+        aria-hidden="true"></canvas>
+    </div>
     <div
       data-herpmap-tip
-      class="pointer-events-none absolute hidden -translate-x-1/2 -translate-y-full bg-[#0b1220] px-2 py-1 text-[11px] text-white ring-1 ring-white/20"
+      class="pointer-events-none absolute hidden -translate-x-1/2 -translate-y-full whitespace-nowrap border border-rule bg-paper px-2 py-1 text-[11px] text-ink"
     >
     </div>
-    <div class="absolute right-2 top-2 flex flex-col gap-1">
+    <div class="hm-zoom" role="group" aria-label="Zoom">
       <button
         type="button"
+        class="btn"
         data-herpmap-zoom="in"
-        aria-label="Zoom in"
-        class="flex h-8 w-8 items-center justify-center border border-white/20 bg-[#0b1220]/80 text-lg leading-none text-white hover:bg-[#0b1220]"
-        >+</button
+        aria-label="Zoom in">+</button
       >
       <button
         type="button"
+        class="btn"
         data-herpmap-zoom="out"
         aria-label="Zoom out"
-        class="flex h-8 w-8 items-center justify-center border border-white/20 bg-[#0b1220]/80 text-lg leading-none text-white hover:bg-[#0b1220]"
-        >−</button
-      >
-      <button
-        type="button"
-        data-herpmap-zoom="reset"
-        aria-label="Reset zoom"
-        class="flex h-8 w-8 items-center justify-center border border-white/20 bg-[#0b1220]/80 text-xs leading-none text-white hover:bg-[#0b1220]"
-        >⤢</button
+        disabled>&minus;</button
       >
     </div>
   </div>
 
-  <p data-herpmap-status class="mt-2 text-xs text-ink-2"></p>
-  <p class="mt-1 text-[11px] text-ink-2">
-    Pinch or scroll to zoom, drag to pan, or use the + / − buttons.
+  <p data-herpmap-status class="mt-2 text-xs text-ink-2">
+    Loading my finds from iNaturalist...
   </p>
+  <p class="sr-only" aria-live="polite" data-herpmap-live></p>
   <div data-herpmap-detail class="mt-4"></div>
 </section>
+
+<style>
+  /* The site's square buttons, stacked in the map's corner on a sheet of
+     paper so they read over the land, the same as Narrow nature's. */
+  .hm-zoom {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: grid;
+  }
+  .hm-zoom .btn {
+    width: 32px;
+    height: 32px;
+    min-height: 0;
+    padding: 0;
+    font-size: 18px;
+    line-height: 1;
+    background: color-mix(in srgb, var(--paper) 90%, transparent);
+  }
+  .hm-zoom .btn + .btn {
+    border-top: 0;
+  }
+  .hm-zoom .btn:hover:not(:disabled) {
+    background: var(--hover);
+  }
+  .hm-zoom .btn:disabled {
+    opacity: 1;
+    color: var(--ink-2);
+    cursor: default;
+  }
+  @media (pointer: coarse) {
+    .hm-zoom .btn {
+      width: 40px;
+      height: 40px;
+    }
+  }
+</style>
 
 <script>
   import { initHerpMap } from "@/lib/hobbies/inat-herp-map";

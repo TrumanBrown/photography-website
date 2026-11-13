@@ -1,3 +1,4 @@
+import { canvasFontReady } from "../canvas-font";
 import { covered } from "../covered";
 import {
   BIOMES,
@@ -303,6 +304,7 @@ export function initHikeBuilder(root: HTMLElement): void {
         name.textContent = terrainControlLabel(index);
         const input = document.createElement("input");
         input.type = "range";
+        input.className = "range";
         input.min = "8";
         input.max = "96";
         input.value = String(Math.round(height * 100));
@@ -756,38 +758,42 @@ export function initHikeBuilder(root: HTMLElement): void {
       );
   }
 
+  const DEVELOPING = "Developing at 2,400 × 1,600...";
   function createPostcard(): void {
-    const developing = "Developing at 2,400 × 1,600...";
-    exportStatus.textContent = developing;
+    exportStatus.textContent = DEVELOPING;
     dialogTitle.textContent = state.routeName;
     if (!dialog.open) dialog.showModal();
-    requestAnimationFrame(() => {
-      renderHikePostcard(postcard, state);
-      const done = () => {
-        // Download or Share may have updated the status mid-develop.
-        if (exportStatus.textContent !== developing) return;
-        exportStatus.textContent = "Rendered on your device at 2,400 × 1,600.";
-      };
-      if (!print || reduceMotion) {
-        postmark(false);
+    // The type is Libre Franklin, so the print waits for it: drawn sooner,
+    // the PNG would keep a fallback face.
+    void canvasFontReady().then(() => requestAnimationFrame(develop));
+  }
+
+  function develop(): void {
+    renderHikePostcard(postcard, state);
+    const done = () => {
+      // Download or Share may have updated the status mid-develop.
+      if (exportStatus.textContent !== DEVELOPING) return;
+      exportStatus.textContent = "Rendered on your device at 2,400 × 1,600.";
+    };
+    if (!print || reduceMotion) {
+      postmark(false);
+      done();
+      return;
+    }
+    // Restart the develop even when the dialog is already open.
+    landing?.remove();
+    landing = null;
+    print.classList.remove("developing");
+    void print.offsetWidth;
+    print.classList.add("developing");
+    postcard.addEventListener(
+      "animationend",
+      () => {
+        postmark(true);
         done();
-        return;
-      }
-      // Restart the develop even when the dialog is already open.
-      landing?.remove();
-      landing = null;
-      print.classList.remove("developing");
-      void print.offsetWidth;
-      print.classList.add("developing");
-      postcard.addEventListener(
-        "animationend",
-        () => {
-          postmark(true);
-          done();
-        },
-        { once: true },
-      );
-    });
+      },
+      { once: true },
+    );
   }
 
   developButton.addEventListener("click", createPostcard);
@@ -892,6 +898,8 @@ export function initHikeBuilder(root: HTMLElement): void {
   fit();
   if (!reduceMotion) raf = requestAnimationFrame(frame);
   else render(0);
+  // The trail's labels are Libre Franklin; once it's in, draw them again.
+  void canvasFontReady().then(() => render());
 
   window.addEventListener(
     "pagehide",

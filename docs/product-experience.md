@@ -87,7 +87,7 @@ An October 2026 audit ran axe-core (WCAG 2.2 A and AA) over every built page in 
 
 - **The rail's two links are 24px rows.** "Photographs" and "Things to try" were 15px tall and 16px apart, under WCAG 2.2's 24px minimum tap target (2.5.8).
 - **Hobby gallery links always have a name.** An empty caption used to give the link an empty `aria-label`; it now falls back to "Open full-resolution photo", like a missing one.
-- **The canvas toys play from the keyboard** (2.1.1). The tide pool beach, the herping road and the three fishing maps each take focus, arrow keys pick (or steer), Enter or Space acts, and a polite live region says what's picked. See [docs/hobbies.md](hobbies.md#interactive-island-conventions).
+- **The canvas toys play from the keyboard** (2.1.1). The tide pool beach, the herping road and the three fishing maps each take focus, arrow keys pick (or steer), Enter or Space acts, and a polite live region says what's picked. See [docs/hobbies.md](hobbies.md#interactive-island-conventions). The herp map joined them in November 2026: the arrows move a ring over the map and pan it once zoomed in, + and − zoom, and Enter opens the place or find in the ring.
 
 ### Motion that answers what you do
 

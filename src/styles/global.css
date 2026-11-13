@@ -253,6 +253,57 @@
     transition: transform 320ms var(--ease);
   }
 
+  /* A slider drawn with the same pen: a 1px line for the track and a square
+     ink thumb, on a 24px tall input so the whole strip takes the drag. The
+     line is ink-2, since the rule colour all but vanishes on paper. Hiking's
+     route length and terrain points and the aquarium's tank size use it. */
+  .range {
+    -webkit-appearance: none;
+    appearance: none;
+    display: block;
+    width: 100%;
+    height: 24px;
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    cursor: pointer;
+  }
+  .range::-webkit-slider-runnable-track {
+    height: 1px;
+    border: 0;
+    background: var(--ink-2);
+  }
+  .range::-moz-range-track {
+    height: 1px;
+    border: 0;
+    background: var(--ink-2);
+  }
+  .range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 12px;
+    height: 12px;
+    margin-top: -5.5px;
+    border: 0;
+    border-radius: 0;
+    background: var(--ink);
+  }
+  .range::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    border: 0;
+    border-radius: 0;
+    background: var(--ink);
+  }
+  .range:hover::-webkit-slider-thumb {
+    outline: 1px solid var(--ink);
+    outline-offset: 2px;
+  }
+  .range:hover::-moz-range-thumb {
+    outline: 1px solid var(--ink);
+    outline-offset: 2px;
+  }
+
   /* Underline tabs, from Cult UI "direction-aware-tabs" and Watermelon UI
      "discrete-tabs": one 1px bar slides to the chosen option. No pill, no
      spring. These pick one value, so they're a radio group; arrow keys move

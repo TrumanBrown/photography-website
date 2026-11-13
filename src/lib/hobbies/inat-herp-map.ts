@@ -1,30 +1,39 @@
 /**
- * "Reptiles & Amphibians" map — a real geographic map of the author's iNaturalist
- * herp observations, the personal counterpart to the road-cruise game.
+ * "My reptiles & amphibians, mapped": a real map of my iNaturalist reptile and
+ * amphibian finds, the personal side of the night-drive game.
  *
- * It fetches the user's Reptilia and Amphibia observations from the public iNat
- * API and draws them on a canvas at three zoom levels:
- *   - World: a real world map (country outlines from committed public-domain
- *     geometry) with a HEAT MAP of the observations. Click a country that has
- *     data to zoom in.
- *   - US states: clicking the US opens a US map (state outlines + Hawaii inset)
- *     with the same heat map; click a state to zoom to it.
- *   - State / country detail: that region's outline blown up with a PIN for
- *     each observation, and a grid below listing each observation's species,
- *     town or region, and date before you click through.
+ * It fetches the Reptilia and Amphibia observations from the public iNat API
+ * and draws them on a canvas in the page's own ink and paper: land in the band
+ * colour, borders as 1px rules, water left as paper, and the finds as a heat
+ * map in flat tints of ink, darker where I found more, with hard edges like a
+ * range map in a field guide. It reads the tokens off <html>, so dark mode
+ * flips it the way it flips the page. Three levels:
+ *   - World: every country. Tap a shaded spot to zoom in.
+ *   - US states: tapping the US opens the states and a Hawaii inset; tap a
+ *     state to zoom to it.
+ *   - State or country: the place outlined among its neighbours, a mark for
+ *     each find (a dot for a reptile, a ring for an amphibian), and a list
+ *     below with each find's species, town or region and date before you
+ *     click through.
+ * Pinch, the wheel, the + and − buttons and a drag zoom and pan any level.
+ * From the keyboard the map is one Tab stop: arrows pan, + and − zoom, 0 fits
+ * it again, Enter opens what's in the ring at the middle and Escape steps back
+ * out. Moves from the keys and buttons ease over 260ms, or jump with reduced
+ * motion. Labels are Libre Franklin 400 (../canvas-font.ts).
  *
  * Positions are snapped to a 0.1° grid and places cut down to a town or region
  * (inat-place.ts) before anything is drawn: an unobscured observation is exact
  * to metres, and a reptile's spot, or a backyard, shouldn't be mapped.
  *
- * A Reptiles / Amphibians / All toggle switches datasets. No map tiles and no
- * runtime geo fetch — the boundaries are baked/committed (scripts/build-herp-geo.mjs),
- * so nothing changes in the CSP; only the iNat API + photo CDNs are contacted,
- * and those are already allow-listed.
+ * No map tiles and no runtime geo fetch: the boundaries are baked
+ * (scripts/build-herp-geo.mjs), so the CSP doesn't change. Only the iNat API
+ * and photo CDNs are contacted, and those are already allow-listed.
  *
  * Mounted by src/components/hobbies/INatHerpMap.astro via [data-herpmap] hooks.
  */
+import { canvasFont, canvasFontIsReady, canvasFontReady } from "../canvas-font";
 import { covered, whenUncovered } from "../covered";
+import { prefersReducedMotion } from "../motion";
 import geoData from "./herp-geo.json";
 import { coarseCoord, coarsePlace } from "./inat-place";
 
@@ -165,11 +174,49 @@ const CONUS_SKIP = new Set(["AK", "HI", "PR"]);
 type Cls = "reptiles" | "amphibians";
 type View = "world" | "us" | "state" | "country";
 
-/** Class-coded pin colors. */
-const CLS_COLOR: Record<Cls, string> = {
-  reptiles: "#f59e0b",
-  amphibians: "#38bdf8",
-};
+/** The page tokens the map draws in, read off <html> so it follows the theme. */
+interface Palette {
+  paper: string;
+  band: string;
+  ink: string;
+  ink2: string;
+  rule: string;
+  /** The ink as red, green and blue, for the heat map's pixels. */
+  inkRgb: [number, number, number];
+  key: string;
+}
+function rgbOf(color: string): [number, number, number] {
+  const hex = color.replace("#", "");
+  const full =
+    hex.length === 3
+      ? hex
+          .split("")
+          .map((c) => c + c)
+          .join("")
+      : hex;
+  const v = parseInt(full.slice(0, 6), 16);
+  if (!Number.isFinite(v)) return [22, 21, 15];
+  return [(v >> 16) & 255, (v >> 8) & 255, v & 255];
+}
+function readPalette(): Palette {
+  const css = getComputedStyle(document.documentElement);
+  const get = (name: string, fallback: string) =>
+    css.getPropertyValue(name).trim() || fallback;
+  const paper = get("--paper", "#fbfaf8");
+  const band = get("--band", "#f3f0ea");
+  const ink = get("--ink", "#16150f");
+  const ink2 = get("--ink-2", "#706c63");
+  const rule = get("--rule", "#e4e0d7");
+  return {
+    paper,
+    band,
+    ink,
+    ink2,
+    rule,
+    inkRgb: rgbOf(ink),
+    key: [paper, band, ink, ink2, rule].join(),
+  };
+}
 
 interface Obs {
   id: number;
@@ -288,42 +335,196 @@ function makeProjection(
   ];
 }
 
-/** Interpolated heat color (blue -> lime -> yellow -> orange -> red) by density. */
-function heatColor(t: number): [number, number, number, number] {
-  const stops: [number, number[], number][] = [
-    [0.12, [37, 99, 235], 70],
-    [0.32, [132, 204, 22], 140],
-    [0.55, [250, 204, 21], 190],
-    [0.78, [249, 115, 22], 215],
-    [1.0, [239, 68, 68], 235],
-  ];
-  if (t <= stops[0][0]) {
-    const a = Math.max(0, (t / stops[0][0]) * stops[0][2]);
-    return [stops[0][1][0], stops[0][1][1], stops[0][1][2], a];
+/** A point on the canvas, in CSS pixels. */
+export interface Pt {
+  x: number;
+  y: number;
+}
+
+/**
+ * The heat map's bands: [density at least, share of ink]. A density of 1 is
+ * one find right on that spot, so a lone find makes a pale patch with a
+ * slightly deeper middle, and the two darkest bands take several finds
+ * stacked up.
+ */
+export const HEAT_BANDS: readonly (readonly [number, number])[] = [
+  [0.12, 0.14],
+  [0.6, 0.28],
+  [1.8, 0.48],
+  [4.5, 0.72],
+];
+
+/** Reused between frames: the density, then the share of ink, per pixel. */
+let field = new Float32Array(0);
+let shares = new Float32Array(0);
+
+/**
+ * The heat map in the page's ink. Every find adds a soft bump of density (a
+ * Gaussian `sigma` px wide) on a 1px grid over `box`, and the density is cut
+ * into the flat bands above, each a stronger share of ink. Edges are eased
+ * just enough not to stair-step, so the patches print like a range map in a
+ * field guide instead of glowing, and nothing is inked more than about two
+ * sigma from a find. Returns where the grid sits and the share of ink on each
+ * pixel (valid until the next call), or null when no find reaches the box.
+ */
+export function heatBands(
+  pts: readonly Pt[],
+  sigma: number,
+  box: { x: number; y: number; w: number; h: number },
+): { x: number; y: number; w: number; h: number; ink: Float32Array } | null {
+  const R = sigma * 3;
+  let left = Infinity;
+  let top = Infinity;
+  let right = -Infinity;
+  let bottom = -Infinity;
+  for (const p of pts) {
+    left = Math.min(left, p.x - R);
+    top = Math.min(top, p.y - R);
+    right = Math.max(right, p.x + R);
+    bottom = Math.max(bottom, p.y + R);
   }
-  for (let i = 1; i < stops.length; i++) {
-    if (t <= stops[i][0]) {
-      const [t0, c0, a0] = stops[i - 1];
-      const [t1, c1, a1] = stops[i];
-      const f = (t - t0) / (t1 - t0);
-      return [
-        Math.round(c0[0] + (c1[0] - c0[0]) * f),
-        Math.round(c0[1] + (c1[1] - c0[1]) * f),
-        Math.round(c0[2] + (c1[2] - c0[2]) * f),
-        Math.round(a0 + (a1 - a0) * f),
-      ];
+  const x0 = Math.max(Math.floor(left), Math.floor(box.x));
+  const y0 = Math.max(Math.floor(top), Math.floor(box.y));
+  const w = Math.min(Math.ceil(right), Math.ceil(box.x + box.w)) - x0;
+  const h = Math.min(Math.ceil(bottom), Math.ceil(box.y + box.h)) - y0;
+  if (!(w > 0 && h > 0)) return null;
+  const n = w * h;
+  if (field.length < n) {
+    field = new Float32Array(n);
+    shares = new Float32Array(n);
+  } else field.fill(0, 0, n);
+  const inv = 1 / (2 * sigma * sigma);
+  for (const p of pts) {
+    const a0 = Math.max(0, Math.floor(p.x - R) - x0);
+    const a1 = Math.min(w - 1, Math.ceil(p.x + R) - x0);
+    const b0 = Math.max(0, Math.floor(p.y - R) - y0);
+    const b1 = Math.min(h - 1, Math.ceil(p.y + R) - y0);
+    for (let b = b0; b <= b1; b++) {
+      const dy = y0 + b + 0.5 - p.y;
+      for (let a = a0; a <= a1; a++) {
+        const dx = x0 + a + 0.5 - p.x;
+        field[b * w + a] += Math.exp(-(dx * dx + dy * dy) * inv);
+      }
     }
   }
-  const last = stops[stops.length - 1];
-  return [last[1][0], last[1][1], last[1][2], last[2]];
+  const floor = HEAT_BANDS[0][0] * 0.9;
+  for (let i = 0; i < n; i++) {
+    const d = field[i];
+    let ink = 0;
+    if (d >= floor) {
+      let below = 0;
+      for (const [at, share] of HEAT_BANDS) {
+        // Each band steps up across 8% either side of its threshold.
+        const t = Math.min(1, Math.max(0, (d / at - 0.92) / 0.16));
+        ink += (share - below) * t;
+        below = share;
+      }
+    }
+    shares[i] = ink;
+  }
+  return { x: x0, y: y0, w, h, ink: shares.subarray(0, n) };
 }
+
+/** Finds the map can name together: a US state, or a country. */
+export interface Place {
+  name: string;
+  country: string;
+  x: number;
+  y: number;
+  n: number;
+}
+
+/**
+ * Labels for the heat map's patches. Places whose patches run together share
+ * one label, so a label never names one corner of a patch. It's named after the
+ * places that hold most of its finds, 80% or more: one place, or two
+ * ("Washington and Oregon"), or the country when it takes three or more.
+ * Biggest first, which is the order they're placed in.
+ */
+export function nameClusters(
+  places: readonly Place[],
+  near: number,
+  countryName: (iso: string) => string,
+): { name: string; x: number; y: number; n: number }[] {
+  const clusters: { members: Place[]; n: number; sx: number; sy: number }[] =
+    [];
+  for (const p of [...places].sort((a, b) => b.n - a.n)) {
+    const hit = clusters.find(
+      (c) => Math.hypot(c.sx / c.n - p.x, c.sy / c.n - p.y) < near,
+    );
+    if (hit) {
+      hit.members.push(p);
+      hit.n += p.n;
+      hit.sx += p.x * p.n;
+      hit.sy += p.y * p.n;
+    } else {
+      clusters.push({ members: [p], n: p.n, sx: p.x * p.n, sy: p.y * p.n });
+    }
+  }
+  return clusters.map((c) => {
+    const most: Place[] = [];
+    let held = 0;
+    for (const m of c.members) {
+      most.push(m);
+      held += m.n;
+      if (held >= c.n * 0.8) break;
+    }
+    const countries = new Set(most.map((m) => m.country));
+    const name =
+      most.length === 1
+        ? most[0].name
+        : most.length === 2
+          ? `${most[0].name} and ${most[1].name}`
+          : countries.size === 1
+            ? countryName(most[0].country)
+            : most[0].name;
+    return { name, x: c.sx / c.n, y: c.sy / c.n, n: c.n };
+  });
+}
+
+function countryName(iso: string): string {
+  if (iso === "US") return "United States";
+  return GEO_COUNTRIES[iso]?.name ?? iso;
+}
+
+let conus: [number, number, number, number] | null = null;
+/** The contiguous US, for the states level. */
+function conusBox(): [number, number, number, number] {
+  if (conus) return conus;
+  const box: [number, number, number, number] = [
+    Infinity,
+    Infinity,
+    -Infinity,
+    -Infinity,
+  ];
+  for (const [abbr, g] of Object.entries(GEO_STATES)) {
+    if (CONUS_SKIP.has(abbr)) continue;
+    box[0] = Math.min(box[0], g.bbox[0]);
+    box[1] = Math.min(box[1], g.bbox[1]);
+    box[2] = Math.max(box[2], g.bbox[2]);
+    box[3] = Math.max(box[3], g.bbox[3]);
+  }
+  conus = box;
+  return box;
+}
+
+type Find = { x: number; y: number; o: Obs };
+type Rings = [number, number][][];
 
 export function initHerpMap(root: HTMLElement): void {
   const canvas = root.querySelector<HTMLCanvasElement>("[data-herpmap-canvas]");
+  const frame = root.querySelector<HTMLElement>("[data-herpmap-frame]");
   const tooltip = root.querySelector<HTMLElement>("[data-herpmap-tip]");
   const detailEl = root.querySelector<HTMLElement>("[data-herpmap-detail]");
   const statusEl = root.querySelector<HTMLElement>("[data-herpmap-status]");
+  const liveEl = root.querySelector<HTMLElement>("[data-herpmap-live]");
   const backBtn = root.querySelector<HTMLButtonElement>("[data-herpmap-back]");
+  const zoomInBtn = root.querySelector<HTMLButtonElement>(
+    '[data-herpmap-zoom="in"]',
+  );
+  const zoomOutBtn = root.querySelector<HTMLButtonElement>(
+    '[data-herpmap-zoom="out"]',
+  );
   const toggleEls = Array.from(
     root.querySelectorAll<HTMLButtonElement>("[data-herpmap-cls]"),
   );
@@ -332,33 +533,45 @@ export function initHerpMap(root: HTMLElement): void {
     1,
     Math.min(500, Number(root.dataset.herpmapLimit) || 300),
   );
-  if (!canvas || !userId) return;
+  if (!canvas || !frame || !userId) return;
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
 
   let all: Obs[] = [];
+  let loaded = false;
   let active: Cls | "all" = "all";
   let view: View = "world";
   let selState: string | null = null;
-  let selCountry: string | null = null; // ISO A2 for the country detail view
+  let selCountry: string | null = null; // ISO A2 for the country level
   let started = false;
   let W = 0;
   let H = 0;
   let dpr = 1;
+  let palette = readPalette();
 
   // Per-render caches for hit-testing.
-  let regionPolys: { key: string; pts: [number, number][][] }[] = [];
-  let pinHits: { x: number; y: number; o: Obs }[] = [];
+  let regionPolys: { key: string; pts: Rings }[] = [];
+  let pinHits: Find[] = [];
   let hiInset: { x: number; y: number; w: number; h: number } | null = null;
+  /** Each find on screen at the world and US levels, keyed by its place. */
+  let dotHits: { x: number; y: number; key: string }[] = [];
+  /** The place under the mouse, outlined (world and US levels). */
+  let hoverKey: string | null = null;
+  /** Where the keyboard's ring sits; NaN puts it in the middle of the map. */
+  let ringX = NaN;
+  let ringY = NaN;
+  /** Label boxes already drawn this frame, so labels never overlap. */
+  let placed: [number, number, number, number][] = [];
 
-  // Zoom + pan, applied on top of each view's base projection (zoom = 1 fits).
-  // Lets you blow up clustered areas (e.g. Puget Sound) on any device.
+  // Zoom and pan on top of each level's own fit (zoom 1), so clustered areas
+  // like Puget Sound can be blown up on any device. Finds sit on a 0.1° grid,
+  // so zooming past 6 would only spread the grid out.
   let zoom = 1;
   let panX = 0;
   let panY = 0;
   const MIN_ZOOM = 1;
-  // Pins sit on a 0.1° grid, so zooming further would only spread the grid out.
   const MAX_ZOOM = 6;
+  const STEP = 1.6;
   let rafPending = false;
 
   function scheduleRender(): void {
@@ -376,24 +589,108 @@ export function initHerpMap(root: HTMLElement): void {
       return [x * zoom + panX, y * zoom + panY];
     };
   }
-  function clampPan(): void {
-    const minX = Math.min(0, W * (1 - zoom));
-    const minY = Math.min(0, H * (1 - zoom));
-    panX = Math.max(minX, Math.min(0, panX));
-    panY = Math.max(minY, Math.min(0, panY));
+  function clampView(z: number, x: number, y: number) {
+    const k = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z));
+    return {
+      z: k,
+      x: Math.max(Math.min(0, W * (1 - k)), Math.min(0, x)),
+      y: Math.max(Math.min(0, H * (1 - k)), Math.min(0, y)),
+    };
   }
-  /** One-finger scroll on mobile until zoomed; then full drag/pan control. */
+  function clampPan(): void {
+    const c = clampView(zoom, panX, panY);
+    zoom = c.z;
+    panX = c.x;
+    panY = c.y;
+  }
+  /** One-finger scroll on phones until zoomed in; then one finger pans the map. */
   function updateTouchAction(): void {
     canvas!.style.touchAction = zoom > 1.01 ? "none" : "pan-y";
   }
+
+  // The buttons and keys ease the map to where it's going. The wheel, a pinch
+  // and a drag move it directly, and stop any ease that's running.
+  let tween = 0;
+  let goal: { z: number; x: number; y: number } | null = null;
+  function stopTween(): void {
+    if (tween) cancelAnimationFrame(tween);
+    tween = 0;
+    goal = null;
+  }
+  /** Where the map is headed: the ease's end while one runs, so key repeats add up. */
+  function heading(): { z: number; x: number; y: number } {
+    return goal ?? { z: zoom, x: panX, y: panY };
+  }
+  function moveTo(z: number, x: number, y: number, then?: () => void): void {
+    const to = clampView(z, x, y);
+    stopTween();
+    const settle = () => {
+      zoom = to.z;
+      panX = to.x;
+      panY = to.y;
+      updateTouchAction();
+    };
+    if (!W || prefersReducedMotion()) {
+      settle();
+      render();
+      then?.();
+      return;
+    }
+    goal = to;
+    // Ease the window onto the map, its centre and its width (1 / zoom), the
+    // way Narrow nature's map moves, so a zoom doesn't swing out and back.
+    const from = { z: zoom, x: panX, y: panY };
+    const c0x = (W / 2 - from.x) / from.z;
+    const c0y = (H / 2 - from.y) / from.z;
+    const c1x = (W / 2 - to.x) / to.z;
+    const c1y = (H / 2 - to.y) / to.z;
+    const s0 = 1 / from.z;
+    const s1 = 1 / to.z;
+    const t0 = performance.now();
+    const step = (now: number) => {
+      const t = Math.min(1, (now - t0) / 260);
+      const e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      if (t < 1) {
+        zoom = 1 / (s0 + (s1 - s0) * e);
+        panX = W / 2 - (c0x + (c1x - c0x) * e) * zoom;
+        panY = H / 2 - (c0y + (c1y - c0y) * e) * zoom;
+        updateTouchAction();
+        render();
+        tween = requestAnimationFrame(step);
+        return;
+      }
+      tween = 0;
+      goal = null;
+      settle();
+      render();
+      then?.();
+    };
+    tween = requestAnimationFrame(step);
+  }
+  function zoomAround(k: number, fx: number, fy: number, then?: () => void) {
+    const t = heading();
+    const z = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, t.z * k));
+    const f = z / t.z;
+    moveTo(z, fx - (fx - t.x) * f, fy - (fy - t.y) * f, then);
+  }
   function resetZoom(): void {
+    stopTween();
     zoom = 1;
     panX = 0;
     panY = 0;
+    centreRing();
     updateTouchAction();
+  }
+  function ringAt(): [number, number] {
+    return Number.isFinite(ringX) ? [ringX, ringY] : [W / 2, H / 2];
+  }
+  function centreRing(): void {
+    ringX = NaN;
+    ringY = NaN;
   }
   /** Zoom to `nz` keeping the focal point (fx, fy) fixed on screen. */
   function applyZoom(nz: number, fx: number, fy: number): void {
+    stopTween();
     nz = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, nz));
     if (Math.abs(nz - zoom) < 1e-3) return;
     const k = nz / zoom;
@@ -416,259 +713,396 @@ export function initHerpMap(root: HTMLElement): void {
     }
     return m;
   }
+  /** Finds per place at the world or US level, the ones a tap can open. */
+  function levelCounts(): Map<string, number> {
+    return view === "us" ? countBy((o) => o.state) : countBy((o) => o.country);
+  }
+  function placeName(key: string): string {
+    return view === "us" ? (STATE_NAME[key] ?? key) : countryName(key);
+  }
 
-  function fit(): void {
-    const cssW = canvas!.clientWidth || 640;
+  function fit(): boolean {
+    const cssW = canvas!.clientWidth;
+    if (!cssW) return false;
     const cssH = Math.max(300, Math.min(520, Math.round(cssW * 0.6)));
     canvas!.style.height = `${cssH}px`;
     dpr = Math.min(window.devicePixelRatio || 1, 2);
     canvas!.width = Math.round(cssW * dpr);
     canvas!.height = Math.round(cssH * dpr);
-    ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
     W = cssW;
     H = cssH;
+    return true;
   }
 
-  function drawRings(
-    g: RegionGeo,
-    project: Project,
-    fill: string,
-    stroke: string,
-    lw: number,
-  ): [number, number][][] {
-    const projected: [number, number][][] = [];
-    for (const ring of g.rings) {
-      ctx!.beginPath();
-      const pr: [number, number][] = [];
-      ring.forEach(([lon, lat], i) => {
-        const [x, y] = project(lon, lat);
-        pr.push([x, y]);
+  // ------------------------------------------------------------- drawing
+  function trace(rings: Rings): void {
+    ctx!.beginPath();
+    for (const ring of rings) {
+      ring.forEach(([x, y], i) => {
         if (i === 0) ctx!.moveTo(x, y);
         else ctx!.lineTo(x, y);
       });
       ctx!.closePath();
-      ctx!.fillStyle = fill;
-      ctx!.fill();
-      ctx!.lineWidth = lw;
-      ctx!.strokeStyle = stroke;
-      ctx!.stroke();
-      projected.push(pr);
     }
-    return projected;
   }
-
-  /** Heatmap: accumulate alpha blobs offscreen, then colourise by density. */
-  function drawHeat(pts: { x: number; y: number }[], radius: number): void {
-    if (pts.length === 0) return;
-    const off = document.createElement("canvas");
-    off.width = Math.round(W * dpr);
-    off.height = Math.round(H * dpr);
-    // Read straight back: kept on the CPU, so reading it doesn't wait on
-    // (and hold up) the GPU.
-    const octx = off.getContext("2d", { willReadFrequently: true });
-    if (!octx) return;
-    octx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    octx.globalCompositeOperation = "lighter";
-    for (const p of pts) {
-      const grd = octx.createRadialGradient(p.x, p.y, 0, p.x, p.y, radius);
-      grd.addColorStop(0, "rgba(0,0,0,0.5)");
-      grd.addColorStop(1, "rgba(0,0,0,0)");
-      octx.fillStyle = grd;
-      octx.fillRect(p.x - radius, p.y - radius, radius * 2, radius * 2);
-    }
-    const img = octx.getImageData(0, 0, off.width, off.height);
-    const data = img.data;
-    for (let i = 0; i < data.length; i += 4) {
-      const t = Math.min(1, data[i + 3] / 255);
-      if (t <= 0.02) {
-        data[i + 3] = 0;
-        continue;
-      }
-      const [r, g, b, a] = heatColor(t);
-      data[i] = r;
-      data[i + 1] = g;
-      data[i + 2] = b;
-      data[i + 3] = a;
-    }
-    octx.putImageData(img, 0, 0);
-    ctx!.save();
-    ctx!.globalAlpha = 0.9;
-    ctx!.drawImage(off, 0, 0, off.width, off.height, 0, 0, W, H);
-    ctx!.restore();
+  /** A place's outline on screen, or null when it's off the canvas. */
+  function onScreen(g: RegionGeo, project: Project): Rings | null {
+    const [x0, y0] = project(g.bbox[0], g.bbox[3]);
+    const [x1, y1] = project(g.bbox[2], g.bbox[1]);
+    if (x1 < 0 || x0 > W || y1 < 0 || y0 > H) return null;
+    return g.rings.map((ring) => ring.map(([lon, lat]) => project(lon, lat)));
   }
-
-  function projectedPoints(
-    project: Project,
-    keep: (o: Obs) => boolean,
-  ): {
-    heat: { x: number; y: number }[];
-    pins: { x: number; y: number; o: Obs }[];
-  } {
-    const heat: { x: number; y: number }[] = [];
-    const pins: { x: number; y: number; o: Obs }[] = [];
+  /** Land in the band colour with a 1px rule for its edge. */
+  function drawLand(g: RegionGeo, project: Project): Rings | null {
+    const rings = onScreen(g, project);
+    if (!rings) return null;
+    trace(rings);
+    ctx!.fillStyle = palette.band;
+    ctx!.fill();
+    ctx!.strokeStyle = palette.rule;
+    ctx!.lineWidth = 1;
+    ctx!.stroke();
+    return rings;
+  }
+  /** The place a level is about, or the one under the mouse, ruled in ink-2. */
+  function outline(rings: Rings): void {
+    trace(rings);
+    ctx!.strokeStyle = palette.ink2;
+    ctx!.lineWidth = 1;
+    ctx!.stroke();
+  }
+  // The heat map's pixels go on a canvas of their own, then onto the map. It's
+  // worked out at the screen's own pixels, so the band edges stay crisp on a
+  // phone instead of going soft (and glowing) when scaled up.
+  const heat = document.createElement("canvas");
+  const hctx = heat.getContext("2d");
+  function drawHeat(
+    pts: readonly Pt[],
+    sigma: number,
+    box = { x: 0, y: 0, w: W, h: H },
+  ): void {
+    if (!hctx || !pts.length) return;
+    const k = dpr;
+    const bands = heatBands(
+      pts.map((p) => ({ x: p.x * k, y: p.y * k })),
+      sigma * k,
+      { x: box.x * k, y: box.y * k, w: box.w * k, h: box.h * k },
+    );
+    if (!bands) return;
+    if (heat.width < bands.w) heat.width = bands.w;
+    if (heat.height < bands.h) heat.height = bands.h;
+    const img = hctx.createImageData(bands.w, bands.h);
+    const [r, g, b] = palette.inkRgb;
+    for (let i = 0; i < bands.ink.length; i++) {
+      const a = bands.ink[i];
+      if (!a) continue;
+      const j = i * 4;
+      img.data[j] = r;
+      img.data[j + 1] = g;
+      img.data[j + 2] = b;
+      img.data[j + 3] = Math.round(a * 255);
+    }
+    hctx.putImageData(img, 0, 0);
+    ctx!.drawImage(
+      heat,
+      0,
+      0,
+      bands.w,
+      bands.h,
+      bands.x / k,
+      bands.y / k,
+      bands.w / k,
+      bands.h / k,
+    );
+  }
+  /** How far each find's ink spreads, in CSS px, at each level. */
+  function sigmaFor(level: "world" | "us" | "place"): number {
+    if (level === "world") return Math.max(2.4, Math.min(4.6, W * 0.0038));
+    if (level === "us") return Math.max(2.4, Math.min(6, W * 0.0052));
+    return Math.max(4, Math.min(7.5, W * 0.0064));
+  }
+  function projected(project: Project, keep: (o: Obs) => boolean): Find[] {
+    const out: Find[] = [];
     for (const o of pool()) {
       if (o.lng == null || o.lat == null || !keep(o)) continue;
       const [x, y] = project(o.lng, o.lat);
-      heat.push({ x, y });
-      pins.push({ x, y, o });
+      out.push({ x, y, o });
     }
-    return { heat, pins };
+    return out;
   }
 
-  function label(text: string): void {
-    ctx!.fillStyle = "rgba(230,235,240,0.95)";
-    ctx!.font = "600 13px system-ui, sans-serif";
-    ctx!.fillText(text, 14, 22);
-  }
-
-  function drawLegend(): void {
-    const legend: [Cls, string][] = [
-      ["reptiles", "Reptiles"],
-      ["amphibians", "Amphibians"],
-    ];
-    let lx = 14;
-    const ly = H - 14;
-    for (const [cls, lbl] of legend) {
-      ctx!.beginPath();
-      ctx!.arc(lx + 5, ly - 4, 4.5, 0, Math.PI * 2);
-      ctx!.fillStyle = CLS_COLOR[cls];
-      ctx!.fill();
-      ctx!.strokeStyle = "rgba(255,255,255,0.9)";
-      ctx!.lineWidth = 1;
-      ctx!.stroke();
-      ctx!.fillStyle = "rgba(210,220,228,0.9)";
-      ctx!.font = "500 11px system-ui, sans-serif";
-      ctx!.fillText(lbl, lx + 14, ly);
-      lx += 14 + ctx!.measureText(lbl).width + 16;
+  /** Where a label could go, given its width: the left end of its baseline. */
+  type Spot = (w: number) => [number, number];
+  const at =
+    (x: number, y: number): Spot =>
+    () => [x, y];
+  /**
+   * A label on a rim of paper, so it reads over the heat and the rules. Caps
+   * are the site's .u-label: 10px, tracked, upper case. It takes the first of
+   * `spots` that fits on the canvas without covering a label already down,
+   * or stays out.
+   */
+  function label(text: string, spots: Spot[], caps = false): void {
+    if (!canvasFontIsReady()) return;
+    const c = ctx!;
+    c.save();
+    c.font = canvasFont(caps ? 10 : 11);
+    if (caps && "letterSpacing" in c) c.letterSpacing = "1.6px";
+    const s = caps ? text.toUpperCase() : text;
+    const w = c.measureText(s).width;
+    for (const spot of spots) {
+      const [x, y] = spot(w);
+      if (x < 4 || x + w > W - 4 || y < 12 || y > H - 4) continue;
+      const box: [number, number, number, number] = [
+        x - 3,
+        y - 11,
+        x + w + 3,
+        y + 4,
+      ];
+      if (
+        placed.some(
+          (b) =>
+            b[0] < box[2] && box[0] < b[2] && b[1] < box[3] && box[1] < b[3],
+        )
+      )
+        continue;
+      placed.push(box);
+      c.lineJoin = "round";
+      c.lineWidth = 3;
+      c.strokeStyle = palette.paper;
+      c.strokeText(s, x, y);
+      c.fillStyle = palette.ink2;
+      c.fillText(s, x, y);
+      break;
     }
+    c.restore();
   }
-
-  function drawPins(pins: { x: number; y: number; o: Obs }[]): void {
-    for (const p of pins) {
-      pinHits.push(p);
-      ctx!.beginPath();
-      ctx!.arc(p.x, p.y, 4.5, 0, Math.PI * 2);
-      ctx!.fillStyle = CLS_COLOR[p.o.cls];
-      ctx!.fill();
-      ctx!.lineWidth = 1.5;
-      ctx!.strokeStyle = "rgba(255,255,255,0.9)";
-      ctx!.stroke();
-    }
-  }
-
-  function clearFrame(): void {
-    ctx!.clearRect(0, 0, W, H);
-    ctx!.fillStyle = "#0b1220";
-    ctx!.fillRect(0, 0, W, H);
-    regionPolys = [];
-    pinHits = [];
-    hiInset = null;
-  }
-
-  // ---------------------------------------------------------- world view
-  function renderWorld(): void {
-    clearFrame();
-    const cnt = countBy((o) => o.country);
-    const project = zoomedProject(makeProjection(WORLD_BBOX, W, H, 8));
-    for (const [iso, g] of Object.entries(GEO_COUNTRIES)) {
-      const n = cnt.get(iso) ?? 0;
-      const fill = n > 0 ? "rgba(56,80,60,0.95)" : "rgba(28,38,54,0.9)";
-      const pr = drawRings(g, project, fill, "rgba(90,110,120,0.35)", 0.5);
-      regionPolys.push({ key: iso, pts: pr });
-    }
-    const { heat } = projectedPoints(project, () => true);
-    drawHeat(heat, Math.max(9, W * 0.018));
-    label("Tap a highlighted country to zoom in");
-  }
-
-  // ------------------------------------------------------- US states view
-  function renderUS(): void {
-    clearFrame();
-    const cnt = countBy((o) => o.state);
-    const conus: [number, number, number, number] = [
-      Infinity,
-      Infinity,
-      -Infinity,
-      -Infinity,
-    ];
-    for (const [abbr, g] of Object.entries(GEO_STATES)) {
-      if (CONUS_SKIP.has(abbr)) continue;
-      conus[0] = Math.min(conus[0], g.bbox[0]);
-      conus[1] = Math.min(conus[1], g.bbox[1]);
-      conus[2] = Math.max(conus[2], g.bbox[2]);
-      conus[3] = Math.max(conus[3], g.bbox[3]);
-    }
-    const project = zoomedProject(makeProjection(conus, W, H, 16));
-    for (const [abbr, g] of Object.entries(GEO_STATES)) {
-      if (CONUS_SKIP.has(abbr)) continue;
-      const n = cnt.get(abbr) ?? 0;
-      const fill = n > 0 ? "rgba(56,80,60,0.9)" : "rgba(30,41,59,0.9)";
-      const pr = drawRings(g, project, fill, "rgba(120,140,120,0.4)", 0.6);
-      regionPolys.push({ key: abbr, pts: pr });
-    }
-    const { heat } = projectedPoints(
-      project,
-      (o) => o.state != null && o.state !== "HI",
-    );
-    drawHeat(heat, Math.max(14, W * 0.03));
-
-    // Hawaii inset (bottom-left)
-    const hg = GEO_STATES.HI;
-    if (hg) {
-      const iw = Math.max(90, W * 0.16);
-      const ih = iw * 0.62;
-      const ix = 10;
-      const iy = H - ih - 10;
-      hiInset = { x: ix, y: iy, w: iw, h: ih };
-      ctx!.save();
-      ctx!.beginPath();
-      ctx!.rect(ix, iy, iw, ih);
-      ctx!.clip();
-      ctx!.fillStyle = "rgba(11,18,32,0.95)";
-      ctx!.fillRect(ix, iy, iw, ih);
-      ctx!.translate(ix, iy);
-      const hiProj = makeProjection(hg.bbox, iw, ih, 8);
-      const n = cnt.get("HI") ?? 0;
-      drawRings(
-        hg,
-        hiProj,
-        n > 0 ? "rgba(56,80,60,0.9)" : "rgba(30,41,59,0.9)",
-        "rgba(120,140,120,0.4)",
-        0.6,
-      );
-      ctx!.restore();
-      const hiProj2 = makeProjection(hg.bbox, iw, ih, 8);
-      const hiHeat = pool()
-        .filter((o) => o.state === "HI" && o.lng != null)
-        .map((o) => {
-          const [x, y] = hiProj2(o.lng!, o.lat!);
-          return { x: x + ix, y: y + iy };
+  /** Name the patches, biggest first. */
+  function namePatches(finds: Find[], sigma: number, near: number): void {
+    const groups = new Map<string, Place>();
+    for (const f of finds) {
+      const o = f.o;
+      const key = o.state ? `US-${o.state}` : o.country;
+      if (!key) continue;
+      const g = groups.get(key);
+      if (g) {
+        g.x += f.x;
+        g.y += f.y;
+        g.n++;
+      } else {
+        groups.set(key, {
+          name: o.state
+            ? (STATE_NAME[o.state] ?? o.state)
+            : countryName(o.country!),
+          country: o.state ? "US" : o.country!,
+          x: f.x,
+          y: f.y,
+          n: 1,
         });
-      drawHeat(hiHeat, Math.max(10, iw * 0.12));
-      ctx!.strokeStyle = "rgba(120,140,120,0.5)";
-      ctx!.lineWidth = 1;
-      ctx!.strokeRect(ix, iy, iw, ih);
-      ctx!.fillStyle = "rgba(200,210,220,0.8)";
-      ctx!.font = "600 10px system-ui, sans-serif";
-      ctx!.fillText("HI", ix + 6, iy + 14);
+      }
     }
-    label("United States: tap a state to zoom in");
+    const places = [...groups.values()].map((g) => ({
+      ...g,
+      x: g.x / g.n,
+      y: g.y / g.n,
+    }));
+    const off = sigma * 2.4 + 4;
+    for (const c of nameClusters(places, near, countryName)) {
+      if (c.x < 0 || c.x > W || c.y < 0 || c.y > H) continue;
+      label(c.name, [
+        () => [c.x + off, c.y + 4],
+        (w) => [c.x - off - w, c.y + 4],
+        (w) => [c.x - w / 2, c.y + off + 11],
+        (w) => [c.x - w / 2, c.y - off - 3],
+      ]);
+    }
   }
 
-  // --------------------------------------------------- state / country detail
-  function renderDetailMap(
+  /** One find: a dot for a reptile, a ring for an amphibian. */
+  function mark(x: number, y: number, cls: Cls): void {
+    ctx!.beginPath();
+    ctx!.arc(x, y, 2.9, 0, Math.PI * 2);
+    if (cls === "reptiles") {
+      ctx!.fillStyle = palette.ink;
+      ctx!.fill();
+    } else {
+      ctx!.fillStyle = palette.paper;
+      ctx!.fill();
+      ctx!.strokeStyle = palette.ink;
+      ctx!.lineWidth = 1.3;
+      ctx!.stroke();
+    }
+  }
+  /** Each find's mark, on a rim of paper so it stands off the heat. */
+  function drawFinds(finds: Find[]): void {
+    ctx!.beginPath();
+    for (const f of finds) {
+      ctx!.moveTo(f.x + 4.6, f.y);
+      ctx!.arc(f.x, f.y, 4.6, 0, Math.PI * 2);
+    }
+    ctx!.fillStyle = palette.paper;
+    ctx!.fill();
+    for (const f of finds) {
+      pinHits.push(f);
+      mark(f.x, f.y, f.o.cls);
+    }
+  }
+  function drawLegend(finds: Find[]): void {
+    if (!canvasFontIsReady()) return;
+    const kinds = (["reptiles", "amphibians"] as Cls[]).filter((c) =>
+      finds.some((f) => f.o.cls === c),
+    );
+    let x = 14;
+    const y = H - 14;
+    for (const cls of kinds) {
+      const text = cls === "reptiles" ? "Reptiles" : "Amphibians";
+      ctx!.beginPath();
+      ctx!.arc(x + 4, y - 4, 4.6, 0, Math.PI * 2);
+      ctx!.fillStyle = palette.paper;
+      ctx!.fill();
+      mark(x + 4, y - 4, cls);
+      label(text, [at(x + 13, y)]);
+      ctx!.font = canvasFont(11);
+      x += 13 + ctx!.measureText(text).width + 18;
+    }
+  }
+
+  /** While the frame has keyboard focus, a ring marks what Enter opens. */
+  function keyboardOn(): boolean {
+    return frame!.matches(":focus-visible");
+  }
+  function drawRing(): void {
+    if (!keyboardOn()) return;
+    const [x, y] = ringAt();
+    ctx!.lineWidth = 2;
+    ctx!.strokeStyle = palette.paper;
+    ctx!.beginPath();
+    ctx!.arc(x, y, 9, 0, Math.PI * 2);
+    ctx!.stroke();
+    ctx!.strokeStyle = palette.ink;
+    ctx!.beginPath();
+    ctx!.arc(x, y, 11, 0, Math.PI * 2);
+    ctx!.stroke();
+  }
+  /** Outline the place under the mouse, or under the ring, if it has finds. */
+  function highlight(counts: Map<string, number>): void {
+    const key = keyboardOn() ? placeAt(...ringAt()) : hoverKey;
+    if (!key || !(counts.get(key) ?? 0)) return;
+    const r = regionPolys.find((p) => p.key === key);
+    if (r) outline(r.pts);
+  }
+
+  // ---------------------------------------------------------- world level
+  function renderWorld(): void {
+    const project = zoomedProject(makeProjection(WORLD_BBOX, W, H, 8));
+    const finds = projected(project, () => true);
+    dotHits = finds.flatMap((f) =>
+      f.o.country ? [{ x: f.x, y: f.y, key: f.o.country }] : [],
+    );
+    for (const [iso, g] of Object.entries(GEO_COUNTRIES)) {
+      const pts = drawLand(g, project);
+      if (pts) regionPolys.push({ key: iso, pts });
+    }
+    highlight(countBy((o) => o.country));
+    const sigma = sigmaFor("world");
+    drawHeat(finds, sigma);
+    namePatches(finds, sigma, sigma * 5);
+  }
+
+  // ------------------------------------------------------- US states level
+  function renderUS(): void {
+    const project = zoomedProject(makeProjection(conusBox(), W, H, 16));
+    const finds = projected(
+      project,
+      (o) => o.state != null && !CONUS_SKIP.has(o.state),
+    );
+    // Hawaii sits in its own box at the bottom left, as US maps do.
+    const iw = Math.max(90, W * 0.16);
+    const ih = iw * 0.62;
+    const ix = 10;
+    const iy = H - ih - 10;
+    const hg = GEO_STATES.HI;
+    const base = hg ? makeProjection(hg.bbox, iw, ih, 8) : null;
+    const hiProject: Project = (lon, lat) => {
+      const [x, y] = base!(lon, lat);
+      return [x + ix, y + iy];
+    };
+    const hiFinds = base ? projected(hiProject, (o) => o.state === "HI") : [];
+    if (hg) hiInset = { x: ix, y: iy, w: iw, h: ih };
+    dotHits = [...finds, ...hiFinds].map((f) => ({
+      x: f.x,
+      y: f.y,
+      key: f.o.state!,
+    }));
+    for (const [abbr, g] of Object.entries(GEO_STATES)) {
+      if (CONUS_SKIP.has(abbr)) continue;
+      const pts = drawLand(g, project);
+      if (pts) regionPolys.push({ key: abbr, pts });
+    }
+    const counts = countBy((o) => o.state);
+    highlight(counts);
+    const sigma = sigmaFor("us");
+    drawHeat(finds, sigma);
+    // Labels keep off the inset, all but its own caption.
+    const keepOff: [number, number, number, number] = [0, iy - 10, iw + 20, H];
+    placed.push(keepOff);
+    namePatches(finds, sigma, sigma * 4);
+    placed.splice(placed.indexOf(keepOff), 1);
+    if (hg && hiInset) drawHawaii(hg, hiProject, hiFinds, counts, sigma);
+  }
+
+  function drawHawaii(
+    hg: RegionGeo,
+    project: Project,
+    finds: Find[],
+    counts: Map<string, number>,
+    sigma: number,
+  ): void {
+    const { x: ix, y: iy, w: iw, h: ih } = hiInset!;
+    ctx!.save();
+    ctx!.beginPath();
+    ctx!.rect(ix, iy, iw, ih);
+    ctx!.clip();
+    ctx!.fillStyle = palette.paper;
+    ctx!.fillRect(ix, iy, iw, ih);
+    drawLand(hg, project);
+    drawHeat(finds, Math.max(2.4, sigma * 0.8), hiInset!);
+    ctx!.restore();
+    const key = keyboardOn() ? placeAt(...ringAt()) : hoverKey;
+    const lit = key === "HI" && (counts.get("HI") ?? 0) > 0;
+    ctx!.strokeStyle = lit ? palette.ink2 : palette.rule;
+    ctx!.lineWidth = 1;
+    ctx!.strokeRect(ix + 0.5, iy + 0.5, iw - 1, ih - 1);
+    // Top right, which is open sea; the islands run from the top left.
+    label("Hawaii", [(w) => [ix + iw - 7 - w, iy + 16]], true);
+  }
+
+  // ------------------------------------------------- state or country level
+  function renderPlace(
     g: RegionGeo,
     title: string,
     keep: (o: Obs) => boolean,
+    isState: boolean,
   ): void {
-    clearFrame();
     const project = zoomedProject(makeProjection(g.bbox, W, H, 24));
-    drawRings(g, project, "rgba(26,38,28,0.95)", "rgba(150,170,150,0.6)", 1.2);
-    const { heat, pins } = projectedPoints(project, keep);
-    drawHeat(heat, Math.max(16, W * 0.045));
-    drawPins(pins);
-    label(title);
-    drawLegend();
+    // Its neighbours too, so the place sits on a map instead of floating on
+    // the paper. For a state, the states stand in for the US outline.
+    for (const [iso, cg] of Object.entries(GEO_COUNTRIES)) {
+      if (isState && iso === "US") continue;
+      drawLand(cg, project);
+    }
+    if (isState)
+      for (const sg of Object.values(GEO_STATES)) drawLand(sg, project);
+    const rings = onScreen(g, project);
+    if (rings) outline(rings);
+    // Every find feeds the heat, so it's true past the border too; the
+    // marks you can tap are this place's.
+    const every = projected(project, () => true);
+    drawHeat(every, sigmaFor("place"));
+    const finds = every.filter((f) => keep(f.o));
+    drawFinds(finds);
+    label(title, [at(14, 22)], true);
+    drawLegend(finds);
   }
 
   let deferred = false;
@@ -686,23 +1120,87 @@ export function initHerpMap(root: HTMLElement): void {
       }
       return;
     }
+    if (!W && !fit()) return;
+    ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx!.fillStyle = palette.paper;
+    ctx!.fillRect(0, 0, W, H);
+    regionPolys = [];
+    pinHits = [];
+    dotHits = [];
+    hiInset = null;
+    // Labels keep clear of the zoom buttons in the top right corner.
+    placed = [[W - 56, 0, W, 100]];
     if (view === "world") renderWorld();
     else if (view === "us") renderUS();
     else if (view === "state" && selState)
-      renderDetailMap(
+      renderPlace(
         GEO_STATES[selState],
         STATE_NAME[selState] ?? selState,
         (o) => o.state === selState,
+        true,
       );
     else if (view === "country" && selCountry)
-      renderDetailMap(
+      renderPlace(
         GEO_COUNTRIES[selCountry],
-        GEO_COUNTRIES[selCountry]?.name ?? selCountry,
+        countryName(selCountry),
         (o) => o.country === selCountry,
+        false,
       );
+    drawRing();
+    syncControls();
+  }
+
+  function syncControls(): void {
+    const t = heading();
+    if (zoomInBtn) zoomInBtn.disabled = t.z >= MAX_ZOOM - 0.01;
+    if (zoomOutBtn) zoomOutBtn.disabled = t.z <= MIN_ZOOM + 0.01;
     if (backBtn) backBtn.classList.toggle("hidden", view === "world");
   }
 
+  // The one line under the map: what a tap does at this level, then how to
+  // move around, in the words for the device in hand.
+  const LOOK = matchMedia("(pointer: coarse)").matches
+    ? "Pinch to zoom and drag to look around."
+    : "Scroll to zoom, and drag or use the arrow keys to look around.";
+  function syncStatus(): void {
+    if (!statusEl || !loaded) return;
+    const tap =
+      view === "world"
+        ? "Tap a shaded spot to see what I found there."
+        : view === "us"
+          ? "Tap a shaded spot to see what I found in that state."
+          : "Tap one of my finds to open it on iNaturalist.";
+    statusEl.textContent = `${tap} ${LOOK}`;
+  }
+  function announce(text: string): void {
+    if (liveEl) liveEl.textContent = text;
+  }
+  /** Say what's in the ring, after the keyboard moves the map. */
+  function describeRing(): void {
+    if (view === "world" || view === "us") {
+      const key = placeAt(...ringAt());
+      const n = key ? (levelCounts().get(key) ?? 0) : 0;
+      announce(
+        key && n
+          ? `${placeName(key)}, ${n} observation${n === 1 ? "" : "s"}. Enter zooms in.`
+          : "No finds in the ring.",
+      );
+    } else {
+      const o = pinAt(...ringAt());
+      announce(
+        o
+          ? `${o.name}, ${fmtDate(o.date)}. Enter opens it on iNaturalist.`
+          : "No finds in the ring.",
+      );
+    }
+  }
+
+  function polyAt(x: number, y: number): string | null {
+    for (const sp of regionPolys) {
+      for (const poly of sp.pts) if (pointInRing(x, y, poly)) return sp.key;
+    }
+    return null;
+  }
   function regionAt(x: number, y: number): string | null {
     if (
       hiInset &&
@@ -712,10 +1210,31 @@ export function initHerpMap(root: HTMLElement): void {
       y <= hiInset.y + hiInset.h
     )
       return "HI";
-    for (const sp of regionPolys) {
-      for (const poly of sp.pts) if (pointInRing(x, y, poly)) return sp.key;
+    return polyAt(x, y);
+  }
+
+  /**
+   * The place a tap or the ring is on, at the world and US levels: the land
+   * under it if that place has finds, or else the place of the nearest find
+   * within three sigma and 10px to spare, past the edge of its patch. So a
+   * patch can be tapped where it spills past a coarse outline into the sea,
+   * and the ring needn't land on a country a few pixels wide.
+   */
+  function placeAt(x: number, y: number): string | null {
+    const counts = levelCounts();
+    const key = regionAt(x, y);
+    if (key && (counts.get(key) ?? 0) > 0) return key;
+    let best: string | null = null;
+    const reach = sigmaFor(view === "us" ? "us" : "world") * 3 + 10;
+    let bestD = reach * reach;
+    for (const d of dotHits) {
+      const dd = (d.x - x) ** 2 + (d.y - y) ** 2;
+      if (dd < bestD) {
+        bestD = dd;
+        best = d.key;
+      }
     }
-    return null;
+    return best;
   }
 
   function pinAt(x: number, y: number): Obs | null {
@@ -736,9 +1255,13 @@ export function initHerpMap(root: HTMLElement): void {
     else if (view === "us" || view === "country") view = "world";
     selState = null;
     if (view === "world") selCountry = null;
+    hoverKey = null;
+    hideTip();
     resetZoom();
     render();
     renderDetail();
+    syncStatus();
+    announce(view === "us" ? "United States." : "The whole world.");
   }
 
   function detailItems(): { title: string; items: Obs[] } | null {
@@ -758,20 +1281,6 @@ export function initHerpMap(root: HTMLElement): void {
   function renderDetail(): void {
     if (!detailEl) return;
     const detail = detailItems();
-    if (statusEl) {
-      if (detail) {
-        statusEl.textContent = "";
-      } else if (view === "us") {
-        const states = countBy((o) => o.state).size;
-        statusEl.textContent = `${pool().filter((o) => o.state).length} observations across ${states} US state${states === 1 ? "" : "s"}. Tap a state to zoom in.`;
-      } else {
-        const cc = countBy((o) => o.country);
-        const mapped = pool().filter((o) => o.lng != null).length;
-        statusEl.textContent = cc.size
-          ? `${pool().length} observations across ${cc.size} countr${cc.size === 1 ? "y" : "ies"} (${mapped} mapped). Tap a highlighted country to zoom in.`
-          : "";
-      }
-    }
     if (!detail || detail.items.length === 0) {
       detailEl.replaceChildren();
       return;
@@ -841,9 +1350,18 @@ export function initHerpMap(root: HTMLElement): void {
       selState = key;
       view = "state";
     }
+    hoverKey = null;
+    hideTip();
     resetZoom();
     render();
     renderDetail();
+    syncStatus();
+    const detail = detailItems();
+    announce(
+      detail
+        ? `${detail.title}${detail.items.length} observation${detail.items.length === 1 ? "" : "s"}, listed under the map.`
+        : "United States.",
+    );
   }
 
   async function fetchClass(cls: Cls, iconic: string): Promise<Obs[]> {
@@ -917,6 +1435,7 @@ export function initHerpMap(root: HTMLElement): void {
   const load = async (): Promise<void> => {
     if (started) return;
     started = true;
+    if (statusEl) statusEl.textContent = "Loading my finds from iNaturalist...";
     try {
       const [rep, amp] = await Promise.all([
         fetchClass("reptiles", "Reptilia"),
@@ -925,18 +1444,19 @@ export function initHerpMap(root: HTMLElement): void {
       all = [...rep, ...amp];
       if (all.length === 0) {
         if (statusEl)
-          statusEl.textContent =
-            "No reptile or amphibian observations to show yet.";
+          statusEl.textContent = "No reptiles or amphibians to show yet.";
         return;
       }
+      loaded = true;
       fit();
       updateTouchAction();
       render();
       renderDetail();
+      syncStatus();
     } catch {
       if (statusEl)
         statusEl.textContent =
-          "Could not load observations right now. See them on iNaturalist.";
+          "Couldn't load my finds right now. See them on iNaturalist.";
     }
   };
 
@@ -965,14 +1485,27 @@ export function initHerpMap(root: HTMLElement): void {
     };
   }
 
-  function handleTap(x: number, y: number): void {
+  /** What a tap does here; the keyboard's Enter taps the ring. */
+  function tapAt(x: number, y: number): void {
     if (view === "state" || view === "country") {
       const o = pinAt(x, y);
       if (o) window.open(o.uri, "_blank", "noopener");
-    } else {
-      const key = regionAt(x, y);
-      if (key) openRegion(key);
+      return;
     }
+    const key = placeAt(x, y);
+    if (key) openRegion(key);
+  }
+
+  function showTip(text: string, x: number, y: number): void {
+    if (!tooltip) return;
+    tooltip.textContent = text;
+    // The frame's 1px rule sits between the wrapper and the canvas.
+    tooltip.style.left = `${x + 1}px`;
+    tooltip.style.top = `${y - 6}px`;
+    tooltip.classList.remove("hidden");
+  }
+  function hideTip(): void {
+    tooltip?.classList.add("hidden");
   }
 
   function showHover(x: number, y: number): void {
@@ -980,37 +1513,35 @@ export function initHerpMap(root: HTMLElement): void {
     if (view === "state" || view === "country") {
       const o = pinAt(x, y);
       canvas!.style.cursor = o ? "pointer" : grab;
-      if (o && tooltip) {
-        tooltip.textContent = `${o.name} · ${fmtDate(o.date)}${o.obscured ? " (approx.)" : ""}`;
-        tooltip.style.left = `${x}px`;
-        tooltip.style.top = `${y}px`;
-        tooltip.classList.remove("hidden");
-      } else if (tooltip) {
-        tooltip.classList.add("hidden");
-      }
-    } else {
-      const key = regionAt(x, y);
-      const byKey =
-        view === "us" ? countBy((o) => o.state) : countBy((o) => o.country);
-      const n = key ? (byKey.get(key) ?? 0) : 0;
-      canvas!.style.cursor = n > 0 ? "pointer" : grab;
-      if (n > 0 && key && tooltip) {
-        const nm =
-          view === "us"
-            ? (STATE_NAME[key] ?? key)
-            : (GEO_COUNTRIES[key]?.name ?? key);
-        tooltip.textContent = `${nm} · ${n} obs`;
-        tooltip.style.left = `${x}px`;
-        tooltip.style.top = `${y}px`;
-        tooltip.classList.remove("hidden");
-      } else if (tooltip) {
-        tooltip.classList.add("hidden");
-      }
+      if (o)
+        showTip(
+          `${o.name} · ${fmtDate(o.date)}${o.obscured ? " (approx.)" : ""}`,
+          x,
+          y,
+        );
+      else hideTip();
+      return;
     }
+    const key = placeAt(x, y);
+    const n = key ? (levelCounts().get(key) ?? 0) : 0;
+    canvas!.style.cursor = n > 0 ? "pointer" : grab;
+    const next = n > 0 ? key : null;
+    if (next !== hoverKey) {
+      hoverKey = next;
+      scheduleRender();
+    }
+    if (n > 0 && key)
+      showTip(
+        `${placeName(key)} · ${n} observation${n === 1 ? "" : "s"}`,
+        x,
+        y,
+      );
+    else hideTip();
   }
 
   canvas.addEventListener("pointerdown", (e) => {
     const [x, y] = toCanvas(e);
+    stopTween();
     pointers.set(e.pointerId, { x, y });
     if (pointers.size === 1) {
       downX = x;
@@ -1022,7 +1553,7 @@ export function initHerpMap(root: HTMLElement): void {
       pinchPrevDist = m.d;
       pinchPrevMid = { x: m.x, y: m.y };
       moved = true;
-      if (tooltip) tooltip.classList.add("hidden");
+      hideTip();
     }
   });
 
@@ -1069,7 +1600,7 @@ export function initHerpMap(root: HTMLElement): void {
         panY += dy;
         clampPan();
         scheduleRender();
-        if (tooltip) tooltip.classList.add("hidden");
+        hideTip();
         canvas!.style.cursor = "grabbing";
       }
       return;
@@ -1085,11 +1616,11 @@ export function initHerpMap(root: HTMLElement): void {
     const p = pointers.get(e.pointerId);
     pointers.delete(e.pointerId);
     if (wasSize === 1 && p && !moved && performance.now() - downT < 500) {
-      handleTap(p.x, p.y);
+      tapAt(p.x, p.y);
     }
     if (pointers.size < 2) pinchPrevDist = 0;
     if (pointers.size === 1) {
-      // one finger remains after a pinch — keep panning, don't treat as a tap
+      // one finger remains after a pinch: keep panning, don't treat as a tap
       const rp = [...pointers.values()][0];
       downX = rp.x;
       downY = rp.y;
@@ -1100,7 +1631,11 @@ export function initHerpMap(root: HTMLElement): void {
   canvas.addEventListener("pointerup", endPointer);
   canvas.addEventListener("pointercancel", endPointer);
   canvas.addEventListener("pointerleave", () => {
-    if (tooltip) tooltip.classList.add("hidden");
+    hideTip();
+    if (hoverKey) {
+      hoverKey = null;
+      scheduleRender();
+    }
   });
 
   // desktop scroll-wheel zoom, around the cursor
@@ -1114,20 +1649,82 @@ export function initHerpMap(root: HTMLElement): void {
     { passive: false },
   );
 
-  // +/- / reset zoom buttons (work on every device)
-  for (const zb of Array.from(
-    root.querySelectorAll<HTMLButtonElement>("[data-herpmap-zoom]"),
-  )) {
-    zb.addEventListener("click", () => {
-      const kind = zb.dataset.herpmapZoom;
-      if (kind === "reset") {
-        resetZoom();
-        render();
-      } else {
-        applyZoom(zoom * (kind === "in" ? 1.6 : 1 / 1.6), W / 2, H / 2);
+  // The keyboard: the arrows move the ring, by 5% of the width or 20% with
+  // Shift held, fine enough to land on a small country. Once zoomed in they
+  // pan the map under it; + and − zoom about the ring, 0 fits the level again, Enter or
+  // Space opens what's in the ring and Escape steps back out a level.
+  frame.addEventListener("keydown", (e) => {
+    if (e.altKey || e.ctrlKey || e.metaKey || !W) return;
+    const dir: Record<string, [number, number]> = {
+      ArrowUp: [0, -1],
+      ArrowDown: [0, 1],
+      ArrowLeft: [-1, 0],
+      ArrowRight: [1, 0],
+    };
+    const d = dir[e.key];
+    if (d) {
+      e.preventDefault();
+      const by = (e.shiftKey ? 0.2 : 0.05) * W;
+      walk(d[0] * by, d[1] * by);
+      return;
+    }
+    if (e.key === "+" || e.key === "=")
+      zoomAround(STEP, ...ringAt(), describeRing);
+    else if (e.key === "-" || e.key === "_")
+      zoomAround(1 / STEP, ...ringAt(), describeRing);
+    else if (e.key === "0") {
+      centreRing();
+      moveTo(1, 0, 0, describeRing);
+    } else if (e.key === "Enter" || e.key === " ") enterRing();
+    else if (e.key === "Escape" && view !== "world") goBack();
+    else return;
+    e.preventDefault();
+  });
+  /**
+   * Move what the keyboard looks at by (dx, dy). A ring that's off to one
+   * side drifts back to the middle first, then the map pans under it, and
+   * whatever the map can't take, at its edges or at the whole-map view, moves
+   * the ring itself. So every place can be reached, the Hawaii inset too.
+   */
+  function walk(dx: number, dy: number): void {
+    let [rx, ry] = ringAt();
+    const back = (r: number, mid: number, by: number): [number, number] => {
+      if ((r > mid && by < 0) || (r < mid && by > 0)) {
+        const next = by < 0 ? Math.max(mid, r + by) : Math.min(mid, r + by);
+        return [next, by - (next - r)];
       }
-    });
+      return [r, by];
+    };
+    [rx, dx] = back(rx, W / 2, dx);
+    [ry, dy] = back(ry, H / 2, dy);
+    const t = heading();
+    const to = clampView(t.z, t.x - dx, t.y - dy);
+    ringX = Math.max(12, Math.min(W - 12, rx + dx - (t.x - to.x)));
+    ringY = Math.max(12, Math.min(H - 12, ry + dy - (t.y - to.y)));
+    moveTo(to.z, to.x, to.y, describeRing);
   }
+  /** Enter does what a tap on the ring would, or says nothing's there. */
+  function enterRing(): void {
+    const [x, y] = ringAt();
+    const hit =
+      view === "state" || view === "country"
+        ? pinAt(x, y) != null
+        : placeAt(x, y) != null;
+    if (hit) tapAt(x, y);
+    else describeRing();
+  }
+  // The ring shows and hides with keyboard focus.
+  frame.addEventListener("focus", () => {
+    render();
+    if (keyboardOn() && loaded) describeRing();
+  });
+  frame.addEventListener("blur", () => render());
+
+  // + and − buttons (work on every device)
+  zoomInBtn?.addEventListener("click", () => zoomAround(STEP, W / 2, H / 2));
+  zoomOutBtn?.addEventListener("click", () =>
+    zoomAround(1 / STEP, W / 2, H / 2),
+  );
 
   backBtn?.addEventListener("click", goBack);
 
@@ -1157,13 +1754,32 @@ export function initHerpMap(root: HTMLElement): void {
     });
   }
 
+  // Follow the theme toggle: redraw in the other theme's tokens.
+  new MutationObserver(() => {
+    const next = readPalette();
+    if (next.key === palette.key) return;
+    palette = next;
+    render();
+  }).observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["class"],
+  });
+
+  // Labels wait for Libre Franklin, then the map draws again with them.
+  void canvasFontReady().then(() => render());
+
+  let lastWidth = 0;
   const ro = new ResizeObserver(() => {
-    if (!started) return;
-    fit();
+    const w = frame.clientWidth;
+    if (!w || w === lastWidth) return;
+    lastWidth = w;
+    stopTween();
+    centreRing();
+    if (!fit()) return;
     clampPan();
     render();
   });
-  ro.observe(canvas);
+  ro.observe(frame);
 
   const io = new IntersectionObserver(
     (entries, obs) => {
@@ -1177,4 +1793,11 @@ export function initHerpMap(root: HTMLElement): void {
     { rootMargin: "200px" },
   );
   io.observe(root);
+
+  // The land goes down straight away, so the frame has its size and the
+  // world is there while the finds load.
+  if (fit()) {
+    lastWidth = frame.clientWidth;
+    render();
+  }
 }

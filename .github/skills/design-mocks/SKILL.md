@@ -27,7 +27,7 @@ From his 2026-10-06 brief. If a direction needs one of these, justify it in writ
 
 - Colour and surface: indigo-to-violet or blue-to-cyan gradients, gradient-filled headlines, glass (backdrop blur with faint white borders), a slate-900 dark mode with one glowing accent, blurred gradient blobs behind a hero, dot-grid, faint-grid or noise overlays, and opacity steps (`/80`, `/60`, `/40`) as the only contrast tool.
 - Layout: the centred hero with a pill badge, a huge headline, a one-line subhead and two buttons; three-column feature grids of tinted rounded icons; bento grids; the same wide section with an eyebrow, heading, subhead and three cards repeated down the page; a testimonial or call-to-action band at the bottom.
-- Detail: one big rounded radius and a large shadow on everything; cards that lift or grow on hover; bold tight Inter or Geist for every heading; emoji in headings; sparkle and rocket icons; staggered fade-up on scroll.
+- Detail: one big rounded radius and a large shadow on everything; cards that lift or grow on hover; bold tight Inter or Geist for every heading; emoji in headings; sparkle and rocket icons; staggered fade-up on scroll; canvas or map text in bold system fonts, and dashboard maps with glowing heat blobs.
 - Copy: "Elevate", "Seamlessly", "Crafted with care", "Discover", "Journey", "Dive into".
 
 ## Run a round

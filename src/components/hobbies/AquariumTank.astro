@@ -60,7 +60,7 @@ const groups = ZONES.map(({ zone, label }) => ({
         max="75"
         step="5"
         value="20"
-        class="aq-range"
+        class="range"
       />
 
       <div class="aq-row aq-meter">
@@ -292,15 +292,6 @@ const groups = ZONES.map(({ zone, label }) => ({
   }
   .aq-roll {
     display: inline-block;
-  }
-  /* 32px tall so the whole strip is a comfortable target; the track stays
-     centered in it. */
-  .aq-range {
-    display: block;
-    width: 100%;
-    height: 32px;
-    margin: 0;
-    accent-color: var(--ink);
   }
   .aq-meter {
     margin-top: 8px;

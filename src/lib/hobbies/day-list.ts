@@ -22,6 +22,7 @@
  *
  * Mounted by src/components/hobbies/DayList.astro via [data-daylist] hooks.
  */
+import { canvasFont, canvasFontReady } from "../canvas-font";
 import {
   initUnderlineTabs,
   prefersReducedMotion,
@@ -499,6 +500,8 @@ export function initDayList(root: HTMLElement): void {
     onWheelHint: showWheelHint,
   });
   if (!map) return;
+  // The answer's labels are Libre Franklin; draw again once it's in.
+  void canvasFontReady().then(() => map.redraw());
 
   /** The pin and the place together, which the reveal frames. */
   function answerBox(): Box {
@@ -590,8 +593,7 @@ export function initDayList(root: HTMLElement): void {
     if (!done || boxT < 1) return;
 
     // Labels sit on a rim of paper so they read over coastlines and relief.
-    ctx.font =
-      '500 11px "Libre Franklin", ui-sans-serif, system-ui, sans-serif';
+    ctx.font = canvasFont(11);
     ctx.textAlign = "left";
     ctx.lineJoin = "round";
     ctx.lineWidth = 3;
