@@ -145,8 +145,10 @@ The Linux user name may differ from the laptop's, so paths below use `~`.
   PowerShell, then pick a user name).
 - VS Code with the WSL and GitHub Copilot extensions, signed in to GitHub as TrumanBrown. Open the
   checkout through WSL (`code ~/projects/photography-website` from a WSL shell).
-- Files go to Truman as `\\wsl.localhost\Ubuntu\home\<user>\...` paths from `wslpath -w`, servers as
-  `http://localhost:<port>/` links. WSL forwards localhost to Windows.
+- Files go to Truman as `\\wsl.localhost\Ubuntu\home\<user>\...` paths from `wslpath -w` (or
+  `C:\Users\<user>\...` for a file on the Windows side), printed in full as text he can copy, and
+  servers as `http://localhost:<port>/` links. WSL forwards localhost to Windows. A `file:///C:/...`
+  link, or a link that shows only the file name, doesn't open from a WSL VS Code window.
 
 ### 2. Tools inside WSL
 

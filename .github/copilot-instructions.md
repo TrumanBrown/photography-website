@@ -37,10 +37,12 @@ never restore, stash or reset files you didn't change, and `git pull --rebase` b
   that part's verdicts so a rejected idea doesn't come back.
 - He works from Windows into this WSL checkout, on more than one PC, and the Linux user name
   differs between them. Give files as Windows paths from `wslpath -w <file>`
-  (`\\wsl.localhost\Ubuntu\home\<user>\projects\photography-website\...`) and servers as
-  `http://localhost:<port>/` links, never bare Linux paths. It stays in WSL on every PC: a dev
-  container or native Windows came up and "contairized is interesting but don't want to do that
-  yet" (2026-10-25).
+  (`\\wsl.localhost\Ubuntu\home\<user>\projects\photography-website\...`, or `C:\Users\<user>\...`
+  for a file on the Windows side) and servers as `http://localhost:<port>/` links, never bare Linux
+  paths. Print the whole path as text he can copy: a link that shows only the file name, or a
+  `file:///C:/...` link, doesn't open from his WSL VS Code window ("i cant open them from wsl vs
+  code window", 2026-11-12). It stays in WSL on every PC: a dev container or native Windows came up
+  and "contairized is interesting but don't want to do that yet" (2026-10-25).
 - He switches between a laptop and a desktop and wants "the same prompt to produce the same
   results on both machines" (2026-10-25). His copilot-home hook pulls this checkout
   (`git pull --ff-only`) and syncs the gitignored `mocks/` and `scripts-local/` through a private
