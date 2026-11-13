@@ -6,14 +6,8 @@ I'm [Truman Brown](https://trumanbrown.com/#weekdays), a product manager on Azur
 [![Lint and Type Check](https://github.com/TrumanBrown/photography-website/actions/workflows/lint.yml/badge.svg?branch=main)](https://github.com/TrumanBrown/photography-website/actions/workflows/lint.yml)
 [![CodeQL](https://github.com/TrumanBrown/photography-website/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/TrumanBrown/photography-website/actions/workflows/codeql.yml)
 
-<a href="https://trumanbrown.com/#weekdays"><picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/weekdays-dark.jpg">
-  <img src="docs/images/weekdays-light.jpg" alt="The Weekdays side of the front door at trumanbrown.com: my resume under the Weekends and Weekdays switch, beside a rail with my portrait at Everest and links to GitHub, LinkedIn and the resume PDF" width="49%">
-</picture></a>
-<a href="https://trumanbrown.com/photographs/"><picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/photographs-dark.jpg">
-  <img src="docs/images/photographs-light.jpg" alt="The photo archive at trumanbrown.com/photographs/: the session list and globe in the rail, a rotating lead photograph, and the first row of session cards" width="49%">
-</picture></a>
+<a href="https://trumanbrown.com/#weekdays"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/weekdays-dark.jpg"><img src="docs/images/weekdays-light.jpg" alt="The Weekdays side of the front door at trumanbrown.com: my resume under the Weekends and Weekdays switch, beside a rail with my portrait at Everest and links to GitHub, LinkedIn and the resume PDF" width="49%"></picture></a>
+<a href="https://trumanbrown.com/photographs/"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/photographs-dark.jpg"><img src="docs/images/photographs-light.jpg" alt="The photo archive at trumanbrown.com/photographs/: the session list and globe in the rail, a rotating lead photograph, and the first row of session cards" width="49%"></picture></a>
 
 Try it: [the front door](https://trumanbrown.com/) (Weekends and Weekdays), [the photo archive](https://trumanbrown.com/photographs/), [Things to try](https://trumanbrown.com/hobbies/) (small interactive nature toys) and [Narrow nature](https://trumanbrown.com/hobbies/narrow-nature/), a daily puzzle where you guess where and when six species were seen together.
 
