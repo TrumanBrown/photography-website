@@ -1,7 +1,8 @@
 // Sends beacons through /api/track the way a browser would. The tables, the
-// network lookup and the email client are fakes put in Node's module cache, so
-// nothing reaches Azure and no email goes out.
+// network lookup and the email client are fakes, so nothing reaches Azure and
+// no email goes out.
 
+const Module = require("node:module");
 const ENV = {
   AZURE_STORAGE_CONNECTION_STRING: "UseDevelopmentStorage=true",
   CONTACT_EMAIL_CONNECTION_STRING:
@@ -63,13 +64,14 @@ class FakeEmailClient {
   }
 }
 
-const stubbed = [];
-function stub(request, exports) {
-  const file = require.resolve(request);
-  require.cache[file] = { id: file, filename: file, loaded: true, exports };
-  stubbed.push(file);
-}
-
+// The Lint job doesn't install the API's packages, so the Azure SDKs are
+// answered before Node looks for them, and the lookup is swapped in the cache.
+const SDKS = {
+  "@azure/data-tables": { TableClient: FakeTableClient },
+  "@azure/communication-email": { EmailClient: FakeEmailClient },
+};
+const load = Module._load;
+const geoService = require.resolve("../shared/geo-service");
 const saved = {};
 let track;
 
@@ -78,18 +80,24 @@ beforeAll(() => {
     saved[name] = process.env[name];
     process.env[name] = value;
   }
-  stub("@azure/data-tables", { TableClient: FakeTableClient });
-  stub("@azure/communication-email", { EmailClient: FakeEmailClient });
-  stub("../shared/geo-service", {
-    lookupPlace: async () => place,
-    warmGeo: async () => {},
-  });
+  Module._load = function (request, ...rest) {
+    return Object.hasOwn(SDKS, request)
+      ? SDKS[request]
+      : load.call(this, request, ...rest);
+  };
+  require.cache[geoService] = {
+    id: geoService,
+    filename: geoService,
+    loaded: true,
+    exports: { lookupPlace: async () => place, warmGeo: async () => {} },
+  };
   delete require.cache[require.resolve("./index")];
   track = require("./index");
 });
 
 afterAll(() => {
-  for (const file of stubbed) delete require.cache[file];
+  Module._load = load;
+  delete require.cache[geoService];
   delete require.cache[require.resolve("./index")];
   for (const [name, value] of Object.entries(saved)) {
     if (value === undefined) delete process.env[name];
