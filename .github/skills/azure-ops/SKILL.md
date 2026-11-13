@@ -48,7 +48,8 @@ Secrets and settings are listed in the [secrets cheat sheet](../../../docs/cicd.
 3. Put the logic in its own module with a `*.test.cjs` next to it; shared helpers go in `api/shared/`.
 4. A new dependency: `cd api && npm install <pkg>` and commit `api/package.json` with `api/package-lock.json`.
 5. Settings go in SWA app settings and the docs, never in code. Admin-only routes reuse `auth.js` and check the `x-ms-client-principal` header; never put `allowedRoles` on `/api` routes, because SWA's 401 override is global and turns API errors into a login page.
-6. After the deploy, `curl -i https://trumanbrown.com/api/<name>`. A function that crashed on its first deploy can stay 404 for good: rename its folder to make SWA register it again.
+6. Treat every header and body field as something the visitor wrote. The visitor's address comes from `clientIp()` in `api/shared/client-ip.js`, never from the first `X-Forwarded-For` entry or `X-Azure-ClientIP`, which a browser can set. An email or anything else sent to Truman from a visitor's request holds counts and fixed words only (lesson 13).
+7. After the deploy, `curl -i https://trumanbrown.com/api/<name>`. A function that crashed on its first deploy can stay 404 for good: rename its folder to make SWA register it again.
 
 ## Investigate the bill
 
@@ -82,6 +83,7 @@ Secrets and settings are listed in the [secrets cheat sheet](../../../docs/cicd.
 10. **Re-running `scripts/bind-domain.sh` would have removed Google's Search Console verification.** It deleted the whole apex TXT record set before writing the Static Web Apps token, and Google's value lives in the same set. It now adds the token beside what's there (2026-10-25). Never delete the apex TXT set.
 11. **"Failed to fetch federated token from GitHub" doesn't always mean a missing `id-token: write`.** It's what `azure/login` says about any failure to get GitHub's OIDC token, including GitHub's token service not answering. On 2026-10-26 it failed the hourly build's second sign-in while the first, five minutes earlier, had worked. Every workflow now signs in through `.github/actions/azure-login`, which retries twice. If all three tries fail, then check the permission and the federated credential's subject.
 12. **A security scan reported a secret that was never committed** (2026-06-25). A subagent read the gitignored local `.env` and called it a leak in the repo. Before reporting one, run `git ls-files <file>` and `git log --all -- <file>`: only what's tracked or in history is exposed.
+13. **The resume alert trusted the beacon** (found 2026-11-12). /api/track put the browser's `via` and copied text into an email from my own sender, so anyone could mail me their words and a link. An email built from a visitor's request holds counts only, and the client IP comes from the header SWA sets, pinned by client-ip.test.cjs (`ba90878`). That's the address SWA's edge appends to `X-Forwarded-For`. A browser's own `X-Forwarded-For` stays at the front of the list, and SWA doesn't set `X-Azure-ClientIP` at all, so a forged one reaches the function as sent. Checked with a throwaway function on a pull request preview, which runs on the same edge as the live site.
 
 ## Gotchas
 
