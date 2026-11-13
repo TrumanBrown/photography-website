@@ -110,6 +110,125 @@ may include photos that have not been uploaded. A normal setup does not need
 to remove them. Collection schemas and JSON glob loaders live in
 `src/content.config.ts`.
 
+## Adding a session
+
+The easy way, drop photos in `staging/` and run the upload script:
+
+```bash
+# 1. Put your photos in a named folder under staging/
+mkdir -p staging/2026-japan
+cp ~/photos/japan/*.jpg staging/2026-japan/
+
+# 2. Upload to Blob Storage and trigger a build
+./scripts/upload-session.sh 2026-japan --build
+```
+
+The script handles Azure auth (auto-switches tenant via `.env`), filters to
+accepted file types (JPG, HEIC, PNG, TIFF, RAW), uploads to a private inbox
+(the `incoming` container), and optionally triggers the build. See [staging/README.md](../staging/README.md).
+The argument must name one direct child of `staging/`; every session folder must
+map to a unique public slug and contain at least one image.
+
+Phones write where each photo was taken into the file, and anyone with a
+published photo's link can download it. So uploads wait in that private inbox,
+and the build removes the GPS position before publishing them to `originals`.
+Only metadata changes: the published file is byte for byte the image you shot,
+at full resolution, camera settings included. It all runs in GitHub Actions, so
+uploading needs nothing beyond `az` (and `gh` for `--build`). Details:
+[security.md](security.md#photo-locations).
+
+The folder name becomes the session's web address, and captions read place
+names from it. So the script stops on a misspelled state, country or island
+(`crater-lake-oreogn-sep-2025`) and says what to rename it to. Add
+`--keep-names` to upload it as it is.
+
+### Setting session metadata
+
+Two options:
+
+- **Admin panel** (no code): visit `/admin`, sign in with GitHub, edit title,
+  cover thumbnail, location, description, and display order in the browser.
+  See [admin.md](admin.md).
+- **`_session.json` sidecar**: add this file at the session's prefix root in Blob
+  Storage (the admin panel writes the same file):
+  ```json
+  {
+    "title": "Japan, Spring 2026",
+    "date": "2026-03-15",
+    "location": "Tokyo → Kyoto",
+    "description": "Two weeks chasing cherry blossoms.",
+    "cover": "DSC03421.jpg",
+    "order": 5
+  }
+  ```
+
+`date` must be a real `YYYY-MM-DD` calendar date. Prebuild validates the whole
+sidecar and fails with the field path instead of publishing partial defaults.
+
+`cover` picks the card thumbnail and the link-preview image. The session page
+opens on a separate wide banner, which is a hard crop: upright frames lose most
+of their height. Set `"banner"` to the filename you want there and it is used
+as-is. Leave it out and the banner derives one: the cover when the cover is
+landscape enough, otherwise the widest photograph in the session. Add an
+optional `"bannerFocus"`, any CSS `object-position` such as `"center 30%"`, to
+steer where that crop sits.
+
+### Title and description conventions
+
+Session titles follow `Place, Region, Month Year`:
+
+```
+Zhangjiajie, Hunan, April 2026
+Gunn Peak, Washington, June 2026
+Tortuguero night walk, Costa Rica, September 2026
+```
+
+The specific place goes first because that's the word people search for, and
+the shape stays the same across the archive so the session list reads as one
+set rather than thirty separate naming decisions. Keep the month in step with
+the date the page displays, which prebuild derives from EXIF.
+
+Descriptions show on the session page only. The archive's cards show the
+title, date, location and photo count, so the same sentences never sit on two
+pages.
+
+A species is only ever named from your own iNaturalist observation of that
+photo. Everything else gets plain words ("a tree frog", "a heron"): a wrong
+species name is worse than no name at all for a naturalist audience, and it
+can rank the page for something it isn't.
+
+Changes go live on the next build. Click **Run workflow** on `Build and Deploy`
+(or **Rebuild Site** in the admin panel) and they're live in about 8 minutes, or
+wait for the hourly build.
+
+Full pipeline walkthrough: [image-pipeline.md](image-pipeline.md).
+
+### Captions and descriptions
+
+After a build publishes new photos, the **Photo captions** workflow looks at
+each one once with a vision model, matches it to your iNaturalist
+observations, and writes a caption for every photo and a description for every
+session into `_session.json`. A blank title or location gets drafted too. The
+site rebuilds with them, usually within half an hour of the upload. Edit any of
+it in `/admin` and your version stays: the pipeline never overwrites text
+you've changed.
+
+It needs a vision model. The recommended one is keyless Azure OpenAI in your
+own tenant, so photos never leave it and there's no API key to leak. How
+identifications work, the checks every caption and description has to pass,
+and commands to preview or redo anything: [photos.md](photos.md).
+
+### Instagram (optional)
+
+The same pipeline can post the archive to an Instagram account: three photos a
+day by default and an optional story, each photo once, with a caption written
+from the photo's own record in your voice. New sessions join the plan after
+their caption run, and a Logic App timer in Azure starts the posting workflow
+on time, since GitHub's own schedules are best effort. Setup takes about 30
+minutes, mostly on Meta's developer site, and nothing about the account goes
+in the repository. Every rule, the setup and troubleshooting:
+[social.md](social.md). Preview what's coming with `npm run social -- preview`.
+
 ## How the local site differs from the live site
 
 | Behavior                  | Local dev                                                    | Production                                      |

@@ -4,7 +4,7 @@
 
 ## The 30-second version
 
-Photos live in **cloud storage** (Azure Blob). The website is **pre-built into a folder of HTML/CSS/JS** by a tool called **Astro**, then served from a **CDN** (Azure Static Web Apps). When you upload new photos, a **scheduled job on GitHub** notices and rebuilds the site. There is no always-on app server or CMS database; three managed Functions and small Table Storage records handle the dynamic features. Cost is about $5/month ([README](../README.md#what-it-costs)).
+Photos live in **cloud storage** (Azure Blob). The website is **pre-built into a folder of HTML/CSS/JS** by a tool called **Astro**, then served from a **CDN** (Azure Static Web Apps). When you upload new photos, a **scheduled job on GitHub** notices and rebuilds the site. There is no always-on app server or CMS database; the Functions in `api/` and small Table Storage records handle the dynamic features. Cost is about $5/month ([README](../README.md#what-it-costs)).
 
 You drop a folder of photos. The site updates itself.
 
@@ -87,6 +87,8 @@ flowchart TB
             FCON["/api/contact"]
             FTRK["/api/track"]
             FMGR["/api/sessionmgr"]
+            FOG["/api/og"]
+            FRES["/api/resume"]
             AUTHN["Built-in auth<br/>(GitHub OAuth + API allowlist)"]
         end
         IDENT["Build identity<br/>OIDC, blob access only"]
@@ -97,6 +99,7 @@ flowchart TB
     subgraph VIS["Visitors"]
         BROWSER["Public visitor browser"]
         ADMIN["You, signed in at /admin"]
+        APPS["Chat and social apps<br/>(link previews)"]
     end
 
     INAT["iNaturalist API + photo CDNs"]
@@ -126,8 +129,12 @@ flowchart TB
     BROWSER -- "hobby photos" --> HMEDIA
     BROWSER -- "POST pageview" --> FTRK
     BROWSER -- "POST message" --> FCON
+    BROWSER -- "open resume PDF" --> FRES
+    APPS -- "fetch og:image" --> FOG
     BROWSER -- "hobby grid" --> INAT
     FTRK -- "no IP, daily hash" --> TPV
+    FRES -- "count the open" --> TPV
+    FOG -- "count the share" --> TPV
     FCON -- "store message" --> TMSG
     FCON -- "rate limit (hashed IP)" --> TRL
     ADMIN -- "GitHub sign-in" --> AUTHN
@@ -143,9 +150,9 @@ flowchart TB
     class CAM,STAGE,CODE author;
     class REPO,SECRETS github;
     class PRE,BUILD,SYNCV,DEPLOY build;
-    class STATIC,FCON,FTRK,FMGR,AUTHN,IDENT,MON,DNS azure;
+    class STATIC,FCON,FTRK,FMGR,FOG,FRES,AUTHN,IDENT,MON,DNS azure;
     class INC,ORIG,DERIV,VAR,META,HMEDIA,TMSG,TPV,TRL store;
-    class BROWSER,ADMIN runtime;
+    class BROWSER,ADMIN,APPS runtime;
     class INAT third;
 ```
 
@@ -154,7 +161,7 @@ flowchart TB
 Two phases matter, and the split is the key to the whole design:
 
 - **Build time (write path).** Photos and code go in, and the GitHub Actions pipeline turns them into a static site, pushing the heavy images to Blob Storage. None of this runs while a visitor is on the site.
-- **Run time (read path).** A visitor's browser loads static HTML from the CDN and talks to three small Azure Functions for the only dynamic bits: recording a pageview, sending a contact message, and (for you, signed in) editing sessions at `/admin`.
+- **Run time (read path).** A visitor's browser loads static HTML from the CDN and talks to the Functions in `api/` for the only dynamic bits: recording a pageview, sending a contact message, counting resume PDF opens and link previews, and (for you, signed in) editing sessions at `/admin`.
 
 ### What happens on a build
 
@@ -176,7 +183,7 @@ sequenceDiagram
     GA->>GA: az logout, then astro build (HTML + responsive variants)
     GA->>AZ: OIDC login again, sync-variants.mjs uploads variants/
     GA->>SWA: deploy dist/ + api/ functions
-    SWA-->>Dev: Live at trumanbrown.com (about 3 minutes)
+    SWA-->>Dev: Live at trumanbrown.com (a median 7.6 minutes on a push)
 ```
 
 ### The photo and Instagram pipelines
@@ -339,7 +346,7 @@ Full image-pipeline mechanics: [image-pipeline.md](image-pipeline.md).
 
 **Why this one:** no framework dependency, accessible, touch-friendly. Loaded only on gallery pages, the home page doesn't pay for it.
 
-**How it is wired:** each slide moves through three tiers — the already-cached grid thumbnail, a size-capped WebP bridge, then the full-size original (image data exactly as uploaded), which is fetched only for the photograph actually on screen. That keeps full resolution without making the first paint wait on a 20 MB file. Details, measurements and tradeoffs: [image-pipeline.md](image-pipeline.md#viewing-full-resolution-without-the-wait).
+**How it is wired:** each slide moves through three tiers: the already-cached grid thumbnail, a size-capped WebP bridge, then the full-size original (image data exactly as uploaded), which is fetched only for the photograph actually on screen. That keeps full resolution without making the first paint wait on a 20 MB file. Details, measurements and tradeoffs: [image-pipeline.md](image-pipeline.md#viewing-full-resolution-without-the-wait).
 
 **Opening and sharing:** the lightbox zooms out of the thumbnail you clicked and back into it on close (an instant fade under `prefers-reduced-motion`). The photo on screen is kept in the address as `#photo-N` with `history.replaceState`, so paging through photos adds no history entries, and a page loaded with that hash opens straight to the photo. A toolbar button copies the link, or opens the device share sheet on touch screens. All of it lives in [Lightbox.astro](../src/components/Lightbox.astro).
 
@@ -429,7 +436,7 @@ Full Bicep tour: [iac-bicep.md](iac-bicep.md).
 ## What's not here (and why)
 
 - **No relational or CMS database.** Session metadata is JSON in Blob; small operational records (messages, rate limits, analytics) use Azure Table Storage.
-- **No always-on application server.** SWA serves files from a CDN and invokes three managed Functions only when requested.
+- **No always-on application server.** SWA serves files from a CDN and invokes the Functions in `api/` only when requested.
 - **No custom account system.** Visitors are public; the owner-only admin uses SWA GitHub OAuth plus a server-side username allowlist.
 - **No third-party analytics SDK.** A small first-party beacon writes bounded, cookieless records to Table Storage.
 

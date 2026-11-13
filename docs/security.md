@@ -6,9 +6,9 @@
 
 The site has no visitor accounts or custom user database. An `/admin` panel uses
 **SWA built-in GitHub authentication** plus a server-side username allowlist,
-see [docs/admin.md](admin.md). Three small Functions handle contact messages,
-analytics, and admin operations, so the runtime surface is intentionally narrow
-but not zero. What we focus on:
+see [docs/admin.md](admin.md). The Functions in `api/` handle contact messages,
+analytics, the resume PDF, link previews and admin operations, so the runtime
+surface is intentionally narrow but not zero. What we focus on:
 
 - Lock down the storage account so attackers can't enumerate or modify it.
 - Never publish where a photo was taken: GPS is stripped from every photo before it's public, and the globe and maps only use coarse, hand-picked points. See [Photo locations](#photo-locations).

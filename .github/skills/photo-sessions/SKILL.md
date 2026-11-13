@@ -41,7 +41,7 @@ Related skills: [image-delivery](../image-delivery/SKILL.md) for resolution, siz
 | `src/pages/admin/index.astro`, `src/lib/admin.ts`, `src/lib/admin-ui.ts` | the admin panel. `admin-ui.ts` holds the pure rules: what fits, toggling, thumbnail sizes                                                                                                                                                    |
 | `api/sessionmgr/`                                                        | admin API. GET reads `admin-index.json`, PUT merges into `_session.json`, POST starts Build and Deploy                                                                                                                                       |
 
-The long versions: [staging/README.md](../../../staging/README.md), [docs/image-pipeline.md](../../../docs/image-pipeline.md), [docs/admin.md](../../../docs/admin.md), [README.md#adding-a-session](../../../README.md#adding-a-session).
+The long versions: [staging/README.md](../../../staging/README.md), [docs/image-pipeline.md](../../../docs/image-pipeline.md), [docs/admin.md](../../../docs/admin.md), [docs/local-dev.md#adding-a-session](../../../docs/local-dev.md#adding-a-session).
 
 ## Add a session
 
@@ -84,7 +84,7 @@ Merging is the same move with one target. Two files that end up with the same lo
 | Rotation | the home page lead photo picks (`showcase`, up to 40)   | 3:2 only (1.48 to 1.52); a pick that doesn't fit can still be removed |
 | Captions | the caption under the photo, which is also its alt text | up to 500 characters                                                  |
 
-Save writes `_session.json` in Blob, and it goes live with the next build: Rebuild Site (about 5 minutes; it needs the `GITHUB_TOKEN` app setting) or the hourly cron. `bannerFocus` has no UI, so edit the sidecar with `az storage blob download` and `upload`; admin saves keep keys they don't know. The ratio constants live in two places each (`LEAD_RATIO` in `src/lib/archive.ts` and `src/lib/admin-ui.ts`, `BANNER_MIN_RATIO` in `admin-ui.ts` and `[slug].astro`), so change both.
+Save writes `_session.json` in Blob, and it goes live with the next build: Rebuild Site (about 8 minutes; it needs the `GITHUB_TOKEN` app setting) or the hourly cron. `bannerFocus` has no UI, so edit the sidecar with `az storage blob download` and `upload`; admin saves keep keys they don't know. The ratio constants live in two places each (`LEAD_RATIO` in `src/lib/archive.ts` and `src/lib/admin-ui.ts`, `BANNER_MIN_RATIO` in `admin-ui.ts` and `[slug].astro`), so change both.
 
 ## A build failed after an upload or an admin save
 

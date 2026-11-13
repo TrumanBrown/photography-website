@@ -14,6 +14,8 @@ The site is a photography archive first, a collection of interactive hobbies sec
 
 ## Measured baseline (July 2026)
 
+These are July's numbers, kept as the starting point. By November 12, 2026 the archive had 65 sessions and 1,252 photographs, and `/`, by then the front door, loaded 18 scripts: 129 KB uncompressed, 47 KB compressed.
+
 The production audit covered every public route, Admin, and the 404 page at desktop (1440×900), tablet (768×1024), and mobile (390×844): 63 route/viewport combinations. All returned the expected status with no horizontal overflow, visible zero-size media, page errors, or unexpected failed requests.
 
 Production content at the time of review:
@@ -89,7 +91,7 @@ An October 2026 audit ran axe-core (WCAG 2.2 A and AA) over every built page in 
 
 ### Motion that answers what you do
 
-A later pass borrowed mechanics from four React component libraries (Cult UI, Watermelon UI, Skiper UI, Magic UI) and rules from Vercel's web interface guidelines, UI/UX Pro Max and Bencium's motion spec. The site has no React, so each one is rewritten in plain CSS or TypeScript in the archive's ink and paper. Things move only in answer to the visitor; the lead photo is the one thing that changes on its own, and it now has a pause. Under `prefers-reduced-motion` all of it settles instantly.
+A later pass borrowed mechanics from four React component libraries (Cult UI, Watermelon UI, Skiper UI, Magic UI) and rules from Vercel's web interface guidelines, UI/UX Pro Max and Bencium's motion spec. The site has no React, so each one is rewritten in plain CSS or TypeScript in the archive's ink and paper. The motion rules it settled on live in [site-design.instructions.md](../.github/instructions/site-design.instructions.md). Under `prefers-reduced-motion` all of it settles instantly.
 
 - **The lightbox opens from the photo you clicked.** PhotoSwipe zooms out of the grid thumbnail (300ms open, 250ms close) and back into it on close. Each photo has its own address (`#photo-4`, kept current with `replaceState`, so it adds no history entries), and loading that address opens the lightbox on that photo. The toolbar's Copy link button copies it; on touch screens it's Share, through the device share sheet. (From Watermelon UI `copy-confirm`, and Vercel's and Pro Max's "deep-link everything".)
 - **Lightbox captions sit under the photograph, never on it.** Each slide keeps room at the bottom for its own caption and capture line, measured at the screen's width, and PhotoSwipe fits the photograph into the space above; the caption sits 12px under it and moves with it when you swipe. Where the photograph leaves height to spare, the toolbar gets its 60px at the top too, so the photograph doesn't slide up under it, but the photograph is never made smaller for that. Zoomed in or dragged, the photograph covers its caption and the caption fades out until it's back in place ([lightbox-caption.ts](../src/lib/lightbox-caption.ts)). The caption used to float over the bottom of the photograph in a dark box, squeezed to half the screen's width, which on a phone covered a third of the picture.
@@ -139,22 +141,22 @@ A later review took five ideas from a reel about AI-built interfaces looking gen
 - The year-grouped archive and session filter remain simpler than tags or faceted search at the current scale.
 - The masonry-style CSS columns keep mixed photo orientations visually natural.
 - Hobbies remain route-local; their heavier code does not affect photography pages.
-- No web font, design system, component library, map SDK, comments, accounts, favorites, or new cloud service was added.
+- No design system, component library, map SDK, comments, accounts or favorites were added. The one web font, Libre Franklin, is self-hosted from `public/fonts/`, and the cloud services added since July (the caption model, the contact email and the Logic App timers) are listed in [azure.md](azure.md).
 - Full-resolution downloads remain available in PhotoSwipe.
 
 ## Ranked roadmap
 
-| Opportunity                                                          | Visitor/owner value                                                            |         Effort | Confidence | Recommendation                                                                    |
-| -------------------------------------------------------------------- | ------------------------------------------------------------------------------ | -------------: | ---------: | --------------------------------------------------------------------------------- |
-| Write session descriptions and captions for featured work            | Stronger storytelling, SEO, and non-visual access                              | Content effort |       High | Start now in Admin; prioritize covers and the first 5–10 photos per session       |
-| Add optional `featured` editorial ordering                           | Lets the owner lead with strongest work rather than only chronology            |         Medium |     Medium | Near term after enough curated captions exist                                     |
-| Add related sessions from explicit tags/collections                  | Better discovery than date adjacency when the archive grows                    |         Medium |     Medium | Add only with an owner-maintained taxonomy                                        |
-| Draft/preview publication status                                     | Safer metadata review before public builds                                     |         Medium |     Medium | Useful when publishing becomes frequent                                           |
-| Static map or timeline exploration                                   | Spatial/temporal discovery                                                     |          Large |     Medium | Proposal only; avoid an always-loaded map SDK                                     |
-| Bulk caption editing/import                                          | Faster metadata work for hundreds of images                                    |         Medium |       High | Add if per-session Admin editing becomes tedious                                  |
-| Structured production monitoring                                     | Faster diagnosis of Function/storage failures                                  |         Medium |     Medium | Enable optional diagnostics when traffic or operational value justifies it        |
-| ~~Restyle the contact drawer and mail button~~ Done in November 2026 | The last stock-Tailwind UI on the public site; one design language everywhere  |          Small |       High | Shipped with the front door: "Write to me" as a word, the drawer in ink and paper |
-| Committed browser check for layout regressions                       | Catches overflow, covered links, faux bold and lazy first images before deploy |         Medium |     Medium | A Playwright script over the validation routes first; CI only if it stays fast    |
+| Opportunity                                                                        | Visitor/owner value                                                            |         Effort | Confidence | Recommendation                                                                                                        |
+| ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | -------------: | ---------: | --------------------------------------------------------------------------------------------------------------------- |
+| ~~Write session descriptions and captions for featured work~~ Done in October 2026 | Stronger storytelling, SEO, and non-visual access                              | Content effort |       High | Shipped as the photo captions pipeline: every photo and session, species from my iNaturalist ([photos.md](photos.md)) |
+| Add optional `featured` editorial ordering                                         | Lets the owner lead with strongest work rather than only chronology            |         Medium |     Medium | Near term after enough curated captions exist                                                                         |
+| Add related sessions from explicit tags/collections                                | Better discovery than date adjacency when the archive grows                    |         Medium |     Medium | Add only with an owner-maintained taxonomy                                                                            |
+| Draft/preview publication status                                                   | Safer metadata review before public builds                                     |         Medium |     Medium | Useful when publishing becomes frequent                                                                               |
+| Static map or timeline exploration                                                 | Spatial/temporal discovery                                                     |          Large |     Medium | Proposal only; avoid an always-loaded map SDK                                                                         |
+| Bulk caption editing/import                                                        | Faster metadata work for hundreds of images                                    |         Medium |       High | Add if per-session Admin editing becomes tedious                                                                      |
+| Structured production monitoring                                                   | Faster diagnosis of Function/storage failures                                  |         Medium |     Medium | Enable optional diagnostics when traffic or operational value justifies it                                            |
+| ~~Restyle the contact drawer and mail button~~ Done in November 2026               | The last stock-Tailwind UI on the public site; one design language everywhere  |          Small |       High | Shipped with the front door: "Write to me" as a word, the drawer in ink and paper                                     |
+| Committed browser check for layout regressions                                     | Catches overflow, covered links, faux bold and lazy first images before deploy |         Medium |     Medium | A Playwright script over the validation routes first; CI only if it stays fast                                        |
 
 ## Validation checklist
 

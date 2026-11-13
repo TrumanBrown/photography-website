@@ -12,7 +12,7 @@ Done means pushed and green. [copilot-instructions.md](../../copilot-instruction
 
 1. `git status --short`. Files you didn't change may belong to another session working in the same checkout (below), so leave them alone.
 2. Run what covers the change: `npm test` (vitest over the `src`, `api` and `scripts` tests), `npm run lint` (ESLint; errors under the gitignored `mocks/` are local only), `npm run check` (`check:csp` plus `astro check`; it needs a session JSON, so on a fresh clone run `node scripts/generate-fixtures.mjs` first) and `npx prettier --check <your files>`. Run `npm run build` when the build path changed.
-3. Update the docs the change touches, in the same commit, in plain words someone rebuilding the site could follow ("so that if i ever have to redeploy this website or any user wants to do something similar, the docs explain all of it very clearly", 2026-10-10). No em dashes.
+3. Update the docs the change touches, in the same commit, in plain words someone rebuilding the site could follow ("so that if i ever have to redeploy this website or any user wants to do something similar, the docs explain all of it very clearly", 2026-10-10). No em dashes. A change that moves a page, adds an API function or renames a section also updates the README's hero, its 'Try it' links, the function count and the layout tree, in the same commit. The 2026-11-05 front door left all four stale for a week. `scripts/docs.test.mjs` fails when the README's layout tree doesn't match the folders git tracks, or when README.md or docs/ count the Functions wrong.
 4. Stage explicit paths: `git add <files>`, or `git add -p` for files other sessions also edit (`docs/hobbies.md`, `staticwebapp.config.json`, `package.json`). Never `git add -A`.
 5. Commit with a plain sentence-case subject that says what changed for a visitor or for Truman (read `git log` for the tone), a paragraph or two of what and why, and the `Co-authored-by: Copilot` trailer. The author must be `Truman Brown <trumanbrown@users.noreply.github.com>`; if `git config user.email` prints anything else (a new PC), fix it before committing (docs/local-dev.md).
 6. `git pull --rebase`, since other sessions and the keepalive bot move `main`. Run `npm run check:csp` again if the rebase touched the config. Then `git push origin main` (from a worktree, `git push origin HEAD:main`).
@@ -54,7 +54,7 @@ He pastes `.../actions/runs/<id>` and asks why it failed.
 1. Prefer a normal bundled `<script>`, which is served from `/_astro/` and covered by `'self'`. Inline only what must run before first paint.
 2. Edit, run `npm run check:csp`, replace the stale `'sha256-...'` token in `staticwebapp.config.json`, and run it again until it matches.
 3. Whitespace counts. The ThemeToggle and LeadPhoto scripts are hashed byte for byte, so a Prettier reflow of the `.astro` file changes the hash.
-4. A fifth inline script needs its own extractor in `csp-hash.mjs`. Without one the check passes and production blocks the script. Update docs/security.md and the count in docs/session-handoff.md lesson 11.
+4. A fifth inline script needs its own extractor in `csp-hash.mjs`. Without one the check passes and production blocks the script. Update docs/security.md, the `check:csp` line in docs/local-dev.md and the count at the top of this section.
 5. Never add `'unsafe-inline'` to `script-src`. A new host goes in the narrowest directive, with no wildcards.
 6. The dev server and `npm run preview` don't send the SWA headers, so CSP problems show only in production or a PR preview. Dark mode broke this way once (`51e5884`).
 
@@ -119,7 +119,7 @@ The default is to push. The exception is when he asks: "because these are a lot 
 - Local `dist/` is gigabytes and says nothing about the deploy size, because variants only move to Blob in CI.
 - The Lint run shows a Prettier annotation even when it's green; dozens of older files fail the check.
 - The keepalive bot can push "Keep scheduled workflows enabled" to `main`, so pull before pushing.
-- Builds take 3 to 7 minutes, not the 3 the docs promise.
+- Build and Deploy takes a median 7.6 minutes on a push (p90 12.4) and 6.0 on the cron, measured 2026-11-12.
 - There's no browser test in the repo. Screenshots and smoothness checks have used Playwright from a scratch folder outside the repo, which won't exist on another machine.
 - His screen recordings are Snipping Tool `.mp4` files under `/mnt/c/Users/<user>/AppData/Local/Packages/Microsoft.ScreenSketch_*/TempState/Recordings/`. There's no system ffmpeg and system pip is locked, so use npm's `ffmpeg-static` or `pip install --target`, then tile frames at about 5 fps with timestamps into contact sheets to judge the motion (2026-10-14).
 - Live page URLs without the trailing slash answer a 301 with an empty body, so `curl -s .../sessions/x | grep og:image` finds nothing even when the tag is there. Use `curl -sL` or the slash URL (2026-06-10).

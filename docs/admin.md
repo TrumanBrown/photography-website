@@ -55,7 +55,7 @@ written, and it starts unticked there.
 The ⤢ button on a tile (or `P` on a focused tile) opens the full-size photograph over the editor,
 with arrow keys to step through the session and a button that applies the current mode to it.
 
-Changes are written to a `_session.json` sidecar file in `originals/<session>/` in Blob Storage. Click **Rebuild Site** to deploy changes (~5 min), or wait for the hourly cron.
+Changes are written to a `_session.json` sidecar file in `originals/<session>/` in Blob Storage. Click **Rebuild Site** to deploy changes (about 8 minutes), or wait for the hourly cron.
 
 ### Messages tab: read contact form submissions
 
@@ -72,7 +72,7 @@ Read-only view of site traffic with same-length prior-period comparisons, a labe
 3. The page lists all sessions found in Blob Storage. Search or filter to find one.
 4. Click **Edit** on any session → the editor panel opens with the written metadata on the left and the session's photographs on the right.
 5. Change what you want, switch between Cover / Header / Rotation / Captions to assign frames → click **Save** (or Ctrl+S / ⌘S).
-6. Click **Rebuild Site** at the top → site updates in ~5 minutes.
+6. Click **Rebuild Site** at the top → site updates in about 8 minutes.
 
 Closing the editor with unsaved edits asks first. The header shows an **Unsaved** badge whenever the
 draft differs from what's in Blob Storage.
@@ -135,6 +135,12 @@ Browser ──GET /api/sessionmgr?type=messages──▶ SWA Functions ──▶
 ```
 
 The API function ([`api/sessionmgr/index.js`](../api/sessionmgr/index.js)) uses the same `AZURE_STORAGE_CONNECTION_STRING` app setting as the contact form function. It derives the Blob hostname from that connection, accesses Blob Storage for sessions, and reads Table Storage (`contactmessages`) for the Messages tab.
+
+The session list comes from `metadata/admin-index.json`, which prebuild writes. A
+sidecar usually has no date, because prebuild reads it from EXIF, so the index carries each
+session's resolved metadata: the raw folder name for reading and writing Blob, the lower-case slug
+for thumbnail URLs, and the EXIF date. The admin sorts with the same `orderThenDateDesc` rule as the
+public site. If the index is missing, the API falls back to scanning `originals/` and the sidecars.
 
 ### Thumbnail performance
 

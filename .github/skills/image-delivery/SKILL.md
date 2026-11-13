@@ -58,7 +58,7 @@ Truman checks against the iCloud original, so check the same way.
 
 ## Cost checks
 
-- The Bandwidth meter is data leaving the storage account. Split it by who asked: `az monitor metrics list --resource "<storage account id>/blobServices/default" --metric Egress --interval P1D --aggregation Total --filter "Authentication eq '*'" --start-time <iso> --end-time <iso>`. `OAuth` is builds and agents, `Anonymous` is visitors. On WSL, strip the `\r` the Windows `az` adds to command output.
+- The Bandwidth meter is data leaving the storage account. To split it by who asked (builds or visitors), use the egress command in [azure-ops](../azure-ops/SKILL.md#investigate-the-bill), "Investigate the bill".
 - `gh cache list`: the prebuild cache and the Astro cache should total well under GitHub's 10 GB (about 1.9 and 1.5 GB in October 2026). Over 10 GB, GitHub evicts one and the next build downloads everything again. A Build and Deploy run over 20 minutes is the tell.
 - README [What it costs](../../../README.md#what-it-costs) and [docs/azure.md](../../../docs/azure.md#monthly-cost) carry the numbers; update them when a change moves the bill.
 

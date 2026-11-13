@@ -1,6 +1,6 @@
 # Azure architecture and resources
 
-> Concise reference. For why we picked Astro/SWA/Blob over alternatives, see [architecture.md](architecture.md). For what each `.bicep` file actually does, see [iac-bicep.md](iac-bicep.md).
+> Concise reference. For why we picked Astro/SWA/Blob over alternatives, see [architecture.md](architecture.md). For what each `.bicep` file actually does, see [iac-bicep.md](iac-bicep.md). To set up your own copy from an empty subscription, see [First-time setup](#first-time-setup).
 
 ## Architecture in one diagram
 
@@ -20,7 +20,7 @@ flowchart TB
     subgraph RG["rg-photography-prod"]
         DID["id-photography-deploy-prod<br/>Blob Data Contributor, Reader,<br/>OpenAI User"]
         SA[("Storage account<br/>originals, derivatives, variants,<br/>hobby-media: readable by URL<br/>metadata, incoming: private<br/>tables: messages, pageviews")]
-        SWA["Static Web App, Free<br/>CDN, TLS, 3 Functions"]
+        SWA["Static Web App, Free<br/>CDN, TLS, the Functions in api/"]
         OAI["Azure OpenAI<br/>optional"]
         LOGIC["Logic App timer<br/>optional"]
         DNS["App Service Domain<br/>+ Azure DNS zone"]
@@ -44,8 +44,9 @@ flowchart TB
 Two paths to the visitor: optimized responsive variants are generated during
 the Astro build and moved to Blob before deployment; full-resolution originals
 also stay in Blob and load only when the lightbox opens. SWA serves the HTML,
-CSS, JavaScript, and other small static assets, and runs the three Functions
-(contact form, analytics beacon, admin API). Every photo is stripped of its GPS
+CSS, JavaScript, and other small static assets, and runs the Functions in
+`api/` (the contact form, the analytics beacon, the admin API, link-preview
+images and the resume PDF). Every photo is stripped of its GPS
 position before it's readable by URL ([security.md](security.md#photo-locations)).
 
 The two identities exist so the workflows that run third-party code can only
@@ -151,6 +152,107 @@ you're happy the copies arrive.
 | WAF | Needs Front Door. Current bounded Functions already use throttling and allowlisted auth; the edge tier is disproportionate at personal traffic. |
 | Plausible/Fathom (~$9/mo) | The first-party Table Storage analytics pipeline covers the small metric set needed. |
 | Azure Key Vault | The few runtime credentials fit SWA's encrypted app settings; Key Vault would add cost and integration without reducing current privilege. |
+
+---
+
+## First-time setup
+
+The minimal sequence for a copy of the site on your own subscription. The resources it creates are listed above, and [cicd.md](cicd.md) explains the workflows and identities.
+
+### 0. Prereqs
+
+- Azure CLI (`az`) installed and `az login` done
+- GitHub CLI (`gh`) installed and `gh auth login` done (logged in as the GitHub account that owns the repo)
+- An empty GitHub repo created and this code pushed to `main`
+- The subscription ID + tenant ID of your Azure subscription
+
+### 1. Fill in placeholders
+
+Edit [site.config.ts](../site.config.ts):
+- `ownerName`, your full name (drives the footer, page metadata and structured data; **becomes public when you push**)
+- `siteTitle`, the site's name: the front page's tab title and the start of every other tab ("Jane Doe | Photographs"); `siteDescription`, taste
+- `domain`, apex domain you'll register (e.g. `<yourname>.com`)
+- `copyrightStartYear`, current year on first deploy
+- `prints`, `true` to take print and licensing inquiries: a Prints button on session photos, a `/prints` page in the footer, and licensing data for Google Images. Inquiries arrive through the contact form; there's no shop. Set `false` if you don't sell prints. Details in [product-experience.md](product-experience.md#prints-and-licensing-inquiries).
+
+Edit [infra/main.parameters.json](../infra/main.parameters.json):
+- `githubOwner`, your GitHub username/org
+- `domainName`, leave `""` on first deploy if you want infra up before registering a domain; fill in and re-deploy later
+
+> Full inventory of what becomes public and what stays private: [privacy.md](privacy.md).
+
+### 2. Bootstrap the deploy identity
+
+```bash
+./scripts/setup-federated-credential.sh <subscription-id> <github-owner> <github-repo>
+```
+
+It prints three values. Add them as repo secrets (Settings → Secrets and variables → Actions):
+- `AZURE_CLIENT_ID`
+- `AZURE_TENANT_ID`
+- `AZURE_SUBSCRIPTION_ID`
+
+This identity can change the whole subscription, so it trusts only the `prod`
+GitHub Environment that the Infra workflow deploys from. Create that environment
+under **Settings → Environments** and limit its deployment branches to `main`.
+Everything else (builds, captions, Instagram) signs in as a second identity that
+the first Infra run creates, with access to the site's blobs only. What this
+does and why: [cicd.md](cicd.md#two-identities-least-privilege-by-job).
+
+### 3. (Optional) Add a PAT for secret auto-write
+
+If you want the **Infra (Bicep)** workflow to auto-write `AZURE_STATIC_WEB_APPS_API_TOKEN`, `AZURE_STORAGE_ACCOUNT` and `AZURE_DEPLOY_CLIENT_ID` (the build identity) back into repo secrets, add a fine-grained PAT with `Secrets: read/write` on this repo as `GH_PAT_FOR_SECRETS`. Otherwise run `./scripts/bootstrap-swa-token.sh <resource-group> <swa-name> <owner/repo>` by hand after the first deploy.
+
+### 4. Run the Infra workflow
+
+GitHub → **Actions** tab → **Infra (Bicep)** → **Run workflow** → environment `prod`.
+
+This deploys the whole Azure stack. Everything it creates is enumerated in [iac-bicep.md](iac-bicep.md#what-the-bicep-deploys-resource-by-resource).
+It also configures the SWA Functions with the storage connection, a private
+analytics salt, and the GitHub user who ran the workflow as the initial admin.
+
+Bicep doesn't give your own Azure account access to the photos, and being the
+subscription's Owner isn't enough. To upload sessions from your machine, give
+yourself `Storage Blob Data Contributor` on the storage account once. It takes
+about five minutes to apply:
+
+```bash
+az role assignment create --assignee <your sign-in name> --role "Storage Blob Data Contributor" \
+  --scope "$(az storage account show -n <storage-account> --query id -o tsv)"
+```
+
+### 5. Register the domain (interactive, one-time)
+
+```bash
+az appservice domain create \
+  --resource-group rg-photography-prod \
+  --hostname yourdomain.com \
+  --contact-info @contact.json \
+  --accept-terms
+```
+
+`contact.json` format: <https://learn.microsoft.com/azure/app-service/manage-custom-dns-buy-domain>. **Gitignored**: never commit it.
+
+Then set `domainName` in `infra/main.parameters.json` and re-run the Infra workflow, then bind the apex/www domains:
+
+```bash
+./scripts/bind-domain.sh rg-photography-prod swa-photography-prod yourdomain.com
+```
+
+### 6. Update `site.config.ts` with the real Blob host
+
+After the first infra deploy, set `blobHost` in [site.config.ts](../site.config.ts) to the actual storage account hostname (printed in the deploy output), and put the same host in the two `blob.core.windows.net` sources of the Content-Security-Policy in [staticwebapp.config.json](../staticwebapp.config.json) (`npm run check:csp` fails until they match). For uploads, set `AZURE_STORAGE_ACCOUNT` in `.env`. Commit and push.
+
+### 7. Tell Google about the site (optional)
+
+In [Google Search Console](https://search.google.com/search-console), add a Domain property for your domain and put the TXT value it gives you at the apex, beside the Static Web Apps token:
+
+```bash
+az network dns record-set txt add-record -g rg-photography-prod -z yourdomain.com -n @ \
+  --value "google-site-verification=<value from Google>"
+```
+
+Never delete the apex TXT record set: both values live in it. Once Google verifies the domain, submit `https://yourdomain.com/sitemap-index.xml` and `https://yourdomain.com/image-sitemap.xml`. "Couldn't fetch" right after a push usually means a deploy was running, so submit again later. The aim is for session pages to come up when people search the places in their titles.
 
 ---
 

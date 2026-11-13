@@ -34,6 +34,21 @@ The tab has four sub-tabs that share one range picker (last 7, 30 or 90 days).
 
 Truman's own visits are left out: signing in to `/admin` sets a `tb_owner` flag in that browser's localStorage, and the beacon sends nothing while it's `"1"`. The Job hunt sub-tab says whether the current browser is counted and has a button to switch it. Sign in to `/admin` once on each device you browse the site from.
 
+## Why it's built this way
+
+Truman sends the same resume PDF to every job application and wasn't going to make one per company. He wanted to know whether the site does anything for that resume: how long people stay, whether they came from it, what they read, click and copy on the Weekdays side, where they go next, and which company's network they're on.
+
+The front door's first numbers couldn't say. From November 5 to 9, 2026, `/` had 60 views in 37 visits with a median of 13 seconds, and its referrers were Google 3, Facebook 3, DuckDuckGo 1 and none 23, with nothing from LinkedIn. Both sides of the front door were recorded as `/`, a link clicked in a PDF or an email arrives with no referrer, clicks, scrolling and copying weren't recorded, and opening the PDF wasn't counted. The tagged links, the Weekdays events, the network lookup and the PDF function (below) each fill one of those gaps. All of it was designed on 2026-11-09 and built the same day.
+
+What it leaves out, agreed with Truman:
+
+- No separate PDF or link per company, and no names or email addresses.
+- No cookies, no following anyone across days or devices, no session replay, mouse tracking or heatmaps.
+- Nothing that slows the front door or needs a cookie banner, and no visitor's IP sent to a third party.
+- No company shown with more certainty than the data has. A Comcast address is home internet, not a lead, which is why every network owner gets a kind.
+
+Asked what else analytics could capture, Truman then picked all ten ideas he was shown. Six serve the job hunt: an email while a company is reading, companies that come back, link shares, PDF opens from anywhere, hiring systems by name and time per job. Four are about the site: real visitors' speed, the errors they hit, light or dark mode with screen sizes, and how photos and hobbies get used. The same limits held. The only new outside code is Google's web-vitals (about 2 KB, bundled, so the CSP didn't change). Alerts are capped because each email costs a fraction of a cent and shares the contact form's hourly allowance, so a visitor can't run up a bill or crowd out a message. Every page got a preview image, his call, so a share of any page can be counted and never pastes as a bare link.
+
 ## How it works
 
 ```
