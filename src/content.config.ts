@@ -109,6 +109,12 @@ const hobbyMediaItem = z.object({
   caption: z.string().optional(),
 });
 
+/** An iNaturalist taxon or place id, with its name so the JSON reads. */
+const inatRef = z.object({
+  id: z.number().int().positive(),
+  name: z.string(),
+});
+
 const hobbies = defineCollection({
   loader: glob({
     pattern: "*.json",
@@ -207,21 +213,37 @@ const hobbies = defineCollection({
       .optional(),
     /**
      * Optional personal touch: a live grid of the author's real iNaturalist
-     * observations for this hobby, with a link to their full observations page.
-     * The pixel game is the playful side; this is the real-world record. Any
-     * hobby with an iNaturalist presence can add this block.
+     * observations for this hobby, with a "View all" link to the same
+     * observations on iNaturalist. The pixel game is the playful side; this is
+     * the real-world record. The filter has to keep the grid to the hobby
+     * (`taxa` is required); see src/lib/hobbies/inat-query.ts.
      */
     inaturalist: z
       .object({
         userId: z.string(),
-        url: z.string().url(),
         heading: z.string().optional(),
         blurb: z.string().optional(),
         limit: z.number().int().positive().max(30).optional(),
-        /** iNat iconic taxa filter, e.g. "Animalia,Mollusca,Actinopterygii". */
-        iconicTaxa: z.string().optional(),
-        /** iNat taxon id filter (narrows to a clade). */
-        taxonId: z.number().int().positive().optional(),
+        /** Groups to show, as iNat taxa (`taxon_ids`). */
+        taxa: z.array(inatRef).min(1),
+        /** Groups inside `taxa` to leave out (`without_taxon_id`). */
+        withoutTaxa: z.array(inatRef).optional(),
+        /** Places to leave out (`not_in_place`). */
+        withoutPlaces: z.array(inatRef).optional(),
+        /** Coarsest identification shown (`hrank`), so vague IDs stay out. */
+        maxRank: z
+          .enum([
+            "species",
+            "genus",
+            "family",
+            "superfamily",
+            "order",
+            "class",
+            "phylum",
+          ])
+          .optional(),
+        /** Leave out captive animals (`captive=false`). */
+        wildOnly: z.boolean().optional(),
       })
       .optional(),
     /**

@@ -201,17 +201,7 @@ const hasPlate =
     }
 
     {
-      inaturalist && (
-        <INatObservations
-          userId={inaturalist.userId}
-          url={inaturalist.url}
-          heading={inaturalist.heading}
-          blurb={inaturalist.blurb}
-          limit={inaturalist.limit}
-          iconicTaxa={inaturalist.iconicTaxa}
-          taxonId={inaturalist.taxonId}
-        />
-      )
+      inaturalist && <INatObservations {...inaturalist} />
     }
 
     {

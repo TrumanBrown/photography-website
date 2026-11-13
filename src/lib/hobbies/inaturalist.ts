@@ -7,8 +7,8 @@
  * Mounted by src/components/hobbies/INatObservations.astro via [data-inat] hooks.
  */
 import { coarsePlace } from './inat-place';
+import { inatApiUrl } from './inat-query';
 
-const API = 'https://api.inaturalist.org/v1/observations';
 const PHOTO_HOSTS = [
   'https://inaturalist-open-data.s3.amazonaws.com/',
   'https://static.inaturalist.org/',
@@ -41,29 +41,18 @@ function allowedHost(url: string): boolean {
 export function initINatObservations(root: HTMLElement): void {
   const grid = root.querySelector<HTMLElement>('[data-inat-grid]');
   const status = root.querySelector<HTMLElement>('[data-inat-status]');
-  const userId = root.dataset.inatUser;
-  const iconic = root.dataset.inatIconic;
-  const taxon = root.dataset.inatTaxon;
+  // The same filter the "View all" link uses (inat-query.ts).
+  const query = root.dataset.inatQuery;
   const limit = Math.max(1, Math.min(30, Number(root.dataset.inatLimit) || 12));
-  if (!grid || !userId) return;
+  if (!grid || !query) return;
 
   let started = false;
   const load = async (): Promise<void> => {
     if (started) return;
     started = true;
     try {
-      const q = new URLSearchParams({
-        user_id: userId,
-        photos: 'true',
-        per_page: String(limit),
-        order_by: 'observed_on',
-        order: 'desc',
-        locale: 'en',
-      });
-      if (iconic) q.set('iconic_taxa', iconic);
-      if (taxon) q.set('taxon_id', taxon);
       // A hung request would leave the placeholder tiles pulsing forever.
-      const res = await fetch(`${API}?${q.toString()}`, {
+      const res = await fetch(inatApiUrl(query, limit), {
         headers: { Accept: 'application/json' },
         signal: AbortSignal.timeout(10_000),
       });
@@ -105,7 +94,7 @@ export function initINatObservations(root: HTMLElement): void {
     } catch {
       grid.replaceChildren();
       if (status) {
-        status.textContent = 'Could not load observations right now. See them on iNaturalist.';
+        status.textContent = "Couldn't load observations right now. See them on iNaturalist.";
       }
     }
   };

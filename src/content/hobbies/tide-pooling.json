@@ -8,9 +8,86 @@
   "interactive": "tidepool",
   "inaturalist": {
     "userId": "trumanbrown",
-    "url": "https://www.inaturalist.org/observations?subview=map&user_id=trumanbrown&verifiable=any",
     "heading": "My tide pooling observations",
     "blurb": "Real critters I've logged on iNaturalist out on the rocks. Tap any photo to open the full observation.",
-    "iconicTaxa": "Animalia,Mollusca,Actinopterygii"
+    "taxa": [
+      { "id": 47115, "name": "Molluscs (Mollusca)" },
+      { "id": 47549, "name": "Echinoderms (Echinodermata)" },
+      { "id": 47534, "name": "Anemones and jellies (Cnidaria)" },
+      { "id": 121639, "name": "True crabs (Brachyura)" },
+      { "id": 123825, "name": "Hermit and porcelain crabs (Anomura)" },
+      { "id": 210289, "name": "Barnacles (Cirripedia)" },
+      { "id": 63680, "name": "Tidepool shrimp (Heptacarpus)" },
+      { "id": 48581, "name": "Rockweed isopods (Idoteidae)" },
+      { "id": 47490, "name": "Bristle worms (Polychaeta)" },
+      { "id": 51280, "name": "Ribbon worms (Nemertea)" },
+      { "id": 52318, "name": "Polyclad flatworms (Polycladida)" },
+      { "id": 48665, "name": "Peanut worms (Sipuncula)" },
+      { "id": 47645, "name": "Sculpins (Cottidae)" },
+      { "id": 86030, "name": "Sculpins (Psychrolutidae)" },
+      { "id": 62607, "name": "Gunnels (Pholidae)" },
+      { "id": 61378, "name": "Pricklebacks and cockscombs (Stichaeidae)" },
+      { "id": 67411, "name": "Clingfish (Gobiesocidae)" },
+      { "id": 51374, "name": "Midshipman (Batrachoididae)" }
+    ],
+    "withoutTaxa": [
+      { "id": 47485, "name": "Land snails and slugs (Stylommatophora)" },
+      { "id": 85104, "name": "Leatherleaf slugs (Veronicellidae)" },
+      { "id": 368108, "name": "Prism slugs (Rathouisiidae)" },
+      { "id": 85811, "name": "Land nerites (Helicinidae)" },
+      { "id": 372889, "name": "Land snails (Cyclophoroidea)" },
+      { "id": 86005, "name": "Land winkles (Pomatiidae)" },
+      { "id": 172173, "name": "Land snails (Annulariidae)" },
+      { "id": 85752, "name": "Salt marsh and land snails (Ellobiidae)" },
+      { "id": 50701, "name": "Salt marsh and land snails (Assimineidae)" },
+      { "id": 551438, "name": "Pond and ramshorn snails (Hygrophila)" },
+      { "id": 68725, "name": "Valve snails (Valvatidae)" },
+      { "id": 84112, "name": "Apple snails (Ampullariidae)" },
+      { "id": 83797, "name": "Mystery snails (Viviparidae)" },
+      { "id": 68812, "name": "Melania snails (Thiaridae)" },
+      { "id": 85954, "name": "River snails (Pachychilidae)" },
+      { "id": 85955, "name": "River snails (Paludomidae)" },
+      { "id": 85890, "name": "River snails (Melanopsidae)" },
+      { "id": 82170, "name": "Hornsnails (Pleuroceridae)" },
+      { "id": 504071, "name": "Juga stream snails (Semisulcospiridae)" },
+      { "id": 85637, "name": "Faucet snails (Bithyniidae)" },
+      { "id": 82220, "name": "Mud snails (Hydrobiidae)" },
+      { "id": 489617, "name": "New Zealand mud snails (Tateidae)" },
+      { "id": 149783, "name": "Pebblesnails (Lithoglyphidae)" },
+      { "id": 85575, "name": "Duskysnails (Amnicolidae)" },
+      { "id": 86006, "name": "Amphibious snails (Pomatiopsidae)" },
+      { "id": 1067235, "name": "Freshwater nerites (Neritininae)" },
+      { "id": 775841, "name": "Freshwater mussels (Unionida)" },
+      { "id": 86074, "name": "Pea clams (Sphaeriidae)" },
+      { "id": 534850, "name": "Asian clams (Cyrenidae)" },
+      { "id": 85746, "name": "Zebra and quagga mussels (Dreissenidae)" },
+      { "id": 53738, "name": "Ghost crabs (Ocypode)" },
+      { "id": 51074, "name": "Land crabs (Gecarcinidae)" },
+      { "id": 84967, "name": "Marsh and forest crabs (Sesarmidae)" },
+      { "id": 71067, "name": "Old World freshwater crabs (Potamoidea)" },
+      { "id": 342943, "name": "Asian freshwater crabs (Gecarcinucoidea)" },
+      {
+        "id": 342941,
+        "name": "Neotropical freshwater crabs (Pseudothelphusoidea)"
+      },
+      {
+        "id": 67520,
+        "name": "South American freshwater crabs (Trichodactyloidea)"
+      },
+      { "id": 51731, "name": "Land hermit crabs (Coenobitidae)" },
+      { "id": 428693, "name": "Freshwater anomurans (Aeglidae)" },
+      { "id": 203709, "name": "Hydras (Hydridae)" },
+      { "id": 171285, "name": "Freshwater jellyfish (Craspedacusta)" },
+      { "id": 151835, "name": "Fish parasites (Myxozoa)" },
+      { "id": 47644, "name": "Freshwater sculpins (Cottus)" }
+    ],
+    "withoutPlaces": [
+      {
+        "id": 29310,
+        "name": "La Cruz, Costa Rica: snorkeling at Islas Murciélago, Aug 2026"
+      }
+    ],
+    "maxRank": "order",
+    "wildOnly": true
   }
 }

@@ -5,42 +5,37 @@
  * the (CSP-safe, Astro-processed) script fetches the public iNat API when the
  * section scrolls into view and fills in thumbnail links. Any hobby with a real
  * iNaturalist presence can drop this in (see the `inaturalist` block in the
- * hobby content schema). The reveal of the games gets the pixel art; this gets
- * the real-world record.
+ * hobby content schema). The filter is built once here, so the grid and the
+ * "View all" link ask iNaturalist for the same observations (inat-query.ts).
  */
-interface Props {
-  /** iNaturalist login or numeric user id. */
-  userId: string;
-  /** Link to the full observations page on iNaturalist. */
-  url: string;
+import {
+  inatExploreUrl,
+  inatFilterQuery,
+  type INatGridFilter,
+} from "@/lib/hobbies/inat-query";
+
+interface Props extends INatGridFilter {
   heading?: string;
   blurb?: string;
   /** Max thumbnails to show. */
   limit?: number;
-  /** Optional iNat iconic taxa filter, e.g. "Animalia,Mollusca,Actinopterygii". */
-  iconicTaxa?: string;
-  /** Optional iNat taxon id filter (narrows to a clade). */
-  taxonId?: number;
 }
 const {
-  userId,
-  url,
-  heading = 'My iNaturalist observations',
+  heading = "My iNaturalist observations",
   blurb,
   limit = 12,
-  iconicTaxa,
-  taxonId,
+  ...filter
 } = Astro.props;
+const query = inatFilterQuery(filter);
+const url = inatExploreUrl(query);
 ---
 
 <section
   class="not-prose mt-12"
   aria-label={heading}
   data-inat
-  data-inat-user={userId}
+  data-inat-query={query}
   data-inat-limit={limit}
-  data-inat-iconic={iconicTaxa}
-  data-inat-taxon={taxonId}
 >
   <div class="mb-4">
     <div class="shead">

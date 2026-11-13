@@ -709,7 +709,7 @@ If the upload ever gets a copyright claim that turns off embedding (its music is
 The section pairs each playful interactive with something real and personal, so it shows the actual hobby as well as the toys:
 
 - **Aquarium**: a video of the real tank (below) and real photos of it (the `hobby-media` gallery above). The fish in the toy that also live in the tank link to a moment in the video.
-- **Tide pooling**: the species photos in the game are real CC-licensed shots, plus a live grid of my own iNaturalist observations at the bottom of the page.
+- **Tide pooling**: the species photos in the game are real CC-licensed shots, plus a live grid of the tide pool animals I've logged on iNaturalist at the bottom of the page.
 - **Fishing**: a gallery of my real catches, paired with the same species sprites used on the maps.
 - **Birding**: my life list from iNaturalist, written into the page at build time with the rarest species as cards, plus a written "spark bird" story beside my own photo of that bird.
 - **Herping**: the game's reveal photos are real CC-licensed shots, and below the game a live world map heat-maps every reptile and amphibian I've logged on iNaturalist in tints of ink, on a coarse grid. Tap a country (or the US, then a state) to zoom in to each find and a details grid, with a Reptiles/Amphibians toggle.
@@ -719,22 +719,39 @@ New hobbies should follow the same pattern: build the game, then add a real pers
 
 ### iNaturalist observations embed
 
-The tide pooling page ends with a live grid of my real observations, each linking out to iNaturalist.
+The tide pooling page ends with a live grid of the tide pool animals I've logged on iNaturalist, each linking out to its observation.
 
-- **Component:** [src/components/hobbies/INatObservations.astro](../src/components/hobbies/INatObservations.astro) + logic [src/lib/hobbies/inaturalist.ts](../src/lib/hobbies/inaturalist.ts). It's reusable: any hobby switches it on with an optional `inaturalist` block in its content JSON:
+- **Component:** [src/components/hobbies/INatObservations.astro](../src/components/hobbies/INatObservations.astro) + logic [src/lib/hobbies/inaturalist.ts](../src/lib/hobbies/inaturalist.ts), with the filter in [src/lib/hobbies/inat-query.ts](../src/lib/hobbies/inat-query.ts). Any hobby switches it on with an optional `inaturalist` block in its content JSON, and the block has to say which animals belong to the hobby (`taxa` is required):
 
   ```json
   "inaturalist": {
     "userId": "trumanbrown",
-    "url": "https://www.inaturalist.org/observations?user_id=trumanbrown",
     "heading": "My tide pooling observations",
-    "blurb": "…",
-    "iconicTaxa": "Animalia,Mollusca,Actinopterygii"
+    "blurb": "...",
+    "taxa": [{ "id": 47115, "name": "Molluscs (Mollusca)" }],
+    "withoutTaxa": [{ "id": 47485, "name": "Land snails and slugs (Stylommatophora)" }],
+    "withoutPlaces": [{ "id": 29310, "name": "La Cruz, Costa Rica: snorkeling at Islas Murciélago, Aug 2026" }],
+    "maxRank": "order",
+    "wildOnly": true
   }
   ```
 
-- **It's lazy and CSP-safe.** The grid stays empty (skeleton tiles) until the section scrolls near the viewport, then a `fetch` to the public iNaturalist API fills it in; thumbnails link to each observation and a "View all on iNaturalist" button links to the full profile. The script is an Astro-processed module, so it satisfies `script-src 'self'`.
-- **Filtering to the right critters.** iNaturalist has no "tide pooling" concept, so the embed filters by `iconic_taxa`, the broad taxonomic buckets. Tide pooling uses `Animalia,Mollusca,Actinopterygii`, which captures crabs, sea stars, anemones, and worms (Animalia), snails/chitons/nudibranchs (Mollusca), and fish (Actinopterygii) while dropping the birds, mammals, insects, and plants from the same account. For tighter curation, make an iNaturalist project and filter by it (the component also accepts a `taxonId`).
+  Each `id` is an iNaturalist taxon or place id, and `name` is only there so the file reads. Look ids up with `https://api.inaturalist.org/v1/taxa?q=<name>` and `https://api.inaturalist.org/v1/places/autocomplete?q=<name>`.
+
+- **It's lazy and CSP-safe.** The grid shows skeleton tiles until the section scrolls near the viewport. Then a `fetch` to the public iNaturalist API fills in the 12 most recently observed, each linking to its observation. The script is an Astro-processed module, so it satisfies `script-src 'self'`.
+- **"View all" opens the same set.** The page turns the filter into one query string at build time ([inat-query.ts](../src/lib/hobbies/inat-query.ts)). The grid's API call and the "View all on iNaturalist" link both start from it, so the link opens the same observations in the same order, newest observed first. Two things about iNaturalist's Explore page shaped it, both read from its source (`app/assets/javascripts/ang` in inaturalist/inaturalist):
+  - Explore runs `parseInt` on `taxon_id`, so a comma list there shows only the first taxon (molluscs alone, 29 records). Several taxa go as `taxon_ids`, which the API reads the same way.
+  - Explore drops parameters it doesn't know, and `not_id` is one of them, so a single observation can't be left out by id. Leave out its place with `not_in_place` instead.
+
+  The link also adds `verifiable=any`, because Explore hides casual records unless told otherwise and the API doesn't, and `place_id=any`, because a signed-in visitor's preferred place would otherwise narrow it. [inat-query.test.ts](../src/lib/hobbies/inat-query.test.ts) keeps the link and the call in step.
+
+- **Filtering to the hobby.** iNaturalist has no tide pooling filter, and a place can't stand in for one: its coast places (Pacific Northwest Coast, Salish Sea) take in Issaquah and Kittitas County, and land slugs turn up on beach days. So the taxa do the work, worldwide, because the grid covers every trip and not just the PNW:
+  - `taxa`: molluscs, echinoderms, cnidarians, true crabs, hermit and porcelain crabs, barnacles, _Heptacarpus_ shrimp, rockweed isopods, bristle worms, ribbon worms, polyclad flatworms, peanut worms, sculpins, gunnels, pricklebacks, clingfish and midshipman. Sculpins means Cottidae and Psychrolutidae, not all of Cottoidei, which also holds greenlings and lingcod. Jellies and squid found at low tide stay in (Truman's call).
+  - `withoutTaxa`: their land and freshwater relatives anywhere in the world: land snails and slugs, freshwater snails and nerites, freshwater mussels and clams, ghost crabs, land crabs, land hermit crabs, freshwater crabs, hydras, freshwater jellyfish and freshwater sculpins (_Cottus_).
+  - `maxRank: "order"` (`hrank`) leaves out vague IDs like "Bivalves" or "Tectipleura", where a land snail can hide, and `wildOnly` leaves out aquarium animals.
+  - `withoutPlaces`: La Cruz, Costa Rica, where five August 2026 records were snorkeling, not tide pooling. It's a standard iNaturalist place, so it won't be edited or deleted, and an id iNaturalist doesn't know is ignored rather than breaking the grid.
+- **What it can't see.** The filter knows what an animal is and where it was, not how it was found. A snorkel trip or a crab from a pot could still show up, so look over the grid after a trip like that and leave its place out the same way.
+- **Checked 2026-11-12.** The old filter (`iconic_taxa=Animalia,Mollusca,Actinopterygii`) took every animal on the account, so the grid opened on a Death Valley pupfish, then a centipede, apple snails and tilapia. The November 2026 review's list (molluscs, echinoderms, cnidarians, crabs, marine worms, sculpins) plus a Pacific coast place still let through 43 records: 28 land slugs and snails, 6 vague IDs (one a clam held next to a fishing rod), 5 jellies, 2 squid and 2 freshwater sculpins. The filter above returns 208 records, and every photo was looked at: tide pools, beaches, wading and dip nets in Washington, Oregon, Kauai, Guanacaste and Cape Cod. iNaturalist's Explore page, opened from the link, showed the same 208 and the same first 12.
 - **CSP additions.** Showing this required allow-listing iNaturalist in [staticwebapp.config.json](../staticwebapp.config.json): the API host in `connect-src` (`https://api.inaturalist.org`) and the two photo CDNs in `img-src` (`https://static.inaturalist.org`, `https://inaturalist-open-data.s3.amazonaws.com`). Those are the only third-party hosts the hobbies section talks to, and they're documented in [docs/security.md](./security.md).
 
 ### Birding life list and spark bird
