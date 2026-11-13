@@ -35,6 +35,7 @@ Related skills: [stipple-plates](../stipple-plates/SKILL.md) for the card art, [
 - **Daily toys go first.** Narrow nature leads Things to try because "it is most likely to have repeat visitors" (2026-10-13).
 - **One at a time.** "start with hobbies shell and just one hobby,. we should build this incrementally not all at once and risk breaking everything" (2026-06-23). Ship one, check it live, then start the next.
 - **No upkeep for him.** "I don't want to have to update all of these, uploading the photos is already a lot of work" (2026-06-23). A toy runs on data baked in once or pulled from records he already keeps, like iNaturalist. Never design one around a log he has to fill in.
+- Data a hobby shows from iNaturalist is fetched at build time and paged to the end, with the client call as a fallback. No skeleton loaders. (The November 2026 site review, TTT-18 and TTT-19.)
 - **Phones from the start.** "ideally these should all work natively on mobile too. the experience doesn't have to be as good as dekstop, but ensure you are developing wiht that in mind" (2026-06-23).
 - Clean, "not overly animated slop" (2026-10-14).
 - **One look across the section.** A toy may keep its own art colours inside its frame, but everything around and on top of it follows the tokens: no fixed light backgrounds in dark mode, no Tailwind palette colours (#0b1220, #2563eb, #f59e0b, #38bdf8) and no glowing blobs. Text drawn on a canvas uses Libre Franklin 300 or 400 and waits for document.fonts.ready (`canvas-font.ts`; the November 2026 site review, TTT-1 to TTT-4).
@@ -53,14 +54,14 @@ Related skills: [stipple-plates](../stipple-plates/SKILL.md) for the card art, [
 
 ## Give a hobby its personal element
 
-Use one of the blocks that already exist before writing new plumbing: `media` (a gallery), `video` (one of his YouTube uploads in place of the hero photo, with `moments` the toy can link to; [docs/hobbies.md](../../../docs/hobbies.md#a-video-of-the-real-thing)), `inaturalist` (his observations, filtered with `iconicTaxa` or `taxonId`), `lifeList`, `spark`, `herpMap`, or a real-data gallery like the fishing catches. The iNaturalist ones load lazily near the viewport, fail quietly, and round places through `inat-place.ts`. His iNaturalist user id comes from the hobby JSON.
+Use one of the blocks that already exist before writing new plumbing: `media` (a gallery), `video` (one of his YouTube uploads in place of the hero photo, with `moments` the toy can link to; [docs/hobbies.md](../../../docs/hobbies.md#a-video-of-the-real-thing)), `inaturalist` (his observations, filtered with `iconicTaxa` or `taxonId`), `lifeList`, `spark`, `herpMap`, or a real-data gallery like the fishing catches. The life list and spark bird come from iNaturalist at build time, with the browser call as a fallback (`birding-inat.ts`). The observations grid and the herp map still fetch near the viewport. All of them fail quietly and round places through `inat-place.ts`. His iNaturalist user id comes from the hobby JSON.
 
 ## Species, facts and reveal photos
 
 - Tide pooling and herping: edit `tidepool-species.ts` or `herping-species.ts` (the sprite `category` must already exist; herping also needs `eyeshine`, and `nonNative` where it applies). Two or three facts each, one ID tip and one behaviour fact, one sentence, 8 to 28 words. Run `npx vitest run src/lib/hobbies/species-facts.test.ts`.
 - Reveal photos: `npm run fetch:tidepool-photos -- --only <id> --wire inat`, or `npm run fetch:herping-photos -- --place 46 --wire inat` (46 is Washington). Review `staging/<hobby>/photos.json`, then commit the wired JSON.
 - Aquarium: the `SPECIES` array in `aquarium-species.ts`. Fishing: `fishing-species.ts`, then the species ids on each water in `fishing-waters.json`. Moving or adding a water needs `node scripts/build-fishing-geo.mjs`, because markers come from `fishing-geo.json`.
-- Bird families: `node scripts/fetch-bird-families.mjs`. The life list itself is live from iNaturalist.
+- Bird families: `node scripts/fetch-bird-families.mjs`. The life list itself comes from iNaturalist at every build.
 - Record a fact check in docs/hobbies.md, as the October 2026 one was.
 
 ## Galleries, catches and maps
@@ -110,6 +111,8 @@ Day list became Narrow nature in two commits: the title and copy first (`dfca9e4
 12. **The hiking studio was one template in different colours** (2026-07-20). It had five fixed terrain anchors, a distance slider that only changed the stats, a fixed relief, and lakes, snow and trees drawn as ellipses on top. Mileage now sets one to seven mountains and zooms the whole world (change the drag inverse with it), moments carve and sample the terrain, and the editor and postcard share one renderer at different densities (`8cb116b`, `2a71460`, `68c1b87`, `777b2b8`, `1044f63`).
 13. **Restyling the frame left the canvas behind.** 2124ef8 (2026-10-12) put the hobby pages in ink on paper but didn't touch what the canvases draw, so the fishing maps' pale ground, the herp map's navy dashboard and bold system-font labels lasted into November. A restyle covers what the canvas draws, and its screenshots include dark mode (2026-11-12).
 14. **Stipple dots read as sightings.** The review's mock drew the herp map's heat as stipple, ink dots scattered round each find, and once ported they looked like animals in spots where he'd seen nothing (2026-11-12). On a map, a dot means a find. Density is a heat map in flat tints of ink, darker where finds stack up, with hard edges so it doesn't glow in dark mode (`heatBands`), and only each find's own mark is a dot.
+15. **The life list stopped at 200 of 242 species.** `species_counts` was asked for one page of 200, so the heading said 200 and the rarest bird he's logged, a Giant babax with about 35 records worldwide, never reached Rarest sightings (the November 2026 review, TTT-19). Page every iNaturalist list until `total_results`, counting what each page actually returned, and test it past one page (`birding-inat.test.ts`).
+16. **A list written into the page has to stay cheap to lay out.** With all 242 rows in the HTML, every font swap laid out about 5,000 boxes, up to 230 ms a pass on a phone at 4x CPU (2026-11-12). Each row's link has `content-visibility: auto` with its exact 81 px height, so rows off screen skip layout until they're near. It's on the link, not the `<li>`, because paint containment would clip the link's focus ring.
 
 ## Gotchas
 

@@ -117,6 +117,7 @@ flowchart TB
     PRE -- "write JPEGs" --> DERIV
     PRE -- "manifest.json, build copies" --> META
     SYNCV -- "upload variants" --> VAR
+    BUILD -- "birding life list, spark photo" --> INAT
     DEPLOY -- "publish" --> STATIC
     DEPLOY -- "deploy functions" --> FCON
     IDENT -. "trusts GitHub OIDC" .-> CI
@@ -180,7 +181,7 @@ sequenceDiagram
     GA->>GA: npm ci (site and api/), then unit tests
     GA->>AZ: OIDC login (build identity)
     GA->>AZ: prebuild.mjs publishes incoming/ to originals/ (GPS removed),<br/>reads build copies (originals only for new photos), writes derivatives/
-    GA->>GA: az logout, then astro build (HTML + responsive variants)
+    GA->>GA: az logout, then astro build (HTML + responsive variants,<br/>the birding life list read from iNaturalist)
     GA->>AZ: OIDC login again, sync-variants.mjs uploads variants/
     GA->>SWA: deploy dist/ + api/ functions
     SWA-->>Dev: Live at trumanbrown.com (a median 7.6 minutes on a push)

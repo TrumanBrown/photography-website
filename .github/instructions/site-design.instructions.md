@@ -35,6 +35,8 @@ look. Everything below is about the public pages.
 - Libre Franklin is self-hosted at weights **300 to 500 only**. `font-semibold`, `font-bold` or
   `font-weight: 600` and up make the browser fake a bold that looks smeared. Page titles are 300,
   titles and body 400, and 500 is the ceiling.
+- Italic follows the same rule as bold: only faces we host. Libre Franklin Italic is self-hosted
+  for scientific names.
 - Page H1: `text-2xl font-light tracking-tight sm:text-[30px]` (prints, hobbies, places, 404).
   Section H2: `text-xl font-light tracking-tight`, or `.shead` on hobby pages.
 - Meta lines, counts, dates and back links are `.u-label` (10px, tracked, uppercase, `ink-2`):

@@ -51,7 +51,7 @@ Truman checks against the iCloud original, so check the same way.
 
 ## Changing sizes, preloading or priority
 
-- Only the likely LCP image is eager with `fetchpriority="high"`: the first row of cards, the banner (also `decoding="sync"`, so the page change never shows bare paper), the lead photo's first frame. Everything else is lazy. Marking every image above the fold high made them compete (`196cf33`).
+- Only the likely LCP image is eager with `fetchpriority="high"`: the first row of cards, the banner (also `decoding="sync"`, so the page change never shows bare paper), the lead photo's first frame, the birding spark photo. Everything else is lazy. Marking every image above the fold high made them compete (`196cf33`).
 - The lightbox preloads bridges for the next slides, never originals. Only the current slide gets its original.
 - Widths in `[slug].astro`, `SessionCard.astro` and `LeadPhoto.astro` decide how many variants exist. More widths mean more files to upload and HEAD on every deploy (about 15,000 already).
 - Bumping `BUILD_COPY_VERSION` remakes every build copy and changes every Astro variant once (the first run took 19 minutes). Change the `astro-cache-v2-` key in the workflow in the same commit. Bumping `DERIVATIVE_VERSION` reconverts every HEIC and RAW photo.
@@ -96,5 +96,6 @@ Truman checks against the iCloud original, so check the same way.
 - `npm run prebuild:remote` downloads build copies over the internet and is billed (a test run cost about $0.35). It also writes to production containers.
 - A lazy image that's `display: none` is never fetched, which is why PlateArt's light and dark pair are both lazy. Don't make both eager.
 - About 1.7 GB of variants from before the build copies are orphaned in Blob. They cost cents a month and nothing removes them.
+- A remote photo given to `getImage` (the birding spark photo, from iNaturalist) is downloaded after the pages render, and if that first download fails, the whole build fails. Later builds reuse the copy in `.cache/astro` and fall back to it when the host is down. `BirdingSpark.astro` checks the photo answers before asking for variants, and its host has to be in `image.remotePatterns` in astro.config.mjs or Astro passes the URL through unprocessed.
 
 Add new verdicts and lessons here, dated, in the commit that acts on them.

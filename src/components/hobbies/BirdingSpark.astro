@@ -1,12 +1,24 @@
 ---
 /**
- * "Spark bird" story: a short first-person note about the species that got the
- * author into the hobby, shown beside their real iNaturalist observation of it.
- * Server-renders the written story (always present); the CSP-safe script lazily
- * loads the observation photo from the public iNat API and removes its slot if
- * the API is unavailable, so the story never depends on the network.
+ * The "spark bird" story: a short first-person note about the species that
+ * got me into birding, beside my latest iNaturalist photo of it. The build
+ * fetches the observation and cuts the photo into square WebP copies, which
+ * go to Blob with the other page variants, so the photo arrives with the page.
+ * It's the first-screen picture on phones and desktops, so it loads eagerly at
+ * high priority. If iNaturalist didn't answer the build, the script fetches
+ * the photo in the browser, and the story stands alone if that fails too.
  * Driven by the `spark` block in the hobby content schema.
  */
+import { getImage } from "astro:assets";
+import {
+  BUILD_FETCH,
+  fetchSparkObservation,
+  inatPhoto,
+  isReachable,
+  loadOnce,
+  sparkCaption,
+} from "@/lib/hobbies/birding-inat";
+
 interface Props {
   userId: string;
   taxonId: number;
@@ -23,6 +35,45 @@ const {
   scientificName,
   story,
 } = Astro.props;
+
+// A square, 18rem beside the story from 640px up and the column's full width
+// below that.
+const SIZES = "(min-width: 640px) 288px, calc(100vw - 32px)";
+
+let photo: {
+  src: string;
+  srcset: string;
+  href: string;
+  caption: string;
+} | null = null;
+try {
+  const obs = await loadOnce(`spark:${userId}:${taxonId}`, () =>
+    fetchSparkObservation(userId, taxonId, BUILD_FETCH),
+  );
+  const original = inatPhoto(obs?.photo, "original");
+  // Astro downloads the photo after the pages render, and a failed first
+  // download fails the whole build, so make sure it's there first.
+  if (obs && original && (await isReachable(original, BUILD_FETCH))) {
+    const image = await getImage({
+      src: original,
+      width: 720,
+      height: 720,
+      fit: "cover",
+      format: "webp",
+      widths: [360, 720, 1080],
+    });
+    photo = {
+      src: image.src,
+      srcset: image.srcSet.attribute,
+      href: obs.url,
+      caption: sparkCaption(obs),
+    };
+  }
+} catch (error) {
+  console.warn(
+    `[birding] The spark photo didn't load at build, so the page will fetch it in the browser: ${error}`,
+  );
+}
 ---
 
 <section
@@ -31,13 +82,39 @@ const {
   data-spark
   data-spark-user={userId}
   data-spark-taxon={taxonId}
+  data-spark-species={species}
+  data-spark-built={photo ? "true" : undefined}
 >
   <div class="shead mb-4"><h2>{heading}</h2></div>
   <div
     class="grid grid-cols-1 gap-6 sm:grid-cols-[minmax(0,18rem)_1fr] sm:items-start"
   >
     <div data-spark-media class="overflow-hidden">
-      <div class="aspect-square w-full animate-pulse bg-rule-soft"></div>
+      {
+        photo && (
+          <a
+            href={photo.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="group block overflow-hidden border border-rule no-underline"
+          >
+            <img
+              src={photo.src}
+              srcset={photo.srcset}
+              sizes={SIZES}
+              alt={species}
+              width="720"
+              height="720"
+              loading="eager"
+              fetchpriority="high"
+              class="block aspect-square w-full bg-band object-cover transition-opacity duration-300 group-hover:opacity-95"
+            />
+            <span class="block border-t border-rule px-3 py-2 text-xs text-ink-2">
+              {photo.caption}
+            </span>
+          </a>
+        )
+      }
     </div>
     <div>
       <h3 class="text-[17px] font-normal leading-tight">{species}</h3>

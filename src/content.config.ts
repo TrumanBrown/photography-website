@@ -225,10 +225,11 @@ const hobbies = defineCollection({
       })
       .optional(),
     /**
-     * Optional personal touch: a live "life list" built from the author's real
-     * iNaturalist species_counts. Features the globally-rarest species the
-     * author has logged (with a fun-fact/range blurb pulled live from iNat's
-     * Wikipedia summaries) above a compact grid of the full list.
+     * Optional personal touch: a "life list" built from the author's
+     * iNaturalist species_counts, fetched at build time and paged to the end,
+     * with the browser fetch as a fallback (BirdingLifeList.astro). Features
+     * the globally-rarest species the author has logged above the full list,
+     * grouped by family.
      */
     lifeList: z
       .object({
@@ -238,14 +239,14 @@ const hobbies = defineCollection({
         blurb: z.string().optional(),
         /** iNat iconic taxa filter, e.g. "Aves" for birds. */
         iconicTaxa: z.string().optional(),
-        /** How many of the rarest species to feature with a blurb. */
+        /** How many of the rarest species to show as cards. */
         featured: z.number().int().positive().max(12).optional(),
       })
       .optional(),
     /**
      * Optional "spark" story: a short first-person note about the species that
-     * got the author into this hobby, shown alongside the author's real
-     * iNaturalist observation of that species.
+     * got the author into this hobby, beside the author's latest iNaturalist
+     * photo of it, fetched at build time (BirdingSpark.astro).
      */
     spark: z
       .object({

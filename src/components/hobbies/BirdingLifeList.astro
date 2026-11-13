@@ -1,12 +1,27 @@
 ---
 /**
- * A live "life list" of a hobby's iNaturalist species — the richer personal
- * counterpart to the selfie-to-bird game. Server-renders only the container,
- * heading, link, and skeletons; the (CSP-safe, Astro-processed) script fetches
- * the public iNat API when the section scrolls into view, features the
- * globally-rarest species the author has logged, and lists the rest. Driven by
- * the `lifeList` block in the hobby content schema.
+ * My birding life list from iNaturalist: the rarest species I've logged as
+ * cards, then every species by family, with search and sort. The build fetches
+ * it (paged to the end, birding-inat.ts) and writes it into the page, so it
+ * arrives with the HTML, and the hourly build keeps it fresh. If iNaturalist
+ * didn't answer the build, the section says it's loading and the script
+ * fetches the same list in the browser. Driven by the `lifeList` block in the
+ * hobby content schema.
  */
+import {
+  BUILD_FETCH,
+  groupByFamily,
+  loadLifeList,
+  loadOnce,
+} from "@/lib/hobbies/birding-inat";
+import {
+  familySection,
+  featuredCard,
+  listItem,
+  speciesCount,
+  toHtml,
+} from "@/lib/hobbies/birding-life-markup";
+
 interface Props {
   /** iNaturalist login or numeric user id. */
   userId: string;
@@ -16,7 +31,7 @@ interface Props {
   blurb?: string;
   /** Optional iNat iconic taxa filter, e.g. "Aves". */
   iconicTaxa?: string;
-  /** How many of the rarest species to feature with a blurb. */
+  /** How many of the rarest species to show as cards. */
   featured?: number;
 }
 const {
@@ -24,9 +39,44 @@ const {
   url,
   heading = "My life list",
   blurb,
-  iconicTaxa,
+  iconicTaxa = "",
   featured = 6,
 } = Astro.props;
+
+let built: { count: string; cards: string; list: string } | null = null;
+try {
+  const life = await loadOnce(`life:${userId}:${iconicTaxa}:${featured}`, () =>
+    loadLifeList(userId, iconicTaxa, featured, BUILD_FETCH),
+  );
+  if (life.species.length > 0) {
+    built = {
+      count: speciesCount(life.species.length),
+      cards: life.featured.map((s) => toHtml(featuredCard(s, userId))).join(""),
+      list: groupByFamily(life.species)
+        .map((group) =>
+          toHtml(
+            familySection(
+              group,
+              group.members.map((s) => listItem(s, userId)),
+            ),
+          ),
+        )
+        .join(""),
+    };
+  }
+} catch (error) {
+  console.warn(
+    `[birding] The life list didn't load at build, so the page will fetch it in the browser: ${error}`,
+  );
+}
+
+const sorts = [
+  { value: "family", label: "By family" },
+  { value: "recent", label: "Recent" },
+  { value: "name", label: "Name" },
+  { value: "most-seen", label: "Most seen" },
+  { value: "rarest", label: "Rarest" },
+];
 ---
 
 <section
@@ -35,12 +85,13 @@ const {
   data-life
   data-life-user={userId}
   data-life-iconic={iconicTaxa}
-  data-life-featured={featured}
+  data-life-featured-n={featured}
+  data-life-built={built ? "true" : undefined}
 >
   <div class="mb-6">
     <div class="shead">
       <h2>{heading}</h2>
-      <span data-life-count class="u-label tabular-nums"></span>
+      <span data-life-count class="u-label tabular-nums">{built?.count}</span>
     </div>
     {blurb && <p class="shead-blurb">{blurb}</p>}
     <a
@@ -52,108 +103,144 @@ const {
     >
   </div>
 
-  <h3 class="u-label mb-3">Rarest sightings</h3>
-  <div
-    data-life-featured
-    class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
-  >
-    {
-      Array.from({ length: featured }).map(() => (
-        <div class="overflow-hidden border border-rule">
-          <div class="aspect-[4/3] animate-pulse bg-rule-soft" />
-          <div class="space-y-2 p-4">
-            <div class="h-4 w-2/3 animate-pulse bg-rule-soft" />
-            <div class="h-3 w-full animate-pulse bg-rule-soft" />
-            <div class="h-3 w-5/6 animate-pulse bg-rule-soft" />
-          </div>
-        </div>
-      ))
-    }
-  </div>
+  {
+    !built && (
+      <p data-life-note class="text-xs text-ink-2">
+        Loading my life list from iNaturalist...
+      </p>
+    )
+  }
 
-  <h3 class="u-label mb-3 mt-10">The full list</h3>
+  <div data-life-body hidden={!built}>
+    <h3 class="u-label mb-3">Rarest sightings</h3>
+    <div
+      data-life-featured
+      class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
+      set:html={built?.cards ?? ""}
+    />
 
-  <div
-    data-life-controls
-    hidden
-    class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center"
-  >
-    <label class="relative flex-1">
-      <span class="sr-only">Search species</span>
-      <input
-        data-life-search
-        type="search"
-        placeholder="Search by name…"
-        autocomplete="off"
-        class="life-input w-full"
-      />
-    </label>
-    <label class="flex items-center gap-2 text-sm text-ink-3">
-      <span class="shrink-0">Sort</span>
-      <select data-life-sort class="life-input">
-        <option value="family">By family</option>
-        <option value="recent">Recently seen</option>
-        <option value="name">Name (A–Z)</option>
-        <option value="genus">Genus (scientific)</option>
-        <option value="most-seen">Most seen</option>
-        <option value="rarest">Rarest first</option>
-      </select>
-    </label>
-  </div>
+    <h3 class="u-label mb-3 mt-10">The full list</h3>
+    <div class="life-controls">
+      <label class="life-search">
+        <span class="sr-only">Search species</span>
+        <input
+          data-life-search
+          type="search"
+          placeholder="Search by name..."
+          autocomplete="off"
+          spellcheck="false"
+        />
+      </label>
+      <div
+        class="utabs life-sort"
+        role="radiogroup"
+        aria-label="Sort the list"
+        data-life-sort
+      >
+        {
+          sorts.map((sort, i) => (
+            <button
+              type="button"
+              role="radio"
+              aria-checked={i === 0 ? "true" : "false"}
+              data-value={sort.value}
+            >
+              {sort.label}
+            </button>
+          ))
+        }
+        <span class="utabs-bar" aria-hidden="true"></span>
+      </div>
+    </div>
 
-  <div data-life-list class="space-y-6">
-    {
-      Array.from({ length: 2 }).map(() => (
-        <section class="space-y-2">
-          <div class="h-4 w-40 animate-pulse bg-rule-soft" />
-          <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: 3 }).map(() => (
-              <div class="flex items-center gap-3 border-b border-rule-soft py-2">
-                <div class="h-16 w-16 shrink-0 animate-pulse bg-rule-soft" />
-                <div class="flex-1 space-y-1.5">
-                  <div class="h-3.5 w-1/2 animate-pulse bg-rule-soft" />
-                  <div class="h-3 w-2/3 animate-pulse bg-rule-soft" />
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      ))
-    }
+    <div data-life-list class="space-y-6" set:html={built?.list ?? ""} />
+    <p data-life-status class="mt-2 text-xs text-ink-2" aria-live="polite"></p>
   </div>
-  <p data-life-status class="mt-2 text-xs text-ink-2"></p>
 </section>
 
 <style>
   /*
-   * Preflight is disabled (applyBaseStyles: false), so there is no base
-   * [hidden]{display:none} rule, and the `flex` utility on the controls would
-   * otherwise beat the UA stylesheet and show them before the data loads. Force
-   * it here so [data-life-controls][hidden] stays hidden until JS reveals it.
+   * Preflight is off (applyBaseStyles: false), so nothing else makes [hidden]
+   * beat a display rule.
    */
   [data-life] [hidden] {
     display: none !important;
   }
 
-  .life-input {
-    min-height: 36px;
-    padding: 6px 10px;
-    border: 1px solid var(--rule);
+  /* Search as the contact form and the rail filter draw a field: one rule
+     under it that darkens on focus. Sort is the site's underline tabs, on the
+     same line from 640px up. */
+  .life-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .life-search {
+    display: block;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .life-search input {
+    display: block;
+    width: 100%;
+    min-height: 33px;
+    padding: 6px 0 7px;
+    border: 0;
+    border-bottom: 1px solid var(--rule);
     border-radius: 0;
-    background: var(--paper);
+    background: none;
     color: var(--ink);
     font: inherit;
     font-size: 13px;
+    line-height: 1.5;
+    -webkit-appearance: none;
+    appearance: none;
   }
-  .life-input::placeholder {
+  .life-search input::placeholder {
     color: var(--ink-2);
+    opacity: 1;
   }
-  .life-input:focus-visible {
+  .life-search input::-webkit-search-cancel-button {
+    -webkit-appearance: none;
+    display: none;
+  }
+  .life-search input:focus {
+    outline: none;
+    box-shadow: none;
     border-color: var(--ink);
   }
-  .life-input option {
-    background: var(--paper);
-    color: var(--ink);
+  .life-sort {
+    flex: none;
+    align-self: flex-start;
+  }
+  @media (min-width: 640px) {
+    .life-controls {
+      flex-direction: row;
+      align-items: flex-end;
+      gap: 28px;
+    }
+    .life-sort {
+      align-self: auto;
+    }
+  }
+  @media (max-width: 399px) {
+    .life-sort {
+      gap: 16px;
+    }
+  }
+</style>
+
+<style is:global>
+  /* The rows are written by the build or by the script, so scoped styles
+     don't reach them. A row off screen skips layout and paint until it's
+     near: 242 of them made every font swap a 200ms layout on a slow phone.
+     Every row is 81px (a 64px photo, 16px padding, a 1px rule), so the space
+     it holds is exact. On the link, not the row, so its focus ring isn't
+     clipped. */
+  [data-life-row] > a {
+    content-visibility: auto;
+    contain-intrinsic-block-size: auto 81px;
   }
 </style>
 

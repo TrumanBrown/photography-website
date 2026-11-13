@@ -61,6 +61,12 @@ export default defineConfig({
   image: {
     // Astro's built-in sharp service. WebP + JPEG variants emitted by <Picture>.
     service: { entrypoint: 'astro/assets/services/sharp' },
+    // The birding spark photo is my own iNaturalist upload, cut into WebP
+    // variants at build like any other photo (BirdingSpark.astro).
+    remotePatterns: [
+      { protocol: 'https', hostname: 'inaturalist-open-data.s3.amazonaws.com' },
+      { protocol: 'https', hostname: 'static.inaturalist.org' },
+    ],
   },
   integrations: [
     sitemap({

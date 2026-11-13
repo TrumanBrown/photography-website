@@ -711,7 +711,7 @@ The section pairs each playful interactive with something real and personal, so 
 - **Aquarium**: a video of the real tank (below) and real photos of it (the `hobby-media` gallery above). The fish in the toy that also live in the tank link to a moment in the video.
 - **Tide pooling**: the species photos in the game are real CC-licensed shots, plus a live grid of my own iNaturalist observations at the bottom of the page.
 - **Fishing**: a gallery of my real catches, paired with the same species sprites used on the maps.
-- **Birding**: a live life list built from my real iNaturalist sightings (rarest species featured with a fun-fact/range blurb), plus a written "spark bird" story shown beside my own observation of that bird.
+- **Birding**: my life list from iNaturalist, written into the page at build time with the rarest species as cards, plus a written "spark bird" story beside my own photo of that bird.
 - **Herping**: the game's reveal photos are real CC-licensed shots, and below the game a live world map heat-maps every reptile and amphibian I've logged on iNaturalist in tints of ink, on a coarse grid. Tap a country (or the US, then a state) to zoom in to each find and a details grid, with a Reptiles/Amphibians toggle.
 - **Hiking**: landscape families and page copy grounded in my Cascades, China, Norway, and Himalayan hiking. Connecting each family directly to real trip photos is a planned follow-up.
 
@@ -739,7 +739,7 @@ The tide pooling page ends with a live grid of my real observations, each linkin
 
 ### Birding life list and spark bird
 
-The birding page reuses the same live-iNaturalist approach in two richer forms. Both are lazy and CSP-safe (same hosts as above, so no new allow-listing is needed), and both degrade gracefully if the API is unavailable.
+The birding page shows two things from my iNaturalist account, and unlike the observations grid above, the build fetches both and writes them into the page, so they arrive with the HTML and the hourly build keeps them fresh. The requests, paging and shaping live in [src/lib/hobbies/birding-inat.ts](../src/lib/hobbies/birding-inat.ts), shared by the build and the browser. If iNaturalist doesn't answer the build, the build logs a warning and carries on, and the page fetches the same data in the browser once the section nears the viewport (same hosts as above, so no new allow-listing). There are no skeletons: while the browser fetches, the life list shows one line, "Loading my life list from iNaturalist...".
 
 - **Life list.** [src/components/hobbies/BirdingLifeList.astro](../src/components/hobbies/BirdingLifeList.astro) + [src/lib/hobbies/birding-life-list.ts](../src/lib/hobbies/birding-life-list.ts). Switched on with an optional `lifeList` block:
 
@@ -754,9 +754,11 @@ The birding page reuses the same live-iNaturalist approach in two richer forms. 
   }
   ```
 
-  It calls `/observations/species_counts` for the full list, sorts by the species' global iNaturalist `observations_count` (fewer records worldwide = more unique), and shows the `featured` rarest as cards (with a link to Wikipedia, but no quote from it: the summaries' first lines, "is a species of bird in the sparrow family", read as filler and were dropped in November 2026). It also pages `/observations` (most-faved first) to show one of my own photos per species rather than a generic representative one. The rest are grouped by taxonomic family (largest family first) into a compact list. "Rarity" here is global record count, not a formal conservation status.
+  It pages `/observations/species_counts` until `total_results`, going by what each page returned. One page of 200 used to stop the list at 200 of 242 species, with the rarest bird I've logged among the missing (TTT-19 in the November 2026 review, and `birding-inat.test.ts` pages past 200). It sorts by the species' global iNaturalist `observations_count` (fewer records worldwide = more unique) and shows the `featured` rarest as cards (with a link to Wikipedia, but no quote from it: the summaries' first lines, "is a species of bird in the sparrow family", read as filler and were dropped in November 2026). It also pages `/observations` to the end, most-faved first, to show one of my own photos per species rather than a generic representative one. The rest are grouped by taxonomic family (largest family first) into a compact list. "Rarity" here is global record count, not a formal conservation status. A count reads ×2 everywhere, on cards and rows.
 
-  The family grouping needs no extra API calls: `species_counts` already returns each species' `ancestor_ids`, and [src/lib/hobbies/bird-families.json](../src/lib/hobbies/bird-families.json) maps every iNaturalist bird-family taxon id to its name, so the grouping is computed client-side and stays live. Regenerate that file with `node scripts/fetch-bird-families.mjs` if iNat ever adds or renames a family.
+  The markup is written once, in [src/lib/hobbies/birding-life-markup.ts](../src/lib/hobbies/birding-life-markup.ts): the build turns it into HTML, and the browser fallback turns the same description into elements, so the two can't drift. Search is a field with one rule under it, like the contact form, and sort is the site's underline tabs (By family, Recent, Name, Most seen, Rarest). Both move the rows already on the page rather than drawing them again. Each row's link has `content-visibility: auto` with its exact 81 px height: with all 242 rows in the HTML, every font swap used to lay all of them out, up to 230 ms a pass on a phone at 4x CPU.
+
+  The family grouping needs no extra API calls: `species_counts` already returns each species' `ancestor_ids`, and [src/lib/hobbies/bird-families.json](../src/lib/hobbies/bird-families.json) maps every iNaturalist bird-family taxon id to its name, so the grouping is worked out wherever the list is drawn. Regenerate that file with `node scripts/fetch-bird-families.mjs` if iNat ever adds or renames a family.
 
 - **Spark bird.** [src/components/hobbies/BirdingSpark.astro](../src/components/hobbies/BirdingSpark.astro) + [src/lib/hobbies/birding-spark.ts](../src/lib/hobbies/birding-spark.ts). Switched on with an optional `spark` block:
 
@@ -771,7 +773,7 @@ The birding page reuses the same live-iNaturalist approach in two richer forms. 
   }
   ```
 
-  The written `story` is server-rendered (it never depends on the network); the script pulls my most recent observation of `taxonId` and shows that photo, place, and date beside it.
+  The written `story` never depends on the network. The build fetches my most recent observation of `taxonId` with a photo, and Astro cuts the original photo into square WebP copies at 360, 720 and 1080 px, which go to Blob with the other page variants. It's the first-screen picture on phones and desktops, so it loads eagerly with `fetchpriority="high"`. It used to be a 240 KB iNaturalist JPEG that a script fetched after the page loaded, and the page's phone LCP was 2.8 to 3.7 s (4G, 4x CPU). Measured the same way on a build, it's about 1.7 s now. Astro downloads a remote photo after the pages render, and a failed first download fails the build, so the component checks the photo answers first and otherwise leaves it to the browser, which shows iNaturalist's 500 px copy. The two iNaturalist photo hosts are in `image.remotePatterns` in [astro.config.mjs](../astro.config.mjs).
 
 ### Herping reptiles & amphibians map (world → country/state, ink heat map + finds)
 
