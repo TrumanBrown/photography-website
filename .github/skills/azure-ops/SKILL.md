@@ -45,7 +45,7 @@ Secrets and settings are listed in the [secrets cheat sheet](../../../docs/cicd.
 
 1. `api/<name>/function.json` (HTTP trigger, `authLevel: anonymous`, a flat route) and `index.js` exporting `async function (context, req)`.
 2. Load Azure SDKs lazily inside a getter, as `getService()` does in `api/sessionmgr/index.js`. A top-level `require('@azure/storage-blob')` crashed the function at load, and SWA answered 404 with no logs.
-3. Put the logic in its own module with a `*.test.cjs` next to it; shared helpers go in `api/shared/`.
+3. Put the logic in its own module with a `*.test.cjs` next to it; shared helpers go in `api/shared/`. A test can't load an Azure SDK: the Lint job runs `npm test` without `api/`'s packages, so fake it the way `api/track/index.test.cjs` does.
 4. A new dependency: `cd api && npm install <pkg>` and commit `api/package.json` with `api/package-lock.json`.
 5. Settings go in SWA app settings and the docs, never in code. Admin-only routes reuse `auth.js` and check the `x-ms-client-principal` header; never put `allowedRoles` on `/api` routes, because SWA's 401 override is global and turns API errors into a login page.
 6. Treat every header and body field as something the visitor wrote. The visitor's address comes from `clientIp()` in `api/shared/client-ip.js`, never from the first `X-Forwarded-For` entry or `X-Azure-ClientIP`, which a browser can set. An email or anything else sent to Truman from a visitor's request holds counts and fixed words only (lesson 13).
