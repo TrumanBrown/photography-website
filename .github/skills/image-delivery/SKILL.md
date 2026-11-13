@@ -53,7 +53,7 @@ Truman checks against the iCloud original, so check the same way.
 
 - Only the likely LCP image is eager with `fetchpriority="high"`: the first row of cards, the banner (also `decoding="sync"`, so the page change never shows bare paper), the lead photo's first frame, the birding spark photo. Everything else is lazy. Marking every image above the fold high made them compete (`196cf33`).
 - The lightbox preloads bridges for the next slides, never originals. Only the current slide gets its original.
-- Widths in `[slug].astro`, `SessionCard.astro` and `LeadPhoto.astro` decide how many variants exist. More widths mean more files to upload and HEAD on every deploy (about 15,000 already).
+- Widths in `[slug].astro`, `SessionCard.astro` and `LeadPhoto.astro` decide how many variants exist. More widths mean more files to upload and HEAD on every deploy (about 15,000 already). `TrailsWalked.astro` on the hiking page copies SessionCard's widths and formats, so its covers reuse the archive's files; change the two together.
 - Bumping `BUILD_COPY_VERSION` remakes every build copy and changes every Astro variant once (the first run took 19 minutes). Change the `astro-cache-v2-` key in the workflow in the same commit. Bumping `DERIVATIVE_VERSION` reconverts every HEIC and RAW photo.
 
 ## Cost checks

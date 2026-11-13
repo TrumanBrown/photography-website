@@ -15,7 +15,7 @@ argument-hint: 'the hobby and the change, e.g. "herping: add the rough-skinned n
 | `fishing`          | `Fishing.astro`; `fishing.ts`, `fishing-sprites.ts`                                    | `fishing-waters.json`, `fishing-species.ts`, `fishing-geo.json` | his catches (`fishing-catches.json`)                                     |
 | `birding`          | `Birding.astro`; `birding.ts` (MediaPipe, on device), `birding-bird.ts`, `bird-ink.ts` | `public/birding/face_landmarker.task`                           | spark bird and life list (`BirdingSpark.astro`, `BirdingLifeList.astro`) |
 | `herping`          | `HerpingNight.astro` + `FieldJournal` + `SpecimenCard`; `herping.ts`                   | `herping-species.ts`, `herping-photos.json`                     | his herp map (`INatHerpMap.astro`, `herp-geo.json`)                      |
-| `hiking`           | `PixelHike.astro`; `hiking.ts`, `hiking-model.ts`, `hiking-renderer.ts`                | none                                                            | the copy                                                                 |
+| `hiking`           | `PixelHike.astro`; `hiking.ts`, `hiking-model.ts`, `hiking-renderer.ts`                | none                                                            | Trails I've walked: my hikes from the archive, linking to their sessions (`TrailsWalked.astro`, `trails` in `hiking.json`) |
 | `narrow-nature`    | `DayList.astro`                                                                        | see the [narrow-nature](../narrow-nature/SKILL.md) skill        | none, it's a puzzle                                                      |
 
 Components are in `src/components/hobbies/`, engines and data in `src/lib/hobbies/`. Shared parts: `SpecimenCard.astro` (the reveal card), `FieldJournal.astro`, `specimen.ts` (`stampFind`, the "New, to your journal" stamp), `pixel-reveal.ts`, `src/lib/motion.ts` (`rollTo`, `setHair`, `stamp`, underline tabs), `src/lib/covered.ts` (`whenUncovered`), `inat-place.ts` (places rounded to 0.1°), `src/lib/canvas-font.ts` (`canvasFont`, `canvasFontReady`: Libre Franklin for any text a canvas draws), and the `.range` slider in `global.css`. The long reference, one section per hobby, is [docs/hobbies.md](../../../docs/hobbies.md).
@@ -24,7 +24,7 @@ Related skills: [stipple-plates](../stipple-plates/SKILL.md) for the card art, [
 
 ## Truman's rules for hobbies
 
-- **Every hobby has a personal element** from his own life or records ("look at how i made the other hobbie sections personal", 2026-06-29).
+- **Every hobby has a personal element** from his own life or records ("look at how i made the other hobbie sections personal", 2026-06-29). Copy isn't a personal element (2026-11-12).
 - **Real and accurate.** Species, facts, places and photos must hold up in front of experts: "it has to be completely accurate and also images. that way i can give it to experts and hobbyists" (2026-10-09). Facts are checkable against field guides or Wikipedia, never invented numbers, and doubtful ones get looked up twice.
 - **Animals first.** He wants the toys "more animal focused"; plants make dead-end clues. Reveal photos must be "clear and of the animal" (2026-07-08).
 - **Real maps.** "make it a real map and make it a heat map of the actual true locations" (2026-07-08), and on a phone it must pinch and zoom (2026-07-09).
@@ -54,7 +54,7 @@ Related skills: [stipple-plates](../stipple-plates/SKILL.md) for the card art, [
 
 ## Give a hobby its personal element
 
-Use one of the blocks that already exist before writing new plumbing: `media` (a gallery), `video` (one of his YouTube uploads in place of the hero photo, with `moments` the toy can link to; [docs/hobbies.md](../../../docs/hobbies.md#a-video-of-the-real-thing)), `inaturalist` (his observations, filtered with `iconicTaxa` or `taxonId`), `lifeList`, `spark`, `herpMap`, or a real-data gallery like the fishing catches. The life list and spark bird come from iNaturalist at build time, with the browser call as a fallback (`birding-inat.ts`). The observations grid and the herp map still fetch near the viewport. All of them fail quietly and round places through `inat-place.ts`. His iNaturalist user id comes from the hobby JSON.
+Use one of the blocks that already exist before writing new plumbing: `media` (a gallery), `video` (one of his YouTube uploads in place of the hero photo, with `moments` the toy can link to; [docs/hobbies.md](../../../docs/hobbies.md#a-video-of-the-real-thing)), `inaturalist` (his observations, filtered with `iconicTaxa` or `taxonId`), `lifeList`, `spark`, `herpMap`, `trails` (sessions from his archive as cards that open them; [docs/hobbies.md](../../../docs/hobbies.md#trails-ive-walked-hiking)), or a real-data gallery like the fishing catches. The life list and spark bird come from iNaturalist at build time, with the browser call as a fallback (`birding-inat.ts`). The observations grid and the herp map still fetch near the viewport. All of them fail quietly and round places through `inat-place.ts`. His iNaturalist user id comes from the hobby JSON.
 
 ## Species, facts and reveal photos
 
@@ -94,6 +94,7 @@ Day list became Narrow nature in two commits: the title and copy first (`dfca9e4
 - Tide pooling and herping: the first-find stamp off the animal, and a pass over older facts with the new copy rules: "it's good to get a pass on these older components" (2026-10-15).
 - The maps after the November 2026 review: the herp map's stipple dots "don't make sense here, and show in spots where i didn't see anything... a heat map is still the best way to do it, just in our same theme"; the fishing maps, canvas fonts and square sliders, "rest looks good". The ink heat map that replaced the stipple: "good enough for now... we can improve for future" (2026-11-12).
 - Birding, after a review of what read as AI on the site: "fix the birding page ai issues with wording, and definitely does not need all the privacy stuff" (2026-11-09). The intro now says what the toy does (his face with a beak and feathers, not the old "pixel bird"), the second description and the privacy paragraph under the toy are gone, the six rarest birds lost their Wikipedia first lines, and card and spark names are sentence case.
+- Hiking, after the November 2026 review: "every other hobby page shows something of mine, and hiking shows none of my hikes while the archive is full of them." "Copy isn't a personal element." Trails I've walked lists the 26 sessions he ticked as hikes, each opening its session. Miles and gain show "only where I give you the real numbers. Never invent them"; he gave none (2026-11-12).
 
 ## Hard-won lessons
 
@@ -126,5 +127,6 @@ Day list became Narrow nature in two commits: the title and copy first (`dfca9e4
 - The dev server uses `trailingSlash: 'always'`, so `/hobbies` without the slash 404s there. Restart it after changing `tailwind.config.mjs` or the content schema.
 - A key the content schema doesn't declare is dropped without an error. When a bulk revert took `dayList` out of `src/content.config.ts`, the puzzle vanished from the page with nothing in the build log (2026-10-09). If a hobby JSON block stops rendering, check the schema first.
 - Headless Chromium blocks iNaturalist photos (`ERR_BLOCKED_BY_ORB`) and reports the page hidden, so lazy iNaturalist grids stay empty in tests while real browsers load them (2026-06-23). Check in a real browser before "fixing" one.
+- Trails I've walked shows each session's cover, never its header: many headers are an animal (a marmot, an ice crawler, a crab), which the review's mock would have put on the trail cards. Name a `photo` when a cover isn't a trail or mountain shot. A renamed or split session drops off the list, with one warning in the build log, until its slug in `trails` is changed too (2026-11-12).
 
 Add new verdicts and lessons here, dated, in the commit that acts on them.

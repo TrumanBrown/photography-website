@@ -279,6 +279,33 @@ const hobbies = defineCollection({
         limit: z.number().int().positive().max(500).optional(),
       })
       .optional(),
+    /**
+     * Optional personal touch: sessions from the photo archive that were
+     * hikes, each a card that opens its session, newest first. A card shows
+     * the session's cover unless `photo` names another of its photographs.
+     * Rendered by TrailsWalked.astro.
+     */
+    trails: z
+      .object({
+        heading: z.string().optional(),
+        hikes: z
+          .array(
+            z.object({
+              /** The session's slug, as in /sessions/<slug>/. */
+              session: z.string(),
+              /** A photograph from that session to show instead of its cover. */
+              photo: z.string().optional(),
+              /**
+               * Distance and elevation gain exactly as Truman gave them. Never
+               * estimated or looked up: a hike without them shows neither.
+               */
+              miles: z.number().positive().optional(),
+              gainFt: z.number().int().positive().optional(),
+            }),
+          )
+          .min(1),
+      })
+      .optional(),
   }),
 });
 

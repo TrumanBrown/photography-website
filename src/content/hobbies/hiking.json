@@ -5,5 +5,36 @@
   "plateNote": "Liberty Bell · Washington Pass, July 2026",
   "accent": "#3f6f52",
   "order": 6,
-  "interactive": "pixel-hike"
+  "interactive": "pixel-hike",
+  "trails": {
+    "heading": "Trails I've walked",
+    "hikes": [
+      { "session": "mt-baker-fall-2026" },
+      { "session": "north-cascades-july-2026" },
+      { "session": "sunrise-rainier-july-2026" },
+      { "session": "june-sauk-mtn-and-nearby" },
+      { "session": "gunn-peak-june-2026" },
+      { "session": "may-ball-mountain-weekend" },
+      { "session": "mt-everest-may-2026" },
+      { "session": "shannan-and-shigatse-may-2026", "photo": "DSC08974.JPG" },
+      { "session": "lijiang-may-2026", "photo": "DSC07937.JPEG" },
+      { "session": "zhangjiajie-april-2026" },
+      { "session": "late-winter-washington-hikes-and-birds-2026" },
+      { "session": "olympic-winter-2026" },
+      { "session": "oregon-coast-gods-thumb-oct-2025" },
+      { "session": "cascades-waterfalls-forest-wildlife-nov-2025" },
+      { "session": "lake-valhalla-wa-nov-2025" },
+      { "session": "napali-coast-hi-oct-2025" },
+      { "session": "koloa-forest-reserve-hi-oct-2025" },
+      { "session": "mt-hood-sep-2025" },
+      { "session": "smith-rock-oregon-sep-2026" },
+      { "session": "crater-lake-oregon-sep-2025" },
+      { "session": "cascades-wa-aug-2025" },
+      { "session": "andalsnes-norway-aug-2025" },
+      { "session": "geiranger-norway-aug-2025" },
+      { "session": "andalsnes-2-norway-aug-2025" },
+      { "session": "skogafoss-iceland-aug-2025" },
+      { "session": "north-cascades-july-2025" }
+    ]
+  }
 }

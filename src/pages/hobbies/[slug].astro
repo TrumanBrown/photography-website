@@ -12,6 +12,7 @@ import BirdingSpark from "@/components/hobbies/BirdingSpark.astro";
 import BirdingLifeList from "@/components/hobbies/BirdingLifeList.astro";
 import INatObservations from "@/components/hobbies/INatObservations.astro";
 import INatHerpMap from "@/components/hobbies/INatHerpMap.astro";
+import TrailsWalked from "@/components/hobbies/TrailsWalked.astro";
 import DayList from "@/components/hobbies/DayList.astro";
 import Lightbox from "@/components/Lightbox.astro";
 import { hobbySlug } from "@/lib/hobbies";
@@ -43,6 +44,7 @@ const {
   spark,
   herpMap,
   dayList,
+  trails,
 } = entry.data;
 // A video takes the hero's place, and the hero photo joins the grid.
 const heroPhoto = video ? undefined : media?.hero;
@@ -87,6 +89,8 @@ const hasPlate =
 
       {dayList && <DayList heading={dayList.heading} />}
     </div>
+
+    {trails && <TrailsWalked heading={trails.heading} hikes={trails.hikes} />}
 
     {
       spark && (

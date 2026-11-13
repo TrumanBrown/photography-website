@@ -713,7 +713,7 @@ The section pairs each playful interactive with something real and personal, so 
 - **Fishing**: a gallery of my real catches, paired with the same species sprites used on the maps.
 - **Birding**: my life list from iNaturalist, written into the page at build time with the rarest species as cards, plus a written "spark bird" story beside my own photo of that bird.
 - **Herping**: the game's reveal photos are real CC-licensed shots, and below the game a live world map heat-maps every reptile and amphibian I've logged on iNaturalist in tints of ink, on a coarse grid. Tap a country (or the US, then a state) to zoom in to each find and a details grid, with a Reptiles/Amphibians toggle.
-- **Hiking**: landscape families and page copy grounded in my Cascades, China, Norway, and Himalayan hiking. Connecting each family directly to real trip photos is a planned follow-up.
+- **Hiking**: Trails I've walked, under the studio: the hikes in my photo archive, newest first, each a card that opens its session ([below](#trails-ive-walked-hiking)).
 
 New hobbies should follow the same pattern: build the game, then add a real personal artifact (photos, a map of real trips, real observations, and so on).
 
@@ -805,3 +805,25 @@ The herping page ends with a live, real geographic map of my reptile and amphibi
 - **One line under the map** says what a tap does at this level, then how to move around, in the words for the device: "Pinch to zoom and drag to look around." on a touch screen, "Scroll to zoom, and drag or use the arrow keys to look around." with a mouse. The blurb above the map doesn't repeat it.
 - **Zoom + pan (any level).** A `zoom`/`panX`/`panY` transform wraps each level's base projection so you can blow up tightly-clustered areas, up to 6× (further would only spread the grid out). It's driven by pinch on mobile, scroll-wheel on desktop, the + and − buttons, the keys, and drag-to-pan, with renders throttled through `requestAnimationFrame` for smooth gestures. The buttons are the site's square `.btn`, stacked in the corner on paper like Narrow nature's, 40px on a touch screen. On touch, the canvas's `touch-action` is `pan-y` at fit (so a one-finger drag still scrolls the page and a tap still selects) and flips to `none` once zoomed in (so one finger pans the map); two-finger pinch works in both. Zoom resets when you change level.
 - **Keyboard and reduced motion.** The frame round the canvas is one Tab stop (`role="application"`, the keys in its label). While it has keyboard focus a ring marks what the keyboard is on, starting in the middle. The arrows move it by 5% of the width (20% with Shift): once zoomed in they pan the map under the ring, and whatever the map can't take, at its edges or at the whole-map view, moves the ring itself, so every place and the Hawaii inset can be reached. `+`/`=` and `-`/`_` zoom about the ring, `0` fits the level again, Enter or Space opens the place or find in the ring, and Escape steps back out. A polite live region says what's in the ring ("Costa Rica, 106 observations. Enter zooms in."). Moves from the keys and buttons ease over 260ms; with reduced motion they jump straight there.
+
+### Trails I've walked (hiking)
+
+The hiking page ends with my hikes from the photo archive: a card for each, newest first, with the place and the date, that opens its session.
+
+- **Component:** [src/components/hobbies/TrailsWalked.astro](../src/components/hobbies/TrailsWalked.astro) + logic [src/lib/hobbies/hiking-trails.ts](../src/lib/hobbies/hiking-trails.ts) (tested in `hiking-trails.test.ts`). Switched on with an optional `trails` block that lists the sessions that were hikes, by slug:
+
+  ```json
+  "trails": {
+    "heading": "Trails I've walked",
+    "hikes": [
+      { "session": "mt-baker-fall-2026" },
+      { "session": "lijiang-may-2026", "photo": "DSC07937.JPEG" }
+    ]
+  }
+  ```
+
+- **Built from the sessions at build time.** Each card takes the session's title without its month, its date and a photo from the sessions collection, so nothing is fetched in the browser and the list of slugs is the only thing to keep up. The order in the JSON doesn't matter: the page sorts by the session's date, and the count beside the heading is the number of cards.
+- **The photo is the session's cover**, the frame its card in the archive shows, unless `photo` names another file in that session. Session headers aren't used, because many of them are an animal (a marmot, an ice crawler, a crab). Tiger Leaping Gorge and Shannan and Shigatse name a photo, since their covers are rooftops and gulls.
+- **A card is a session card:** the photo cropped to 4:3 on two sheets of paper, the place, and the date in tracked capitals. It uses the session card's widths (320 to 960) and formats, so a cover reuses the variant files the archive already has, and it loads lazily, since the section sits below the studio. A click opens the session with the same plain page change as a card in the archive (`data-open="session"`, [open.ts](../src/lib/open.ts)).
+- **Miles and gain only as I give them.** A hike can carry `miles` and `gainFt`, shown as a second tracked line ("9.5 mi · 4,300 ft gain"). They're my numbers or nothing, never estimated from the photos or looked up on a trail site. None were given in November 2026, so none show.
+- **Renamed or missing sessions.** A hike whose session isn't in the build is left out with one warning in the build log, so a fixture build still passes and a renamed session can't break a deploy. When a session is renamed or split, change its slug here in the same commit (the photo-sessions skill has the steps), and add a new hike by adding its slug.

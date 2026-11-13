@@ -52,6 +52,7 @@ The long versions: [staging/README.md](../../../staging/README.md), [docs/image-
 5. Photo captions takes 15 to 30 minutes and then starts a second build. It fills in a blank title and location.
 6. Truman sets the cover, header and rotation in /admin, saves, and presses Rebuild Site. Don't pick for him unless he asks.
 7. Check the result (below), and add a gazetteer entry if the globe has no pin for the new place (session-globe).
+8. If it was a hike, add `{ "session": "<slug>" }` to `trails` in `src/content/hobbies/hiking.json` so it shows under Trails I've walked on /hobbies/hiking/ (hobby-pages). Ask him when it isn't clear it was a hike.
 
 ### After the deploy
 
@@ -68,7 +69,7 @@ This was done for the Tibet trip on 2026-10-14: one session became Lhasa, Shanna
 1. List the photos: `az storage blob list --account-name <account> --container-name originals --prefix <old>/ --auth-mode login --query "[].name" -o tsv`.
 2. Copy each one to `originals/<new>/<file>` on the server side, then delete it from `<old>/`.
 3. Write each new `<new>/_session.json` with a title, a `location` the gazetteer knows, and `images` with their captions carried over. In the old sidecar, drop the moved files from `images`, `showcase` and `cover`. A `cover` that names a missing file fails the build, while a missing `banner` quietly falls back.
-4. Add gazetteer entries for the new places so they don't stack on the old pin (`7ebde27`), then commit and push.
+4. Add gazetteer entries for the new places so they don't stack on the old pin (`7ebde27`), point any `trails` entry in `src/content/hobbies/hiking.json` at the new slug (otherwise the hike drops off Trails I've walked, with a warning in the build log), then commit and push.
 5. Expect each moved photo to be downloaded once more (the manifest is keyed by blob name), new derivatives and copies under the new slug, and old `#photo-N` links to shift. Add a redirect route in `staticwebapp.config.json` if the old URL was shared. Captions and Instagram history follow the shot (camera, clock and subsecond), not the folder, so they survive the move.
 
 Merging is the same move with one target. Two files that end up with the same lower-case name fail the build (`validateImageTargets`), and so do two folders that sanitize to the same slug.
