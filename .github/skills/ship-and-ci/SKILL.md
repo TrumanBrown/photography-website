@@ -120,6 +120,7 @@ The default is to push. The exception is when he asks: "because these are a lot 
 - The Lint run shows a Prettier annotation even when it's green; dozens of older files fail the check.
 - The keepalive bot can push "Keep scheduled workflows enabled" to `main`, so pull before pushing.
 - Build and Deploy takes a median 7.6 minutes on a push (p90 12.4) and 6.0 on the cron, measured 2026-11-12.
+- The README's two hero pictures sit side by side only while each `<picture>` is on one line. GitHub lifts each `<img>` out of its `<picture>`, and the line breaks inside one turn into spaces that push the pair past the column, so they stack (`d0382ff`). Check a README layout change with `gh api markdown -f mode=markdown -F text=@README.md`; `mode=gfm` renders like a comment and turns every line break into `<br>`.
 - There's no browser test in the repo. Screenshots and smoothness checks have used Playwright from a scratch folder outside the repo, which won't exist on another machine.
 - His screen recordings are Snipping Tool `.mp4` files under `/mnt/c/Users/<user>/AppData/Local/Packages/Microsoft.ScreenSketch_*/TempState/Recordings/`. There's no system ffmpeg and system pip is locked, so use npm's `ffmpeg-static` or `pip install --target`, then tile frames at about 5 fps with timestamps into contact sheets to judge the motion (2026-10-14).
 - Live page URLs without the trailing slash answer a 301 with an empty body, so `curl -s .../sessions/x | grep og:image` finds nothing even when the tag is there. Use `curl -sL` or the slash URL (2026-06-10).
