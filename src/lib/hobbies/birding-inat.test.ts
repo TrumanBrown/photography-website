@@ -64,23 +64,34 @@ describe("loadLifeList", () => {
     expect(life.featured[0].common).toBe("Giant babax");
   });
 
-  it("walks every page of my own observations for photos and dates", async () => {
+  it("walks every page of my observations and shows my most-faved photo", async () => {
     const observations: {
       id: number;
+      faves_count: number;
       taxon: { id: number; ancestor_ids?: number[] };
       photos: { url: string }[];
       observed_on: string;
     }[] = Array.from({ length: 467 }, (_, i) => ({
-      id: i,
-      taxon: { id: (i % 241) + 1 },
+      id: 1000 - i,
+      faves_count: 0,
+      taxon: { id: (i % 240) + 1 },
       photos: [{ url: `${PHOTOS}/obs-${i}/square.jpg` }],
       observed_on: "2025-05-01",
     }));
-    // The only babax observation, a subspecies, on the third page.
+    // The babax twice: a newer photo nobody faved on page one, and a faved
+    // one, logged as a subspecies, on page three.
+    observations[5] = {
+      id: 995,
+      faves_count: 0,
+      taxon: { id: 242 },
+      photos: [{ url: `${PHOTOS}/newer/square.jpg` }],
+      observed_on: "2026-04-02",
+    };
     observations[466] = {
-      id: 466,
+      id: 534,
+      faves_count: 1,
       taxon: { id: 9001, ancestor_ids: [3, 242, 9001] },
-      photos: [{ url: `${PHOTOS}/mine/square.jpg` }],
+      photos: [{ url: `${PHOTOS}/faved/square.jpg` }],
       observed_on: "2026-03-02",
     };
     const inat = fakeINat({ species: lifeList(), observations });
@@ -91,7 +102,8 @@ describe("loadLifeList", () => {
     const babax = life.species.find((s) => s.common === "Giant babax");
 
     expect(inat.pagesOf("/observations")).toEqual(["1", "2", "3"]);
-    expect(babax?.photo).toBe(`${PHOTOS}/mine/small.jpg`);
-    expect(babax?.lastObservedOn).toBe("2026-03-02");
+    expect(babax?.photo).toBe(`${PHOTOS}/faved/small.jpg`);
+    expect(babax?.observationId).toBe(534);
+    expect(babax?.lastObservedOn).toBe("2026-04-02");
   });
 });

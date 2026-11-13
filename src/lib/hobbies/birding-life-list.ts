@@ -68,6 +68,7 @@ function readRows(list: HTMLElement): Row[] {
         wikipediaUrl: null,
         familyId: el.dataset.family || null,
         lastObservedOn: el.dataset.last || null,
+        observationId: null,
       },
     }),
   );

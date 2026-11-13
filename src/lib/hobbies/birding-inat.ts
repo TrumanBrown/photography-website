@@ -7,8 +7,8 @@
  * The list is /observations/species_counts, paged until total_results: every
  * species I've logged, with how many times. One page used to stop it at 200 of
  * 242 species, rarest bird included (the November 2026 review, TTT-19). A
- * second pass over my own bird observations, most-faved first and also paged
- * to the end, gives each species one of my photos and the day I last saw it.
+ * second pass over my own bird observations, also paged to the end, gives each
+ * species my most-faved photo of it and the day I last saw it.
  *
  * "Rarity" is the species' global iNaturalist record count (fewer records
  * worldwide = more unique), not a conservation status.
@@ -74,6 +74,8 @@ export interface Species {
   familyId: string | null;
   /** The day I last logged it, YYYY-MM-DD. */
   lastObservedOn: string | null;
+  /** The observation my photo of it comes from, which "My sighting" opens. */
+  observationId: number | null;
 }
 
 export interface LifeList {
@@ -113,6 +115,7 @@ interface ObservationsPage {
   total_results?: number;
   results?: {
     id: number;
+    faves_count?: number;
     taxon?: { id?: number; ancestor_ids?: number[] } | null;
     photos?: INatPhoto[];
     observed_on?: string | null;
@@ -245,6 +248,7 @@ export async function fetchSpeciesCounts(
         wikipediaUrl: wikipediaLink(taxon.wikipedia_url),
         familyId: familyIdOf(taxon.ancestor_ids ?? []),
         lastObservedOn: null,
+        observationId: null,
       });
     }
     if (results.length === 0 || received >= (data.total_results ?? 0)) break;
@@ -253,9 +257,14 @@ export async function fetchSpeciesCounts(
 }
 
 /**
- * Walks my own observations, most-faved first, so the first photo seen for a
- * species is my best one, and keeps the latest date seen for each. An
- * observation of a subspecies counts for its species.
+ * Walks every one of my observations with a photo, newest first, and gives
+ * each species its most-faved photo of mine, the newest one on a tie. That
+ * observation is the one its "My sighting" link opens. Keeps the latest date
+ * seen for each species too. An observation of a subspecies counts for its
+ * species.
+ *
+ * Pages go by id. Ordered by faves, where nearly all tie at none, iNaturalist's
+ * pages overlapped and 14 of 467 observations never came back (2026-11-13).
  */
 export async function addMyObservations(
   userId: string,
@@ -264,7 +273,7 @@ export async function addMyObservations(
   options: FetchOptions = {},
 ): Promise<void> {
   const byId = new Map(species.map((s) => [s.id, s]));
-  const withMyPhoto = new Set<number>();
+  const bestFaves = new Map<number, number>();
   let received = 0;
   for (let page = 1; received < MAX_RESULTS; page += 1) {
     const q = new URLSearchParams({
@@ -272,7 +281,7 @@ export async function addMyObservations(
       photos: "true",
       per_page: String(OBSERVATIONS_PER_PAGE),
       page: String(page),
-      order_by: "votes",
+      order_by: "id",
       order: "desc",
       locale: "en",
     });
@@ -298,9 +307,11 @@ export async function addMyObservations(
       const s = match == null ? undefined : byId.get(match);
       if (!s) continue;
       const photo = inatPhoto(o.photos?.[0]?.url, "small");
-      if (photo && !withMyPhoto.has(s.id)) {
+      const faves = o.faves_count ?? 0;
+      if (photo && faves > (bestFaves.get(s.id) ?? -1)) {
         s.photo = photo;
-        withMyPhoto.add(s.id);
+        s.observationId = o.id;
+        bestFaves.set(s.id, faves);
       }
       if (
         o.observed_on &&

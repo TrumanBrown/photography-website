@@ -65,6 +65,13 @@ export function observationsUrl(userId: string, taxonId: number): string {
   return `https://www.inaturalist.org/observations?user_id=${encodeURIComponent(userId)}&taxon_id=${taxonId}`;
 }
 
+/** The observation my photo comes from, or all my sightings when that's unknown. */
+function sightingUrl(s: Species, userId: string): string {
+  return s.observationId
+    ? `https://www.inaturalist.org/observations/${s.observationId}`
+    : observationsUrl(userId, s.id);
+}
+
 /** "242 species", "1,001 species". */
 export function speciesCount(n: number): string {
   return `${n.toLocaleString("en-US")} species`;
@@ -130,7 +137,7 @@ export function featuredCard(s: Species, userId: string): Markup {
           "a",
           {
             class: "draw self-start text-ink",
-            href: observationsUrl(userId, s.id),
+            href: sightingUrl(s, userId),
             ...NEW_TAB,
           },
           "My sighting →",
@@ -153,7 +160,8 @@ export function featuredCard(s: Species, userId: string): Markup {
 /**
  * One species in the full list. The data-* values are what search and sort
  * read back, so the browser can reorder rows the build wrote without
- * fetching anything.
+ * fetching anything. A row opens my one sighting, or the list of them when
+ * there are several.
  */
 export function listItem(s: Species, userId: string): Markup {
   const seen = monthYear(s.lastObservedOn);
@@ -172,7 +180,8 @@ export function listItem(s: Species, userId: string): Markup {
       {
         class:
           "group flex items-center gap-3 border-b border-rule-soft py-2 pr-2 no-underline transition-colors hover:bg-hover hover:no-underline",
-        href: observationsUrl(userId, s.id),
+        href:
+          s.mine === 1 ? sightingUrl(s, userId) : observationsUrl(userId, s.id),
         ...NEW_TAB,
       },
       h(
