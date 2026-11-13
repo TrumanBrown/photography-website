@@ -348,8 +348,11 @@ work. Don't move it into `~/.copilot/session-state/`; it's for reading.
 
 ### 9. Restart and check
 
-1. Restart VS Code (or run Developer: Reload Window). A running Copilot caches instructions and
-   hooks, so a new chat alone isn't enough the first time.
+1. Close every VS Code window and open the checkout again. A running Copilot caches instructions and
+   hooks, so a new chat alone isn't enough the first time. Developer: Reload Window reloads those,
+   but VS Code's WSL server keeps the PATH it read when it started, so right after installing nvm a
+   reloaded chat still runs an older `node`. If `which node` in the new chat isn't under `~/.nvm`,
+   run `wsl --shutdown` in PowerShell and open the checkout again.
 2. Start a Copilot chat in `~/projects/photography-website`, then read
    `~/.copilot/logs/photo-local-sync.log` and `~/.copilot/logs/copilot-home-sync.log`. No new lines
    means both syncs worked.
