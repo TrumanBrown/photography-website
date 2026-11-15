@@ -19,6 +19,7 @@ import { buildLeadFrames, coverFileOf, type LeadItem } from "@/lib/archive";
 import { sortHobbies, hobbySlug, thingsToTryLine } from "@/lib/hobbies";
 import { jsonForScript } from "@/lib/html";
 import { instagramUrl } from "@/lib/instagram";
+import { defaultPreview } from "@/lib/og";
 import {
   LINKS,
   PROJECTS,
@@ -88,10 +89,7 @@ const counts = {
   weekdays: `${WORK.length} roles since ${firstYear(WORK)} · ${PROJECTS.length} side projects`,
 };
 
-const first = sessions[0];
-const firstCover = first?.data.images.find(
-  (image) => image.file === coverFileOf(first),
-);
+const sitePhoto = await defaultPreview();
 const siteOrigin = (Astro.site ?? `https://${siteConfig.domain}`).toString();
 const instagram = instagramUrl();
 // Identifies me as an entity, with the off-site profiles that corroborate it.
@@ -110,19 +108,43 @@ const personSchema = {
     ...(instagram ? [instagram] : []),
   ],
 };
+// The image Google is asked to show beside this page in its results. The
+// share image (og:image) is the same photo, so the two hints agree.
+const pageSchema = sitePhoto && {
+  "@context": "https://schema.org",
+  "@type": "WebPage",
+  url: siteOrigin,
+  name: siteConfig.siteTitle,
+  primaryImageOfPage: {
+    "@type": "ImageObject",
+    url: sitePhoto.src,
+    width: sitePhoto.width,
+    height: sitePhoto.height,
+    caption: sitePhoto.alt,
+  },
+};
 ---
 
 <BaseLayout
   section="home"
   description={siteConfig.siteDescription}
-  ogImage={firstCover?.fullUrl}
-  ogImageAlt={first ? `${first.data.title} cover photograph` : undefined}
+  ogImage={sitePhoto?.src}
+  ogImageAlt={sitePhoto?.alt}
 >
   <script
     type="application/ld+json"
     set:html={jsonForScript(personSchema)}
     is:inline
   />
+  {
+    pageSchema && (
+      <script
+        type="application/ld+json"
+        set:html={jsonForScript(pageSchema)}
+        is:inline
+      />
+    )
+  }
 
   <div class="door" data-door>
     <span id="weekdays" class="week-anchor" aria-hidden="true"></span>

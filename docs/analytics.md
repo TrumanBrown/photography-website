@@ -165,7 +165,7 @@ Limits, kept in the `contactratelimit` table: one email per network owner and ci
 
 Every page's `og:image` and `twitter:image` is `https://trumanbrown.com/api/og?p=<page>&i=<image>` ([src/lib/og.ts](../src/lib/og.ts), [src/layouts/BaseLayout.astro](../src/layouts/BaseLayout.astro)). Chat and social apps fetch it to draw a preview. [api/og](../api/og/index.js) names the app from its user agent ([api/shared/share-app.js](../api/shared/share-app.js)), writes a `share` row, and answers 302 to the image. It only redirects to an image path on the site or to the site's own Blob account, so it can't be used to bounce people elsewhere. Search engines are recorded as "Search engine" and left out of the shares; fetchers not named yet are kept as "Other" with their user agent, so the list can grow.
 
-Every page has a preview: session, place and archive pages use their cover photo, each hobby page uses its stipple drawing flattened onto the paper colour at build ([src/pages/og/[slug].jpg.ts](../src/pages/og/[slug].jpg.ts), `/og/<slug>.jpg`, 1200 × 630), and everything else uses the front door's photo.
+Every page has a preview: session, place and archive pages use their cover photo, each hobby page uses its stipple drawing flattened onto the paper colour at build ([src/pages/og/[slug].jpg.ts](../src/pages/og/[slug].jpg.ts), `/og/<slug>.jpg`, 1200 × 630), and everything else uses the front door's photo: `sitePhoto` in [site.config.ts](../site.config.ts), or the newest session's cover if that photo is gone.
 
 Apps cache previews (LinkedIn for about a week), so repeat shares of a page may not show. The server never sees `#weekdays`, so a share of `/#weekdays` shows as `/`. These fetches come from the app's servers, so they carry no company or place.
 

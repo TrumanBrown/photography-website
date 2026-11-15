@@ -129,3 +129,40 @@ export function buildLeadFrames(sessions: Session[]): LeadFrame[] {
 export function coverFileOf(entry: Session): string {
   return entry.data.cover ?? entry.data.images[0].file;
 }
+
+export interface SitePhoto {
+  src: string;
+  alt: string;
+  width: number;
+  height: number;
+}
+
+/**
+ * The photo that stands for the site (`sitePhoto` in site.config.ts). If it
+ * isn't in the archive, as on a fresh clone or after a session is renamed,
+ * the newest session's cover stands in. `sessions` is newest first.
+ */
+export function sitePhotoOf(
+  sessions: Session[],
+  pin: { session: string; file: string },
+): SitePhoto | undefined {
+  const pinned = sessions.find((entry) => sessionSlug(entry) === pin.session);
+  const image = pinned?.data.images.find((i) => i.file === pin.file);
+  if (pinned && image?.fullUrl) return photoOf(pinned, image);
+  const newest = sessions[0];
+  const cover = newest?.data.images.find((i) => i.file === coverFileOf(newest));
+  if (!newest || !cover?.fullUrl) return undefined;
+  return {
+    ...photoOf(newest, cover),
+    alt: `${newest.data.title} cover photograph`,
+  };
+}
+
+function photoOf(entry: Session, image: SessionImage): SitePhoto {
+  return {
+    src: image.fullUrl ?? "",
+    alt: image.alt || image.caption || `${entry.data.title} photograph`,
+    width: image.width,
+    height: image.height,
+  };
+}

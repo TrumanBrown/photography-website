@@ -9,6 +9,7 @@ export const siteConfig = {
   siteTitle: 'Jane Doe',
   siteDescription: 'Personal photography by Jane Doe.',
   domain: 'janedoe.com',
+  sitePhoto: { session: 'my-first-session', file: 'IMG_0001.jpg' },
   defaultLocale: 'en-US',
   sessionsSort: 'orderThenDateDesc' as 'orderThenDateDesc' | 'dateDesc',
   sections: {

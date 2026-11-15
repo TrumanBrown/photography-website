@@ -6,7 +6,8 @@
  */
 import { getCollection } from "astro:content";
 import { sortSessions } from "./sessions";
-import { coverFileOf } from "./archive";
+import { sitePhotoOf, type SitePhoto } from "./archive";
+import { siteConfig } from "../../site.config";
 
 /** The address apps fetch for a page's preview image. */
 export function previewUrl(
@@ -20,19 +21,12 @@ export function previewUrl(
   return url.toString();
 }
 
-let fallback: Promise<{ src?: string; alt?: string }> | undefined;
+let fallback: Promise<SitePhoto | undefined> | undefined;
 
-/** The front door's photo: the newest session's cover. */
-export function defaultPreview(): Promise<{ src?: string; alt?: string }> {
-  fallback ??= getCollection("sessions").then((all) => {
-    const first = sortSessions(all)[0];
-    const cover = first?.data.images.find(
-      (image) => image.file === coverFileOf(first),
-    );
-    return {
-      src: cover?.fullUrl,
-      alt: first ? `${first.data.title} cover photograph` : undefined,
-    };
-  });
+/** The front door's photo: `sitePhoto` in site.config.ts. */
+export function defaultPreview(): Promise<SitePhoto | undefined> {
+  fallback ??= getCollection("sessions").then((all) =>
+    sitePhotoOf(sortSessions(all), siteConfig.sitePhoto),
+  );
   return fallback;
 }

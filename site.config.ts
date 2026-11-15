@@ -30,6 +30,18 @@ export const siteConfig = {
   /** Apex domain (no scheme, no www). www is bound automatically by SWA. */
   domain: "trumanbrown.com",
 
+  /**
+   * The photo that stands for the site: the front door's share image
+   * (LinkedIn, Slack, Teams), the image Google is asked to show beside the
+   * front door, and the share image of any page without a photo of its own.
+   * A session's folder name and a file in it. If it isn't in the archive, the
+   * newest session's cover stands in.
+   */
+  sitePhoto: {
+    session: "costa-rica-tapir-valley-august-2026",
+    file: "DSC07100.JPEG",
+  },
+
   /** BCP-47 locale for <html lang>. */
   defaultLocale: "en-US",
 

@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buildLeadFrames, buildPlaces, coverFileOf } from "./archive";
+import {
+  buildLeadFrames,
+  buildPlaces,
+  coverFileOf,
+  sitePhotoOf,
+} from "./archive";
 
 type AnySession = Parameters<typeof buildPlaces>[0][number];
 
@@ -154,5 +159,43 @@ describe("coverFileOf", () => {
     expect(coverFileOf(session("a", { images: [wide("a.jpg")] }))).toBe(
       "a.jpg",
     );
+  });
+});
+
+describe("sitePhotoOf", () => {
+  const shot = (file: string, caption?: string) => ({
+    ...wide(file),
+    caption,
+    fullUrl: `https://blob.example/originals/${file}`,
+  });
+  const archive = [
+    session("newest", {
+      title: "Mount Baker",
+      cover: "b.jpg",
+      images: [shot("b.jpg")],
+    }),
+    session("tapir", {
+      images: [shot("frog.jpg", "Red-eyed tree frog, Tapir Valley")],
+    }),
+  ];
+
+  it("uses the pinned photo, described by its caption", () => {
+    expect(
+      sitePhotoOf(archive, { session: "tapir", file: "frog.jpg" }),
+    ).toEqual({
+      src: "https://blob.example/originals/frog.jpg",
+      alt: "Red-eyed tree frog, Tapir Valley",
+      width: 6000,
+      height: 4000,
+    });
+  });
+
+  it("falls back to the newest cover when the pinned photo is gone", () => {
+    const photo = sitePhotoOf(archive, {
+      session: "renamed",
+      file: "frog.jpg",
+    });
+    expect(photo?.src).toBe("https://blob.example/originals/b.jpg");
+    expect(photo?.alt).toBe("Mount Baker cover photograph");
   });
 });
