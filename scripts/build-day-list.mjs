@@ -611,10 +611,13 @@ function factFrom(summary) {
   return sentence;
 }
 
-/** The fact and link for a species: the written one, else from Wikipedia. */
-function factFor(id, taxon) {
+/**
+ * The fact and link for a species: the written one, else from Wikipedia.
+ * Without a taxon (--facts on a written species), the link it has stays.
+ */
+function factFor(id, taxon, link = "") {
   const written = WRITTEN[String(id)];
-  const wiki = wikiUrl(taxon?.wikipedia_url);
+  const wiki = taxon ? wikiUrl(taxon.wikipedia_url) : link;
   if (!written) return { fact: factFrom(taxon?.wikipedia_summary), wiki };
   return { fact: written.fact, wiki: written.wiki ?? wiki };
 }
@@ -954,7 +957,7 @@ if (FACTS) {
         // Without its summary there's nothing better to put there.
         if (!taxon) continue;
       }
-      const next = factFor(clue.id, taxon);
+      const next = factFor(clue.id, taxon, clue.wiki);
       if (next.fact !== clue.fact || next.wiki !== clue.wiki) {
         Object.assign(clue, next);
         changed++;

@@ -315,6 +315,19 @@ describe("the full list's facts", () => {
     ).toEqual([]);
   });
 
+  it("keep their Wikipedia link, unless the facts file drops it", () => {
+    const entries = written as Record<string, { fact: string; wiki?: string }>;
+    expect(
+      clues
+        .filter((c) => {
+          const entry = entries[c.id];
+          if (entry && "wiki" in entry) return c.wiki !== entry.wiki;
+          return Boolean(c.fact) && !c.wiki;
+        })
+        .map((c) => `${c.id} ${c.name}`),
+    ).toEqual([]);
+  });
+
   it("keep each to one sentence of 12 to 25 words", () => {
     expect(
       offenders(
