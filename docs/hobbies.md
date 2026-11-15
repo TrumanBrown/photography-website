@@ -472,7 +472,8 @@ with the rules and uses one set of words throughout:
 - **The result is a receipt.** "Lock it in" swaps the panel for the verdict, the place and where the
   points came from: Place (distance, and how many species were showing), Month, Total. The full list
   with facts follows under the board. Wikipedia's bracketed Latin name and IPA pronunciation are
-  trimmed from the facts at render time (`tidyFact`), so the JSON keeps the source text.
+  trimmed from the facts at render time (`tidyFact`), so the JSON keeps the source text. Only the
+  first sentence shows, and a fact under 15 characters or cut off with "..." shows no line at all.
 - **The answer lands in one beat.** The map glides to frame the pin and the place together
   (`CAMERA_MS`, 650ms, no closer than 48x), then a dashed line runs from the pin to the nearest edge
   of the place over 600ms (`LINE_MS`), the same point the distance is measured to. The "km off"

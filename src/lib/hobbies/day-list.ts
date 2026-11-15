@@ -329,25 +329,50 @@ const IPA_BARE = new RegExp(`\\s*\\/(?=[^/\\s]*[${IPA}])[^/\\s]+\\/`, "g");
 // Wikipedia's audio link, which can sit inside the pronunciation bracket.
 const LISTEN = /\s*\(\s*listen\s*\)/gi;
 
+// Words a period can follow without ending the sentence: an initial ("P.
+// aethiopicus"), a dotted short form ("U.S.", "e.g.") or a common abbreviation.
+const NOT_AN_END =
+  /(?:^|[\s(])(?:[A-Za-z]|(?:[A-Za-z]\.)+[A-Za-z]|approx|ca|cf|etc|var|subsp|ssp|spp?|vs|St|Mt|Mr|Mrs|Ms|Dr|Jr|Sr|No|Fr|Ft)$/;
+
+/** The text up to the end of its first sentence. */
+function firstSentence(text: string): string {
+  const end = /[.!?]['")\]]*\s+(?=["'(]?[A-Z0-9])/g;
+  for (const match of text.matchAll(end)) {
+    const before = text.slice(0, match.index);
+    if (match[0][0] === "." && NOT_AN_END.test(before)) continue;
+    return text.slice(0, match.index + match[0].trimEnd().length);
+  }
+  return text;
+}
+
+/** Shorter than this, a fact is a stub ("...") rather than something to read. */
+const MIN_FACT_LENGTH = 15;
+
 /**
+ * The fact for the full list, or "" when there's nothing worth a line.
  * Wikipedia's opening sentence repeats the Latin name in brackets and often
  * carries a pronunciation. Both sit right under a name that's already shown,
  * so they come out. A bracket needs an IPA letter to count as a
- * pronunciation, so "(25 mi/h)" survives.
+ * pronunciation, so "(25 mi/h)" survives. Only the first sentence shows, and
+ * a stub or a sentence cut off with "..." doesn't show at all.
  */
 export function tidyFact(fact: string, sci: string): string {
   const latin = new RegExp(
     `\\s*\\(\\s*${sci.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*\\)`,
     "g",
   );
-  return fact
-    .replace(LISTEN, "")
-    .replace(IPA_IN_BRACKETS, "")
-    .replace(IPA_BARE, "")
-    .replace(latin, "")
-    .replace(/\s{2,}/g, " ")
-    .replace(/\s+([,.;:])/g, "$1")
-    .trim();
+  const tidy = firstSentence(
+    fact
+      .replace(LISTEN, "")
+      .replace(IPA_IN_BRACKETS, "")
+      .replace(IPA_BARE, "")
+      .replace(latin, "")
+      .replace(/\s{2,}/g, " ")
+      .replace(/\s+([,.;:])/g, "$1")
+      .trim(),
+  );
+  if (tidy.length < MIN_FACT_LENGTH || /(\.\.\.|\u2026)$/.test(tidy)) return "";
+  return tidy;
 }
 
 function formatPin(pin: LonLat): string {

@@ -261,4 +261,46 @@ describe("tidyFact", () => {
       }
     }
   });
+
+  it("shows only the first sentence", () => {
+    expect(
+      tidyFact(
+        "The Namaqua dove (Oena capensis) is a small pigeon. It is the only species in the genus Oena.",
+        "Oena capensis",
+      ),
+    ).toBe("The Namaqua dove is a small pigeon.");
+  });
+
+  it("doesn't end a sentence at an initial or a short form", () => {
+    expect(
+      tidyFact(
+        "It was once treated as a subspecies of P. aethiopicus, found across the U.S. and Mexico. It digs.",
+        "Phacochoerus africanus",
+      ),
+    ).toBe(
+      "It was once treated as a subspecies of P. aethiopicus, found across the U.S. and Mexico.",
+    );
+  });
+
+  it("hides a stub or a sentence cut off with dots", () => {
+    expect(tidyFact("...", "Trichostetha capensis")).toBe("");
+    expect(tidyFact("A beetle.", "Trichostetha capensis")).toBe("");
+    expect(
+      tidyFact(
+        "It has been introduced to New Zealand, Australia, Peru, Brazil...",
+        "Anas platyrhynchos",
+      ),
+    ).toBe("");
+  });
+
+  it("leaves no stub or cut-off fact on either full list", () => {
+    for (const round of [...daily, ...extra]) {
+      for (const clue of round.clues) {
+        const tidy = tidyFact(clue.fact, clue.sci);
+        if (!tidy) continue;
+        expect(tidy.length).toBeGreaterThanOrEqual(15);
+        expect(tidy).not.toMatch(/(\.\.\.|\u2026)$/);
+      }
+    }
+  });
 });
