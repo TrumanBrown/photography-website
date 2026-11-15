@@ -37,13 +37,16 @@ const groups = ZONES.map(({ zone, label }) => ({
 ---
 
 <section data-aquarium aria-label="Interactive planted aquarium" class="not-prose">
-  <div class="aq-frame">
-    <canvas
-      data-aquarium-canvas
-      class="block w-full touch-manipulation"
-      style="image-rendering: pixelated"
-      role="img"
-      aria-label="A planted freshwater tank. Add fish using the controls below."></canvas>
+  <div class="aq-pin" data-aquarium-pin>
+    <div class="aq-frame">
+      <canvas
+        data-aquarium-canvas
+        class="block w-full touch-manipulation"
+        style="image-rendering: pixelated"
+        role="img"
+        aria-label="A planted freshwater tank. Add fish using the controls below."
+      ></canvas>
+    </div>
   </div>
 
   <div class="aq">
@@ -155,6 +158,35 @@ const groups = ZONES.map(({ zone, label }) => ({
   .aq-frame.is-tipping {
     position: relative;
     z-index: 2;
+  }
+
+  /* On a phone the species list starts well below the tank, so a fish you
+     add would jump in off screen. There the tank stays pinned to the top
+     while the list scrolls under it, on a strip of paper. The negative
+     margins keep the spacing as it was until it pins. Only where the tank
+     takes well under half the screen: a phone on its side, a short window or
+     a desktop keep the page as it was. */
+  @media (max-width: 1023px) and (max-aspect-ratio: 4/5) {
+    .aq-pin {
+      position: sticky;
+      top: 0;
+      z-index: 6;
+      margin: -10px 0;
+      padding: 10px 0;
+      background: var(--paper);
+    }
+    /* Keep what you tab to clear of the pinned tank. The canvas is
+       0.52 of the page's width, 220 to 460px tall (aquarium.ts fit). */
+    [data-aquarium] :global(:is(button, input, a)) {
+      scroll-margin-top: calc(clamp(220px, 52vw, 460px) + 24px);
+    }
+    /* Tipped over, the tank leans past the edge of the screen. Left alone
+       that widens the page, the phone lets the view slide inside it, and a
+       scroll during the tip moves the pinned tank. clip, unlike hidden,
+       leaves the page as the box the tank pins to. */
+    :global(main:has([data-aquarium])) {
+      overflow-x: clip;
+    }
   }
 
   /* Phones and tablets stack the tank panel first, right under the canvas, so

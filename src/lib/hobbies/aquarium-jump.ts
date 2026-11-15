@@ -100,6 +100,9 @@ export interface Launch {
 
 export interface JumpsOptions {
   tank: HTMLCanvasElement;
+  /** A box that moves with the tank and never turns. On a phone the tank is
+   *  pinned to the top of the screen, so it moves on the page as it scrolls. */
+  pin: HTMLElement;
   /** Size of one drawn pixel, so the leap matches the tank's grid. */
   pix: number;
   /** The fish facing +x on its own canvas, centred, with its size in CSS px. */
@@ -120,6 +123,8 @@ interface Jump extends Launch {
   lastDrip: number;
   /** Page position of the surface where it goes in. */
   entry: Point;
+  /** Page position of the pin at launch. */
+  pin: Point;
 }
 
 interface Drop {
@@ -133,6 +138,9 @@ interface Drop {
   color: string;
   /** Page y of the water it falls back into, or none. */
   surface: number | null;
+  /** Page position of the pin when it was thrown, for a splash that stays
+   *  with the tank. Null for water loose on the page. */
+  pin: Point | null;
 }
 
 /** Morph from swatch to fish, s. */
@@ -161,7 +169,7 @@ export interface Jumps {
 }
 
 export function createJumps(options: JumpsOptions): Jumps {
-  const { tank, pix, sprite, onSplash } = options;
+  const { tank, pin, pix, sprite, onSplash } = options;
   const jumps: Jump[] = [];
   /** Fish poured out of a tipped tank, falling away. */
   const fallers: Array<{
@@ -183,6 +191,26 @@ export function createJumps(options: JumpsOptions): Jumps {
   let last = 0;
 
   const snap = (v: number) => Math.round(v / pix) * pix;
+
+  function pinAt(): Point {
+    const box = pin.getBoundingClientRect();
+    return { x: box.left + window.scrollX, y: box.top + window.scrollY };
+  }
+
+  /**
+   * Where a jump is `t` seconds in. It leaves from the page and lands in the
+   * tank, so if a pinned tank has moved on the page since launch, the fish
+   * follows it more the further along it is.
+   */
+  function where(jump: Jump, t: number, pinNow: Point): ArcState {
+    const at = jump.arc.at(t);
+    const k = clamp(t / jump.arc.duration, 0, 1);
+    return {
+      ...at,
+      x: at.x + (pinNow.x - jump.pin.x) * k,
+      y: at.y + (pinNow.y - jump.pin.y) * k,
+    };
+  }
 
   /** Splash blues that show on the page around the tank, in either theme. */
   function waterColors(): string[] {
@@ -221,6 +249,7 @@ export function createJumps(options: JumpsOptions): Jumps {
     now: number,
     count: number,
     surface: number | null,
+    pinThen: Point | null,
   ): void {
     const colors = waterColors();
     for (let i = 0; i < count; i++) {
@@ -235,6 +264,7 @@ export function createJumps(options: JumpsOptions): Jumps {
         size: Math.random() < 0.75 ? pix : pix / 2,
         color: colors[i % colors.length],
         surface,
+        pin: pinThen,
       });
     }
   }
@@ -252,15 +282,27 @@ export function createJumps(options: JumpsOptions): Jumps {
         }
       : { x: entry.x, y: entry.y - 70 };
     const arc = jumpArc(from, entry, spec.swatch ? 56 : 18);
-    jumps.push({ ...spec, arc, start: now, lastDrip: 0, entry });
+    jumps.push({
+      ...spec,
+      arc,
+      start: now,
+      lastDrip: 0,
+      entry,
+      pin: pinAt(),
+    });
     if (!raf) {
       last = now;
       raf = requestAnimationFrame(frame);
     }
   }
 
-  function draw(c: CanvasRenderingContext2D, jump: Jump, t: number): void {
-    const { x, y, vx, vy } = jump.arc.at(t);
+  function draw(
+    c: CanvasRenderingContext2D,
+    jump: Jump,
+    t: number,
+    pinNow: Point,
+  ): void {
+    const { x, y, vx, vy } = where(jump, t, pinNow);
     const box = tank.getBoundingClientRect();
     // Page to screen, then onto the tank's pixel grid.
     const gx = box.left + snap(x - window.scrollX - box.left);
@@ -315,6 +357,7 @@ export function createJumps(options: JumpsOptions): Jumps {
     c.setTransform(dpr, 0, 0, dpr, 0, 0);
     c.imageSmoothingEnabled = false;
     c.clearRect(0, 0, w, h);
+    const pinNow = pinAt();
 
     for (let i = jumps.length - 1; i >= 0; i--) {
       const jump = jumps[i];
@@ -322,7 +365,7 @@ export function createJumps(options: JumpsOptions): Jumps {
       if (t >= jump.arc.duration) {
         const end = jump.arc.at(jump.arc.duration);
         jumps.splice(i, 1);
-        spray(jump.entry, now, 18, jump.entry.y);
+        spray(jump.entry, now, 18, jump.entry.y, jump.pin);
         onSplash({
           species: jump.species,
           x: jump.entryX,
@@ -336,7 +379,7 @@ export function createJumps(options: JumpsOptions): Jumps {
       // Water flicks off its tail once it's clear of the swatch.
       if (t > MORPH && t - jump.lastDrip > DRIP_EVERY) {
         jump.lastDrip = t;
-        const at = jump.arc.at(t);
+        const at = where(jump, t, pinNow);
         // It faces the way it's going, so its tail is straight back.
         const speed = Math.hypot(at.vx, at.vy) || 1;
         const back = jump.size * 0.45;
@@ -351,9 +394,10 @@ export function createJumps(options: JumpsOptions): Jumps {
           size: Math.random() < 0.5 ? pix : pix / 2,
           color: colors[Math.floor(Math.random() * colors.length)],
           surface: null,
+          pin: null,
         });
       }
-      draw(c, jump, t);
+      draw(c, jump, t, pinNow);
     }
 
     const box = tank.getBoundingClientRect();
@@ -397,8 +441,11 @@ export function createJumps(options: JumpsOptions): Jumps {
       }
       c.globalAlpha = Math.min(1, (1 - age / d.life) * 3);
       c.fillStyle = d.color;
-      const gx = box.left + snap(d.x - window.scrollX - box.left);
-      const gy = box.top + snap(d.y - window.scrollY - box.top);
+      // A splash moves with a pinned tank; loose water stays on the page.
+      const ox = d.pin ? pinNow.x - d.pin.x : 0;
+      const oy = d.pin ? pinNow.y - d.pin.y : 0;
+      const gx = box.left + snap(d.x + ox - window.scrollX - box.left);
+      const gy = box.top + snap(d.y + oy - window.scrollY - box.top);
       c.fillRect(gx, gy, d.size, d.size);
     }
     c.globalAlpha = 1;
@@ -443,6 +490,7 @@ export function createJumps(options: JumpsOptions): Jumps {
           size: Math.random() < 0.7 ? pix : pix / 2,
           color: colors[Math.floor(Math.random() * colors.length)],
           surface: null,
+          pin: null,
         });
       }
       wake();

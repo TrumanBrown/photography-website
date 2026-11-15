@@ -522,8 +522,15 @@ export function initAquarium(root: HTMLElement): void {
   const nets: Net[] = [];
   /** Everything poured out when the tank was tipped, still falling. */
   const spilled: Array<{ fish: Fish; x: number; y: number; vx: number; vy: number; spin: number; turn: number }> = [];
-  let tip: { start: number; side: 1 | -1; left: number; top: number } | null = null;
+  let tip: { start: number; side: 1 | -1; dx: number; dy: number } | null = null;
   const tank: HTMLElement = canvas.parentElement ?? canvas;
+  /** Moves with the tank but never turns (AquariumTank pins it on phones). */
+  const pin: HTMLElement = root.querySelector<HTMLElement>('[data-aquarium-pin]') ?? root;
+  /** Where the tank's top left is on the page now. */
+  function tankAt(dx: number, dy: number): { left: number; top: number } {
+    const box = pin.getBoundingClientRect();
+    return { left: box.left + window.scrollX + dx, top: box.top + window.scrollY + dy };
+  }
   const sprites = new Map<string, Sprite>();
 
   /** A species drawn once on its own canvas, for drawing turned. */
@@ -759,7 +766,8 @@ export function initAquarium(root: HTMLElement): void {
       // Tip the tank out: everything in it pours over the low side.
       const side: 1 | -1 = Math.random() < 0.5 ? -1 : 1;
       const box = canvas!.getBoundingClientRect();
-      tip = { start: performance.now(), side, left: box.left + window.scrollX, top: box.top + window.scrollY };
+      const at = pin.getBoundingClientRect();
+      tip = { start: performance.now(), side, dx: box.left - at.left, dy: box.top - at.top };
       for (const f of fish) {
         spilled.push({
           fish: f,
@@ -1006,9 +1014,10 @@ export function initAquarium(root: HTMLElement): void {
       const sin = Math.sin(lean);
       // Tank pixels to page pixels, turned about the low bottom corner.
       const ox = tip.side < 0 ? 0 : W;
+      const { left, top } = tankAt(tip.dx, tip.dy);
       const toPage = (x: number, y: number) => ({
-        x: tip!.left + ox + (x - ox) * cos - (y - H) * sin,
-        y: tip!.top + H + (x - ox) * sin + (y - H) * cos,
+        x: left + ox + (x - ox) * cos - (y - H) * sin,
+        y: top + H + (x - ox) * sin + (y - H) * cos,
       });
       // Everything rushes for the low corner of the rim and pours out.
       const rimX = tip.side < 0 ? 0 : W;
@@ -1147,6 +1156,7 @@ export function initAquarium(root: HTMLElement): void {
   // ------------------------------------------------------------- wiring
   const jumps = createJumps({
     tank: canvas,
+    pin,
     pix: PIX,
     sprite: spriteFor,
     onSplash(splash) {
