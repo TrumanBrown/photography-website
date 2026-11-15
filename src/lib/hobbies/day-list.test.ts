@@ -14,6 +14,7 @@ import {
 } from "./day-list";
 import puzzles from "./day-list.json";
 import extras from "./day-list-extra.json";
+import facts from "./day-list-facts.json";
 
 const daily = puzzles.rounds as Round[];
 const extra = extras.rounds as Round[];
@@ -197,6 +198,72 @@ describe("bestPossible", () => {
   it("clamps out-of-range counts from old saved games", () => {
     expect(bestPossible(0)).toBe(bestPossible(1));
     expect(bestPossible(9)).toBe(bestPossible(6));
+  });
+});
+
+describe("the full list's facts", () => {
+  const written = (
+    facts as { facts: Record<string, { fact: string; why?: string }> }
+  ).facts;
+  const clues = [...daily, ...extra].flatMap((r) => r.clues);
+  const offenders = (bad: (fact: string) => boolean) =>
+    clues
+      .filter((c) => c.fact && bad(c.fact))
+      .map((c) => `${c.id} ${c.name}: ${c.fact}`);
+  const words = (fact: string) => fact.split(/\s+/).filter(Boolean).length;
+
+  it("give every species a fact, unless the facts file says why not", () => {
+    expect(
+      clues
+        .filter((c) => !c.fact.trim() && !written[c.id]?.why)
+        .map((c) => `${c.id} ${c.name}`),
+    ).toEqual([]);
+  });
+
+  it("match the written facts the builder copies in", () => {
+    expect(
+      clues
+        .filter((c) => written[c.id] && written[c.id].fact !== c.fact)
+        .map((c) => `${c.id} ${c.name}`),
+    ).toEqual([]);
+  });
+
+  it("keep each to one sentence of 12 to 25 words", () => {
+    expect(
+      offenders(
+        (f) =>
+          words(f) < 12 ||
+          words(f) > 25 ||
+          !/\.['"]?$/.test(f) ||
+          /[.?!]['"]? +[A-Z]/.test(f),
+      ),
+    ).toEqual([]);
+  });
+
+  it("leave out taxonomy", () => {
+    expect(
+      offenders((f) =>
+        /\b(?:is|was|are) (?:a|an|the) (?:\w+ )?(?:species|genus|subspecies) of\b|\bdescribed by\b|\bfamily [A-Z]/.test(
+          f,
+        ),
+      ),
+    ).toEqual([]);
+  });
+
+  it("never stop at '...' or an abbreviation", () => {
+    expect(
+      offenders(
+        (f) =>
+          /(\.\.\.|\u2026)$/.test(f) ||
+          /(?:^|[\s(])(?:[A-Za-z]|(?:[A-Za-z]\.)+[A-Za-z]|etc|sp|spp|var|ca|St|Mt)\.$/.test(
+            f,
+          ),
+      ),
+    ).toEqual([]);
+  });
+
+  it("never join clauses with a dash", () => {
+    expect(offenders((f) => /[\u2013\u2014]| -- | - /.test(f))).toEqual([]);
   });
 });
 

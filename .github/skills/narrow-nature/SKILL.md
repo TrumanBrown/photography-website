@@ -1,6 +1,6 @@
 ---
 name: narrow-nature
-description: "Narrow nature (formerly Day list), the daily place-guessing puzzle at /hobbies/narrow-nature/: DayList.astro, src/lib/hobbies/day-list.ts, day-list-map.ts and day-list-borders.ts, the round data built from iNaturalist by scripts/build-day-list.mjs (accuracy rules, --extra, --retag), resolve-day-list-places.mjs, the relief tiles and borders, map zoom, scoring, the reveal and its stamps, More lists (ten more a day), photo credits and the share text. Use when: changing the puzzle, its rules, scoring, instructions or layout; adding or vetting places or rebuilding the rounds; a species, a native, introduced or endemic label, or a fact is wrong; the map, zoom, relief or borders need work, especially on phones; changing the reveal or the points stamps; or renaming anything players' saved progress depends on."
+description: "Narrow nature (formerly Day list), the daily place-guessing puzzle at /hobbies/narrow-nature/: DayList.astro, src/lib/hobbies/day-list.ts, day-list-map.ts and day-list-borders.ts, the round data built from iNaturalist by scripts/build-day-list.mjs (accuracy rules, --extra, --retag, --facts), the hand-written facts in day-list-facts.json, resolve-day-list-places.mjs, the relief tiles and borders, map zoom, scoring, the reveal and its stamps, More lists (ten more a day), photo credits and the share text. Use when: changing the puzzle, its rules, scoring, instructions or layout; adding or vetting places or rebuilding the rounds; a species, a native, introduced or endemic label, or a fact is wrong; the map, zoom, relief or borders need work, especially on phones; changing the reveal or the points stamps; or renaming anything players' saved progress depends on."
 argument-hint: 'the change, e.g. "add Madagascar to More lists" or "the borders draw across a bay"'
 ---
 
@@ -15,6 +15,7 @@ A daily puzzle that asks you to read a community instead of one organism. Six sp
 | `src/lib/hobbies/day-list-map.ts`                                 | zoom (1x to 64x) and pan, gestures, relief tiles and their palette, camera moves for the reveal                                                                      |
 | `src/lib/hobbies/day-list-borders.ts` + `day-list-borders/`       | country and state borders (generated)                                                                                                                                |
 | `src/lib/hobbies/day-list.json`, `day-list-extra.json`            | the daily set and the More lists set (generated)                                                                                                                     |
+| `src/lib/hobbies/day-list-facts.json`                             | the full list's facts, written by hand from Wikipedia, by taxon id. The builder copies them into both sets; an empty one says why                                    |
 | `public/day-list/relief/v1/` + `day-list-relief.json`             | relief tiles (about 2,900 files, served immutable) and the list of which exist                                                                                       |
 | `scripts/build-day-list.mjs`, `resolve-day-list-places.mjs`       | build the sets from iNaturalist and Wikipedia; vet candidate places                                                                                                  |
 | `scripts/build-day-list-relief.mjs`, `build-day-list-borders.mjs` | cut the tiles; build the borders from Natural Earth                                                                                                                  |
@@ -29,6 +30,7 @@ The long version, including every accuracy rule, is [docs/hobbies.md](../../../d
 - **The map has to work on a phone**: zoom to see how close you were, more detail than flat continents, state and country borders (2026-10-12).
 - **Photographer names stay off the board.** Credits go in a closed footnote, because a name can give the place away (2026-10-13).
 - **More lists is capped at ten a day**, so places don't repeat and it doesn't cost much (2026-10-12).
+- **Every fact on the full list follows site-copy Species facts: one sentence, 12 to 25 words.** A species with no fact shows no fact line. day-list.test.ts fails on an empty or '...' fact (2026-11-15). An empty one passes only when day-list-facts.json says why: Wikipedia has nothing on that species but taxonomy.
 - **Feedback lands by what it's about, not in the middle of the screen**: the "-X points" stamp "slamming first like a stamp and slowly drifting down and away" (2026-10-14). It lands on the top-right corner of the clue photo it bought, since the score is often off screen on a phone, and he's fine with that: "its fine on the photo since the photo is large and this is small and in top right" (2026-10-25).
 
 ## Add places or rebuild the rounds
@@ -36,10 +38,11 @@ The long version, including every accuracy rule, is [docs/hobbies.md](../../../d
 1. Vet candidates: `node scripts/resolve-day-list-places.mjs` (add `--extra` for More lists). It resolves each to an iNaturalist place id and reports how much data it has, its busiest month and the size of its boundary.
 2. Paste the keepers into `PLACES` or `EXTRA_PLACES` in `scripts/build-day-list.mjs`.
 3. Build: `npm run build:day-list` (the daily set) or `npm run build:day-list -- --extra`. About an hour per set: it throttles to roughly one request a second, retries with a widening pause, and refuses to write a set with fewer than ten rounds.
-4. Rebuild the daily set near midnight. Today's round is `todayNumber() % ROUNDS.length` by the visitor's local date, so adding or removing daily rounds changes everyone's "today", including people partway through.
-5. `npm run build:day-list -- --retag [--extra]` relabels native, introduced and endemic without changing any species (about ten minutes for both sets), and is safe any time.
-6. Run `npx vitest run src/lib/hobbies/day-list.test.ts`. It reads the built data: the real sets must never share a place, every round needs six species and a boundary, and there must be enough extras for a week.
-7. Record any fact check in the docs, as the October 2026 one was.
+4. Write the facts. The build ends with the species that have no entry in `day-list-facts.json`; until they get one they carry the first sentence of their Wikipedia summary that isn't taxonomy, or nothing if it runs over 25 words, and `npm test` fails. Write each from its Wikipedia article to site-copy's Species facts (one sentence, 12 to 25 words, the hook first, no taxonomy), check it against the article, then run `npm run build:day-list -- --facts [--extra]`. That changes only facts and links, needs no network for written ones, and is safe any time.
+5. Rebuild the daily set near midnight. Today's round is `todayNumber() % ROUNDS.length` by the visitor's local date, so adding or removing daily rounds changes everyone's "today", including people partway through.
+6. `npm run build:day-list -- --retag [--extra]` relabels native, introduced and endemic without changing any species (about ten minutes for both sets), and is safe any time.
+7. Run `npx vitest run src/lib/hobbies/day-list.test.ts`. It reads the built data: the real sets must never share a place, every round needs six species and a boundary, there must be enough extras for a week, and every fact must match `day-list-facts.json` and pass the Species facts rule.
+8. Record any fact check in the docs, as the October and November 2026 ones were.
 
 ## Map data
 
@@ -67,6 +70,7 @@ The long version, including every accuracy rule, is [docs/hobbies.md](../../../d
 6. **Borders from Natural Earth needed work**: its zoom limits left Mexico blank beside a fully drawn US, and state lines ran across bays such as the Chesapeake. Each country's zoom now comes from its states' sizes, and lines that cross water are dropped (`27fdb80`).
 7. **The reveal reads better in beats**: the line draws from the pin to the place over about 600 ms while the distance rolls up, then the boundary strokes in. Under reduced motion it all shows at once.
 8. **The rename went in two commits**, title and copy first (`dfca9e4`), then the URL with 301s from the old paths (`a9c0572`). The code kept the old name on purpose.
+9. **The full list printed Wikipedia as it came**: taxonomy ("a member of the duck, goose, and swan family Anatidae"), facts cut at "subspecies of P." and lines of nothing but "...". In the daily set 10 of 234 facts were empty or "..." and 136 ran over 25 words, because the builder kept the first 230 characters of each summary. The page now shows one sentence and hides a stub (`a5f11e7`). Every fact is written by hand in `day-list-facts.json`, checked against its article, and the test holds the data to the Species facts rule. Eleven species have only taxonomy on Wikipedia and show no fact rather than an invented one.
 
 ## Gotchas
 

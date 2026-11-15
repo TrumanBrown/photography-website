@@ -21,8 +21,11 @@
  *    every place that contains it, and a stray listing somewhere (a user-made
  *    place that calls Mallards introduced) shouldn't outvote the rest. So the
  *    label goes with the majority of the place's own flagged records.
- *  - Facts come from the taxon's Wikipedia summary and ship with the article
- *    link so a player can check them.
+ *  - Facts come from day-list-facts.json, one sentence per species written
+ *    from its Wikipedia article, and ship with the article link so a player
+ *    can check them. A species without one gets the first sentence of its
+ *    Wikipedia summary that isn't taxonomy, if that sentence is short enough,
+ *    and the build lists it so a fact gets written.
  *  - Photos are openly licensed only, and the licence and photographer travel
  *    with the photo so the UI can credit them. CC BY and CC BY-NC both require
  *    attribution.
@@ -38,6 +41,8 @@
  *   npm run build:day-list -- --extra           extras -> day-list-extra.json
  *   npm run build:day-list -- --retag [--extra] refresh the native/introduced
  *                                               labels only, same species
+ *   npm run build:day-list -- --facts [--extra] refresh the facts and their
+ *                                               links only, same species
  */
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -46,12 +51,17 @@ import { fileURLToPath } from "node:url";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const EXTRA = process.argv.includes("--extra");
 const RETAG = process.argv.includes("--retag");
+const FACTS = process.argv.includes("--facts");
 const OUT = join(
   root,
   EXTRA
     ? "src/lib/hobbies/day-list-extra.json"
     : "src/lib/hobbies/day-list.json",
 );
+/** The written facts, by iNaturalist taxon id. */
+const WRITTEN = JSON.parse(
+  readFileSync(join(root, "src/lib/hobbies/day-list-facts.json"), "utf8"),
+).facts;
 
 const UA = {
   "User-Agent": "trumanbrown.com day-list builder (+https://trumanbrown.com)",
@@ -563,18 +573,70 @@ function stripHtml(value) {
   return text.replace(/\s+/g, " ").trim();
 }
 
-/** Trim a Wikipedia summary to whole sentences so it never ends mid-word. */
-function firstSentences(text, limit = 230) {
-  const clean = stripHtml(text);
-  if (!clean) return "";
-  if (clean.length <= limit) return clean;
-  const cut = clean.slice(0, limit);
-  const stop = Math.max(
-    cut.lastIndexOf(". "),
-    cut.lastIndexOf("! "),
-    cut.lastIndexOf("? "),
+// A sentence about classification rather than the animal: "is a species of
+// moth in the family ...", "was described by ...".
+const TAXONOMY =
+  /\b(?:is|was|are) (?:a|an|the) (?:\w+ )?(?:species|genus|subspecies) of\b|\bdescribed by\b|\bfamily [A-Z]/;
+// Words a period can follow without ending the sentence: an initial ("P.
+// aethiopicus"), a dotted short form ("U.S.") or a common abbreviation.
+const ABBREVIATION =
+  /(?:^|[\s(])(?:[A-Za-z]|(?:[A-Za-z]\.)+[A-Za-z]|approx|ca|cf|etc|var|subsp|ssp|spp?|vs|St|Mt|Mr|Mrs|Ms|Dr|Jr|Sr|No|Fr|Ft)$/;
+const MAX_FACT_WORDS = 25;
+
+/** Split text into sentences, without breaking at an abbreviation. */
+function sentences(text) {
+  const out = [];
+  let start = 0;
+  for (const match of text.matchAll(/[.!?]['")\]]*\s+(?=["'(]?[A-Z0-9])/g)) {
+    const before = text.slice(start, match.index);
+    if (match[0][0] === "." && ABBREVIATION.test(before)) continue;
+    out.push(text.slice(start, match.index + match[0].trimEnd().length));
+    start = match.index + match[0].length;
+  }
+  out.push(text.slice(start));
+  return out.map((s) => s.trim()).filter(Boolean);
+}
+
+/**
+ * A fact from a Wikipedia summary, for a species with no written one: the
+ * first sentence that isn't taxonomy, or nothing when that sentence runs
+ * over 25 words or stops at an abbreviation or "...".
+ */
+function factFrom(summary) {
+  const sentence = sentences(stripHtml(summary)).find((s) => !TAXONOMY.test(s));
+  if (!sentence) return "";
+  if (sentence.split(/\s+/).length > MAX_FACT_WORDS) return "";
+  if (/(\.\.\.|\u2026)$/.test(sentence)) return "";
+  if (ABBREVIATION.test(sentence.slice(0, -1))) return "";
+  return sentence;
+}
+
+/** The fact and link for a species: the written one, else from Wikipedia. */
+function factFor(id, taxon) {
+  const written = WRITTEN[String(id)];
+  const wiki = wikiUrl(taxon?.wikipedia_url);
+  if (!written) return { fact: factFrom(taxon?.wikipedia_summary), wiki };
+  return { fact: written.fact, wiki: written.wiki ?? wiki };
+}
+
+/** Species on the board that still need a fact written. */
+function unwritten(rounds) {
+  const missing = new Map();
+  for (const round of rounds) {
+    for (const clue of round.clues) {
+      if (!WRITTEN[String(clue.id)]) missing.set(clue.id, clue.name);
+    }
+  }
+  return missing;
+}
+
+function reportUnwritten(rounds) {
+  const missing = unwritten(rounds);
+  if (!missing.size) return;
+  console.log(
+    `\n${missing.size} species have no written fact in src/lib/hobbies/day-list-facts.json yet:`,
   );
-  return stop > 60 ? cut.slice(0, stop + 1) : `${cut.trimEnd()}...`;
+  for (const [id, name] of missing) console.log(`  - ${id} ${name}`);
 }
 
 /**
@@ -772,8 +834,7 @@ async function enrich(clue) {
     global: clue.global,
     local: clue.local,
     standing: "native",
-    fact: firstSentences(taxon.wikipedia_summary),
-    wiki: wikiUrl(taxon.wikipedia_url),
+    ...factFor(clue.id, taxon),
     rank: taxon.conservation_status
       ? taxon.conservation_status.status_name || ""
       : "",
@@ -868,6 +929,41 @@ if (RETAG) {
   }
   writeFileSync(OUT, `${JSON.stringify(set, null, 2)}\n`);
   console.log(`\nRelabelled ${changed} species in ${OUT}.`);
+  process.exit(0);
+}
+
+/**
+ * --facts: keep every round's species, refresh only the facts and their
+ * links from day-list-facts.json, fetching a summary only for a species that
+ * has no written fact. Safe to run on the live set any time, like --retag.
+ */
+if (FACTS) {
+  const set = JSON.parse(readFileSync(OUT, "utf8"));
+  let changed = 0;
+  for (const round of set.rounds) {
+    for (const clue of round.clues) {
+      let taxon = null;
+      if (!WRITTEN[String(clue.id)]) {
+        try {
+          const data = await api(`taxa/${clue.id}`, { locale: "en" });
+          taxon = (data.results || [])[0] || null;
+        } catch {
+          taxon = null;
+        }
+        await sleep(THROTTLE);
+        // Without its summary there's nothing better to put there.
+        if (!taxon) continue;
+      }
+      const next = factFor(clue.id, taxon);
+      if (next.fact !== clue.fact || next.wiki !== clue.wiki) {
+        Object.assign(clue, next);
+        changed++;
+      }
+    }
+  }
+  writeFileSync(OUT, `${JSON.stringify(set, null, 2)}\n`);
+  console.log(`Refreshed ${changed} facts in ${OUT}.`);
+  reportUnwritten(set.rounds);
   process.exit(0);
 }
 
@@ -992,3 +1088,4 @@ const payload = {
 mkdirSync(dirname(OUT), { recursive: true });
 writeFileSync(OUT, `${JSON.stringify(payload, null, 2)}\n`);
 console.log(`\nWrote ${OUT} with ${rounds.length} rounds.`);
+reportUnwritten(rounds);

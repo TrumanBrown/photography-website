@@ -415,6 +415,9 @@ More lists deals up to ten more a day per browser, from a separate set of places
   state borders drawn over the map, from the files in `src/lib/hobbies/day-list-borders/`.
 - [src/lib/hobbies/day-list.json](../src/lib/hobbies/day-list.json), the daily set, and
   [day-list-extra.json](../src/lib/hobbies/day-list-extra.json), the More lists set.
+- [src/lib/hobbies/day-list-facts.json](../src/lib/hobbies/day-list-facts.json), the facts on the
+  full list, written by hand and kept by iNaturalist taxon id. The builder copies them into both
+  sets.
 - [public/day-list/relief/](../public/day-list/relief/) and
   [day-list-relief.json](../src/lib/hobbies/day-list-relief.json), the terrain tiles and the list of
   which exist.
@@ -471,9 +474,10 @@ with the rules and uses one set of words throughout:
   distance under it, and stays there with the result.
 - **The result is a receipt.** "Lock it in" swaps the panel for the verdict, the place and where the
   points came from: Place (distance, and how many species were showing), Month, Total. The full list
-  with facts follows under the board. Wikipedia's bracketed Latin name and IPA pronunciation are
-  trimmed from the facts at render time (`tidyFact`), so the JSON keeps the source text. Only the
-  first sentence shows, and a fact under 15 characters or cut off with "..." shows no line at all.
+  with facts follows under the board, one written sentence per species (see the accuracy rules).
+  `tidyFact` still guards the page against a fact taken straight from Wikipedia: it trims a
+  bracketed Latin name or IPA pronunciation, shows only the first sentence, and shows no line for a
+  fact under 15 characters or cut off with "...". A species with no fact shows no fact line.
 - **The answer lands in one beat.** The map glides to frame the pin and the place together
   (`CAMERA_MS`, 650ms, no closer than 48x), then a dashed line runs from the pin to the nearest edge
   of the place over 600ms (`LINE_MS`), the same point the distance is measured to. The "km off"
@@ -625,9 +629,23 @@ The puzzle is aimed at people who know the species, so the builder is strict abo
   also has to hold worldwide: at least half the species' records anywhere must be flagged endemic.
   That drops island listings of a local subspecies, like Grey Wagtail on Madeira (2% worldwide),
   and keeps real endemics, which run from 66% (Red-necked Wallaby, introduced abroad) to 100%.
-- **Facts come from the taxon's Wikipedia summary** and ship with the article link so they can be
-  checked. iNaturalist returns those URLs with raw spaces in the title, which do not resolve, so the
-  builder normalises them.
+- **Facts are written by hand from Wikipedia** and ship with the article link so they can be
+  checked. Each is one sentence of 12 to 25 words that leads with something about the animal, the
+  site's rule for species facts. Until November 2026 the builder kept the first 230 characters of
+  each Wikipedia summary, so the full list read like a scraped encyclopedia: taxonomy ("a member of
+  the duck, goose, and swan family Anatidae"), facts cut off at "subspecies of P." and lines of
+  "...". In the daily set 10 of 234 facts were empty or "..." and 136 ran over 25 words. All 368
+  species were then written again from their Wikipedia articles, each checked against its article.
+  Seven with no article of their own carry a fact that holds for their whole genus or a close
+  relative, linked to that article, and a few links iNaturalist didn't have were added. Eleven
+  species have nothing on Wikipedia but taxonomy, so they have no fact, and the file says why. The
+  facts live in `day-list-facts.json`, and
+  [day-list.test.ts](../src/lib/hobbies/day-list.test.ts) fails on a fact in either set that's
+  empty without a reason, over 25 words, more than one sentence, taxonomy, cut off at "..." or an
+  abbreviation, or joined with a dash. A species without a written fact gets the first sentence of
+  its Wikipedia summary that isn't taxonomy, if that's 25 words or fewer, and the build lists it so
+  one gets written. iNaturalist returns article URLs with raw spaces in the title, which do not
+  resolve, so the builder normalises them.
 - **Photos are openly licensed only.** The builder walks `default_photo` then `taxon_photos` until it
   finds an acceptable licence, because the best-known species often have an all-rights-reserved lead
   image. The photographer and licence travel with the photo and are rendered under it on the
@@ -644,6 +662,7 @@ The puzzle is aimed at people who know the species, so the builder is strict abo
 npm run build:day-list                       # daily set
 npm run build:day-list -- --extra            # More lists set
 npm run build:day-list -- --retag [--extra]  # refresh the labels only, same species
+npm run build:day-list -- --facts [--extra]  # refresh the facts and links only, same species
 ```
 
 A full build takes around an hour per set: the script throttles to one request a second, and it
@@ -652,7 +671,9 @@ rather than a whole round. Failed calls retry with a widening pause, because a b
 thousand requests and a dropped socket is a matter of when rather than if. It refuses to write a set
 with fewer than ten rounds. Rebuilding the daily set changes the rounds people are partway through,
 so do it near midnight. `--retag` keeps every round's species and only relabels native, introduced
-and endemic, so it's safe to run any time (about ten minutes for both sets).
+and endemic, so it's safe to run any time (about ten minutes for both sets). `--facts` does the same
+for the facts and their links, from `day-list-facts.json`. After a full build, write a fact for each
+species the build lists as missing, then run `--facts`.
 
 **No runtime API calls.** Puzzle data ships as JSON, the terrain ships as same-origin tiles, and
 photos load straight from the iNaturalist CDNs already allow-listed in `img-src`, so the island costs
