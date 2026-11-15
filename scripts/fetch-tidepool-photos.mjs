@@ -8,6 +8,11 @@
  * photo when one is available (src/lib/hobbies/tidepool-photos.json). This finds
  * properly-licensed candidates so you can drop real photos into those tiles.
  *
+ * To choose which photo a card shows, use scripts/reveal-photos.mjs instead:
+ * it stages every candidate on a contact sheet to pick from by eye. This
+ * script takes the first licensed photo it finds, which put blurry and
+ * hand-held shots on the cards until November 2026.
+ *
  * Usage:
  *   node scripts/fetch-tidepool-photos.mjs [options]
  *   npm run fetch:tidepool-photos -- [options]

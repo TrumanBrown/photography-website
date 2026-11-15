@@ -7,10 +7,13 @@
  *
  * Used by the tide pool and herping reveal cards (SpecimenCard.astro), which
  * already hold a canvas (for the sprite) and an <img> (for the photo) in the
- * same square.
+ * same frame. The steps count blocks across, and the rows follow the frame's
+ * shape.
  */
 
 const STEPS = [6, 12, 24, 48];
+/** The card's frame, for when it can't be measured yet (the card opens just after). */
+const FRAME_ASPECT = 4 / 3;
 const STEP_MS = 90;
 
 const pending = new WeakMap<HTMLCanvasElement, number[]>();
@@ -44,10 +47,19 @@ export function revealFromPixels(
     return;
   }
 
-  // The card crops the photo to a square from the middle (object-fit: cover).
-  const side = Math.min(img.naturalWidth, img.naturalHeight);
-  const sx = (img.naturalWidth - side) / 2;
-  const sy = (img.naturalHeight - side) / 2;
+  // The card crops the photo to its frame from the middle (object-fit: cover).
+  // The canvas itself is still hidden here, so measure the frame it sits in.
+  const box = (canvas.parentElement ?? canvas).getBoundingClientRect();
+  const aspect =
+    box.width && box.height ? box.width / box.height : FRAME_ASPECT;
+  let sw = img.naturalWidth;
+  let sh = sw / aspect;
+  if (sh > img.naturalHeight) {
+    sh = img.naturalHeight;
+    sw = sh * aspect;
+  }
+  const sx = (img.naturalWidth - sw) / 2;
+  const sy = (img.naturalHeight - sh) / 2;
   const tiny = document.createElement("canvas");
   const tctx = tiny.getContext("2d");
   if (!tctx) {
@@ -55,10 +67,13 @@ export function revealFromPixels(
     return;
   }
 
+  canvas.width = 192;
+  canvas.height = Math.round(192 / aspect);
   const draw = (blocks: number) => {
+    const rows = Math.max(1, Math.round(blocks / aspect));
     tiny.width = blocks;
-    tiny.height = blocks;
-    tctx.drawImage(img, sx, sy, side, side, 0, 0, blocks, blocks);
+    tiny.height = rows;
+    tctx.drawImage(img, sx, sy, sw, sh, 0, 0, blocks, rows);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, canvas.width, canvas.height);

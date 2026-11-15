@@ -1,165 +1,165 @@
 {
-  "$comment": "id -> { photo, credit }. Optional real photos for the tide-pool reveal card. Populated by scripts/fetch-tidepool-photos.mjs (CC-licensed, with attribution). If a photo fails to load the card falls back to the pixel sprite, so partial coverage is fine. `photo` may be an iNaturalist URL or a hobby-media blob URL.",
+  "$comment": "id -> { photo, credit }. The photo each reveal card shows, picked by eye from contact sheets with scripts/reveal-photos.mjs (tide-pooling candidates, then pick): CC0, CC BY or CC BY-NC, credited on the card. photo is iNaturalist's 500 px copy, which the toy preloads; the card swaps in the 1024 px copy when it opens. If a photo fails to load the card falls back to the pixel sprite.",
   "species": {
     "purple-shore-crab": {
-      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/80870423/medium.jpg",
-      "credit": "(c) Thomas Shahan, some rights reserved (CC BY-NC) via iNaturalist"
+      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/58966606/medium.jpeg",
+      "credit": "(c) passiflora4, some rights reserved (CC BY-NC) via iNaturalist"
     },
     "green-shore-crab": {
-      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/544060582/medium.jpg",
-      "credit": "(c) Pete Lypkie, some rights reserved (CC BY) via iNaturalist"
-    },
-    "kelp-crab": {
-      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/242596732/medium.jpg",
-      "credit": "(c) Cricket Raspet, some rights reserved (CC BY) via iNaturalist"
-    },
-    "red-rock-crab": {
-      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/61212274/medium.gif",
-      "credit": "(c) John, some rights reserved (CC BY-NC) via iNaturalist"
-    },
-    "porcelain-crab": {
-      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/135818256/medium.jpeg",
-      "credit": "(c) Toby, some rights reserved (CC BY) via iNaturalist"
-    },
-    "hairy-hermit-crab": {
-      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/167036524/medium.jpg",
-      "credit": "(c) scutler2, some rights reserved (CC BY-NC) via iNaturalist"
-    },
-    "grainyhand-hermit-crab": {
-      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/22915941/medium.jpg",
-      "credit": "(c) Wendy Feltham, some rights reserved (CC BY-NC) via iNaturalist"
-    },
-    "ochre-star": {
-      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/29300126/medium.jpeg",
-      "credit": "(c) burkemtnman, some rights reserved (CC BY-NC) via iNaturalist"
-    },
-    "sunflower-star": {
-      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/346893906/medium.jpg",
-      "credit": "(c) Neil McDaniel, some rights reserved (CC BY-NC) via iNaturalist"
-    },
-    "six-rayed-star": {
-      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/284042864/medium.jpg",
-      "credit": "(c) Alyana Lalani, some rights reserved (CC BY-NC) via iNaturalist"
-    },
-    "blood-star": {
-      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/152343163/medium.jpg",
-      "credit": "(c) Wendy Feltham, some rights reserved (CC BY-NC) via iNaturalist"
-    },
-    "leather-star": {
-      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/43943728/medium.jpeg",
+      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/471718/medium.jpg",
       "credit": "no rights reserved via iNaturalist"
     },
+    "kelp-crab": {
+      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/109877730/medium.jpg",
+      "credit": "(c) Kristi Monahan, some rights reserved (CC BY-NC) via iNaturalist"
+    },
+    "red-rock-crab": {
+      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/100280808/medium.jpeg",
+      "credit": "(c) Sara Thiebaud, some rights reserved (CC BY-NC) via iNaturalist"
+    },
+    "porcelain-crab": {
+      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/457085008/medium.jpg",
+      "credit": "(c) Brodie Springer, some rights reserved (CC BY-NC) via iNaturalist"
+    },
+    "hairy-hermit-crab": {
+      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/110128494/medium.jpeg",
+      "credit": "(c) Erin McKittrick, some rights reserved (CC BY) via iNaturalist"
+    },
+    "grainyhand-hermit-crab": {
+      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/375279463/medium.jpg",
+      "credit": "(c) Marilynne Box, some rights reserved (CC BY) via iNaturalist"
+    },
+    "ochre-star": {
+      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/486788658/medium.jpg",
+      "credit": "(c) Ed Bierman, some rights reserved (CC BY) via iNaturalist"
+    },
+    "sunflower-star": {
+      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/115144642/medium.jpeg",
+      "credit": "(c) Brian, some rights reserved (CC BY-NC) via iNaturalist"
+    },
+    "six-rayed-star": {
+      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/61775689/medium.jpeg",
+      "credit": "(c) Damon Tighe, some rights reserved (CC BY-NC) via iNaturalist"
+    },
+    "blood-star": {
+      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/143892106/medium.jpeg",
+      "credit": "(c) florawhite, some rights reserved (CC BY) via iNaturalist"
+    },
+    "leather-star": {
+      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/791869/medium.JPG",
+      "credit": "(c) Robin Gwen Agarwal, some rights reserved (CC BY-NC) via iNaturalist"
+    },
     "giant-green-anemone": {
-      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/338945179/medium.jpeg",
-      "credit": "(c) Kaitlin, some rights reserved (CC BY-NC) via iNaturalist"
+      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/106477465/medium.jpg",
+      "credit": "(c) The Sith, some rights reserved (CC BY-NC) via iNaturalist"
     },
     "aggregating-anemone": {
-      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/27254893/medium.jpg",
-      "credit": "(c) Alison Young, some rights reserved (CC BY-NC) via iNaturalist"
+      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/6948726/medium.jpg",
+      "credit": "(c) C. Mallory, some rights reserved (CC BY-NC) via iNaturalist"
     },
     "painted-anemone": {
       "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/180118478/medium.jpeg",
       "credit": "(c) Laurent Fey, some rights reserved (CC BY-NC) via iNaturalist"
     },
     "opalescent-nudibranch": {
-      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/264746119/medium.jpg",
-      "credit": "(c) Liam Ragan, some rights reserved (CC BY-NC) via iNaturalist"
+      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/671777668/medium.jpg",
+      "credit": "(c) Ken-ichi Ueda, some rights reserved (CC BY) via iNaturalist"
     },
     "sea-lemon": {
-      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/168037687/medium.jpeg",
-      "credit": "(c) Erin McKittrick, some rights reserved (CC BY) via iNaturalist"
+      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/83019584/medium.jpeg",
+      "credit": "(c) karin fletcher, some rights reserved (CC BY-NC) via iNaturalist"
     },
     "clown-nudibranch": {
-      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/90393866/medium.jpg",
-      "credit": "(c) Morton Jonuschat, some rights reserved (CC BY-NC) via iNaturalist"
+      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/1011328/medium.JPG",
+      "credit": "(c) Donna Pomeroy, some rights reserved (CC BY-NC) via iNaturalist"
     },
     "leopard-dorid": {
-      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/465789179/medium.jpg",
-      "credit": "no rights reserved via iNaturalist"
+      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/418519406/medium.jpeg",
+      "credit": "(c) Charlotte Seid, some rights reserved (CC BY-NC) via iNaturalist"
     },
     "gumboot-chiton": {
-      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/181044378/medium.jpg",
-      "credit": "(c) Robin Gwen Agarwal, some rights reserved (CC BY-NC) via iNaturalist"
+      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/582439518/medium.jpg",
+      "credit": "(c) Jerry Kirkhart, some rights reserved (CC BY) via iNaturalist"
     },
     "black-katy-chiton": {
-      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/496370038/medium.jpeg",
-      "credit": "no rights reserved via iNaturalist"
+      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/593761/medium.jpg",
+      "credit": "(c) Don Loarie, some rights reserved (CC BY) via iNaturalist"
     },
     "lined-chiton": {
-      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/3971245/medium.jpg",
-      "credit": "(c) Wendy Feltham, some rights reserved (CC BY-NC) via iNaturalist"
+      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/222229540/medium.jpg",
+      "credit": "(c) Makena, some rights reserved (CC BY-NC) via iNaturalist"
     },
     "black-turban-snail": {
-      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/171346585/medium.jpeg",
-      "credit": "(c) ah80957, some rights reserved (CC BY-NC) via iNaturalist"
+      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/594582/medium.jpg",
+      "credit": "(c) Don Loarie, some rights reserved (CC BY) via iNaturalist"
     },
     "frilled-dogwinkle": {
-      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/280813856/medium.jpeg",
-      "credit": "(c) Eric William Bartram, some rights reserved (CC BY-NC) via iNaturalist"
-    },
-    "checkered-periwinkle": {
-      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/22313768/medium.jpeg",
+      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/4154982/medium.JPG",
       "credit": "(c) Erin McKittrick, some rights reserved (CC BY) via iNaturalist"
     },
+    "checkered-periwinkle": {
+      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/225763278/medium.jpg",
+      "credit": "(c) Zachary Dankowicz, some rights reserved (CC BY) via iNaturalist"
+    },
     "moon-snail": {
-      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/85441911/medium.jpg",
-      "credit": "(c) maradg, some rights reserved (CC BY-NC) via iNaturalist"
+      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/746237630/medium.jpg",
+      "credit": "(c) Shane, some rights reserved (CC BY-NC) via iNaturalist"
     },
     "ribbed-limpet": {
-      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/282921356/medium.jpeg",
-      "credit": "(c) Lex Orr, some rights reserved (CC BY-NC) via iNaturalist"
+      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/8953708/medium.jpg",
+      "credit": "(c) Alex Bairstow, some rights reserved (CC BY-NC) via iNaturalist"
     },
     "plate-limpet": {
-      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/189984236/medium.jpeg",
+      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/189984188/medium.jpeg",
       "credit": "(c) rolandwirth, some rights reserved (CC BY-NC) via iNaturalist"
     },
     "purple-sea-urchin": {
-      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/40831338/medium.jpeg",
-      "credit": "(c) Robby Deans, some rights reserved (CC BY-NC) via iNaturalist"
+      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/338665145/medium.jpeg",
+      "credit": "(c) Dave, some rights reserved (CC BY-NC) via iNaturalist"
     },
     "green-sea-urchin": {
-      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/439952231/medium.jpeg",
-      "credit": "(c) Bogsnail, some rights reserved (CC BY-NC) via iNaturalist"
+      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/474919620/medium.jpg",
+      "credit": "(c) Денис Кокшаров, some rights reserved (CC BY-NC) via iNaturalist"
     },
     "red-sea-urchin": {
-      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/65472908/medium.jpeg",
-      "credit": "(c) Erin McKittrick, some rights reserved (CC BY) via iNaturalist"
+      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/473561530/medium.jpeg",
+      "credit": "(c) Paul Norwood, some rights reserved (CC BY-NC) via iNaturalist"
     },
     "acorn-barnacle": {
-      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/412779811/medium.jpeg",
-      "credit": "(c) Olivia Iclef, some rights reserved (CC BY-NC) via iNaturalist"
+      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/750710/medium.JPG",
+      "credit": "(c) Rebecca Johnson, some rights reserved (CC BY-NC) via iNaturalist"
     },
     "gooseneck-barnacle": {
-      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/81268996/medium.jpeg",
-      "credit": "(c) lisamaree, some rights reserved (CC BY-NC) via iNaturalist"
+      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/122407234/medium.jpeg",
+      "credit": "(c) ellwaters, some rights reserved (CC BY-NC) via iNaturalist"
     },
     "california-mussel": {
-      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/266156481/medium.jpeg",
-      "credit": "no rights reserved via iNaturalist"
+      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/282590494/medium.jpeg",
+      "credit": "(c) jlucasor, some rights reserved (CC BY-NC) via iNaturalist"
     },
     "tidepool-sculpin": {
-      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/342317237/medium.jpg",
-      "credit": "(c) Sadie Hine, some rights reserved (CC BY-NC) via iNaturalist"
+      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/240955373/medium.jpeg",
+      "credit": "(c) Alex Bairstow, some rights reserved (CC BY-NC) via iNaturalist"
     },
     "penpoint-gunnel": {
-      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/88441263/medium.jpeg",
-      "credit": "(c) Sara Thiebaud, some rights reserved (CC BY-NC) via iNaturalist"
+      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/4699724/medium.jpg",
+      "credit": "(c) Wendy Feltham, some rights reserved (CC BY-NC) via iNaturalist"
     },
     "high-cockscomb": {
       "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/344892541/medium.jpg",
       "credit": "(c) Nicole Abeln, some rights reserved (CC BY-NC) via iNaturalist"
     },
     "california-sea-cucumber": {
-      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/342617511/medium.jpg",
-      "credit": "(c) Shelby Connelly, some rights reserved (CC BY-NC) via iNaturalist"
+      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/1734/medium.jpg",
+      "credit": "(c) Ken-ichi Ueda, some rights reserved (CC BY) via iNaturalist"
     },
     "giant-pacific-octopus": {
-      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/85955706/medium.jpg",
-      "credit": "(c) Claudia Mills, some rights reserved (CC BY-NC) via iNaturalist"
+      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/174792488/medium.jpg",
+      "credit": "(c) KJ, some rights reserved (CC BY-NC) via iNaturalist"
     },
     "tidepool-shrimp": {
-      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/146290753/medium.jpg",
-      "credit": "(c) Sean, some rights reserved (CC BY-NC) via iNaturalist"
+      "photo": "https://inaturalist-open-data.s3.amazonaws.com/photos/29520432/medium.jpg",
+      "credit": "(c) Jeff Goddard, some rights reserved (CC BY-NC) via iNaturalist"
     }
   }
 }

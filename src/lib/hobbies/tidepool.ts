@@ -18,7 +18,7 @@ import { SPECIES, type TidepoolSpecies, type TidepoolCategory } from './tidepool
 import photoData from './tidepool-photos.json';
 import { rollTo, setHair } from '@/lib/motion';
 import { revealFromPixels, stopPixelReveal } from './pixel-reveal';
-import { stampFind } from './specimen';
+import { stampFind, upgradePhoto } from './specimen';
 
 /** Optional real photos per species id (CC-licensed). See tidepool-photos.json. */
 const PHOTOS = (photoData.species ?? {}) as Record<string, { photo?: string; credit?: string }>;
@@ -723,17 +723,20 @@ export function initTidepool(root: HTMLElement): void {
   function paintRevealSprite(sp: TidepoolSpecies): void {
     if (photoEl) photoEl.classList.add('is-hidden');
     revealCanvas!.classList.remove('is-hidden');
+    // The card's frame is 4:3, so the sprite sits in the middle of a 160 by
+    // 120 scene.
+    const w = 160;
     const size = 120;
-    revealCanvas!.width = size * dpr;
+    revealCanvas!.width = w * dpr;
     revealCanvas!.height = size * dpr;
     rctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
     rctx!.imageSmoothingEnabled = false;
-    rctx!.clearRect(0, 0, size, size);
+    rctx!.clearRect(0, 0, w, size);
     rctx!.fillStyle = '#0b3346';
-    rctx!.fillRect(0, 0, size, size);
+    rctx!.fillRect(0, 0, w, size);
     rctx!.fillStyle = 'rgba(120,160,170,0.35)';
-    rctx!.fillRect(0, size * 0.7, size, size * 0.3);
-    drawCritter(rctx!, sp, size / 2, size / 2 + 6, PIX * 1.6);
+    rctx!.fillRect(0, size * 0.7, w, size * 0.3);
+    drawCritter(rctx!, sp, w / 2, size / 2 + 6, PIX * 1.6);
   }
 
   function showCard(sp: TidepoolSpecies, isNew: boolean): void {
@@ -748,6 +751,7 @@ export function initTidepool(root: HTMLElement): void {
       photoEl.classList.add('is-hidden');
       revealCanvas!.classList.add('is-hidden');
       photoEl.onerror = () => {
+        upgradePhoto(photoEl, '');
         paintRevealSprite(sp);
         if (creditEl) creditEl.classList.add('is-hidden');
       };
@@ -758,13 +762,17 @@ export function initTidepool(root: HTMLElement): void {
       } else {
         photoEl.src = photo;
       }
+      upgradePhoto(photoEl, photo);
       if (creditEl) {
         creditEl.textContent = credit;
         creditEl.classList.toggle('is-hidden', !credit);
       }
     } else {
       // A photo still loading for an earlier critter mustn't land on this one.
-      if (photoEl) photoEl.onload = null;
+      if (photoEl) {
+        photoEl.onload = null;
+        upgradePhoto(photoEl, '');
+      }
       paintRevealSprite(sp);
       if (creditEl) creditEl.classList.add('is-hidden');
     }

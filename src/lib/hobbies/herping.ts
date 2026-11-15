@@ -26,7 +26,7 @@ import {
 import photoData from "./herping-photos.json";
 import { rollTo, setHair } from "@/lib/motion";
 import { revealFromPixels, stopPixelReveal } from "./pixel-reveal";
-import { stampFind } from "./specimen";
+import { stampFind, upgradePhoto } from "./specimen";
 
 /** Optional real photos per species id (CC-licensed). See herping-photos.json. */
 const PHOTOS = (photoData.species ?? {}) as Record<
@@ -769,29 +769,32 @@ export function initHerping(root: HTMLElement): void {
   function paintRevealSprite(sp: HerpSpecies): void {
     if (photoEl) photoEl.classList.add("is-hidden");
     revealCanvas!.classList.remove("is-hidden");
+    // The card's frame is 4:3, so the sprite sits in the middle of a 160 by
+    // 120 scene.
+    const w = 160;
     const size = 120;
-    revealCanvas!.width = size * dpr;
+    revealCanvas!.width = w * dpr;
     revealCanvas!.height = size * dpr;
     rctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
     rctx!.imageSmoothingEnabled = false;
-    rctx!.clearRect(0, 0, size, size);
+    rctx!.clearRect(0, 0, w, size);
     rctx!.fillStyle = "#0b1020";
-    rctx!.fillRect(0, 0, size, size);
+    rctx!.fillRect(0, 0, w, size);
     // a hint of headlight glow behind the sprite
     const grd = rctx!.createRadialGradient(
-      size / 2,
+      w / 2,
       size / 2,
       0,
-      size / 2,
+      w / 2,
       size / 2,
       size * 0.6,
     );
     grd.addColorStop(0, "rgba(255,238,190,0.16)");
     grd.addColorStop(1, "rgba(255,238,190,0)");
     rctx!.fillStyle = grd;
-    rctx!.fillRect(0, 0, size, size);
+    rctx!.fillRect(0, 0, w, size);
     rctx!.save();
-    rctx!.translate(size / 2, size / 2 + 8);
+    rctx!.translate(w / 2, size / 2 + 8);
     SPRITES[sp.category](rctx!, PIX * 2 * sp.size, sp.color, sp.accent);
     rctx!.restore();
   }
@@ -849,6 +852,7 @@ export function initHerping(root: HTMLElement): void {
       photoEl.classList.add("is-hidden");
       revealCanvas!.classList.add("is-hidden");
       photoEl.onerror = () => {
+        upgradePhoto(photoEl, "");
         paintRevealSprite(sp);
         if (creditEl) creditEl.classList.add("is-hidden");
       };
@@ -863,13 +867,17 @@ export function initHerping(root: HTMLElement): void {
       } else {
         photoEl.src = photo;
       }
+      upgradePhoto(photoEl, photo);
       if (creditEl) {
         creditEl.textContent = credit;
         creditEl.classList.toggle("is-hidden", !credit);
       }
     } else {
       // A photo still loading for an earlier animal mustn't land on this one.
-      if (photoEl) photoEl.onload = null;
+      if (photoEl) {
+        photoEl.onload = null;
+        upgradePhoto(photoEl, "");
+      }
       paintRevealSprite(sp);
       if (creditEl) creditEl.classList.add("is-hidden");
     }

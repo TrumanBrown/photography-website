@@ -1,11 +1,11 @@
 ---
 /**
- * The reveal card shared by the tide pool and herping toys, set like a
- * specimen label: a square picture, the name, the Latin name, one fact and
- * the photo credit, with one button that stays in the fiction. The engine
- * fills it through the data-<prefix>-* hooks, opens it by adding "is-open"
- * to the [data-<prefix>-card] scrim, and hides the photo or sprite with
- * "is-hidden".
+ * The reveal card shared by the tide pool and herping toys: the photograph
+ * across the top at 4:3, and under it a specimen label with the name, the
+ * Latin name, one fact and the photo credit, with one button that stays in
+ * the fiction. The engine fills it through the data-<prefix>-* hooks, opens
+ * it by adding "is-open" to the [data-<prefix>-card] scrim, and hides the
+ * photo or sprite with "is-hidden".
  */
 interface Props {
   /** Hook prefix the engine queries: "tp" for tide pooling, "hp" for herping. */
@@ -29,7 +29,7 @@ const nameId = `${prefix}-specimen-name`;
     <div class="specimen-pic">
       <canvas
         {...hook("reveal")}
-        width="120"
+        width="160"
         height="120"
         style="image-rendering: pixelated"
         aria-hidden="true"></canvas>
@@ -38,79 +38,99 @@ const nameId = `${prefix}-specimen-name`;
           until the photo loads (the pixel reveal). Chrome never fetches a
           lazy image that isn't displayed. */
       }
-      <img {...hook("photo")} alt="" class="is-hidden" decoding="async" />
+      <img
+        {...hook("photo")}
+        alt=""
+        width="1024"
+        height="768"
+        class="is-hidden"
+        decoding="async"
+      />
     </div>
-    <p class="u-label specimen-status" {...hook("badge")}></p>
-    <div class="specimen-names">
-      <h3 id={nameId} {...hook("name")}></h3>
-      <p class="specimen-sci" {...hook("sci")}></p>
-    </div>
-    <div class="specimen-mark" {...hook("mark")}></div>
-    <p class="specimen-fact" {...hook("fact")}></p>
-    <p class="specimen-credit is-hidden" {...hook("credit")}></p>
-    <div class="specimen-act">
-      <button type="button" class="btn" {...hook("close")}>{closeLabel}</button>
+    <div class="specimen-label">
+      <div class="specimen-head">
+        <div class="specimen-names">
+          <p class="u-label specimen-status" {...hook("badge")}></p>
+          <h3 id={nameId} {...hook("name")}></h3>
+          <p class="specimen-sci" {...hook("sci")}></p>
+        </div>
+        <div class="specimen-mark" {...hook("mark")}></div>
+      </div>
+      <p class="specimen-fact" {...hook("fact")}></p>
+      <div class="specimen-foot">
+        <p class="specimen-credit is-hidden" {...hook("credit")}></p>
+        <button type="button" class="btn" {...hook("close")}
+          >{closeLabel}</button
+        >
+      </div>
     </div>
   </div>
 </div>
 
 <style>
+  /* The card is centred with margin: auto rather than align-items, so on a
+     short screen it scrolls inside the scrim instead of losing its top. */
   .specimen-scrim {
     position: fixed;
     inset: 0;
     z-index: 50;
     display: none;
-    align-items: center;
-    justify-content: center;
+    overflow-y: auto;
     padding: 16px;
     background: color-mix(in srgb, var(--paper) 72%, transparent);
   }
   .specimen-scrim.is-open {
     display: flex;
   }
-  /* The picture spans the status, names and stamp rows; the stamp's row takes
-     what's left of its height, so the stamp lines up with its bottom edge. */
   .specimen {
-    display: grid;
-    grid-template-columns: 132px minmax(0, 1fr);
-    grid-template-rows: auto auto 1fr;
-    column-gap: 18px;
     width: 100%;
-    max-width: 440px;
-    padding: 18px;
+    max-width: 600px;
+    margin: auto;
     border: 1px solid var(--ink);
     background: var(--paper);
     color: var(--ink);
   }
+  /* The animal is the point of the card, so its photograph takes the full
+     width. Capped on short screens so the label still fits beside it. */
   .specimen-pic {
     position: relative;
-    grid-column: 1;
-    grid-row: 1 / span 3;
-    width: 132px;
-    height: 132px;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    max-height: min(450px, 56dvh);
+    overflow: hidden;
+    border-bottom: 1px solid var(--ink);
     background: var(--band);
   }
   .specimen-pic canvas,
   .specimen-pic img {
     position: absolute;
     inset: 0;
+    display: block;
     width: 100%;
     height: 100%;
   }
   .specimen-pic img {
     object-fit: cover;
   }
+  .specimen-label {
+    padding: 16px 20px 18px;
+  }
+  /* The names on the left and a first find's stamp on the right, on the
+     paper under the photo, so the stamp never covers the animal. */
+  .specimen-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 16px;
+  }
   .specimen-status {
-    grid-column: 2;
-    grid-row: 1;
     margin: 0 0 6px;
   }
   .specimen-status.is-warn {
     color: var(--ink);
   }
-  /* A first find is stamped on the blank card under the names, beside the
-     picture so it never covers the animal (src/lib/hobbies/specimen.ts); the
-     plain label stays for screen readers. */
+  /* A first find is stamped beside the names (src/lib/hobbies/specimen.ts);
+     the plain label stays for screen readers. */
   .specimen-status.is-stamped {
     position: absolute;
     width: 1px;
@@ -119,34 +139,11 @@ const nameId = `${prefix}-specimen-name`;
     clip-path: inset(50%);
     white-space: nowrap;
   }
-  .specimen-names {
-    grid-column: 2;
-    grid-row: 2;
-  }
-  .specimen-mark {
-    grid-column: 2;
-    grid-row: 3;
-    align-self: end;
-    display: flex;
-  }
-  /* In the flow, so a long name pushes it down rather than under it. Turned
-     on its left end, it slams down away from the picture and its low corner
-     stays level with the picture's bottom edge. */
-  .specimen-mark :global(.specimen-stamp) {
-    position: relative;
-    top: auto;
-    right: auto;
-    margin-top: 22px;
-    transform-origin: 0 50%;
-  }
-  .specimen-mark :global(.specimen-stamp > i) {
-    letter-spacing: 0.14em;
-  }
   .specimen-names h3 {
     margin: 0;
-    font-size: 17px;
-    font-weight: 400;
-    line-height: 1.25;
+    font-size: 21px;
+    font-weight: 300;
+    line-height: 1.2;
   }
   .specimen-sci {
     margin: 2px 0 0;
@@ -154,26 +151,41 @@ const nameId = `${prefix}-specimen-name`;
     font-style: italic;
     color: var(--ink-3);
   }
+  .specimen-mark {
+    display: flex;
+  }
+  .specimen-mark :global(.specimen-stamp) {
+    position: relative;
+    top: auto;
+    right: auto;
+    transform-origin: 50% 50%;
+  }
+  .specimen-mark :global(.specimen-stamp > i) {
+    letter-spacing: 0.14em;
+  }
   .specimen-fact {
-    grid-column: 1 / -1;
-    margin: 14px 0 0;
-    font-size: 14px;
+    margin: 12px 0 0;
+    font-size: 15px;
     line-height: 1.55;
   }
+  .specimen-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-top: 14px;
+  }
   .specimen-credit {
-    grid-column: 1 / -1;
-    margin: 8px 0 0;
+    margin: 0;
+    max-width: 40ch;
     font-size: 11px;
+    line-height: 1.4;
     color: var(--ink-2);
   }
-  .specimen-act {
-    grid-column: 1 / -1;
-    display: flex;
-    justify-content: flex-end;
-    margin-top: 16px;
-  }
-  .specimen-act .btn {
+  .specimen-foot .btn {
+    flex: none;
     min-height: 44px;
+    margin-left: auto;
     padding-inline: 18px;
     border-color: var(--ink);
   }
@@ -181,15 +193,23 @@ const nameId = `${prefix}-specimen-name`;
     display: none;
   }
 
-  @media (max-width: 400px) {
-    .specimen {
-      grid-template-columns: 104px minmax(0, 1fr);
-      column-gap: 14px;
-      padding: 16px;
+  @media (max-width: 520px) {
+    .specimen-label {
+      padding: 14px 16px 16px;
     }
-    .specimen-pic {
-      width: 104px;
-      height: 104px;
+    .specimen-names h3 {
+      font-size: 19px;
+    }
+    .specimen-fact {
+      font-size: 14px;
+    }
+    .specimen-foot {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .specimen-foot .btn {
+      width: 100%;
+      margin-left: 0;
     }
   }
 </style>
