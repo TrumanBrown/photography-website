@@ -36,6 +36,7 @@ import { covered, whenUncovered } from "../covered";
 import { prefersReducedMotion } from "../motion";
 import geoData from "./herp-geo.json";
 import { coarseCoord, coarsePlace } from "./inat-place";
+import { speciesName } from "../species-name";
 
 const API = "https://api.inaturalist.org/v1/observations";
 const PHOTO_HOSTS = [
@@ -1411,11 +1412,9 @@ export function initHerpMap(root: HTMLElement): void {
           lng: lng == null ? null : coarseCoord(lng),
           lat: lat == null ? null : coarseCoord(lat),
           obscured: !!o.obscured,
-          name:
-            o.taxon?.preferred_common_name ||
-            o.taxon?.name ||
-            o.species_guess ||
-            "Observation",
+          name: o.taxon?.preferred_common_name
+            ? speciesName(o.taxon.preferred_common_name)
+            : o.taxon?.name || o.species_guess || "Observation",
           sci: o.taxon?.name || "",
           place: coarsePlace(o.place_guess),
           date: o.observed_on || "",

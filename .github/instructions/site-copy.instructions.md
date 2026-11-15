@@ -65,7 +65,7 @@ rather than only writing it down here.
   - `I grew up fishing various lakes and streams in Minnesota.`
   - `Tide pooling quickly became one of my favorite hobbies after moving to WA.`
 - Hobby intros follow: personal history → what the toy does → one imperative on how to play.
-  - `I keep returning to mountain trails, from the Cascades to China, Norway, and the Himalaya. Build a trail of your own, then turn the journey into a postcard.`
+  - `I keep returning to mountain trails, from the Cascades to China, Norway, and the Himalaya. Build a trail of your own, then turn it into a postcard.`
 - A game with rules to learn (Narrow nature) is the exception. Its intro is the premise in one or two
   plain sentences, and the rules go in numbered "How to play" steps that use the same words as the
   buttons. No backstory and no metaphors: people need to know what to do before why it exists.
@@ -73,7 +73,7 @@ rather than only writing it down here.
 - Undersell. Use honest hedges instead of hype.
   - `The bioload meter is just for fun, not necessarily entirely accurate.`
   - `A playful estimate, not trail guidance.`
-- Diminutives are the house joke: `silly little virtual experiences`, `a little pixel bird`, `Fun maps of where I spend most my time fishing.`
+- Diminutives are the house joke: `silly little virtual experiences`, `a little pixel bird`, `Fun maps of where I spend most of my time fishing.`
 - State privacy plainly, in short sentences, and repeat it where it matters.
   - `Your photo stays on your device. Nothing is uploaded, so feel free to snap away`
 - Add a stewardship aside wherever a visitor might go do the real thing.
@@ -145,6 +145,15 @@ photo is the animal's name and the place, plus what it's doing when it's doing s
 it sits goes in the alt text, never the caption. A session description is one or two short
 sentences that name two or three animals at most, never a list of everything in the photos.
 
+This covers every fact or note a visitor can open: tide pool and herping cards, the fishing map
+notes, the aquarium picker and Narrow nature's full list.
+
+Species names are sentence case everywhere ('Black oystercatcher', 'Western red-backed
+salamander'), even when iNaturalist or a field guide capitalises every word. Proper nouns keep
+their capitals ('Dunn's salamander', 'American goshawk'). `speciesName()` in
+[species-name.js](../../src/lib/species-name.js) does it for the site and the captions pipeline,
+so a name fetched live goes through it too.
+
 - Two or three facts per species, one picked at random. Give one ID/field-mark tip and one
   behavior or story fact.
 - One sentence each, roughly 12–25 words, leading with the hook.
@@ -155,8 +164,10 @@ sentences that name two or three animals at most, never a list of everything in 
   or conservation status.
 - Never open with `Did you know`, `Fun fact:`, `Interestingly`, or `Believe it or not`.
 - [species-facts.test.ts](../../src/lib/hobbies/species-facts.test.ts) checks the mechanical
-  parts for the tide pool and herping cards: two or three facts, one sentence each, no dashes,
-  no stock openers and none of the words under "Do not write".
+  parts for the tide pool and herping cards and the fishing notes: two or three facts (one note
+  per fish), one sentence each, no dashes, no semicolons in the fishing notes, no stock openers
+  and none of the words under "Do not write". It also checks that every name in those lists and
+  the aquarium picker is already sentence case.
 
 ## Do not write
 

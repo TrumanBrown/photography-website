@@ -1,20 +1,9 @@
 ---
 import { getCollection } from "astro:content";
 import PlateArt from "@/components/PlateArt.astro";
-import { sortHobbies, hobbySlug } from "@/lib/hobbies";
+import { sortHobbies, hobbySlug, hobbyVerb } from "@/lib/hobbies";
 
 const hobbies = sortHobbies(await getCollection("hobbies"));
-
-/** The verb on each card, so the link names the world rather than the widget. */
-const VERBS: Record<string, string> = {
-  "narrow-nature": "Guess where",
-  "aquarium-keeping": "Plan a tank",
-  "tide-pooling": "Walk the beach",
-  fishing: "Open the maps",
-  birding: "Make a bird",
-  herping: "Take the wheel",
-  hiking: "Build a trail",
-};
 ---
 
 {
@@ -32,7 +21,7 @@ const VERBS: Record<string, string> = {
               <a class="tcard" href={`/hobbies/${slug}/`} data-open="hobby">
                 <PlateArt slug={slug} size="mini" />
                 <span class="tn">{entry.data.title}</span>
-                <span class="tv">{VERBS[slug] ?? "Try it"} →</span>
+                <span class="tv">{hobbyVerb(slug)} →</span>
               </a>
             );
           })}

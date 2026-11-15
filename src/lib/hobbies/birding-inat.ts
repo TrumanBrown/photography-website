@@ -15,6 +15,7 @@
  */
 import birdFamiliesRaw from "./bird-families.json";
 import { coarsePlace } from "./inat-place";
+import { speciesName } from "../species-name";
 
 export interface FamilyInfo {
   common: string;
@@ -240,7 +241,9 @@ export async function fetchSpeciesCounts(
       seen.add(taxon.id);
       species.push({
         id: taxon.id,
-        common: taxon.preferred_common_name || taxon.name || "Unknown species",
+        common: taxon.preferred_common_name
+          ? speciesName(taxon.preferred_common_name)
+          : taxon.name || "Unknown species",
         scientific: taxon.name || "",
         photo: inatPhoto(taxon.default_photo?.url, "small"),
         mine: count,
@@ -410,7 +413,7 @@ export function groupByFamily(species: Species[]): FamilyGroup[] {
     if (!group) {
       group = {
         key,
-        common: family ? family.common : "Other birds",
+        common: family ? speciesName(family.common) : "Other birds",
         sci: family ? family.sci : null,
         members: [],
       };

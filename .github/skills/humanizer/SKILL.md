@@ -352,7 +352,7 @@ Remove these outright. Nothing here needs rewriting.
 
 ### 25. Writing about the document instead of its subject
 
-**Watch for:** what the text replaced ("was added to replace"); how it was assembled or sourced ("generated from", "compiled from", "anything unconfirmed is flagged rather than guessed"); a legend, layout, or order the reader can already see ("the table below compares", "this section is organized by owner").
+**Watch for:** what the text replaced ("was added to replace"); how it was assembled or sourced ("generated from", "compiled from", "anything unconfirmed is flagged rather than guessed"); a legend, layout, or order the reader can already see ("the table below compares", "this section is organized by owner"). On a web page, the UI versions: a line that points at the page around it ("Below the game is a map of..."), and "here" at the end of a blurb ("Plan your own aquarium here").
 **Problem:** The text describes itself instead of its subject. Mention a previous version only in change logs, release notes, migration guides, and other documents about change. Keep a source credit the reader can follow; cut the account of how you worked. Keep a caveat that changes what the reader should do. State a convention only when the reader cannot infer it, and state it once. A single description of the page is *weak alone*.
 **Before:**
 > This function was added to replace the previous approach of iterating through all items, which caused O(n²) performance.
@@ -362,6 +362,10 @@ Remove these outright. Nothing here needs rewriting.
 > The figures below are drawn from each vendor's published pricing; anything we could not confirm is flagged rather than guessed.
 **After:**
 > Prices are each vendor's published rate. Two vendors publish nothing; call them.
+**Before (UI):**
+> Plan your own planted freshwater aquarium here. Below the game is a map of the reptiles and amphibians I've logged.
+**After:**
+> Plan your own planted freshwater aquarium. (The map has its own heading, so the pointer to it goes.)
 
 ## F. Writing for the wrong reader
 

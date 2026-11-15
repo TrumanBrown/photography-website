@@ -2,7 +2,7 @@
   "$comment": "Curated named, clickable waters. lat/lon position the map marker (the build script projects them); species reference ids in fishing-species.ts. kind: lake|river|sound. r = relative click/label size hint. Edit freely — only re-run scripts/build-fishing-geo.mjs if you change lat/lon.",
   "waters": [
     { "id": "lake-of-the-woods", "state": "mn", "name": "Lake of the Woods", "kind": "lake", "lat": 48.95, "lon": -94.9, "r": 1.1,
-      "species": ["walleye", "sauger", "muskellunge", "northern-pike", "pickerel", "lake-sturgeon", "smallmouth-bass"] },
+      "species": ["walleye", "sauger", "muskellunge", "northern-pike", "lake-sturgeon", "smallmouth-bass"] },
     { "id": "lake-superior", "state": "mn", "name": "Lake Superior", "kind": "lake", "lat": 47.55, "lon": -90.8, "r": 1.1,
       "species": ["lake-trout", "chinook-salmon", "coho-salmon", "steelhead", "brown-trout"] },
     { "id": "red-lake", "state": "mn", "name": "Red Lake", "kind": "lake", "lat": 48.05, "lon": -94.95, "r": 1.0,

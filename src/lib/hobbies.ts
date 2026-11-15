@@ -25,6 +25,24 @@ export function sortHobbies(entries: Hobby[]): Hobby[] {
 }
 
 /**
+ * The verb at the foot of each hobby card, on the home band and on /hobbies/,
+ * so a card says it can be played and names the world rather than the widget.
+ */
+const VERBS: Record<string, string> = {
+  'narrow-nature': 'Guess where',
+  'aquarium-keeping': 'Plan a tank',
+  'tide-pooling': 'Walk the beach',
+  fishing: 'Open the maps',
+  birding: 'Make a bird',
+  herping: 'Take the wheel',
+  hiking: 'Build a trail',
+};
+
+export function hobbyVerb(slug: string): string {
+  return VERBS[slug] ?? 'Try it';
+}
+
+/**
  * What's in Things to try, said the same way everywhere it's counted: "6
  * hobbies and a daily puzzle". Narrow nature is the puzzle; the rest are
  * hobbies.

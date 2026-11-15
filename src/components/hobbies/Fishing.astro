@@ -56,6 +56,9 @@ async function buildCard(c: Catch) {
     fishId: c.fishId,
     name: f?.common ?? c.fishId,
     where: c.where,
+    // "Coho salmon from a small river": a label like "A small river" or
+    // "Near Mt. Adams" reads mid-sentence in the alt text.
+    alt: `${f?.common ?? c.fishId} from ${c.where.replace(/^(A|Near) /, (m) => m.toLowerCase())}`,
     thumb: thumb.src,
     view: view.src,
     full: c.full?.src,
@@ -125,8 +128,8 @@ const groups = [
   </div>
   <p class="sr-only" aria-live="polite" data-fish-live></p>
   <p class="mt-2 max-w-[72ch] text-xs leading-relaxed text-ink-2">
-    Each fish marks a real lake or river. Tap one, or pick it with the arrow keys and press Enter, to see what
-    swims there. The boxed Twin Cities area gets its own zoomed map, since that area is small and I spent most my
+    Each fish marks a lake or river I've fished. Tap one, or pick it with the arrow keys and press Enter, to see what
+    swims there. The boxed Twin Cities area gets its own zoomed map, since that area is small and I spent most of my
     time there.
   </p>
 
@@ -150,7 +153,7 @@ const groups = [
       <h2>Fish I've caught</h2>
     </div>
     <p class="shead-blurb">
-      The real fish I've caught alongside their pixel counterparts. Tap a photo to take a closer look.
+      The fish I've caught, next to their pixel versions. Tap a photo to take a closer look.
     </p>
     <div id="fishing-catches" class="mt-6 space-y-8">
       {
@@ -182,7 +185,7 @@ const groups = [
                   >
                     <img
                       src={card.thumb}
-                      alt={`${card.name} caught at ${card.where}`}
+                      alt={card.alt}
                       loading="lazy"
                       class="block aspect-[4/3] w-full bg-band object-cover transition-opacity duration-300 group-hover:opacity-90"
                     />

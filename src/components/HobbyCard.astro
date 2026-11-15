@@ -1,7 +1,7 @@
 ---
 import type { CollectionEntry } from "astro:content";
 import PlateArt from "@/components/PlateArt.astro";
-import { hobbySlug } from "@/lib/hobbies";
+import { hobbySlug, hobbyVerb } from "@/lib/hobbies";
 
 interface Props {
   entry: CollectionEntry<"hobbies">;
@@ -19,14 +19,19 @@ const { title, summary, plateNote } = entry.data;
   <h2 class="t"><span class="draw">{title}</span></h2>
   {plateNote && <span class="m">{plateNote}</span>}
   <p class="d">{summary}</p>
+  <span class="v">{hobbyVerb(slug)} <span aria-hidden="true">→</span></span>
 </a>
 
 <style>
   /* The same anatomy as a session card (a picture, a title, one tracked
      line), so the two halves of the site read as one. The picture is a
-     stipple plate drawn from one of my photos. */
+     stipple plate drawn from one of my photos. The verb at the foot is the
+     home band's, so the card says it can be played; it sits at the bottom
+     so the verbs line up along a row whatever the summary's length. */
   .hcard {
-    display: block;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
     color: inherit;
     text-decoration: none;
   }
@@ -55,5 +60,13 @@ const { title, summary, plateNote } = entry.data;
     font-size: 13px;
     line-height: 1.45;
     color: var(--ink-3);
+  }
+  .v {
+    display: block;
+    margin-top: auto;
+    padding-top: 10px;
+    font-size: 13px;
+    line-height: 1.3;
+    color: var(--ink);
   }
 </style>

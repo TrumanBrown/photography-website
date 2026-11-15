@@ -5,6 +5,7 @@
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { speciesName } from "../../src/lib/species-name.js";
 import { ROOT } from "./settings.mjs";
 
 const VOICE_FILE = join(ROOT, ".github/instructions/site-copy.instructions.md");
@@ -44,84 +45,12 @@ export function loadVoiceRules(sections = VOICE_SECTIONS) {
   }
 }
 
-const KEEP_CAPITALISED = new Set(
-  (
-    "American African Asian Asiatic European Australian Chinese Japanese Tibetan Himalayan Indian " +
-    "Mexican Canadian Canada Californian California Oregon Washington Pacific Atlantic Caribbean " +
-    "Andean Amazonian Amazon Costa Rican Panamanian Panamic Nicaraguan Cuban Tico Mediterranean " +
-    "Arctic Siberian Mongolian Korean Formosan Taiwanese Malayan Bornean Sumatran Javan Philippine " +
-    "Brazilian Peruvian Hawaiian Alaskan Alaska Cascade Cascades Olympic Columbia Sierra Nevada " +
-    "Rocky Appalachian Yunnan Yulong Sichuan Bering Chinook Dungeness Monterey Carolina Virginia " +
-    "Texas Florida Arizona Louisiana Kentucky Tennessee Connecticut Nashville Mississippi Missouri " +
-    "Idaho Utah Montana Colorado Sonoran Mojave Baja Chihuahuan Galapagos Galápagos Cocos Gulf " +
-    "Oriental Moorish Spanish Montezuma Roosevelt Halloween Isabella Paris Thoas Peralta Sabinal " +
-    "Pere Père Sally-Lightfoot"
-  ).split(" "),
-);
-
-/** Words that start a place name, so they and the word after them keep capitals: "La Loma", "Cape May". */
-const PLACE_PREFIX = new Set([
-  "La",
-  "El",
-  "Los",
-  "Las",
-  "San",
-  "Santa",
-  "Mount",
-  "Cape",
-  "Rio",
-  "Río",
-  "St.",
-  "Saint",
-]);
-
-/** Place names inside species names, kept capitalised: "Puget Sound garter snake". */
-const PROPER_PHRASE = Object.fromEntries(
-  [
-    "Puget Sound",
-    "Tapir Valley",
-    "Great Basin",
-    "Rocky Mountain",
-    "Great Plains",
-    "Gulf Coast",
-    "North American",
-    "South American",
-    "Central American",
-    "West Indian",
-  ].map((p) => [p.toLowerCase(), p]),
-);
-const PROPER_PHRASES = new RegExp(
-  `\\b(?:${Object.keys(PROPER_PHRASE).join("|")})\\b`,
-  "gi",
-);
-
 /**
  * iNat's "Northwestern Garter Snake" -> "Northwestern garter snake", keeping
- * proper nouns. With `midSentence`, the first word is lowercased too unless it's
- * a proper noun ("two northwestern garter snakes", "two Pacific chorus frogs").
+ * proper nouns. The site uses the same helper, so the rules live in one place:
+ * src/lib/species-name.js.
  */
-export function displayName(common, { midSentence = false } = {}) {
-  if (!common) return "";
-  const words = common.split(" ");
-  const proper = (word, i) =>
-    // Possessives: Wilson's, Pallas'.
-    /'s?$/i.test(word) ||
-    KEEP_CAPITALISED.has(word) ||
-    /^[A-Z]{2,}$/.test(word) ||
-    (PLACE_PREFIX.has(word) && i < words.length - 1) ||
-    (i > 0 && PLACE_PREFIX.has(words[i - 1])) ||
-    // Demonyms ahead of the noun: Ecuadorian, Caribbean, Chinese.
-    (i < words.length - 1 &&
-      /(?:ian|ean|ese)$/i.test(word) &&
-      !/^ocean$/i.test(word));
-  return words
-    .map((word, i) => {
-      if (i === 0 && !midSentence) return word;
-      return proper(word, i) ? word : word.toLowerCase();
-    })
-    .join(" ")
-    .replace(PROPER_PHRASES, (m) => PROPER_PHRASE[m.toLowerCase()]);
-}
+export const displayName = speciesName;
 
 export function speciesLabel(taxon) {
   const common = displayName(taxon.common);

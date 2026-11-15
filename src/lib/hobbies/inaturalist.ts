@@ -8,6 +8,7 @@
  */
 import { coarsePlace } from './inat-place';
 import { inatApiUrl } from './inat-query';
+import { speciesName } from '../species-name';
 
 const PHOTO_HOSTS = [
   'https://inaturalist-open-data.s3.amazonaws.com/',
@@ -67,8 +68,9 @@ export function initINatObservations(root: HTMLElement): void {
       for (const o of items.slice(0, limit)) {
         const thumb = upgrade(o.photos![0].url!);
         if (!allowedHost(thumb)) continue;
-        const name =
-          o.taxon?.preferred_common_name || o.taxon?.name || o.species_guess || 'Observation';
+        const name = o.taxon?.preferred_common_name
+          ? speciesName(o.taxon.preferred_common_name)
+          : o.taxon?.name || o.species_guess || 'Observation';
         const a = document.createElement('a');
         a.href = o.uri || `https://www.inaturalist.org/observations/${o.id}`;
         a.target = '_blank';

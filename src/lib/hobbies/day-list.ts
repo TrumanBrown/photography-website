@@ -40,6 +40,7 @@ import {
   type WorldMap,
 } from "./day-list-map";
 import puzzles from "./day-list.json";
+import { speciesName } from "../species-name";
 
 interface Clue {
   id: number;
@@ -349,14 +350,6 @@ export function tidyFact(fact: string, sci: string): string {
     .trim();
 }
 
-/**
- * iNaturalist capitalises animal names but not plant ones, which is the
- * convention in the field. Lift the first letter so the slots look even.
- */
-function displayName(name: string): string {
-  return name.charAt(0).toUpperCase() + name.slice(1);
-}
-
 function formatPin(pin: LonLat): string {
   return (
     `${Math.abs(pin.lat).toFixed(1)}\u00b0${pin.lat >= 0 ? "N" : "S"}, ` +
@@ -384,7 +377,7 @@ export function photoCredits(clues: Round["clues"], shown: number): string {
     .slice(0, Math.max(0, shown))
     .map(
       (clue) =>
-        `<li>${escapeHtml(displayName(clue.name))} &middot; &copy; ${escapeHtml(
+        `<li>${escapeHtml(speciesName(clue.name))} &middot; &copy; ${escapeHtml(
           clue.by,
         )} &middot; <span class="dl-nowrap">${escapeHtml(clue.licence)}</span></li>`,
     )
@@ -725,7 +718,7 @@ export function initDayList(root: HTMLElement): void {
               : ""
           } alt="" width="500" height="500" decoding="async"></div>
           <figcaption class="dl-slot__body">
-            <span class="dl-slot__name">${escapeHtml(displayName(clue.name))}</span>
+            <span class="dl-slot__name">${escapeHtml(speciesName(clue.name))}</span>
             <span class="dl-slot__sci">${escapeHtml(clue.sci)}</span>
             <span class="dl-slot__count">${count(clue.global)} sightings worldwide</span>
           </figcaption>
@@ -811,7 +804,7 @@ export function initDayList(root: HTMLElement): void {
     const clue = round.clues[lines - 1];
     if (announce) {
       announce.textContent =
-        `Species ${lines} of ${round.clues.length}: ${displayName(clue.name)}, ` +
+        `Species ${lines} of ${round.clues.length}: ${speciesName(clue.name)}, ` +
         `${count(clue.global)} sightings worldwide. ` +
         `Up to ${count(bestPossible(lines))} points now.`;
     }
@@ -967,7 +960,7 @@ export function initDayList(root: HTMLElement): void {
           .filter(Boolean)
           .join(" &middot; ");
         return `<li class="dl-entry">
-          <p class="dl-entry__name">${escapeHtml(displayName(clue.name))}</p>
+          <p class="dl-entry__name">${escapeHtml(speciesName(clue.name))}</p>
           <p class="dl-entry__sci"><i>${escapeHtml(clue.sci)}</i>${
             status
               ? ` &middot; <span class="dl-entry__status">${status}</span>`

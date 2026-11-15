@@ -19,7 +19,7 @@ This doc covers how the section is wired, how to add a hobby, the conventions ev
 | Per-hobby page          | [src/pages/hobbies/[slug].astro](../src/pages/hobbies/%5Bslug%5D.astro)                                                                      |
 | Card                    | [src/components/HobbyCard.astro](../src/components/HobbyCard.astro)                                                                          |
 | Card opening scenes     | [src/lib/scenes/](../src/lib/scenes/), see [Opening scenes](#opening-scenes)                                                                 |
-| Slug + sort helpers     | [src/lib/hobbies.ts](../src/lib/hobbies.ts)                                                                                                  |
+| Slug, sort, card verbs  | [src/lib/hobbies.ts](../src/lib/hobbies.ts)                                                                                                  |
 | Facts line under titles | [src/lib/hobby-facts.ts](../src/lib/hobby-facts.ts)                                                                                          |
 | Shared UI parts         | [src/styles/global.css](../src/styles/global.css), [src/lib/motion.ts](../src/lib/motion.ts), see [Shared parts](#shared-parts-and-the-look) |
 | Nav + sidebar behavior  | [src/components/Header.astro](../src/components/Header.astro), [src/layouts/BaseLayout.astro](../src/layouts/BaseLayout.astro)               |
@@ -111,6 +111,8 @@ The other shared pieces:
 - `.u-label` (the archive's tracked caps label), `.btn` / `.btn-ink` (square, a rule for a border; ink for the one primary action), `.linkbtn` (a text button, 32px tall), `.range` (a slider: a 1px ink-2 line for the track and a square ink thumb on a 24px tall input, for hiking's route length and terrain points and the aquarium's tank size), and `.shead` / `.shead-blurb` / `.shead-link` (a light section heading with a plain count or link on the right). All in `global.css`.
 - [canvas-font.ts](../src/lib/canvas-font.ts): `canvasFont(size, 300 | 400)` and `canvasFontReady()`, for any text a canvas draws (the herp and fishing maps, the hiking editor and postcard, Narrow nature's answer). See island convention 8.
 - [FieldJournal.astro](../src/components/hobbies/FieldJournal.astro) and [SpecimenCard.astro](../src/components/hobbies/SpecimenCard.astro): the journal row and the reveal card shared by tide pooling and herping, driven through `data-tp-*` / `data-hp-*` hooks. The card is a modal: focus moves to its button, Escape or the scrim closes it, and focus returns.
+- Every card, on `/hobbies/` and in the home page's band, ends with the hobby's verb and an arrow ("Guess where →", "Take the wheel →"), from `hobbyVerb()` in [src/lib/hobbies.ts](../src/lib/hobbies.ts), so it says it can be played. On `/hobbies/` the verb sits at the foot of the card, so the verbs line up along a row whatever the summary's length. The `summary` above it is also the page's meta description and link-preview text.
+- [species-name.js](../src/lib/species-name.js): `speciesName()` puts a common name in sentence case and keeps proper nouns ("Western red-backed salamander", "Prince Henry's laughingthrush", "New Zealand red admiral"). Every name from iNaturalist goes through it (the birding life list and its family headings, the observations grid, the herp map, Narrow nature), and the photo captions pipeline uses the same function, so there's one list of proper nouns. A proper noun it lowercases goes in its lists, with a case in `species-name.test.ts`. Names typed into the hobby data are already sentence case, and `species-facts.test.ts` checks them.
 - The page header in [src/pages/hobbies/[slug].astro](../src/pages/hobbies/%5Bslug%5D.astro): "← Things to try", a light sentence-case title, one tracked line of facts from [hobby-facts.ts](../src/lib/hobby-facts.ts) (counts are computed from each toy's data, so adding a species updates it), then the intro.
 
 ---
@@ -302,7 +304,7 @@ A first find gets "New to your journal" stamped in ink on the blank card beside 
 
 ## Reference implementation: the fishing island
 
-A clickable pixel map of the two places I fish: Minnesota and Washington. Each map is drawn from a baked land/lake/river/sound mask, and every named water shows up as a small fish sprite of its signature species. Tap a water and a panel lists what you can catch there. From the keyboard each map is one Tab stop: the arrow keys walk its waters from west to east, ringed and named, and Enter or Space opens the panel. The Twin Cities metro gets its own zoomed inset, since those lakes are tiny at full state scale. Below the maps, a catch gallery of real photos sits beside the matching pixel sprite, split into Washington and Minnesota; tapping a photo opens it full-screen in the same PhotoSwipe lightbox the photography pages use. There are 37 waters across the two states, 33 species, and 16 catches today.
+A clickable pixel map of the two places I fish: Minnesota and Washington. Each map is drawn from a baked land/lake/river/sound mask, and every named water shows up as a small fish sprite of its signature species. Tap a water and a panel lists what you can catch there. From the keyboard each map is one Tab stop: the arrow keys walk its waters from west to east, ringed and named, and Enter or Space opens the panel. The Twin Cities metro gets its own zoomed inset, since those lakes are tiny at full state scale. Below the maps, a catch gallery of real photos sits beside the matching pixel sprite, split into Washington and Minnesota; tapping a photo opens it full-screen in the same PhotoSwipe lightbox the photography pages use. There are 37 waters across the two states, 32 species, and 16 catches today.
 
 **The look.** The pixel art keeps its own land and water colours, a step darker in dark mode (`LIGHT` and `DARK` in fishing.ts, rebaked when the theme toggle flips), and the canvas leaves everything outside the state clear, so the map sits on the page's own paper in both themes. Everything on top of the art follows the page and is drawn at the screen's resolution, so it stays sharp: the Twin Cities box is a 1px ink rule with a tracked "Twin Cities" caption that moves off any fish, water names sit on paper tags in Libre Franklin 400, and the only ring is round the fish the arrow keys are on, in ink and paper. The fish have no halos. On a phone the Minnesota and Washington tabs name the map, so the label above it only shows from 768px up. Until November 2026 the maps kept a pale `#e9eff0` ground, a Tailwind blue box and bold system-font labels in black boxes, which glared out of the dark page (TTT-2).
 
@@ -312,7 +314,7 @@ A clickable pixel map of the two places I fish: Minnesota and Washington. Each m
 - [src/lib/hobbies/fishing.ts](../src/lib/hobbies/fishing.ts), the engine: map rendering from the mask, water markers, the species panel, the water shimmer, and the catch gallery. It has no dependencies.
 - [src/lib/hobbies/fishing-geo.json](../src/lib/hobbies/fishing-geo.json), the baked land/water masks per state plus the Twin Cities inset.
 - [src/lib/hobbies/fishing-waters.json](../src/lib/hobbies/fishing-waters.json), the named waters (location on the map, kind, and which species live there).
-- [src/lib/hobbies/fishing-species.ts](../src/lib/hobbies/fishing-species.ts), the species dataset.
+- [src/lib/hobbies/fishing-species.ts](../src/lib/hobbies/fishing-species.ts), the species dataset. Each fish has one `note`, the fact the panel shows: an ID tip or a behaviour in one sentence. All 32 were rewritten and checked against Wikipedia in November 2026 (the muskie's "fish of 10,000 casts" against the Minnesota DNR), replacing angling-magazine blurbs with 17 em dashes and claims like "pound for pound the hardest-fighting freshwater fish". The same pass found the Lake of the Woods "pickerel" catch was a young muskie, since chain pickerel don't live in Minnesota. [species-facts.test.ts](../src/lib/hobbies/species-facts.test.ts) holds the notes to the copy rules with the tide pool and herping facts.
 - [src/lib/hobbies/fishing-catches.json](../src/lib/hobbies/fishing-catches.json), the catch gallery entries (each pairs a species + location with a photo, and records its full-size original's URL and dimensions).
 - [src/lib/hobbies/fishing-sprites.ts](../src/lib/hobbies/fishing-sprites.ts), the shared `drawFish` sprite routine used for both the map markers and the gallery thumbnails.
 - [src/assets/hobbies/fishing/](../src/assets/hobbies/fishing/), small copies of the catch photos (at most 1600 px, no metadata) for the thumbnails and the lightbox's quick preview. They go through Astro's image pipeline, so the responsive variants get offloaded to Blob by `sync-variants.mjs` in CI. The lightbox then ends on the full-size original in Blob Storage (`hobby-media/fishing/full/`), the same way the photography pages do.
@@ -364,7 +366,7 @@ A road-cruising game: a dark, wet Pacific Northwest back road scrolls toward you
 
 **Files**
 
-- [src/components/hobbies/HerpingNight.astro](../src/components/hobbies/HerpingNight.astro), the road canvas and its caption, plus the same shared journal row and reveal card as tide pooling, and the mounting `<script>`.
+- [src/components/hobbies/HerpingNight.astro](../src/components/hobbies/HerpingNight.astro), the road canvas and its caption, plus the same shared journal row and reveal card as tide pooling, and the mounting `<script>`. The caption is the page's one line of controls (steer by mouse, drag or arrow keys, then tap or press Enter) and the stewardship advice. The intro above says what the toy is and ends "Take the wheel.", without repeating the controls.
 - [src/lib/hobbies/herping.ts](../src/lib/hobbies/herping.ts), the whole engine: the scrolling road, the headlight lighting, the eyeshine tells, the pixel sprites, tap-to-reveal, and the journal. It has no dependencies and fetches nothing at runtime.
 - [src/lib/hobbies/herping-species.ts](../src/lib/hobbies/herping-species.ts), the ~20-species PNW roster, salamander-forward (12 of the 20 are salamanders/newts) and led by the real animals I've logged, each with a sprite `category`, `rarity`, `eyeshine` colour, and a couple of real facts.
 - [src/lib/hobbies/herping-photos.json](../src/lib/hobbies/herping-photos.json), the CC-licensed reveal photos (falls back to the pixel sprite if a photo fails to load).
@@ -375,7 +377,7 @@ A road-cruising game: a dark, wet Pacific Northwest back road scrolls toward you
 
 **Salamander-forward on purpose.** The game is about finding salamanders on a wet night, so a `CATEGORY_WEIGHT` table biases spawning heavily toward caudates (salamander 10, newt 7, frog/toad 2, snake/lizard 1.2), multiplied by each species' rarity weight. So the road is mostly salamanders with the occasional frog and a rare snake, and the ~20-species journal fills salamander-first.
 
-**Where the species and facts come from.** Hand-picked PNW herps you'd actually meet cruising a rainy road west of the Cascades, led by the salamanders I've logged on iNaturalist (Ensatina, Western Red-backed, Dunn's, Northwestern, Rough-skinned Newt, Pacific Giant), plus more PNW caudates (Cope's Giant, Cascade Torrent, Van Dyke's, Clouded, Western Tiger, Long-toed). Facts are curated from standard references and are meant to be interesting, not authoritative. A second check in October 2026 corrected the chorus frog's color change (it takes weeks, not minutes), the western tiger salamander's size and the rubber boa's lifespan, and dropped two claims only documented for related species (Cope's giant barking, Van Dyke's sticky slime). The American Bullfrog is flagged `nonNative`, and its card reads "Non-native" where others read "New to your journal" or "Found again".
+**Where the species and facts come from.** Hand-picked PNW herps you'd actually meet cruising a rainy road west of the Cascades, led by the salamanders I've logged on iNaturalist (ensatina, western red-backed, Dunn's, northwestern, rough-skinned newt, Pacific giant), plus more PNW caudates (Cope's giant, Cascade torrent, Van Dyke's, clouded, western tiger, long-toed). Facts are curated from standard references and are meant to be interesting, not authoritative. A second check in October 2026 corrected the chorus frog's color change (it takes weeks, not minutes), the western tiger salamander's size and the rubber boa's lifespan, and dropped two claims only documented for related species (Cope's giant barking, Van Dyke's sticky slime). Names are sentence case, as everywhere on the site; 15 of the 20 were Title Case until November 2026. The American bullfrog is flagged `nonNative`, and its card reads "Non-native" where others read "New to your journal" or "Found again".
 
 **Real photos.** Same pattern as tide pooling. The helper [scripts/fetch-herping-photos.mjs](../scripts/fetch-herping-photos.mjs) (`npm run fetch:herping-photos`) first tries each species' iNaturalist taxon default photo (the community-curated, clearly representative ID shot), then falls back to research-grade / most-faved observations, all restricted to `cc0,cc-by,cc-by-nc`. `--place 46` prefers Washington photos, and the default `--size medium` (~500px, ~120KB) is the right size for the card banner: big enough to look crisp, at a quarter the weight of `large`. `--wire inat` writes the iNat photo URLs into `herping-photos.json` (allow-listed hosts); `--wire blob` points at self-hosted `hobby-media` copies instead. Attribution travels with each photo and is shown in the card.
 
@@ -436,8 +438,8 @@ block is still opt-in per hobby, so it can be dropped onto any other hobby page 
 "dayList": { "heading": "Today's list" }
 ```
 
-`HobbyCard` treats a `dayList` block the same as an `interactive` island when choosing its call to
-action, so the card reads "Play it" rather than "Explore".
+Its card, on `/hobbies/` and in the home page's band, ends "Guess where →" (`hobbyVerb()` in
+[src/lib/hobbies.ts](../src/lib/hobbies.ts)).
 
 ### How the page reads
 
@@ -785,7 +787,7 @@ The birding page shows two things from my iNaturalist account, and unlike the ob
     "userId": "trumanbrown",
     "taxonId": 4838,
     "heading": "My spark bird",
-    "species": "Black Oystercatcher",
+    "species": "Black oystercatcher",
     "scientificName": "Haematopus bachmani",
     "story": ["First paragraph…", "Second paragraph…"]
   }

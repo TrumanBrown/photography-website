@@ -77,7 +77,7 @@ export const SPECIES: HerpSpecies[] = [
   },
   {
     id: "western-red-backed-salamander",
-    common: "Western Red-backed Salamander",
+    common: "Western red-backed salamander",
     scientific: "Plethodon vehiculum",
     category: "salamander",
     color: "#3a3330",
@@ -93,7 +93,7 @@ export const SPECIES: HerpSpecies[] = [
   },
   {
     id: "dunns-salamander",
-    common: "Dunn's Salamander",
+    common: "Dunn's salamander",
     scientific: "Plethodon dunni",
     category: "salamander",
     color: "#3f4632",
@@ -103,13 +103,13 @@ export const SPECIES: HerpSpecies[] = [
     eyeshine: "#dfe8ea",
     facts: [
       "It sticks to wet, mossy rocks in the splash zone of shaded streams and seeps.",
-      "Its greenish-yellow back stripe stops short of the tail tip, unlike the Western Red-backed it lives beside.",
+      "Its greenish-yellow back stripe stops short of the tail tip, unlike the western red-backed salamander it lives beside.",
       "Lungless like its Plethodon cousins, it never strays far from moisture.",
     ],
   },
   {
     id: "northwestern-salamander",
-    common: "Northwestern Salamander",
+    common: "Northwestern salamander",
     scientific: "Ambystoma gracile",
     category: "salamander",
     color: "#4a4038",
@@ -125,7 +125,7 @@ export const SPECIES: HerpSpecies[] = [
   },
   {
     id: "rough-skinned-newt",
-    common: "Rough-skinned Newt",
+    common: "Rough-skinned newt",
     scientific: "Taricha granulosa",
     category: "newt",
     color: "#5a3a22",
@@ -141,7 +141,7 @@ export const SPECIES: HerpSpecies[] = [
   },
   {
     id: "pacific-giant-salamander",
-    common: "Pacific Giant Salamander",
+    common: "Pacific giant salamander",
     scientific: "Dicamptodon tenebrosus",
     category: "salamander",
     color: "#524638",
@@ -157,7 +157,7 @@ export const SPECIES: HerpSpecies[] = [
   },
   {
     id: "long-toed-salamander",
-    common: "Long-toed Salamander",
+    common: "Long-toed salamander",
     scientific: "Ambystoma macrodactylum",
     category: "salamander",
     color: "#2f2f2f",
@@ -173,7 +173,7 @@ export const SPECIES: HerpSpecies[] = [
   },
   {
     id: "coastal-giant-salamander",
-    common: "Cope's Giant Salamander",
+    common: "Cope's giant salamander",
     scientific: "Dicamptodon copei",
     category: "salamander",
     color: "#4a4438",
@@ -188,7 +188,7 @@ export const SPECIES: HerpSpecies[] = [
   },
   {
     id: "cascade-torrent-salamander",
-    common: "Cascade Torrent Salamander",
+    common: "Cascade torrent salamander",
     scientific: "Rhyacotriton cascadae",
     category: "salamander",
     color: "#5a5236",
@@ -204,7 +204,7 @@ export const SPECIES: HerpSpecies[] = [
   },
   {
     id: "van-dykes-salamander",
-    common: "Van Dyke's Salamander",
+    common: "Van Dyke's salamander",
     scientific: "Plethodon vandykei",
     category: "salamander",
     color: "#3a3a30",
@@ -219,7 +219,7 @@ export const SPECIES: HerpSpecies[] = [
   },
   {
     id: "clouded-salamander",
-    common: "Clouded Salamander",
+    common: "Clouded salamander",
     scientific: "Aneides ferreus",
     category: "salamander",
     color: "#4a4038",
@@ -235,7 +235,7 @@ export const SPECIES: HerpSpecies[] = [
   },
   {
     id: "western-tiger-salamander",
-    common: "Western Tiger Salamander",
+    common: "Western tiger salamander",
     scientific: "Ambystoma mavortium",
     category: "salamander",
     color: "#2a2620",
@@ -253,7 +253,7 @@ export const SPECIES: HerpSpecies[] = [
   // ---- frogs & toads ----
   {
     id: "pacific-chorus-frog",
-    common: "Pacific Chorus Frog",
+    common: "Pacific chorus frog",
     scientific: "Pseudacris regilla",
     category: "frog",
     color: "#5a8a3a",
@@ -269,7 +269,7 @@ export const SPECIES: HerpSpecies[] = [
   },
   {
     id: "northern-red-legged-frog",
-    common: "Northern Red-legged Frog",
+    common: "Northern red-legged frog",
     scientific: "Rana aurora",
     category: "frog",
     color: "#8a5a3a",
@@ -285,7 +285,7 @@ export const SPECIES: HerpSpecies[] = [
   },
   {
     id: "western-toad",
-    common: "Western Toad",
+    common: "Western toad",
     scientific: "Anaxyrus boreas",
     category: "toad",
     color: "#6a6a4a",
@@ -301,7 +301,7 @@ export const SPECIES: HerpSpecies[] = [
   },
   {
     id: "american-bullfrog",
-    common: "American Bullfrog",
+    common: "American bullfrog",
     scientific: "Lithobates catesbeianus",
     category: "frog",
     color: "#4a6a3a",
@@ -320,7 +320,7 @@ export const SPECIES: HerpSpecies[] = [
   // ---- snakes & lizards ----
   {
     id: "northwestern-garter-snake",
-    common: "Northwestern Garter Snake",
+    common: "Northwestern garter snake",
     scientific: "Thamnophis ordinoides",
     category: "snake",
     color: "#3a4a2f",
@@ -336,7 +336,7 @@ export const SPECIES: HerpSpecies[] = [
   },
   {
     id: "common-garter-snake",
-    common: "Common Garter Snake",
+    common: "Common garter snake",
     scientific: "Thamnophis sirtalis",
     category: "snake",
     color: "#2f3a2a",
@@ -352,7 +352,7 @@ export const SPECIES: HerpSpecies[] = [
   },
   {
     id: "northern-alligator-lizard",
-    common: "Northern Alligator Lizard",
+    common: "Northern alligator lizard",
     scientific: "Elgaria coerulea",
     category: "lizard",
     color: "#6a5a3a",
@@ -368,7 +368,7 @@ export const SPECIES: HerpSpecies[] = [
   },
   {
     id: "rubber-boa",
-    common: "Rubber Boa",
+    common: "Rubber boa",
     scientific: "Charina bottae",
     category: "snake",
     color: "#7a6a4a",
