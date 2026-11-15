@@ -8,16 +8,22 @@ interface Props {
 }
 
 const { section = "photography" } = Astro.props;
-const linkBase = "no-underline hover:underline";
+// Each link is a 24px row (WCAG 2.5.8) and, from 360px up, one line. Below
+// md the theme word sits beside the name, which leaves the nav row room for
+// its three links.
+const linkBase =
+  "inline-flex min-h-6 items-center no-underline hover:underline min-[360px]:whitespace-nowrap";
 const activeClass = "text-ink";
 const idleClass = "text-ink-2 hover:text-ink";
 ---
 
 <header class="site-header border-b" style="border-color: var(--rule)">
   <div
-    class="mx-auto max-w-6xl px-4 py-3 sm:px-6 md:flex md:items-center md:justify-between md:gap-4 md:py-4"
+    class="mx-auto max-w-6xl px-4 py-2 sm:px-6 md:flex md:items-center md:justify-between md:gap-4 md:py-4"
   >
-    <div class="flex min-w-0 items-center gap-2">
+    <div
+      class="flex min-w-0 items-center justify-between gap-2 md:justify-start"
+    >
       {
         section === "photography" && (
           <button
@@ -48,10 +54,11 @@ const idleClass = "text-ink-2 hover:text-ink";
       >
         {siteConfig.ownerName}
       </a>
+      <ThemeToggle class="min-h-6 md:hidden" />
     </div>
     <nav
       aria-label="Primary"
-      class="mt-3 flex items-center justify-between gap-5 border-t pt-3 text-[11px] uppercase tracking-[0.16em] md:mt-0 md:shrink-0 md:justify-end md:border-0 md:pt-0"
+      class="mt-2 flex items-center justify-between gap-3 border-t pt-2 text-[11px] uppercase tracking-[0.16em] max-[419px]:tracking-[0.12em] md:mt-0 md:shrink-0 md:justify-end md:gap-5 md:border-0 md:pt-0"
       style="border-color: var(--rule)"
     >
       <a
@@ -81,7 +88,7 @@ const idleClass = "text-ink-2 hover:text-ink";
       <a href="/#weekdays" data-open="page" class:list={[linkBase, idleClass]}
         >About me</a
       >
-      <ThemeToggle />
+      <ThemeToggle class="hidden min-h-6 md:inline-block" />
     </nav>
   </div>
 </header>

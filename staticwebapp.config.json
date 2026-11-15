@@ -27,6 +27,26 @@
       "statusCode": 302
     },
     {
+      "route": "/work",
+      "redirect": "/#weekdays",
+      "statusCode": 302
+    },
+    {
+      "route": "/contact",
+      "redirect": "/#weekdays",
+      "statusCode": 302
+    },
+    {
+      "route": "/resume",
+      "redirect": "/Truman-Brown-Resume.pdf?via=typed",
+      "statusCode": 302
+    },
+    {
+      "route": "/cv",
+      "redirect": "/Truman-Brown-Resume.pdf?via=typed",
+      "statusCode": 302
+    },
+    {
       "route": "/hobbies/day-list",
       "redirect": "/hobbies/narrow-nature/",
       "statusCode": 301

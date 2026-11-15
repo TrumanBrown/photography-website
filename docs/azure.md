@@ -170,7 +170,7 @@ The minimal sequence for a copy of the site on your own subscription. The resour
 
 Edit [site.config.ts](../site.config.ts):
 - `ownerName`, your full name (drives the footer, page metadata and structured data; **becomes public when you push**)
-- `siteTitle`, the site's name: the front page's tab title and the start of every other tab ("Jane Doe | Photographs"); `siteDescription`, taste
+- `siteTitle`, the site's name: the front page's tab title and the start of every other tab ("Jane Doe | Photographs"); `siteDescription`, the front page's description, which search engines show under your name (lead with what you do), and the fallback for any page without its own
 - `domain`, apex domain you'll register (e.g. `<yourname>.com`)
 - `copyrightStartYear`, current year on first deploy
 - `prints`, `true` to take print and licensing inquiries: a Prints button on session photos, a `/prints` page in the footer, and licensing data for Google Images. Inquiries arrive through the contact form; there's no shop. Set `false` if you don't sell prints. Details in [product-experience.md](product-experience.md#prints-and-licensing-inquiries).

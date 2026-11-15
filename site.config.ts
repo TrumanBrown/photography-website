@@ -19,9 +19,13 @@ export const siteConfig = {
    */
   siteTitle: "Truman Brown",
 
-  /** <meta description> for SEO and link previews. */
+  /**
+   * The front door's <meta description>, the line Google shows under my name,
+   * so it leads with my job. Also the fallback for a page without its own.
+   * LinkedIn's card shows only the title, photo and domain.
+   */
   siteDescription:
-    "Wildlife, landscape and travel photography by Truman Brown. Washington, Costa Rica, China and Tibet.",
+    "Product manager on Azure Local at Microsoft. On weekends, wildlife and landscape photos from Washington and beyond, six nature toys and a daily puzzle.",
 
   /** Apex domain (no scheme, no www). www is bound automatically by SWA. */
   domain: "trumanbrown.com",

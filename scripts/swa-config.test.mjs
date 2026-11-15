@@ -24,6 +24,16 @@ describe("staticwebapp.config.json", () => {
     const about = config.routes.find((rule) => rule.route === "/about");
     expect(about).toMatchObject({ redirect: "/#weekdays" });
   });
+
+  it("sends the short typed addresses to the resume and to About me", () => {
+    const target = (route) =>
+      config.routes.find((rule) => rule.route === route)?.redirect;
+    // The PDF's own address, so the open is counted and tagged as typed.
+    expect(target("/resume")).toBe("/Truman-Brown-Resume.pdf?via=typed");
+    expect(target("/cv")).toBe("/Truman-Brown-Resume.pdf?via=typed");
+    expect(target("/work")).toBe("/#weekdays");
+    expect(target("/contact")).toBe("/#weekdays");
+  });
 });
 
 describe("resume PDF route", () => {

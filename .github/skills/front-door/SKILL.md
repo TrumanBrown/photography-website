@@ -9,8 +9,8 @@ description: 'The front door at / and About me: the Weekends and Weekdays switch
 
 | Path                                                          | What's there                                                                                                                                                             |
 | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `src/pages/index.astro`                                       | the switch, both sides, the person structured data, the script that reads `#weekdays`                                                                                    |
-| `src/components/about/MeRail.astro`                           | the rail: name, nav, the portrait, where I live, links, "Write to me", Resume (PDF). A block above the page under 900px                                                  |
+| `src/pages/index.astro`                                       | the switch, both sides, the person structured data, the script that reads `#weekdays`. Its description is `siteDescription` in `site.config.ts`                          |
+| `src/components/about/MeRail.astro`                           | the rail: name (the h1), nav, portrait, where I live, links, "Write to me", Resume (PDF). Under 900px a block above the page, its top row like the archive's phone bar   |
 | `src/lib/about.ts`                                            | every word on the Weekdays side: my two lines, the summary, jobs, school, skills, the three projects, the video                                                          |
 | `src/components/about/Resume.astro`                           | work, school and skills as ruled rows, every line showing (no "N more")                                                                                                  |
 | `src/components/about/Projects.astro`                         | each project beside its live piece                                                                                                                                       |
@@ -28,14 +28,16 @@ description: 'The front door at / and About me: the Weekends and Weekdays switch
 - **Say what it is and what it does.** The site, the README and the resume describe what he built and what it does. They don't credit AI agents, explain how AI was used to build it, or quote his messages to agents. Those messages stay in the skills' verdicts (2026-11-12).
 - **Never change his resume.** Its words are his, so a new `public/Truman-Brown-Resume.pdf` only ever comes from a PDF he exported himself. The only edits to that file are the privacy and `?via=resume` fixes in "Update the resume", never its wording (2026-11-12).
 - **The switch can't be missed.** Heading-size words, a tracked line under each saying what's behind it, a 2px bar.
-- **Every "About me" goes to `/#weekdays`.** It works without script through `:target`, and `/about/` redirects there.
+- **Every "About me" goes to `/#weekdays`.** It works without script through `:target`, and `/about/`, `/work` and `/contact` redirect there. `/resume` and `/cv` redirect to `/Truman-Brown-Resume.pdf?via=typed`, so the open is counted and tagged.
+- **The home description leads with my job,** because Google shows it under my name. The LinkedIn card shows only the og:title, the photo and the domain, and it reads well as 'Truman Brown' (checked in LinkedIn 2026-11-12), so leave the title and the share image alone.
+- **My name in the rail is the front door's h1,** styled as the archive's name. Don't add another h1 to `/`.
 - **Don't link seattlebalc.com.** It's a friend's site that the radar reads from, not his work. The radar's link goes to the balcFlights-LED README, where a video shows the real panel. The privacy page still names the site in words, because visitors' browsers talk to it.
 - **Photos he picked, not the first one.** The site project shows the newest session's header photo, chosen the way the session page chooses its banner (`banner`, then a wide cover, then the widest).
 - **The resume is on the page, not only in the rail.** Resume (PDF) is the Weekdays side's one filled button, first in the row under his line. The rail lists it as a plain link with the others. Never two Resume buttons in different styles.
 - **Every resume line shows.** No collapsing a job behind "N more": he found the button easy to miss.
 - **The resume comes before the side projects.** Never suggest moving the projects up or trimming the resume to make room for them (see the 2026-11-09 verdict).
 - **Counts read the same everywhere.** The Weekends row and the site project both say "6 hobbies and a daily puzzle" through `thingsToTryLine` (`src/lib/hobbies.ts`), and photo counts get thousands separators. The Weekdays role count is in the switch's count line only, not repeated over Work.
-- **The icon is Mount Baker on the LED panel** (`public/favicon.svg`), picked from round 2 of the icon mocks (`mocks/portfolio/brand2.html`). Rules for it are in site-design.instructions.md.
+- **The icon is Mount Baker on the LED panel** (`public/favicon.svg`), picked from round 2 of the icon mocks (`mocks/portfolio/brand2.html`). Rules for it are in site-design.instructions.md. If the drawing changes, remake `public/favicon.ico` from it too (16, 32 and 48px PNGs in one ICO, made with sharp).
 - **Tabs say his name first:** "Truman Brown", "Truman Brown | Work" while Weekdays shows, and "Truman Brown | <page>" everywhere else. He picked this over page-first, which reads better in a crowded tab strip.
 - **Today's layout, sized up.** Round 2's three-column, two-page and projects-first layouts all crowded the page. What fixed the blank space was a wider rail (248px, the archive's stays 212px), one centered column the footer's width, bigger resume type (15px lines, 18px titles) and smaller project pictures (a 320px column, the radar 240px). The work should always take more room than the projects.
 - **Same photo, never a different one,** when moving between pages. The lead photo is handed over by its URL and moves to its place. Nothing else carries over.
@@ -85,6 +87,8 @@ If it says NO DATA, `curl -s https://seattlebalc.com/api/v1/flights | head` firs
 - 2026-11-12, asked after the site review whether to keep the real-time resume email or drop it and keep only the company counts in /admin: "keep". It stays, with counts only and nothing the browser sent ([docs/analytics.md](../../../docs/analytics.md#email-alerts)).
 
 - 2026-11-12, on the site review's "say how it was built" changes (a How I built this page quoting his prompts, AI wording in the Weekdays blurbs and the README, and a retyped projects line in the resume PDF): "why are you including my prompts in "what i asked for" and why are you giving credit to ai agents everywhere", "did you change my resume??? ABSOLUTELY DO NOT DO THAT" and "the website and everything should not focus on "how i used ai" it should be simply what i built and what it does". None of it had been pushed, and all of it was removed.
+
+- 2026-11-15, on the site review's first-minute fixes (HM-2, HM-12, HM-13, HM-14): he kept his own description draft, "six nature toys and a daily puzzle", over matching the site's "6 hobbies" wording, and asked for all four short addresses (/resume, /cv, /work, /contact). On a phone, Photographs and Things to try sit beside his name, as in the archive's phone bar.
 
 ## Hard-won lessons
 

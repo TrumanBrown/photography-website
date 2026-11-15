@@ -22,9 +22,11 @@ const links = [
 
 <aside class="rail me-rail" aria-label="About me">
   <div class="rail-top">
-    <a class="me" href="/" aria-current="page" data-track="rail:name"
-      >{siteConfig.ownerName}</a
-    >
+    <h1 class="me-h">
+      <a class="me" href="/" aria-current="page" data-track="rail:name"
+        >{siteConfig.ownerName}</a
+      >
+    </h1>
     <nav class="rail-nav u-label" aria-label="Primary">
       <a
         class="rail-link"
@@ -123,6 +125,11 @@ const links = [
     padding: 18px 16px 12px;
     position: relative;
   }
+  /* My name is the front door's one heading, so the page has a title for
+     search engines and screen readers. It looks the same as the archive's. */
+  .me-h {
+    margin: 0;
+  }
   .me {
     display: block;
     color: var(--ink);
@@ -206,9 +213,10 @@ const links = [
     text-decoration: none;
   }
 
-  /* On a phone the rail is a block above the page: name and theme on top,
-     then the photo beside where I live and the links. The page's own tabs
-     and doors take over the rail's navigation. */
+  /* On a phone the rail is a block above the page: one row with the name,
+     the theme word, Photographs and Things to try, the way the archive's
+     phone bar has them, then the photo beside where I live and the links.
+     About me stays hidden, since the switch is right under it. */
   @media (max-width: 899px) {
     .rail {
       position: static;
@@ -228,13 +236,35 @@ const links = [
     .rail-top {
       grid-area: top;
       padding: 14px var(--gutter, 18px) 12px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
     }
-    .rail-nav {
-      display: none;
+    .me-h {
+      margin-right: auto;
+      min-width: 0;
     }
     .rail-theme {
-      top: 10px;
-      right: var(--gutter, 18px);
+      position: static;
+      order: 1;
+    }
+    .rail-nav {
+      flex-direction: row;
+      align-items: center;
+      gap: 14px;
+      margin-top: 0;
+      order: 2;
+    }
+    .rail-link,
+    .rail-link:hover {
+      color: var(--ink);
+      text-decoration: underline;
+      text-decoration-color: var(--ink-2);
+      text-decoration-thickness: 1px;
+      text-underline-offset: 4px;
+    }
+    .rail-link[data-week-link] {
+      display: none;
     }
     .me-pic {
       grid-area: pic;
@@ -249,6 +279,13 @@ const links = [
     }
     .me-link {
       min-height: 24px;
+    }
+  }
+  /* As in the archive's phone bar: from 360px up each label fits on one
+     line and only the name stacks. */
+  @media (min-width: 360px) and (max-width: 899px) {
+    .rail-link {
+      white-space: nowrap;
     }
   }
 </style>
