@@ -14,7 +14,8 @@
   "mimeTypes": {
     ".avif": "image/avif",
     ".webp": "image/webp",
-    ".wasm": "application/wasm"
+    ".wasm": "application/wasm",
+    ".bin": "application/octet-stream"
   },
   "routes": [
     {

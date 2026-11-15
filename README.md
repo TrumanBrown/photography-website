@@ -59,7 +59,7 @@ The docs explain why each piece exists ([docs/architecture.md](docs/architecture
 The site is a static Astro build on Azure Static Web Apps, with the photos in Azure Blob Storage. Drop a folder of photos into Blob and the next build picks them up.
 
 - Frontend: Astro 7 and Tailwind v3, built to static pages ([docs/architecture.md](docs/architecture.md)).
-- Things to try: canvas toys drawn in code (aquarium, tide pooling, fishing, birding selfie-to-bird, herping night drive, hiking trail studio) and the Narrow nature daily puzzle. Each card shows a stipple drawing made from my own photos ([docs/hobbies.md](docs/hobbies.md)).
+- Things to try: canvas toys drawn in code (aquarium, tide pooling, fishing, birding selfie-to-bird, herping night drive, hiking trail studio) and the Narrow nature daily puzzle. Each card shows a stipple drawing made from my own photos, and the night drive's ferns and trees are cut from them too, drawn only where the headlights reach ([docs/hobbies.md](docs/hobbies.md)).
 - Dynamic API: the Functions in `api/`, bundled with Static Web Apps: the contact form, the admin API, the analytics beacon, link-preview images and the resume PDF ([docs/architecture.md](docs/architecture.md)).
 - Admin and analytics: a browser `/admin` panel behind GitHub sign-in, and cookieless traffic metrics ([docs/admin.md](docs/admin.md), [docs/analytics.md](docs/analytics.md)).
 - Hosting: Azure Static Web Apps, Free tier ([docs/azure.md](docs/azure.md)).

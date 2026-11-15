@@ -17,10 +17,11 @@
  * checked again in October 2026, and species-facts.test.ts holds every fact to
  * the site's copy rules (.github/instructions/site-copy.instructions.md).
  *
- * Each species maps to a CATEGORY, which is what the pixel sprite renderer in
- * herping.ts draws (parameterized by color/size). `rarity` weights how often a
- * species turns up on the road; `eyeshine` is the tapetal glint color that gives
- * it away in the headlight beam before it's fully lit.
+ * Each species maps to a CATEGORY, the outline the night drive stipples it
+ * from (herping-drive.ts), at its `size`, more densely the darker its `color`
+ * prints in the theme's ink. `rarity` weights how often a species turns up on
+ * the road. `eyeshine` records the tapetal glint's colour; the drive draws
+ * every glint in the page's ink, in the plates' one pen, so it isn't shown.
  */
 
 export type HerpCategory =
@@ -38,9 +39,9 @@ export interface HerpSpecies {
   common: string;
   scientific: string;
   category: HerpCategory;
-  /** Primary sprite color (body). */
+  /** Body colour: how densely the drive stipples it. */
   color: string;
-  /** Secondary sprite color (stripe, belly, markings). */
+  /** Secondary colour (stripe, belly, markings). */
   accent: string;
   /** Relative on-screen size, ~0.7 (tiny) to ~1.4 (Pacific giant). */
   size: number;

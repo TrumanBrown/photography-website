@@ -14,7 +14,8 @@ the home page. The files live in `src/assets/plates/`, and
 `src/components/PlateArt.astro` shows them. Each subject in `subjects.json`
 is named after its hobby's slug, and the caption under a card is `plateNote`
 in `src/content/hobbies/<slug>.json` (keep it in step with the subject's
-`note`).
+`note`). The same pen also draws props for a toy, like the ferns and trees of
+the herping night drive ([Drives](#drives)).
 
 Read [lessons](./references/lessons.md) before choosing photos or touching the
 pipeline. It records which photos worked, which failed and why.
@@ -176,6 +177,10 @@ polygon around any debris as well.
 | `stones`, `ground_at`           | Stone bed with cast shadow; height of the ground (0-1 of subject)                                                      |
 | `bubbles`                       | Rising bubbles in front of a fish's mouth                                                                              |
 | `kind: "globe"`, `lon0`, `lat0` | A lit globe from `src/lib/geo-land.json`                                                                               |
+| `kind: "drive"`                 | A toy's props, each cut out and drawn at several heights ([Drives](#drives)); `site` and `props` go with it            |
+| `mask: "green"`, `keep`         | Plants by colour, where rembg sees one texture; `keep` drops pieces smaller than that share of the largest             |
+| `mask: "grabcut"`, `core`       | GrabCut from a line of points down the subject's middle (`core_width` wide), for a trunk among trunks                  |
+| `metres`, `lods`, `fade_top`    | Drive props: height in the world, the heights drawn (CSS px), and how much of the top dissolves (a trunk into canopy)  |
 
 ## Sizes
 
@@ -184,6 +189,29 @@ polygon around any debris as well.
 | `card` | 880x660 | about 350x260 CSS px        | /hobbies/ cards                          |
 | `mini` | 360x270 | about 125-260 CSS px across | home page band                           |
 | `icon` | 120x90  | 60x45                       | too small for most subjects; see lessons |
+
+Drive props have their own sizes (`DRIVE_LODS`, 48 to 384 px tall, trunks to
+768), drawn at one plate pixel per CSS pixel with a 0.75 px pen.
+
+## Drives
+
+A drive is a set of props for a toy that moves through a scene, each cut out of
+one photo and drawn like a small plate. The first is `herping-drive`, the night
+drive's sword ferns and mossy trunks. The toy places them along a road it
+builds in code and draws only the dots its headlights reach
+([docs/hobbies.md](../../../docs/hobbies.md#reference-implementation-the-herping-island-night-drive)).
+
+- **One file per theme.** `stipple.py herping-drive` writes every prop at every
+  size into `<site>/<name>.bin` (ink on paper) and `<name>-dark.bin`
+  (scratchboard). `build_drive` documents the format and
+  `src/lib/hobbies/herping-drive.ts` `parseDrive` reads it. A contact sheet of
+  each prop in both themes goes to `~/.cache/stipple-plates/review/`.
+- **Check each cutout** with `review.py masks herping-drive`, which shows every
+  prop's mask over its photo, as `herping-drive/<prop>`.
+- **Several sizes, one pen.** A prop is seen from 60 m ahead to beside the car,
+  so each is drawn at several heights and the toy picks the smallest at least
+  as tall as it needs. Scaling one drawing up spreads its dots into a grid.
+- **Cut props, never a whole photo.** See the lessons for why.
 
 ## Choosing a photo
 

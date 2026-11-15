@@ -42,8 +42,15 @@ def masks(names, subjects):
     """Left: the whole photo with the crop box. Right: the crop with the cutout;
     exclude polygons and skin_out boxes use the right-hand coordinates."""
     rows = []
+    # A drive's props are checked one by one, as <drive>/<prop>.
+    expanded = []
     for n in names:
         cfg = subjects[n]
+        if cfg.get("kind") == "drive":
+            expanded += [(f"{n}/{k}", v) for k, v in cfg["props"].items()]
+        else:
+            expanded.append((n, cfg))
+    for n, cfg in expanded:
         if cfg.get("kind") == "globe":
             continue
         path = S.resolve_src(cfg["src"], cfg.get("photo", 0))

@@ -1,23 +1,30 @@
 /**
- * "Night Drive" road-cruising game — the interactive for the Herping hobby.
+ * "Night drive", the Herping hobby's toy.
  *
- * A dark, wet Pacific Northwest back road scrolls toward you at night. Your
- * headlight beam follows the pointer / finger (you steer it). Herps sit on and
- * beside the road; as the beam nears one, a colored EYESHINE glint shimmers — the
- * real herper's tell — before the animal is lit. Tap an illuminated animal to
- * "brake and ID": it wiggles, and a reveal card shows the common + scientific
- * name, a real CC photo (when baked in), and a fun fact. A field journal tracks
- * how many of the ~15 species you've found, persisted in localStorage.
+ * You drive slowly down a forest road at night. The roadside is drawn in
+ * stipple from Truman's photos (herping-drive.ts): sword ferns and mossy
+ * trunks along the verges, a post-and-rail fence on some stretches, edge
+ * lines, centre dashes and puddles on the road. Only what the headlights
+ * reach is drawn: the low beams light the road ahead and the near verges, and
+ * a spotlight you steer draws the rest wherever it goes. Salamanders, newts
+ * and the odd frog or snake cross the road ahead. Their eyeshine glints in
+ * the headlights and is brightest when the spotlight is on them. Tap one
+ * that's lit, or press Enter, and the car stops: the specimen card shows its
+ * photo and a fact, and "Keep driving" sets off again. A field journal in
+ * localStorage counts the species you've found.
  *
- * Self-contained: no dependencies, no runtime fetch. Sprites are canvas fillRect;
- * the night is a dark veil punched by the beam via `destination-out`. Pauses
- * offscreen / when hidden; honors prefers-reduced-motion (the road stops moving
- * and it degrades to a stationary headlamp sweep). Photos per species can be
- * layered in via herping-photos.json (the card falls back to the pixel sprite).
+ * Dots go to the GPU through the scene renderer's WebGL sink (scenes/gl.ts),
+ * or where WebGL2 isn't there, are stamped into a pixel buffer at 1x. Pauses
+ * offscreen and when hidden. Under reduced motion the car stays parked,
+ * nothing crawls, there's no rain and the beam goes straight where it's aimed.
  *
  * Mounted by src/components/hobbies/HerpingNight.astro via [data-hp-*] hooks.
  */
 import { covered, whenUncovered } from "../covered";
+import { makeRenderer } from "../scenes/gl";
+import type { Sink } from "../scenes/pen";
+import driveUrl from "@/assets/hobbies/herping/herping-drive.bin?url";
+import driveDarkUrl from "@/assets/hobbies/herping/herping-drive-dark.bin?url";
 import {
   SPECIES,
   type HerpSpecies,
@@ -27,6 +34,32 @@ import photoData from "./herping-photos.json";
 import { rollTo, setHair } from "@/lib/motion";
 import { revealFromPixels, stopPixelReveal } from "./pixel-reveal";
 import { stampFind, upgradePhoto } from "./specimen";
+import {
+  buildTile,
+  type Camera,
+  camera,
+  critterArt,
+  type CritterArt,
+  eyeshine,
+  FAR,
+  FENCE,
+  keepShare,
+  lightAt,
+  lowBeam,
+  MARK,
+  markArea,
+  nearest,
+  paleness,
+  parseDrive,
+  PEN,
+  type Prop,
+  ROAD,
+  spotAt,
+  spotDistance,
+  threshold,
+  TILE,
+  type Tile,
+} from "./herping-drive";
 
 /** Optional real photos per species id (CC-licensed). See herping-photos.json. */
 const PHOTOS = (photoData.species ?? {}) as Record<
@@ -34,7 +67,6 @@ const PHOTOS = (photoData.species ?? {}) as Record<
   { photo?: string; credit?: string }
 >;
 
-const PIX = 4;
 const STORE_KEY = "herping-discovered-v1";
 const RARITY_WEIGHT: Record<Rarity, number> = {
   common: 6,
@@ -54,191 +86,165 @@ const CATEGORY_WEIGHT: Record<HerpCategory, number> = {
   snake: 1.2,
   lizard: 1.2,
 };
+/** Crawling speed across the road, metres a second. */
+const CRAWL: Record<HerpCategory, number> = {
+  salamander: 0.1,
+  newt: 0.1,
+  frog: 0.16,
+  toad: 0.12,
+  snake: 0.25,
+  lizard: 0.25,
+};
 type Rarity = HerpSpecies["rarity"];
 
-function snap(v: number): number {
-  return Math.round(v / PIX) * PIX;
-}
-function hexToRgb(hex: string): [number, number, number] {
-  const h = hex.replace("#", "");
-  return [
-    parseInt(h.slice(0, 2), 16),
-    parseInt(h.slice(2, 4), 16),
-    parseInt(h.slice(4, 6), 16),
-  ];
-}
-function shade(hex: string, amt: number): string {
-  const [r, g, b] = hexToRgb(hex);
-  const t = amt < 0 ? 0 : 255;
-  const p = Math.abs(amt);
-  const mix = (c: number) => Math.round((t - c) * p + c);
-  return `rgb(${mix(r)}, ${mix(g)}, ${mix(b)})`;
-}
+/** Drawn about twice life size, so you can make one out from the car. */
+const LENGTH_M = 0.36;
+/** The size each animal's dots are stippled at, px; scaled from there. */
+const ART_PX = 64;
+/** Animals lie on the road, seen at a low angle: their depth is squashed. */
+const SQUASH = 0.55;
 
-// ----------------------------------------------------------- critter sprites
-// Each draws centered at the origin, pointing "up" (head toward the top, i.e.
-// toward the oncoming headlights). `u` is the pixel-block size.
-type Ctx = CanvasRenderingContext2D;
-type Sprite = (c: Ctx, u: number, color: string, accent: string) => void;
-
-function rect(
-  c: Ctx,
-  u: number,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  fill: string,
-): void {
-  c.fillStyle = fill;
-  c.fillRect(
-    snap(x * u),
-    snap(y * u),
-    Math.max(u, snap(w * u)),
-    Math.max(u, snap(h * u)),
-  );
-}
-
-const salamander: Sprite = (c, u, col, acc) => {
-  const dk = shade(col, -0.28);
-  const hi = shade(col, 0.14);
-  for (let i = 0; i < 6; i++) {
-    const w = Math.max(1, 3 - Math.floor(i / 2));
-    rect(c, u, -w / 2, 3 + i, w, 1, i % 2 ? col : dk);
-  }
-  rect(c, u, -2, -3, 4, 6, col);
-  rect(c, u, -2, -3, 4, 1, hi);
-  rect(c, u, -0.5, -4, 1, 13, acc); // dorsal stripe down back + tail
-  rect(c, u, -2, -5, 4, 2, col);
-  rect(c, u, -1, -6, 2, 1, col);
-  rect(c, u, -4, -2, 2, 1, dk);
-  rect(c, u, 2, -2, 2, 1, dk);
-  rect(c, u, -4, 2, 2, 1, dk);
-  rect(c, u, 2, 2, 2, 1, dk);
-  rect(c, u, -5, -2, 1, 1, dk);
-  rect(c, u, 4, -2, 1, 1, dk);
-  rect(c, u, -5, 2, 1, 1, dk);
-  rect(c, u, 4, 2, 1, 1, dk);
-};
-
-const newt: Sprite = (c, u, col, acc) => {
-  const dk = shade(col, -0.3);
-  rect(c, u, -2, -3, 4, 6, col);
-  for (let i = 0; i < 6; i++)
-    rect(
-      c,
-      u,
-      -Math.max(1, 2 - Math.floor(i / 3)) / 2,
-      3 + i,
-      Math.max(1, 2 - Math.floor(i / 3)),
-      1,
-      i % 2 ? col : dk,
-    );
-  rect(c, u, -2, -5, 4, 2, col);
-  rect(c, u, -1, -6, 2, 1, col);
-  // warty texture
-  rect(c, u, -1, -2, 1, 1, dk);
-  rect(c, u, 0, 0, 1, 1, dk);
-  rect(c, u, -2, 1, 1, 1, dk);
-  rect(c, u, 1, -1, 1, 1, dk);
-  // belly-orange legs peeking
-  rect(c, u, -4, -2, 2, 1, acc);
-  rect(c, u, 2, -2, 2, 1, acc);
-  rect(c, u, -4, 2, 2, 1, acc);
-  rect(c, u, 2, 2, 2, 1, acc);
-};
-
-const lizard: Sprite = (c, u, col, acc) => {
-  const dk = shade(col, -0.3);
-  const hi = shade(col, 0.12);
-  for (let i = 0; i < 9; i++) {
-    const w = Math.max(1, 3 - Math.floor(i / 3));
-    rect(c, u, -w / 2, 3 + i, w, 1, i % 2 ? col : dk);
-  }
-  rect(c, u, -2, -3, 4, 6, col);
-  rect(c, u, -2, -3, 4, 1, hi);
-  for (let i = 0; i < 4; i++)
-    rect(c, u, -2, -2 + i * 2, 4, 1, i % 2 ? dk : acc); // banding
-  rect(c, u, -2, -5, 4, 2, col);
-  rect(c, u, -1, -6, 2, 1, col);
-  rect(c, u, -4, -2, 2, 1, dk);
-  rect(c, u, 2, -2, 2, 1, dk);
-  rect(c, u, -4, 3, 2, 1, dk);
-  rect(c, u, 2, 3, 2, 1, dk);
-};
-
-const frog: Sprite = (c, u, col, acc) => {
-  const dk = shade(col, -0.28);
-  const hi = shade(col, 0.12);
-  rect(c, u, -5, 0, 3, 4, dk);
-  rect(c, u, 2, 0, 3, 4, dk);
-  rect(c, u, -6, 3, 2, 2, dk);
-  rect(c, u, 4, 3, 2, 2, dk);
-  rect(c, u, -3, -3, 6, 6, col);
-  rect(c, u, -3, -3, 6, 1, hi);
-  rect(c, u, -0.5, -3, 1, 6, acc);
-  rect(c, u, -3, -5, 2, 2, col);
-  rect(c, u, 1, -5, 2, 2, col);
-  rect(c, u, -4, 2, 2, 1, dk);
-  rect(c, u, 2, 2, 2, 1, dk);
-};
-
-const toad: Sprite = (c, u, col, acc) => {
-  const dk = shade(col, -0.3);
-  rect(c, u, -4, 0, 3, 3, dk);
-  rect(c, u, 1, 0, 3, 3, dk);
-  rect(c, u, -3, -3, 6, 6, col);
-  rect(c, u, -0.5, -3, 1, 6, acc); // pale dorsal stripe
-  // warts
-  rect(c, u, -2, -1, 1, 1, dk);
-  rect(c, u, 1, -2, 1, 1, dk);
-  rect(c, u, 2, 1, 1, 1, dk);
-  rect(c, u, -2, 2, 1, 1, dk);
-  rect(c, u, -3, -5, 3, 2, col); // parotoid + eye ridge
-  rect(c, u, 0, -5, 3, 2, col);
-  rect(c, u, -4, 1, 1, 1, dk);
-  rect(c, u, 3, 1, 1, 1, dk);
-};
-
-const snake: Sprite = (c, u, col, acc) => {
-  const dk = shade(col, -0.32);
-  for (let i = -6; i <= 6; i++) {
-    const x = Math.round(Math.sin(i / 2.2) * 3);
-    rect(c, u, x - 1, i, 2, 1, i % 2 ? col : dk);
-    rect(c, u, x, i, 1, 1, i % 2 ? acc : col);
-  }
-  const hx = Math.round(Math.sin(-7 / 2.2) * 3);
-  rect(c, u, hx - 1, -7, 3, 2, col);
-  rect(c, u, hx - 1, -8, 2, 1, col);
-};
-
-const SPRITES: Record<HerpCategory, Sprite> = {
-  salamander,
-  newt,
-  lizard,
-  frog,
-  toad,
-  snake,
-};
-
-/** Head position (block units, pre-scale) where the eyeshine glint sits. */
-const EYE: Record<HerpCategory, { dy: number; dx: number }> = {
-  salamander: { dy: -5, dx: 1 },
-  newt: { dy: -5, dx: 1 },
-  lizard: { dy: -5, dx: 1 },
-  frog: { dy: -4.5, dx: 2 },
-  toad: { dy: -4.5, dx: 2 },
-  snake: { dy: -7, dx: 0.6 },
-};
-
-// ----------------------------------------------------------------- the game
 interface Animal {
   sp: HerpSpecies;
+  /** Across the road and along it, metres. */
   x: number;
-  y: number;
-  size: number;
-  wiggle: number; // set on reveal, decays — drives the little shimmy
+  z: number;
+  /** Which way it's crossing, and how fast. */
+  dir: number;
+  speed: number;
+  /** Heading on the ground, radians, 0 toward +x. */
+  ang: number;
+  seed: number;
+  art: CritterArt;
+  /** Where it is on screen this frame, and how long. */
+  sx: number;
+  sy: number;
+  len: number;
+  /** Set on reveal, decays: drives the little shimmy. */
+  wiggle: number;
+  sway: number;
   found: boolean;
+}
+
+/** What draws a frame: the WebGL sink, or squares on a 2D canvas. */
+interface Dots {
+  frame(W: number, H: number, dpr: number): void;
+  dots(xyr: Float32Array, count: number, color: string, alpha: number): void;
+  /** Clear paper in cells `size` px across, centred on each x, y (r unused). */
+  paper(xyr: Float32Array, count: number, size: number, color: string): void;
+  flush(): void;
+}
+
+function glDots(sink: Sink): Dots {
+  return {
+    frame: (W, H, dpr) => sink.frame(W, H, dpr, 1, 1),
+    dots: (xyr, count, color, alpha) =>
+      count && sink.circles(xyr, count, 0, color, alpha),
+    paper: (xyr, count, _size, color) =>
+      count && sink.circles(xyr, count, 0, color, 1),
+    flush: () => sink.flush(),
+  };
+}
+
+/** A CSS colour as RGB bytes, the way the browser reads it. */
+function rgbOf(color: string): [number, number, number] {
+  const pad = document.createElement("canvas").getContext("2d", {
+    willReadFrequently: true,
+  });
+  if (!pad) return [0, 0, 0];
+  pad.fillStyle = color;
+  pad.fillRect(0, 0, 1, 1);
+  const [r, g, b] = pad.getImageData(0, 0, 1, 1).data;
+  return [r, g, b];
+}
+
+/**
+ * Without WebGL: every dot stamped straight into a pixel buffer, edges
+ * anti-aliased by how much of each pixel the disc covers, and the buffer put
+ * on the canvas once a frame. Filling a path of tens of thousands of tiny
+ * shapes made the browser rasterize each one, at about 45 ms a frame.
+ */
+function pixelDots(
+  canvas: HTMLCanvasElement,
+  colors: () => { paper: string },
+): Dots | null {
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+  const known = new Map<string, [number, number, number]>();
+  const rgb = (c: string) => {
+    let v = known.get(c);
+    if (!v) known.set(c, (v = rgbOf(c)));
+    return v;
+  };
+  let img: ImageData | null = null;
+  let data = new Uint8ClampedArray(0);
+  let w = 0;
+  let h = 0;
+  let k = 1;
+  return {
+    frame(W, H, dpr) {
+      w = Math.round(W * dpr);
+      h = Math.round(H * dpr);
+      k = dpr;
+      if (canvas.width !== w) canvas.width = w;
+      if (canvas.height !== h) canvas.height = h;
+      if (!img || img.width !== w || img.height !== h) {
+        img = ctx.createImageData(w, h);
+        data = img.data;
+      }
+      const [r, g, b] = rgb(colors().paper);
+      new Uint32Array(data.buffer).fill(
+        ((255 << 24) | (b << 16) | (g << 8) | r) >>> 0,
+      );
+    },
+    paper(xyr, count, size, color) {
+      const [r, g, b] = rgb(color);
+      const c32 = ((255 << 24) | (b << 16) | (g << 8) | r) >>> 0;
+      const px = new Uint32Array(data.buffer);
+      const half = (size * k) / 2;
+      for (let i = 0; i < count * 3; i += 3) {
+        const x0 = Math.max(0, Math.round(xyr[i] * k - half));
+        const x1 = Math.min(w, Math.round(xyr[i] * k + half));
+        const y0 = Math.max(0, Math.round(xyr[i + 1] * k - half));
+        const y1 = Math.min(h, Math.round(xyr[i + 1] * k + half));
+        for (let y = y0; y < y1; y++) px.fill(c32, y * w + x0, y * w + x1);
+      }
+    },
+    dots(xyr, count, color, alpha) {
+      const [r, g, b] = rgb(color);
+      const c32 = ((255 << 24) | (b << 16) | (g << 8) | r) >>> 0;
+      const px = new Uint32Array(data.buffer);
+      for (let i = 0; i < count * 3; i += 3) {
+        const cx = xyr[i] * k;
+        const cy = xyr[i + 1] * k;
+        const rr = xyr[i + 2] * k;
+        const x0 = Math.max(0, Math.floor(cx - rr - 0.5));
+        const x1 = Math.min(w - 1, Math.ceil(cx + rr + 0.5));
+        const y0 = Math.max(0, Math.floor(cy - rr - 0.5));
+        const y1 = Math.min(h - 1, Math.ceil(cy + rr + 0.5));
+        for (let y = y0; y <= y1; y++) {
+          const dy = y + 0.5 - cy;
+          for (let x = x0; x <= x1; x++) {
+            const dx = x + 0.5 - cx;
+            const cover = rr - Math.sqrt(dx * dx + dy * dy) + 0.5;
+            if (cover <= 0) continue;
+            if (cover >= 1 && alpha >= 1) {
+              px[y * w + x] = c32;
+              continue;
+            }
+            const a = (cover >= 1 ? 1 : cover) * alpha;
+            const o = (y * w + x) * 4;
+            data[o] += (r - data[o]) * a;
+            data[o + 1] += (g - data[o + 1]) * a;
+            data[o + 2] += (b - data[o + 2]) * a;
+          }
+        }
+      }
+    },
+    flush() {
+      if (img) ctx.putImageData(img, 0, 0);
+    },
+  };
 }
 
 function loadDiscovered(): Set<string> {
@@ -258,8 +264,64 @@ function saveDiscovered(set: Set<string>): void {
   }
 }
 
+/** A prop as the toy draws it: its sizes' dots as 0-1 of the prop, and a widened silhouette. */
+interface Ready {
+  prop: Prop;
+  u: Float32Array[];
+  v: Float32Array[];
+  /** Each dot's rank, worked out once. */
+  rank: Float32Array[];
+  halo: Uint8Array;
+}
+
+function prepare(props: Prop[]): Ready[] {
+  return props.map((prop) => {
+    const u = prop.sizes.map((s) => s.x.map((x) => x / s.w));
+    const v = prop.sizes.map((s) => s.y.map((y) => y / s.h));
+    const rank = prop.sizes.map((s) =>
+      Float32Array.from({ length: s.n }, (_, i) => threshold(i * 7)),
+    );
+    // The silhouette grown by two of its pixels: a ring of clear paper round
+    // the prop, so it stands out against whatever is behind it.
+    const { maskW: w, maskH: h, mask } = prop;
+    let a = Uint8Array.from(mask, (m) => (m > 60 ? 1 : 0));
+    for (let pass = 0; pass < 2; pass++) {
+      const b = new Uint8Array(a.length);
+      for (let y = 0; y < h; y++)
+        for (let x = 0; x < w; x++) {
+          let on = 0;
+          for (let dy = -1; dy <= 1 && !on; dy++)
+            for (let dx = -1; dx <= 1 && !on; dx++) {
+              const yy = y + dy;
+              const xx = x + dx;
+              if (yy >= 0 && yy < h && xx >= 0 && xx < w) on = a[yy * w + xx];
+            }
+          b[y * w + x] = on;
+        }
+      a = b;
+    }
+    return { prop, u, v, rank, halo: a };
+  });
+}
+
+const drawings = new Map<string, Promise<Ready[] | null>>();
+function loadProps(url: string): Promise<Ready[] | null> {
+  let p = drawings.get(url);
+  if (!p) {
+    p = fetch(url)
+      .then((r) => (r.ok ? r.arrayBuffer() : null))
+      .then((b) => {
+        const props = b ? parseDrive(b) : null;
+        return props ? prepare(props) : null;
+      })
+      .catch(() => null);
+    drawings.set(url, p);
+  }
+  return p;
+}
+
 export function initHerping(root: HTMLElement): void {
-  const canvas = root.querySelector<HTMLCanvasElement>("[data-hp-canvas]");
+  let canvas = root.querySelector<HTMLCanvasElement>("[data-hp-canvas]");
   const card = root.querySelector<HTMLElement>("[data-hp-card]");
   const revealCanvas =
     root.querySelector<HTMLCanvasElement>("[data-hp-reveal]");
@@ -280,6 +342,7 @@ export function initHerping(root: HTMLElement): void {
 
   if (
     !canvas ||
+    !frame ||
     !card ||
     !revealCanvas ||
     !nameEl ||
@@ -292,44 +355,105 @@ export function initHerping(root: HTMLElement): void {
   ) {
     return;
   }
-  const ctx = canvas.getContext("2d");
   const rctx = revealCanvas.getContext("2d");
-  if (!ctx || !rctx) return;
+  if (!rctx) return;
 
   const reduceMotion = window.matchMedia(
     "(prefers-reduced-motion: reduce)",
   ).matches;
-  const wrap: Element = canvas.parentElement ?? canvas;
   const total = SPECIES.length;
   const discovered = loadDiscovered();
 
   let W = 0;
   let H = 0;
   let dpr = 1;
-  let bg: HTMLCanvasElement | null = null;
+  /** Where the car is along the road, metres, and how fast it's going. */
+  let carZ = 0;
+  let speed = reduceMotion ? 0 : ROAD.speed;
+  let salt = 1;
+  const tiles = new Map<number, Tile>();
+  let props: Ready[] | null = null;
   let animals: Animal[] = [];
-  let scrollY = 0; // road offset, grows downward
-  let beamX = 0; // current headlight aim (px)
-  let beamTargetX = 0; // where the pointer wants it
-  let sceneSalt = 1;
   let onscreen = true;
   let running = false;
   let raf = 0;
   let last = 0;
   let spawnTimer = 0;
-  let brake = 0; // brake-light flash, decays
+  let dirty = true;
 
-  // Speed of the road (px/sec). Reduced motion parks the car — you sweep the
-  // headlamp over stationary animals instead of dodging vestibular motion.
-  const SPEED = reduceMotion ? 0 : 74;
+  const beam = { x: 0, y: 0 };
+  const aim = { x: 0, y: 0 };
+  let aimed = false;
   const rainDrops: { x: number; y: number; len: number; v: number }[] = [];
 
-  function rng(seed: number): () => number {
-    let s = seed % 2147483647;
-    if (s <= 0) s += 2147483646;
-    return () => (s = (s * 16807) % 2147483647) / 2147483647;
+  /* --------------------------------------------------------- the sink */
+  const colors = () => {
+    const s = getComputedStyle(frame);
+    return {
+      ink: s.getPropertyValue("--ink").trim() || "#16150f",
+      paper: s.getPropertyValue("--paper").trim() || "#fbfaf8",
+      red: s.getPropertyValue("--ink").trim() || "#16150f",
+    };
+  };
+  let palette = colors();
+  let dark = document.documentElement.classList.contains("dark");
+  const noLabels = () => null;
+  const gl = makeRenderer(canvas, false);
+  let out: Dots | null = null;
+  let glFailed = !gl;
+  const makeOut = (): Dots | null => {
+    if (gl && !glFailed)
+      return gl.ready ? glDots(gl.sink(palette, noLabels)) : null;
+    return pixelDots(canvas!, () => palette);
+  };
+  if (gl) {
+    void gl.whenReady(1500).then((ok) => {
+      if (!ok) {
+        // A canvas that has a WebGL context can't draw 2D: start a new one.
+        glFailed = true;
+        const fresh = canvas!.cloneNode(false) as HTMLCanvasElement;
+        canvas!.replaceWith(fresh);
+        canvas = fresh;
+      }
+      out = makeOut();
+      if (!ok) fit();
+      kick();
+    });
+  } else out = makeOut();
+
+  function loadTheme(): void {
+    const url = dark ? driveDarkUrl : driveUrl;
+    void loadProps(url).then((p) => {
+      if (!p || (dark ? driveDarkUrl : driveUrl) !== url) return;
+      props = p;
+      tiles.clear();
+      kick();
+    });
   }
 
+  /* --------------------------------------------------------- the world */
+  function cam(): Camera {
+    return camera(W, H, carZ);
+  }
+
+  function ensureTiles(): void {
+    if (!props) return;
+    const from = Math.floor(carZ / TILE);
+    const to = Math.floor((carZ + FAR) / TILE);
+    for (const k of tiles.keys()) if (k < from || k > to) tiles.delete(k);
+    for (let t = from; t <= to; t++)
+      if (!tiles.has(t))
+        tiles.set(
+          t,
+          buildTile(
+            t,
+            salt,
+            props.map((r) => r.prop),
+          ),
+        );
+  }
+
+  /* --------------------------------------------------------- the animals */
   function pickSpecies(): HerpSpecies {
     const weight = (s: HerpSpecies) =>
       RARITY_WEIGHT[s.rarity] * CATEGORY_WEIGHT[s.category];
@@ -343,377 +467,470 @@ export function initHerping(root: HTMLElement): void {
     return SPECIES[0];
   }
 
-  // Road geometry: a lane down the middle with gravel shoulders. Animals live
-  // between roadLeft()..roadRight() (including a little onto the shoulders).
-  function roadHalf(): number {
-    return Math.min(W * 0.34, 230);
-  }
-  function laneEdge(side: number): number {
-    return W / 2 + side * roadHalf();
+  /**
+   * How much of an animal's inside is dotted. Dots are light on the dark
+   * page and ink on paper, so a pale animal is dense in dark mode and a dark
+   * one is dense in light mode.
+   */
+  function inkTone(sp: HerpSpecies): number {
+    const pale = paleness(sp.color);
+    return dark ? pale : 1 - pale;
   }
 
-  function spawnAnimal(atTop: boolean): void {
+  function spawnAnimal(initial: boolean): void {
+    if (!W) return;
     const sp = pickSpecies();
-    const half = roadHalf();
-    const x = W / 2 + (Math.random() - 0.5) * 2 * (half * 1.05);
-    const y = atTop ? -30 - Math.random() * 40 : Math.random() * H * 0.6;
-    const size = sp.size * (0.9 + Math.random() * 0.15);
-    animals.push({ sp, x, y, size, wiggle: 0, found: false });
+    const c = cam();
+    // Newcomers turn up far ahead and the car closes on them; parked (reduced
+    // motion), they turn up anywhere in reach, out of the spotlight.
+    const near = reduceMotion || initial;
+    for (let tries = 0; tries < 10; tries++) {
+      const dir = Math.random() < 0.5 ? -1 : 1;
+      const z =
+        carZ +
+        (near ? nearest(c) + 4 + Math.random() * 26 : 48 + Math.random() * 26);
+      const x = (Math.random() * 2 - 1) * (ROAD.half - 0.4);
+      const dz = z - carZ;
+      const s = c.f / dz;
+      const sx = W / 2 + (x - ROAD.camX) * s;
+      const sy = c.horizon + ROAD.camH * s;
+      const crowded = animals.some(
+        (o) => Math.abs(o.z - z) < 3 && Math.abs(o.x - x) < 1.2,
+      );
+      const spotted = near && spotAt(c, beam, sx, sy, dz) > 0.1;
+      if ((crowded || spotted) && tries < 9) continue;
+      const seed = 1 + Math.floor(Math.random() * 1e6);
+      animals.push({
+        sp,
+        x,
+        z,
+        dir,
+        speed: CRAWL[sp.category] * (0.8 + 0.4 * Math.random()),
+        ang: (dir > 0 ? 0 : Math.PI) + (Math.random() - 0.5) * 0.9,
+        seed,
+        art: critterArt(sp.category, ART_PX, inkTone(sp), seed, 1.6),
+        sx,
+        sy,
+        len: 0,
+        wiggle: 0,
+        sway: Math.random() * 6.28,
+        found: false,
+      });
+      return;
+    }
   }
 
-  function buildScene(): void {
+  const CROWD = 5;
+  function populate(): void {
     animals = [];
-    scrollY = 0;
-    const r = rng(Math.round(W) * 13 + sceneSalt * 101);
-    const seed = Math.max(4, Math.round(H / 90));
-    for (let i = 0; i < seed; i++) spawnAnimal(false);
+    for (let i = 0; i < CROWD; i++) spawnAnimal(true);
+    dirty = true;
+  }
+
+  function resetRain(): void {
     rainDrops.length = 0;
-    const drops = reduceMotion ? 0 : Math.round((W * H) / 9000);
+    if (reduceMotion) return;
+    const drops = Math.round((W * H) / 9000);
     for (let i = 0; i < drops; i++) {
       rainDrops.push({
-        x: r() * W,
-        y: r() * H,
-        len: 6 + r() * 10,
-        v: 340 + r() * 260,
+        x: Math.random() * W,
+        y: Math.random() * H,
+        len: 6 + Math.random() * 10,
+        v: 340 + Math.random() * 260,
       });
     }
-    bakeRoad();
   }
 
-  function fit(): void {
-    const cssW =
-      canvas!.clientWidth || (wrap as HTMLElement).clientWidth || 640;
-    const cssH = Math.max(340, Math.min(560, Math.round(cssW * 0.7)));
-    canvas!.style.height = `${cssH}px`;
-    dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvas!.width = Math.round(cssW * dpr);
-    canvas!.height = Math.round(cssH * dpr);
-    ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx!.imageSmoothingEnabled = false;
-    W = cssW;
-    H = cssH;
-    if (!beamX) {
-      beamX = W / 2;
-      beamTargetX = W / 2;
-    }
-    buildScene();
+  /* -------------------------------------------------------- the drawing */
+  let buf = new Float32Array(3 * 65536);
+  let n = 0;
+  const room = (more: number) => {
+    if ((n + more) * 3 <= buf.length) return;
+    const next = new Float32Array(Math.max(buf.length * 2, (n + more) * 3));
+    next.set(buf.subarray(0, n * 3));
+    buf = next;
+  };
+  const push = (x: number, y: number, r: number) => {
+    if (n * 3 >= buf.length) room(1);
+    buf[n * 3] = x;
+    buf[n * 3 + 1] = y;
+    buf[n * 3 + 2] = r;
+    n++;
+  };
+  const emit = (o: Dots, color: string, alpha = 1) => {
+    o.dots(buf, n, color, alpha);
+    n = 0;
+  };
+
+  /** The ground under a screen point, if there is any: across and ahead, metres. */
+  function groundAt(c: Camera, x: number, y: number) {
+    if (y <= c.horizon + 1) return null;
+    const dz = (c.f * ROAD.camH) / (y - c.horizon);
+    return { xr: ((x - W / 2) * dz) / c.f, dz };
   }
 
-  // The asphalt + shoulders + forest edges are baked once into a tile of height
-  // H and blitted twice with the scroll offset, so the whole road surface slides
-  // seamlessly under the car. The scrolling centerline dashes are drawn live.
-  function bakeRoad(): void {
-    const c = document.createElement("canvas");
-    c.width = Math.round(W * dpr);
-    c.height = Math.round(H * dpr);
-    const b = c.getContext("2d");
-    if (!b) return;
-    b.setTransform(dpr, 0, 0, dpr, 0, 0);
-    b.imageSmoothingEnabled = false;
-    const r = rng(Math.round(W) * 31 + sceneSalt * 101);
-    const lx = laneEdge(-1);
-    const rx = laneEdge(1);
-
-    // forest floor / undergrowth on the far sides
-    b.fillStyle = "#0d130c";
-    b.fillRect(0, 0, W, H);
-    for (let i = 0; i < 90; i++) {
-      const side = r() < 0.5 ? 0 : 1;
-      const x = side ? rx + 8 + r() * (W - rx - 8) : r() * Math.max(1, lx - 8);
-      const y = r() * H;
-      b.fillStyle = r() < 0.5 ? "#152016" : "#0f1a10";
-      b.fillRect(snap(x), snap(y), PIX, PIX);
-    }
-
-    // gravel shoulders
-    for (const [sx, ex] of [
-      [lx - 26, lx],
-      [rx, rx + 26],
-    ] as const) {
-      b.fillStyle = "#2a2620";
-      b.fillRect(snap(sx), 0, snap(ex - sx), H);
-      for (let i = 0; i < 120; i++) {
-        b.fillStyle = r() < 0.5 ? "#3a352c" : "#211d18";
-        b.fillRect(snap(sx + r() * (ex - sx)), snap(r() * H), PIX, PIX);
-      }
-    }
-
-    // asphalt
-    const g = b.createLinearGradient(lx, 0, rx, 0);
-    g.addColorStop(0, "#1c1e22");
-    g.addColorStop(0.5, "#26282d");
-    g.addColorStop(1, "#1c1e22");
-    b.fillStyle = g;
-    b.fillRect(snap(lx), 0, snap(rx - lx), H);
-    // wet speckle + faint cracks
-    for (let i = 0; i < 260; i++) {
-      b.fillStyle = r() < 0.5 ? "rgba(70,76,86,0.5)" : "rgba(10,12,16,0.6)";
-      b.fillRect(snap(lx + r() * (rx - lx)), snap(r() * H), PIX, PIX);
-    }
-    // damp puddle sheen patches
-    for (let i = 0; i < 5; i++) {
-      const px = lx + PIX + r() * (rx - lx - PIX * 2);
-      const py = r() * H;
-      const pw = 20 + r() * 60;
-      b.fillStyle = "rgba(90,110,130,0.10)";
-      for (let k = -3; k <= 3; k++) {
-        const ww = Math.round(Math.sqrt(Math.max(0, 1 - (k / 3.5) ** 2)) * pw);
-        b.fillRect(snap(px - ww / 2), snap(py + k * PIX * 2), ww, PIX * 2);
-      }
-    }
-    // solid lane-edge paint (fog lines)
-    b.fillStyle = "rgba(210,205,180,0.5)";
-    b.fillRect(snap(lx + PIX), 0, PIX, H);
-    b.fillRect(snap(rx - PIX * 2), 0, PIX, H);
-
-    bg = c;
-  }
-
-  // ------------------------------------------------------------- lighting
-  /** Elliptical beam metric: how far (0 = center) an (x,y) is from the pool. */
-  function beamDist(x: number, y: number): number {
-    const cy = H * 0.46;
-    const rx = Math.max(60, W * 0.2);
-    const ry = H * 0.4;
-    const dx = (x - beamX) / rx;
-    const dy = (y - cy) / ry;
-    return Math.hypot(dx, dy);
-  }
-
-  function drawSprite(
-    c: Ctx,
-    a: Animal,
-    cx: number,
-    cy: number,
-    unit: number,
+  /**
+   * Road marks or fence pieces (`MARK` numbers each), moved by `ox`, `oz`.
+   * `shift` turns every rank by the same amount, so the fence's posts, all
+   * drawn from one pattern, don't drop the same dots.
+   */
+  function drawMarks(
+    c: Camera,
+    m: Float32Array,
+    count: number,
+    ox: number,
+    oz: number,
+    shift: number,
   ): void {
-    c.save();
-    c.translate(snap(cx), snap(cy));
-    if (a.wiggle > 0)
-      c.rotate(Math.sin(a.wiggle * 22) * 0.14 * Math.min(1, a.wiggle));
-    SPRITES[a.sp.category](c, unit, a.sp.color, a.sp.accent);
-    c.restore();
-  }
-
-  function drawEyeshine(c: Ctx, a: Animal, intensity: number): void {
-    const unit = PIX * a.size;
-    const e = EYE[a.sp.category];
-    const ey = a.y + e.dy * unit;
-    const [rr, gg, bb] = hexToRgb(a.sp.eyeshine);
-    const flick = 0.85 + 0.15 * Math.sin(performance.now() / 110 + a.x);
-    // A tight coloured halo around a small bright pupil-glint, so it reads as
-    // eyeshine rather than a glowing orb. Halo grows only modestly with intensity.
-    const halo = unit * (1.6 + intensity * 1.9);
-    for (const s of [-1, 1]) {
-      const ex = a.x + s * e.dx * unit;
-      const grd = c.createRadialGradient(ex, ey, 0, ex, ey, halo);
-      grd.addColorStop(
-        0,
-        `rgba(${rr},${gg},${bb},${(0.85 * intensity * flick).toFixed(3)})`,
-      );
-      grd.addColorStop(
-        0.45,
-        `rgba(${rr},${gg},${bb},${(0.28 * intensity).toFixed(3)})`,
-      );
-      grd.addColorStop(1, `rgba(${rr},${gg},${bb},0)`);
-      c.fillStyle = grd;
-      c.beginPath();
-      c.arc(ex, ey, halo, 0, Math.PI * 2);
-      c.fill();
-      // bright round pupil-glint
-      c.fillStyle = `rgba(255,255,255,${(0.95 * intensity * flick).toFixed(3)})`;
-      c.beginPath();
-      c.arc(ex, ey, Math.max(1.1, unit * 0.32), 0, Math.PI * 2);
-      c.fill();
+    const { camX, camH } = ROAD;
+    for (let i = 0, j = 0; i < count; i++, j += MARK) {
+      const dz = m[j + 2] + oz - c.z;
+      if (dz < 1 || dz > FAR) continue;
+      let rank = m[j + 6] + shift;
+      if (rank >= 1) rank -= 1;
+      const xr = m[j] + ox - camX;
+      const keep = keepShare(markArea(c, m[j + 5], m[j + 3], xr, dz), m[j + 4]);
+      if (rank >= keep) continue;
+      const s = c.f / dz;
+      const x = W / 2 + xr * s;
+      const y = c.horizon + (camH - m[j + 1]) * s;
+      if (x < -2 || x > W + 2 || y < -2 || y > H + 2) continue;
+      const lit = lightAt(c, beam, xr, m[j + 1], dz, x, y);
+      if (rank >= keep * lit * 1.1) continue;
+      push(x, y, PEN * (dz < 5 ? 1.15 : 1));
     }
   }
 
-  function render(): void {
-    ctx!.clearRect(0, 0, W, H);
+  function drawProp(
+    o: Dots,
+    c: Camera,
+    r: Ready,
+    px: number,
+    pz: number,
+    scale: number,
+    mirror: boolean,
+    seed: number,
+  ): void {
+    const dz = pz - c.z;
+    if (dz < 0.6 || dz > FAR) return;
+    const { prop } = r;
+    const s = c.f / dz;
+    const hPx = prop.metres * scale * s;
+    const wPx = hPx * prop.aspect;
+    const bx = W / 2 + (px - ROAD.camX) * s;
+    const by = c.horizon + ROAD.camH * s;
+    const left = bx - wPx / 2;
+    const top = by - hPx;
+    if (left > W || left + wPx < 0 || top > H || by < 0 || hPx < 3) return;
+    // The smallest drawing at least this tall; past the largest, it grows.
+    let k = 0;
+    while (k < prop.sizes.length - 1 && prop.sizes[k].h < hPx) k++;
+    const size = prop.sizes[k];
+    const fit = hPx / size.h;
+    const keep = Math.min(1, fit * fit);
+    const grow = fit > 1 ? Math.min(1.6, Math.sqrt(fit)) : 1;
 
-    // 1) scrolling road surface (two tiles)
-    if (bg) {
-      const off = ((scrollY % H) + H) % H;
-      ctx!.drawImage(bg, 0, 0, bg.width, bg.height, 0, off, W, H);
-      ctx!.drawImage(bg, 0, 0, bg.width, bg.height, 0, off - H, W, H);
+    // Clear paper where it stands, so nearer things hide what's behind.
+    if (hPx > 10) {
+      // A coarser grid for big props: the ring of paper is wider than a cell.
+      const g = hPx > 400 ? 6 : hPx > 150 ? 4 : 3;
+      const { maskW: mw, maskH: mh } = prop;
+      const y0 = Math.max(0, top);
+      const y1 = Math.min(H, by);
+      const x0 = Math.max(0, left);
+      const x1 = Math.min(W, left + wPx);
+      for (let y = y0; y < y1; y += g) {
+        const my = Math.min(mh - 1, Math.floor(((y - top) / hPx) * mh));
+        for (let x = x0; x < x1; x += g) {
+          let u = (x - left) / wPx;
+          if (mirror) u = 1 - u;
+          const mx = Math.min(mw - 1, Math.floor(u * mw));
+          if (r.halo[my * mw + mx]) push(x + g / 2, y + g / 2, g * 0.8);
+        }
+      }
+      o.paper(buf, n, g, palette.paper);
+      n = 0;
     }
 
-    // 2) scrolling centerline dashes
-    const dash = 26;
-    const gap = 22;
-    const period = dash + gap;
-    ctx!.fillStyle = "rgba(220,214,150,0.55)";
-    let y = -((scrollY % period) + period) % period;
-    for (; y < H; y += period)
-      ctx!.fillRect(snap(W / 2 - PIX), snap(y), PIX * 2, dash);
-
-    // 3) animals (drawn bright; the night veil below hides the unlit ones)
-    for (const a of animals) {
-      const d = beamDist(a.x, a.y);
-      if (d < 1.35) drawSprite(ctx!, a, a.x, a.y, PIX * a.size);
+    const U = r.u[k];
+    const V = r.v[k];
+    const ranks = r.rank[k];
+    const shift = threshold(seed);
+    const wm = prop.metres * scale * prop.aspect;
+    const hm = prop.metres * scale;
+    const xr0 = px - ROAD.camX;
+    room(size.n);
+    for (let i = 0; i < size.n; i++) {
+      let rank = ranks[i] + shift;
+      if (rank >= 1) rank -= 1;
+      if (rank >= keep) continue;
+      const u = mirror ? 1 - U[i] : U[i];
+      const x = left + u * wPx;
+      const y = top + V[i] * hPx;
+      if (x < -2 || x > W + 2 || y < -2 || y > H + 2) continue;
+      const lit = lightAt(
+        c,
+        beam,
+        xr0 + (u - 0.5) * wm,
+        (1 - V[i]) * hm,
+        dz,
+        x,
+        y,
+      );
+      if (rank >= keep * lit * 1.1) continue;
+      push(x, y, size.r[i] * grow);
     }
+    emit(o, palette.ink);
+  }
 
-    // 4) the night veil, punched by the headlight beam
-    ctx!.save();
-    ctx!.fillStyle = "rgba(3,5,10,0.95)";
-    ctx!.fillRect(0, 0, W, H);
-    ctx!.globalCompositeOperation = "destination-out";
-    const cy = H * 0.46;
-    const rx = Math.max(60, W * 0.2);
-    const ry = H * 0.4;
-    ctx!.save();
-    ctx!.translate(beamX, cy);
-    ctx!.scale(rx / ry, 1);
-    const beam = ctx!.createRadialGradient(0, 0, 0, 0, 0, ry);
-    beam.addColorStop(0, "rgba(0,0,0,1)");
-    beam.addColorStop(0.55, "rgba(0,0,0,0.85)");
-    beam.addColorStop(1, "rgba(0,0,0,0)");
-    ctx!.fillStyle = beam;
-    ctx!.fillRect(
-      -ry * (rx / ry) - 10,
-      -ry - 10,
-      (ry * (rx / ry) + 10) * 2,
-      (ry + 10) * 2,
-    );
-    ctx!.restore();
-    ctx!.restore();
+  /** An animal's local point on screen: turned to its heading, laid on the road. */
+  function toScreen(
+    a: Animal,
+    lx: number,
+    ly: number,
+    turn: number,
+    k: number,
+  ) {
+    const cs = Math.cos(a.ang + turn);
+    const sn = Math.sin(a.ang + turn);
+    return [
+      a.sx + (lx * cs - ly * sn) * k,
+      a.sy + (lx * sn + ly * cs) * k * SQUASH,
+    ];
+  }
 
-    // 5) warm headlight tint over the lit pool
-    ctx!.save();
-    ctx!.globalCompositeOperation = "overlay";
-    ctx!.translate(beamX, cy);
-    ctx!.scale(rx / ry, 1);
-    const warm = ctx!.createRadialGradient(0, 0, 0, 0, 0, ry);
-    warm.addColorStop(0, "rgba(255,238,190,0.28)");
-    warm.addColorStop(1, "rgba(255,238,190,0)");
-    ctx!.fillStyle = warm;
-    ctx!.fillRect(-ry * (rx / ry), -ry, ry * (rx / ry) * 2, ry * 2);
-    ctx!.restore();
+  function placeAnimal(c: Camera, a: Animal): number {
+    const dz = a.z - c.z;
+    const s = c.f / Math.max(0.5, dz);
+    a.sx = W / 2 + (a.x - ROAD.camX) * s;
+    a.sy = c.horizon + ROAD.camH * s;
+    a.len = LENGTH_M * a.sp.size * s;
+    return dz;
+  }
 
-    // 6) eyeshine glints — a ring of tells around the beam's edge, so animals
-    //    betray themselves as you sweep toward them, before the body fades in.
+  function drawAnimal(o: Dots, c: Camera, a: Animal): void {
+    const dz = placeAnimal(c, a);
+    if (dz < 0.8 || dz > FAR) return;
+    const k = a.len / ART_PX;
+    const lit = lightAt(c, beam, a.x - ROAD.camX, 0, dz, a.sx, a.sy);
+    if (lit < 0.02) return;
+    const turn =
+      (a.wiggle > 0
+        ? Math.sin(a.wiggle * 22) * 0.14 * Math.min(1, a.wiggle)
+        : 0) + (reduceMotion ? 0 : 0.06 * Math.sin(a.sway));
+    const h = a.art.holes;
+    for (let i = 0; i < h.length; i += 3) {
+      const [x, y] = toScreen(a, h[i], h[i + 1], turn, k);
+      push(x, y, Math.max(1.2, h[i + 2] * k));
+    }
+    emit(o, palette.paper);
+    const keep = Math.min(1, k * k);
+    const rs = Math.max(0.55, Math.min(1.3, k));
+    const d = a.art.dots;
+    for (let i = 0, j = 0; i < d.length; i += 3, j++) {
+      const rank = threshold(a.seed + j);
+      if (rank >= keep * lit * 1.15) continue;
+      const [x, y] = toScreen(a, d[i], d[i + 1], turn, k);
+      push(x, y, d[i + 2] * rs);
+    }
+    emit(o, palette.ink);
+  }
+
+  interface Drawable {
+    z: number;
+    draw: () => void;
+  }
+  const order: Drawable[] = [];
+
+  function render(now: number): void {
+    if (!out || !W) return;
+    const o = out;
+    const c = cam();
+    o.frame(W, H, dpr);
+    if (!props) {
+      o.flush();
+      return;
+    }
+    ensureTiles();
+
+    // The road first: its marks lie flat, so their order doesn't matter.
+    for (const tile of tiles.values())
+      drawMarks(c, tile.marks, tile.count, 0, 0, 0);
+    emit(o, palette.ink);
+
+    // Everything standing up, furthest first, so nearer things cover it.
+    order.length = 0;
+    for (const [, tile] of tiles) {
+      for (const p of tile.placed) {
+        const r = props[p.prop];
+        if (r)
+          order.push({
+            z: p.z,
+            draw: () => drawProp(o, c, r, p.x, p.z, p.scale, p.mirror, p.seed),
+          });
+      }
+      for (const post of tile.posts) {
+        order.push({
+          z: post.z,
+          draw: () => {
+            drawMarks(
+              c,
+              FENCE,
+              FENCE.length / MARK,
+              post.x,
+              post.z,
+              threshold(Math.round(post.z * 977)),
+            );
+            emit(o, palette.ink);
+          },
+        });
+      }
+    }
+    for (const a of animals)
+      order.push({ z: a.z, draw: () => drawAnimal(o, c, a) });
+    order.sort((a, b) => b.z - a.z);
+    for (const d of order) d.draw();
+
+    // Eyeshine over everything: a clear ring of paper round each eye, the
+    // eye, and when the light's on it, a burst of tiny dots.
     for (const a of animals) {
       if (a.found) continue;
-      const d = beamDist(a.x, a.y);
-      // Brightest when the beam is on the animal (d small), fading with distance
-      // so a faint glint still tips you off as you sweep toward it.
-      const intensity = Math.max(0, Math.min(1, 1.25 - d / 1.35));
-      if (intensity > 0.04) drawEyeshine(ctx!, a, intensity);
+      const dz = placeAnimal(c, a);
+      if (dz < 0.8 || dz > FAR) continue;
+      const k = a.len / ART_PX;
+      const e = a.art.eyes;
+      const [hx, hy] = toScreen(a, (e[0] + e[2]) / 2, 0, 0, k);
+      const shine = eyeshine(c, beam, a.x - ROAD.camX, dz, hx, hy);
+      if (shine < 0.03) continue;
+      const flick = reduceMotion
+        ? 1
+        : 0.85 + 0.15 * Math.sin(now / 110 + a.seed);
+      const er =
+        Math.max(1.1, Math.min(3, e[3] * k * 0.62)) * (0.85 + 0.35 * shine);
+      const eyes: number[] = [];
+      for (let q = 0; q < 4; q += 2)
+        eyes.push(
+          ...toScreen(
+            a,
+            e[q],
+            Math.sign(e[q + 1]) * Math.max(Math.abs(e[q + 1]) * k, er * 1.3),
+            0,
+            1,
+          ),
+        );
+      for (let q = 0; q < 4; q += 2) push(eyes[q], eyes[q + 1], er + 2);
+      emit(o, palette.paper);
+      for (let q = 0; q < 4; q += 2) push(eyes[q], eyes[q + 1], er);
+      emit(o, palette.ink, Math.min(1, (0.6 + 0.4 * shine) * flick));
+      if (shine > 0.45) {
+        const rr = er + 1.6 + shine * 2.4;
+        for (let q = 0; q < 4; q += 2)
+          for (let b = 0; b < 8; b++) {
+            const t = (b / 8) * Math.PI * 2 + a.seed;
+            push(
+              eyes[q] + Math.cos(t) * rr,
+              eyes[q + 1] + Math.sin(t) * rr,
+              0.55,
+            );
+          }
+        emit(o, palette.ink, shine);
+      }
     }
 
-    // 7) rain streaks
+    // Rain shows only where the light catches it.
     if (rainDrops.length) {
-      ctx!.strokeStyle = "rgba(150,170,200,0.25)";
-      ctx!.lineWidth = 1;
-      ctx!.beginPath();
       for (const p of rainDrops) {
-        ctx!.moveTo(p.x, p.y);
-        ctx!.lineTo(p.x - 2, p.y + p.len);
+        const g = groundAt(c, p.x, p.y);
+        const low = g ? lowBeam(g.xr, 0.8, g.dz) : 0;
+        const lit = Math.max(low * 0.7, spotAt(c, beam, p.x, p.y, 12));
+        if (lit < 0.15 || threshold(Math.round(p.v)) > lit) continue;
+        for (let q = 0; q < 3; q++)
+          push(p.x - (0.12 * q * p.len) / 2, p.y + (q * p.len) / 2, 0.55);
       }
-      ctx!.stroke();
+      emit(o, palette.ink, 0.7);
     }
-
-    // 8) the car hood + twin headlamps at the bottom
-    drawHood();
-
-    // 9) brake-light flash on a successful ID
-    if (brake > 0) {
-      ctx!.fillStyle = `rgba(220,40,40,${(0.35 * brake).toFixed(3)})`;
-      ctx!.fillRect(0, H - 10, W, 10);
-    }
+    o.flush();
   }
 
-  function drawHood(): void {
-    const hoodTop = H - 18;
-
-    // hood silhouette with a faint top rim so it reads as a car
-    ctx!.fillStyle = "#06080c";
-    ctx!.beginPath();
-    ctx!.moveTo(W * 0.5 - 160, H + 6);
-    ctx!.quadraticCurveTo(W * 0.5 - 94, hoodTop - 8, W * 0.5 - 74, hoodTop);
-    ctx!.lineTo(W * 0.5 + 74, hoodTop);
-    ctx!.quadraticCurveTo(W * 0.5 + 94, hoodTop - 8, W * 0.5 + 160, H + 6);
-    ctx!.closePath();
-    ctx!.fill();
-    ctx!.strokeStyle = "rgba(140,150,170,0.2)";
-    ctx!.lineWidth = 1;
-    ctx!.beginPath();
-    ctx!.moveTo(W * 0.5 - 74, hoodTop + 0.5);
-    ctx!.lineTo(W * 0.5 + 74, hoodTop + 0.5);
-    ctx!.stroke();
-
-    // two round headlamps: soft glow + housing ring + bright lens + hot core
-    for (const s of [-1, 1]) {
-      const hx = W / 2 + s * 54;
-      const hy = hoodTop - 2;
-
-      ctx!.save();
-      ctx!.globalCompositeOperation = "lighter";
-      const glow = ctx!.createRadialGradient(hx, hy, 0, hx, hy, 32);
-      glow.addColorStop(0, "rgba(255,246,210,0.5)");
-      glow.addColorStop(0.4, "rgba(255,236,180,0.2)");
-      glow.addColorStop(1, "rgba(255,236,180,0)");
-      ctx!.fillStyle = glow;
-      ctx!.beginPath();
-      ctx!.arc(hx, hy, 32, 0, Math.PI * 2);
-      ctx!.fill();
-      ctx!.restore();
-
-      // housing ring
-      ctx!.fillStyle = "#0e1116";
-      ctx!.beginPath();
-      ctx!.ellipse(hx, hy, 13, 8, 0, 0, Math.PI * 2);
-      ctx!.fill();
-      ctx!.strokeStyle = "rgba(120,130,150,0.4)";
-      ctx!.lineWidth = 1;
-      ctx!.stroke();
-
-      // bright lens
-      const lens = ctx!.createRadialGradient(hx, hy, 0, hx, hy, 11);
-      lens.addColorStop(0, "rgba(255,255,255,1)");
-      lens.addColorStop(0.4, "rgba(255,248,214,0.95)");
-      lens.addColorStop(1, "rgba(255,214,130,0)");
-      ctx!.fillStyle = lens;
-      ctx!.beginPath();
-      ctx!.ellipse(hx, hy, 11, 6.5, 0, 0, Math.PI * 2);
-      ctx!.fill();
-
-      // hot core
-      ctx!.fillStyle = "#fffdf6";
-      ctx!.beginPath();
-      ctx!.ellipse(hx, hy, 3.2, 2.2, 0, 0, Math.PI * 2);
-      ctx!.fill();
+  /* ------------------------------------------------------------ sizing */
+  function fit(): void {
+    const cssW = frame!.clientWidth || 640;
+    const cssH = Math.max(340, Math.min(560, Math.round(cssW * 0.7)));
+    canvas!.style.height = `${cssH}px`;
+    // Without WebGL the dots are filled on the CPU, four times as fast at 1x.
+    dpr = gl && !glFailed ? Math.min(window.devicePixelRatio || 1, 2) : 1;
+    const first = !W;
+    const kx = W ? cssW / W : 1;
+    const ky = H ? cssH / H : 1;
+    W = cssW;
+    H = cssH;
+    beam.x *= kx;
+    beam.y *= ky;
+    aim.x *= kx;
+    aim.y *= ky;
+    for (const p of rainDrops) {
+      p.x *= kx;
+      p.y *= ky;
     }
+    if (first || !rainDrops.length) resetRain();
+    // Until the visitor steers, the spotlight rests on the left verge ahead.
+    if (!aimed) {
+      beam.x = aim.x = W * 0.3;
+      beam.y = aim.y = H * 0.56;
+    }
+    if (!animals.length) populate();
   }
 
-  // ------------------------------------------------------------- the loop
+  /* ------------------------------------------------------------ the loop */
   function update(dt: number): void {
-    scrollY += SPEED * dt;
-    // Reduced motion moves the beam straight to where it's aimed.
-    beamX = reduceMotion
-      ? beamTargetX
-      : beamX + (beamTargetX - beamX) * Math.min(1, dt * 9);
-    if (brake > 0) brake = Math.max(0, brake - dt * 2);
-
-    for (const a of animals) {
-      a.y += SPEED * dt;
-      if (a.wiggle > 0) a.wiggle = Math.max(0, a.wiggle - dt);
-    }
-    // recycle animals that slid past the car
-    animals = animals.filter((a) => a.y < H + 60);
-
-    // keep the road populated
-    if (SPEED > 0) {
-      spawnTimer -= dt;
-      const target = Math.max(4, Math.round(H / 90));
-      if (spawnTimer <= 0 && animals.length < target + 2) {
-        spawnAnimal(true);
-        spawnTimer = 0.5 + Math.random() * 0.9;
+    const was = { x: beam.x, y: beam.y };
+    if (reduceMotion) {
+      beam.x = aim.x;
+      beam.y = aim.y;
+    } else {
+      const k = Math.min(1, dt * 9);
+      beam.x += (aim.x - beam.x) * k;
+      beam.y += (aim.y - beam.y) * k;
+      if (Math.hypot(aim.x - beam.x, aim.y - beam.y) < 0.3) {
+        beam.x = aim.x;
+        beam.y = aim.y;
       }
     }
-  }
+    if (beam.x !== was.x || beam.y !== was.y) dirty = true;
 
-  function updateRain(dt: number): void {
+    // The car stops while a find's card is open, and sets off again after.
+    if (!reduceMotion) {
+      const target = card!.classList.contains("is-open") ? 0 : ROAD.speed;
+      speed += (target - speed) * Math.min(1, dt * 2.2);
+      carZ += speed * dt;
+    }
+
+    const c = cam();
+    const behind = nearest(c) - 0.5;
+    for (const a of animals) {
+      if (a.wiggle > 0) {
+        a.wiggle = Math.max(0, a.wiggle - dt);
+        dirty = true;
+      }
+      if (reduceMotion || a.found) continue;
+      a.x += a.dir * a.speed * dt;
+      a.sway += dt * 4;
+    }
+    const before = animals.length;
+    animals = animals.filter(
+      (a) => Math.abs(a.x) < ROAD.half + 1.5 && a.z - carZ > behind,
+    );
+    if (animals.length !== before) dirty = true;
+
+    if (animals.length < CROWD) {
+      spawnTimer -= dt;
+      if (reduceMotion || spawnTimer <= 0) {
+        spawnAnimal(false);
+        spawnTimer = 0.8 + Math.random() * 1.6;
+        dirty = true;
+      }
+    }
+
     for (const p of rainDrops) {
       p.y += p.v * dt;
       p.x -= p.v * dt * 0.12;
@@ -725,14 +942,24 @@ export function initHerping(root: HTMLElement): void {
   }
 
   function step(now: number): void {
+    raf = 0;
+    if (!running) return;
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
-    // SPEED already parks the car under reduced motion; the beam and the
-    // brake light still need real time to move and fade.
     update(dt);
-    updateRain(reduceMotion ? 0 : dt);
-    render();
-    raf = requestAnimationFrame(step);
+    // Moving, every frame changes; parked (reduced motion), it only draws
+    // again when something did change.
+    if (!reduceMotion || dirty) render(now);
+    dirty = false;
+    if (!reduceMotion || animals.some((a) => a.wiggle > 0))
+      raf = requestAnimationFrame(step);
+  }
+  function kick(): void {
+    dirty = true;
+    if (running && !raf) {
+      last = performance.now();
+      raf = requestAnimationFrame(step);
+    } else if (!running && out) render(performance.now());
   }
   function start(): void {
     // Not under a scene that's still playing; it starts once that's gone.
@@ -744,13 +971,13 @@ export function initHerping(root: HTMLElement): void {
   function stop(): void {
     running = false;
     cancelAnimationFrame(raf);
+    raf = 0;
   }
 
-  // ----------------------------------------------------------- discovery
+  /* --------------------------------------------------------- discovery */
   function reveal(a: Animal): void {
     a.found = true;
     a.wiggle = reduceMotion ? 0 : 0.9;
-    brake = 1;
     const sp = a.sp;
     const isNew = !discovered.has(sp.id);
     if (isNew) {
@@ -759,44 +986,47 @@ export function initHerping(root: HTMLElement): void {
       updateJournal();
     }
     showLastFind(sp);
-    // drift the found animal off after a moment so it doesn't linger forever
+    // It moves on while the card is open, so the road is clear behind it.
     setTimeout(() => {
-      a.y = H + 100;
+      animals = animals.filter((o) => o !== a);
+      kick();
     }, 1400);
     showCard(sp, isNew);
+    kick();
   }
 
-  function paintRevealSprite(sp: HerpSpecies): void {
+  function paintRevealStipple(sp: HerpSpecies): void {
     if (photoEl) photoEl.classList.add("is-hidden");
     revealCanvas!.classList.remove("is-hidden");
-    // The card's frame is 4:3, so the sprite sits in the middle of a 160 by
-    // 120 scene.
+    revealCanvas!.style.imageRendering = "auto";
+    // The card's frame is 4:3, so the drawing sits in the middle of a 160 by
+    // 120 plate.
     const w = 160;
     const size = 120;
-    revealCanvas!.width = w * dpr;
-    revealCanvas!.height = size * dpr;
-    rctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
-    rctx!.imageSmoothingEnabled = false;
-    rctx!.clearRect(0, 0, w, size);
-    rctx!.fillStyle = "#0b1020";
-    rctx!.fillRect(0, 0, w, size);
-    // a hint of headlight glow behind the sprite
-    const grd = rctx!.createRadialGradient(
-      w / 2,
-      size / 2,
-      0,
-      w / 2,
-      size / 2,
-      size * 0.6,
-    );
-    grd.addColorStop(0, "rgba(255,238,190,0.16)");
-    grd.addColorStop(1, "rgba(255,238,190,0)");
-    rctx!.fillStyle = grd;
-    rctx!.fillRect(0, 0, w, size);
-    rctx!.save();
-    rctx!.translate(w / 2, size / 2 + 8);
-    SPRITES[sp.category](rctx!, PIX * 2 * sp.size, sp.color, sp.accent);
-    rctx!.restore();
+    const ratio = Math.min(window.devicePixelRatio || 1, 2);
+    revealCanvas!.width = w * ratio;
+    revealCanvas!.height = size * ratio;
+    const c = rctx!;
+    c.setTransform(ratio, 0, 0, ratio, 0, 0);
+    c.fillStyle = palette.paper;
+    c.fillRect(0, 0, w, size);
+    const art = critterArt(sp.category, 92, inkTone(sp), 7, 2.1);
+    c.fillStyle = palette.ink;
+    c.beginPath();
+    const cx = w / 2;
+    const cy = size / 2;
+    const d = art.dots;
+    for (let i = 0; i < d.length; i += 3) {
+      c.moveTo(cx + d[i] + d[i + 2], cy + d[i + 1]);
+      c.arc(cx + d[i], cy + d[i + 1], d[i + 2], 0, Math.PI * 2);
+    }
+    for (let k = 0; k < 4; k += 2) {
+      const x = cx + art.eyes[k];
+      const y = cy + art.eyes[k + 1];
+      c.moveTo(x + 2.2, y);
+      c.arc(x, y, 2.2, 0, Math.PI * 2);
+    }
+    c.fill();
   }
 
   function photoUrlFor(sp: HerpSpecies): string | undefined {
@@ -851,9 +1081,10 @@ export function initHerping(root: HTMLElement): void {
       // they're preloaded), then the photo resolves out of pixels.
       photoEl.classList.add("is-hidden");
       revealCanvas!.classList.add("is-hidden");
+      revealCanvas!.style.imageRendering = "pixelated";
       photoEl.onerror = () => {
         upgradePhoto(photoEl, "");
-        paintRevealSprite(sp);
+        paintRevealStipple(sp);
         if (creditEl) creditEl.classList.add("is-hidden");
       };
       photoEl.onload = () => revealFromPixels(revealCanvas!, photoEl);
@@ -878,7 +1109,7 @@ export function initHerping(root: HTMLElement): void {
         photoEl.onload = null;
         upgradePhoto(photoEl, "");
       }
-      paintRevealSprite(sp);
+      paintRevealStipple(sp);
       if (creditEl) creditEl.classList.add("is-hidden");
     }
 
@@ -924,16 +1155,41 @@ export function initHerping(root: HTMLElement): void {
     setHair(barEl!, discovered.size / total);
   }
 
-  /** Topmost tappable (at least partly lit) animal under a point. */
+  /**
+   * The animal under a point, if the light is on it. A tap aims the beam
+   * where it lands and the beam glides there, so light at the aim counts too.
+
+  /** How lit an animal is, body or eyes, for tapping and for Enter. */
+  function seen(c: Camera, a: Animal, at: { x: number; y: number }) {
+    const dz = placeAnimal(c, a);
+    if (dz < 0.8 || dz > FAR) return { body: 0, eyes: 0 };
+    const xr = a.x - ROAD.camX;
+    return {
+      body: lightAt(c, at, xr, 0, dz, a.sx, a.sy),
+      eyes: eyeshine(c, at, xr, dz, a.sx, a.sy),
+    };
+  }
+
+  /**
+   * The animal under a point, if the light is on it or its eyes are shining.
+   * A tap aims the beam where it lands and the beam glides there, so light
+   * at the aim counts too.
+   */
   function hitTest(px: number, py: number): Animal | null {
+    if (!W) return null;
+    const c = cam();
     let best: Animal | null = null;
     let bestD = Infinity;
     for (const a of animals) {
       if (a.found) continue;
-      const unit = PIX * a.size;
-      const rad = unit * 9;
-      const dd = Math.hypot(px - a.x, py - a.y);
-      if (dd <= rad && beamDist(a.x, a.y) < 1.3 && dd < bestD) {
+      const now = seen(c, a, beam);
+      const then = seen(c, a, aim);
+      const rad = Math.max(20, a.len * 0.7);
+      const dd = Math.hypot(px - a.sx, py - a.sy);
+      const lit =
+        Math.max(now.body, then.body) >= 0.15 ||
+        Math.max(now.eyes, then.eyes) >= 0.6;
+      if (dd <= rad && lit && dd < bestD) {
         best = a;
         bestD = dd;
       }
@@ -941,51 +1197,84 @@ export function initHerping(root: HTMLElement): void {
     return best;
   }
 
-  // -------------------------------------------------------------- wiring
-  function pointToCanvas(e: MouseEvent): { x: number; y: number } {
-    const rect2 = canvas!.getBoundingClientRect();
-    return { x: e.clientX - rect2.left, y: e.clientY - rect2.top };
-  }
-
-  canvas.addEventListener("pointerdown", (e: PointerEvent) => {
-    beamTargetX = pointToCanvas(e).x;
-  });
-  // Stop and ID on click, not pointerdown. The card opens over the road, so a
-  // tap's click would land on its scrim and close it again, and the mousedown
-  // that follows a pointerdown would pull focus off the card's button.
-  canvas.addEventListener("click", (e: MouseEvent) => {
-    const p = pointToCanvas(e);
-    const a = hitTest(p.x, p.y);
-    if (a) reveal(a);
-  });
-  canvas.addEventListener("pointermove", (e: PointerEvent) => {
-    const p = pointToCanvas(e);
-    if (e.pointerType === "touch" && e.buttons === 0) return; // only steer while dragging on touch
-    beamTargetX = p.x;
-    if (e.pointerType !== "touch") {
-      canvas.style.cursor = hitTest(p.x, p.y) ? "pointer" : "crosshair";
-    }
-  });
-
-  // Keyboard play: the arrow keys steer the beam, and Enter or Space stops
-  // for the animal nearest the middle of it.
+  /**
+   * What Enter stops for: the animal nearest the middle of the spotlight,
+   * or failing that the one whose eyes shine brightest.
+   */
   function inBeam(): Animal | null {
+    if (!W) return null;
+    const c = cam();
     let best: Animal | null = null;
     let bestD = 1;
     for (const a of animals) {
       if (a.found) continue;
-      const d = beamDist(a.x, a.y);
+      const dz = placeAnimal(c, a);
+      if (dz < 0.8 || dz > FAR) continue;
+      const d = spotDistance(c, beam, a.sx, a.sy);
       if (d < bestD) {
         best = a;
         bestD = d;
       }
     }
+    if (best) return best;
+    let bright = 0.5;
+    for (const a of animals) {
+      if (a.found) continue;
+      const { eyes } = seen(c, a, beam);
+      if (eyes > bright) {
+        best = a;
+        bright = eyes;
+      }
+    }
     return best;
   }
-  frame?.addEventListener("keydown", (e: KeyboardEvent) => {
-    if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
-      const nudge = Math.max(24, W * 0.06) * (e.key === "ArrowLeft" ? -1 : 1);
-      beamTargetX = Math.max(0, Math.min(W, beamTargetX + nudge));
+
+  /* ------------------------------------------------------------ wiring */
+  function pointToFrame(e: MouseEvent): { x: number; y: number } {
+    const rect = canvas!.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }
+  function aimAt(x: number, y: number): void {
+    aimed = true;
+    aim.x = Math.max(0, Math.min(W, x));
+    aim.y = Math.max(H * 0.05, Math.min(H, y));
+    kick();
+  }
+
+  frame.addEventListener("pointerdown", (e: PointerEvent) => {
+    const p = pointToFrame(e);
+    aimAt(p.x, p.y);
+  });
+  // Stop and ID on click, not pointerdown. The card opens over the road, so a
+  // tap's click would land on its scrim and close it again, and the mousedown
+  // that follows a pointerdown would pull focus off the card's button.
+  frame.addEventListener("click", (e: MouseEvent) => {
+    const p = pointToFrame(e);
+    const a = hitTest(p.x, p.y);
+    if (a) reveal(a);
+  });
+  frame.addEventListener("pointermove", (e: PointerEvent) => {
+    if (e.pointerType === "touch" && e.buttons === 0) return; // only steer while dragging on touch
+    const p = pointToFrame(e);
+    aimAt(p.x, p.y);
+    if (e.pointerType !== "touch") {
+      canvas!.style.cursor = hitTest(p.x, p.y) ? "pointer" : "crosshair";
+    }
+  });
+
+  // Keyboard play: the arrow keys steer the beam, and Enter or Space stops
+  // for the animal nearest the middle of it.
+  frame.addEventListener("keydown", (e: KeyboardEvent) => {
+    const dx = Math.max(24, W * 0.06);
+    const dy = Math.max(20, H * 0.08);
+    const move: Record<string, [number, number]> = {
+      ArrowLeft: [-dx, 0],
+      ArrowRight: [dx, 0],
+      ArrowUp: [0, -dy],
+      ArrowDown: [0, dy],
+    };
+    if (move[e.key]) {
+      aimAt(aim.x + move[e.key][0], aim.y + move[e.key][1]);
     } else if (e.key === "Enter" || e.key === " ") {
       const a = inBeam();
       if (a) reveal(a);
@@ -1008,16 +1297,36 @@ export function initHerping(root: HTMLElement): void {
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") closeCard();
   });
+  // A new road: another stretch of forest, new animals on it.
   resetBtn?.addEventListener("click", () => {
-    sceneSalt++;
-    buildScene();
+    salt++;
+    tiles.clear();
+    populate();
+    kick();
+  });
+
+  // Follow the theme toggle: the other theme's drawings, in its ink.
+  new MutationObserver(() => {
+    const next = colors();
+    if (next.ink === palette.ink && next.paper === palette.paper) return;
+    palette = next;
+    dark = document.documentElement.classList.contains("dark");
+    for (const a of animals)
+      a.art = critterArt(a.sp.category, ART_PX, inkTone(a.sp), a.seed, 1.6);
+    out = makeOut();
+    loadTheme();
+    kick();
+  }).observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["class"],
   });
 
   const ro = new ResizeObserver(() => {
+    const before = W;
     fit();
-    if (!running && onscreen && !document.hidden) render();
+    if (W !== before) kick();
   });
-  ro.observe(wrap);
+  ro.observe(frame);
 
   const io = new IntersectionObserver(
     (entries) => {
@@ -1027,7 +1336,7 @@ export function initHerping(root: HTMLElement): void {
     },
     { threshold: 0.05 },
   );
-  io.observe(canvas);
+  io.observe(frame);
 
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) stop();
@@ -1037,15 +1346,15 @@ export function initHerping(root: HTMLElement): void {
     if (onscreen && !document.hidden) start();
   });
 
-  // --------------------------------------------------------------- init
+  /* -------------------------------------------------------------- init */
   fit();
+  loadTheme();
   updateJournal();
   // The journal saves in the order things were found, so its last entry is
   // the most recent new find.
   const lastId = [...discovered].pop();
   const lastSpecies = SPECIES.find((s) => s.id === lastId);
   if (lastSpecies) showLastFind(lastSpecies);
-  render();
   start();
   preloadPhotos();
 }

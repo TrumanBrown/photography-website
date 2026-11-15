@@ -151,6 +151,32 @@ What failed, and why:
   0-1 coordinates of the cropped (and flipped) image, which is the cutout
   pane in the mask sheet, not the full photo.
 
+## Drives (the night drive's roadside, November 2026)
+
+- **A whole photo stippled edge to edge is a mess of dots.** The first night
+  drive drew DSC03802, a fern-lined trail in Olympic, as one scene. Ferns,
+  trunks, the rail and the trail all ran into one texture, and Truman said
+  "the background is hard to tell what it is, should have clear plants, rails,
+  trees, etc. this just looks like a mess of dots" (2026-11-15). The plates
+  read because each subject is cut out and sits on bare paper. A roadside
+  needs the same: each fern and trunk its own cutout, with paper between them.
+  A single photo also can't move like a road, which he asked for too.
+- **rembg can't cut a fern out of a forest.** On DSC03802 it kept a sliver of
+  one frond and lost the clump. The green-and-pale colour mask (`"mask":
+"green"`) gets the whole clump with each frond's outline. Trunks among other
+  trunks need GrabCut seeded with a line down the trunk (`"mask": "grabcut"`).
+- **No photo of a paved road at night exists in his archive.** The road
+  itself (edge lines, dashes, puddles, gravel) and the fence are drawn in
+  code, in the same pen.
+- **Thinning dots at random washes a drawing out.** Showing each dot with a
+  chance equal to the light on it turned half-lit ferns into grey noise. The
+  light is full strength across most of the beam and thins only at its rim.
+- **Puddles drawn as rings read as targets.** A puddle at night is dark water
+  with a lit rim and the headlights caught across it as short streaks.
+- **A prop seen close needs a bigger drawing.** Trunks passing the car were
+  scaled past their largest drawing and the dots spread into a grid. They get
+  a 768 px size; ferns, which stay smaller, stop at 384.
+
 ## On the site
 
 - **One image per theme, both lazy.** The theme is a class on `<html>`, which

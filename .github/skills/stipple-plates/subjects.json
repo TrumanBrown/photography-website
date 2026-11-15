@@ -367,5 +367,69 @@
     "kind": "globe",
     "lon0": -100.0,
     "lat0": 22.0
+  },
+  "herping-drive": {
+    "note": "Night drive roadside: sword ferns and mossy trunks · Olympic National Park, February 2026, and Western Washington, spring 2026",
+    "kind": "drive",
+    "site": "src/assets/hobbies/herping",
+    "props": {
+      "fern": {
+        "src": "olympic-winter-2026/DSC03802.JPEG",
+        "crop": [0.14, 0.5, 0.45, 0.86],
+        "mask": "green",
+        "keep": 0.05,
+        "metres": 1.4,
+        "detail": 0.3,
+        "light": { "weight": 0.3 }
+      },
+      "maple": {
+        "src": "olympic-winter-2026/DSC03806.JPEG",
+        "crop": [0.385, 0.0, 0.52, 0.95],
+        "mask": "grabcut",
+        "lods": [48, 96, 192, 384, 768],
+        "core": [
+          [0.296, 0.032],
+          [0.333, 0.526],
+          [0.481, 0.926]
+        ],
+        "core_width": 0.11,
+        "metres": 7.5,
+        "light": { "weight": 0.36 },
+        "fade_top": 0.2
+      },
+      "alder": {
+        "src": "spring-pnw-various-wildlife-2026/DSC05734.JPG",
+        "crop": [0.46, 0.0, 0.7, 0.82],
+        "mask": "grabcut",
+        "lods": [48, 96, 192, 384, 768],
+        "core": [
+          [0.417, 0.037],
+          [0.417, 0.61],
+          [0.479, 0.878],
+          [0.292, 0.945],
+          [0.479, 0.878],
+          [0.667, 0.945]
+        ],
+        "core_width": 0.1,
+        "metres": 6.5,
+        "light": { "weight": 0.36 },
+        "fade_top": 0.25
+      },
+      "mossy": {
+        "src": "olympic-winter-2026/DSC03806.JPEG",
+        "crop": [0.64, 0.0, 0.79, 0.98],
+        "mask": "grabcut",
+        "lods": [48, 96, 192, 384, 768],
+        "core": [
+          [0.533, 0.082],
+          [0.4, 0.51],
+          [0.4, 0.918]
+        ],
+        "core_width": 0.1,
+        "metres": 8.0,
+        "light": { "weight": 0.36 },
+        "fade_top": 0.2
+      }
+    }
   }
 }

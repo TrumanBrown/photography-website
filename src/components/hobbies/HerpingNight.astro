@@ -1,10 +1,10 @@
 ---
 /**
  * Herping "night drive" game. Static markup + the reveal card; all behaviour
- * (dark road, headlight beam, eyeshine, sprites, journal) lives in
- * @/lib/hobbies/herping, bound via the [data-hp-*] hooks. The mounting script is
- * an Astro-processed module (served from /_astro/), so it satisfies the strict
- * `script-src 'self'` CSP.
+ * (the roadside drawn by the headlights, eyeshine, the stippled animals, the
+ * journal) lives in @/lib/hobbies/herping, bound via the [data-hp-*] hooks.
+ * The mounting script is an Astro-processed module (served from /_astro/), so
+ * it satisfies the strict `script-src 'self'` CSP.
  */
 import FieldJournal from "@/components/hobbies/FieldJournal.astro";
 import SpecimenCard from "@/components/hobbies/SpecimenCard.astro";
@@ -19,18 +19,15 @@ import { SPECIES } from "@/lib/hobbies/herping-species";
     data-hp-frame
     tabindex="0"
     role="application"
-    aria-label="A dark rainy road at night. Steer the headlight beam and look for the eyeshine of animals out on the road, then tap one to identify it. Arrow keys steer, Enter stops for whatever's in the beam."
+    aria-label="A forest road at night, drawn only where your headlights reach. Steer the beam over the ferns and the road, watch for the eyeshine of animals crossing, then tap a lit one to identify it. Arrow keys steer, Enter stops for whatever's in the beam."
   >
-    <canvas
-      data-hp-canvas
-      class="block w-full touch-none"
-      style="image-rendering: pixelated"
-      aria-hidden="true"></canvas>
+    <canvas data-hp-canvas class="block w-full touch-none" aria-hidden="true"
+    ></canvas>
   </div>
   <p class="sr-only" aria-live="polite" data-hp-live></p>
   <p class="hp-note">
-    Steer with the mouse, by dragging on touch, or with the arrow keys, then
-    tap an animal in the beam or press Enter to stop for it. Please never handle
+    Steer with the mouse, by dragging on touch, or with the arrow keys, then tap
+    an animal in the beam or press Enter to stop for it. Please never handle
     real salamanders with bug-sprayed or lotioned hands, and put any cover you
     flip back the way you found it.
   </p>
@@ -42,7 +39,8 @@ import { SPECIES } from "@/lib/hobbies/herping-species";
   .hp-frame {
     overflow: hidden;
     border: 1px solid var(--rule);
-    background: #000;
+    background: var(--paper);
+    cursor: crosshair;
   }
   .hp-note {
     margin: 8px 0 0;

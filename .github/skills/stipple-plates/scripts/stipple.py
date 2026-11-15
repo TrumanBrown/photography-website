@@ -61,6 +61,16 @@ SIZES = {
 ICON_OVERRIDES = dict(stones=False, bubbles=False, fill=(0.94, 0.88), cy=0.5)
 INK = {"light": (22, 21, 15), "dark": (236, 233, 225)}  # --ink in each theme
 
+# Drives (`"kind": "drive"`): the herping night drive's roadside, a set of
+# props (sword ferns, mossy trunks) each cut out of a photo and drawn like a
+# small plate, at several heights (`lods`, CSS px), since the toy shows them
+# from far away to right beside the car. They're drawn at one plate pixel per
+# CSS pixel with a fixed pen, so the dots stay the same size at any distance.
+DRIVE_PEN = 0.75
+DRIVE_LODS = (48, 96, 192, 384)
+# Height of the silhouette kept with each prop, for occlusion.
+DRIVE_MASK = 96
+
 
 # ----------------------------------------------------------------- sources
 def resolve_src(src: str, photo: int = 0) -> Path:
@@ -283,8 +293,63 @@ def subject_mask(cfg, rgb, key):
         if cfg.get("ground_out"):
             m = m * (1 - ground_out_mask(rgb, cfg["ground_out"]))
         return m, land
+    if cfg.get("mask") == "green":
+        return green_mask(rgb, cfg), None
+    if cfg.get("mask") == "grabcut":
+        return grabcut_mask(rgb, cfg, key), None
     raw = poly_mask(rgb.shape[:2], cfg["polygon"]) if "polygon" in cfg else cutout(rgb, key)
     return clean_mask(raw, cfg, rgb), None
+
+
+def green_mask(rgb, cfg):
+    """Plants against forest litter, where rembg sees one texture: the green
+    (and pale, lit) leaves by colour, small gaps between leaflets closed, the
+    gaps between fronds left open so each keeps its outline. Polygons in
+    `exclude` take out anything else green."""
+    hsv = cv2.cvtColor(cv2.GaussianBlur((rgb * 255).astype(np.uint8), (3, 3), 0), cv2.COLOR_RGB2HSV).astype(np.int16)
+    h, s, v = hsv[..., 0], hsv[..., 1], hsv[..., 2]
+    g = ((h >= 28) & (h <= 90) & (s >= 45) & (v >= 60)) | ((h >= 25) & (h <= 100) & (v >= 140) & (s >= 12))
+    g = cv2.morphologyEx(g.astype(np.uint8), cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7)))
+    g = cv2.morphologyEx(g, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))) > 0
+    H, W = g.shape
+    for poly in cfg.get("exclude", []):
+        g &= poly_mask((H, W), [poly]) < 0.5
+    lab, n = ndimage.label(g)
+    if n > 1:
+        sizes = ndimage.sum(g, lab, range(1, n + 1))
+        g = np.isin(lab, 1 + np.where(sizes >= cfg.get("keep", 0.02) * sizes.max())[0])
+    return cv2.GaussianBlur(g.astype(np.float32), (0, 0), 1.0)
+
+
+def grabcut_mask(rgb, cfg, key):
+    """A trunk against more trunks: OpenCV GrabCut, seeded with the crop as
+    the box and `core`, a line of 0-1 points (of the crop) down the middle of
+    the subject, as certain foreground. Cached like the rembg cutouts."""
+    cache = CACHE / "masks" / f"{key}-grabcut-{hashlib.sha1(json.dumps(cfg['core']).encode()).hexdigest()[:8]}.png"
+    if cache.exists():
+        m = np.asarray(Image.open(cache).convert("L")).astype(np.float32) / 255.0
+        if m.shape == rgb.shape[:2]:
+            return cv2.GaussianBlur(m, (0, 0), 1.0)
+    H, W = rgb.shape[:2]
+    k = min(1.0, 1400 / max(H, W))
+    small = cv2.resize((rgb * 255).astype(np.uint8), (int(W * k), int(H * k)), interpolation=cv2.INTER_AREA)
+    h, w = small.shape[:2]
+    m = np.full((h, w), cv2.GC_PR_BGD, np.uint8)
+    b = max(2, int(0.02 * w))
+    m[:, :b] = m[:, -b:] = cv2.GC_BGD
+    pts = np.array([(int(x * w), int(y * h)) for x, y in cfg["core"]])
+    cv2.polylines(m, [pts], False, cv2.GC_FGD, max(3, int(cfg.get("core_width", 0.08) * w)))
+    bg, fg = np.zeros((1, 65)), np.zeros((1, 65))
+    cv2.grabCut(cv2.cvtColor(small, cv2.COLOR_RGB2BGR), m, None, bg, fg, 6, cv2.GC_INIT_WITH_MASK)
+    out = ((m == cv2.GC_FGD) | (m == cv2.GC_PR_FGD)).astype(np.uint8)
+    lab, n = ndimage.label(out)
+    if n > 1:
+        out = lab == 1 + int(np.argmax(ndimage.sum(out, lab, range(1, n + 1))))
+    out = ndimage.binary_fill_holes(out)
+    out = cv2.resize(out.astype(np.uint8) * 255, (W, H), interpolation=cv2.INTER_LINEAR)
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    Image.fromarray(out).save(cache)
+    return cv2.GaussianBlur(out.astype(np.float32) / 255.0, (0, 0), 1.0)
 
 
 def ground_out_mask(rgb, opts):
@@ -774,12 +839,42 @@ def subject_field(cfg, W, H, dark):
         rho = np.maximum(rho, cfg["floor_light"] * m_p)
     rim_k = cfg.get("rim", 0.58) * (0.83 if dark else 1.0)
     rho = np.maximum(rho, rim_k * rim(outline_src, cfg.get("rim_width", 1.2)) * np.clip(m_p * 1.5, 0, 1))
+    if cfg.get("fade_top"):
+        # After the outline, so a trunk's top dissolves with no edge left.
+        rho = rho * fade_top(H, cfg["fade_top"])
     if cfg.get("stones"):
         rho = rho + stones(m_p, dark, ground_at=cfg.get("ground_at"), halo=cfg.get("clear_feet", False),
                            ground=cfg.get("ground_light", 1.0) if not dark else 1.0)
     if cfg.get("bubbles"):
         rho = np.maximum(rho, bubbles(m_p, dark))
     return np.clip(rho, 0, 0.9).astype(np.float32)
+
+
+# ----------------------------------------------------------------- drives
+def prop_aspect(cfg):
+    """Width over height of a prop's cut-out, so each size frames it exactly."""
+    rgb, key = source_rgb(cfg)
+    m, _ = subject_mask(cfg, rgb, key)
+    ys, xs = np.where(m > 0.5)
+    return (xs.max() - xs.min() + 1) / (ys.max() - ys.min() + 1)
+
+
+def fade_top(H, amount):
+    """1 below the top `amount` of the plate, easing to 0 at its top edge: a
+    trunk dissolving into the dark canopy instead of ending in a cut."""
+    t = np.clip(np.arange(H, dtype=np.float32) / max(1.0, amount * H), 0, 1)
+    return (t * t * (3 - 2 * t))[:, None]
+
+
+def prop_mask(cfg, W, H):
+    """A prop's silhouette at W x H, where the toy clears a ring of paper."""
+    rgb, key = source_rgb(cfg)
+    m, _ = subject_mask(cfg, rgb, key)
+    (m_p,) = place([m], m, W, H, (1.0, 1.0), 0.5)
+    m_p = np.clip(m_p, 0, 1)
+    if cfg.get("fade_top"):
+        m_p = m_p * fade_top(H, cfg["fade_top"])
+    return m_p
 
 
 def globe_field(cfg, W, H, dark):
@@ -861,21 +956,29 @@ def lloyd(rho, n, iters, rng, init=None):
     return pts[sw > 0] if init is None else pts
 
 
-def render(pts, rho, r0, rng, ss=4):
-    """Draw at ss x and downsample for round, anti-aliased dots (1-2 px circles
-    drawn directly come out as crosses). Each radius follows the local spacing
-    (median distance to six neighbours) so dark areas tile instead of fusing."""
-    H, W = rho.shape
-    big = np.zeros((H * ss, W * ss), np.uint8)
+def dot_radii(pts, r0, rng):
+    """Each radius follows the local spacing (median distance to six
+    neighbours) so dark areas tile instead of fusing."""
     if len(pts) > 7:
         dist, _ = cKDTree(pts).query(pts, k=7, workers=-1)
         spacing = np.median(dist[:, 1:], axis=1)
     else:
         spacing = np.full(len(pts), 4 * r0)
-    radii = np.clip(0.36 * spacing, 0.7 * r0, 1.15 * r0) * (1 + 0.05 * rng.standard_normal(len(pts)))
+    return np.clip(0.36 * spacing, 0.7 * r0, 1.15 * r0) * (1 + 0.05 * rng.standard_normal(len(pts)))
+
+
+def draw(pts, radii, W, H, ss=4):
+    """Draw at ss x and downsample for round, anti-aliased dots (1-2 px circles
+    drawn directly come out as crosses)."""
+    big = np.zeros((H * ss, W * ss), np.uint8)
     for (x, y), r in zip(pts, radii):
         cv2.circle(big, (int(x * ss * 16), int(y * ss * 16)), max(int(r * ss * 16), 16), 255, -1, cv2.LINE_8, shift=4)
     return cv2.resize(big, (W, H), interpolation=cv2.INTER_AREA)
+
+
+def render(pts, rho, r0, rng, ss=4):
+    H, W = rho.shape
+    return draw(pts, dot_radii(pts, r0, rng), W, H, ss)
 
 
 def dot_count(rho, r0):
@@ -891,7 +994,82 @@ def save(alpha, path, theme):
     Image.fromarray(rgba).save(path, "WEBP", lossless=True, quality=100, method=6)
 
 
+def build_drive(name, cfg, out=None):
+    """Every prop at every size, in both inkings, in one file per theme:
+    `<site>/<name>.bin` (ink on paper) and `<name>-dark.bin` (scratchboard).
+    src/lib/hobbies/herping-drive.ts `parseDrive` reads them. Little-endian:
+
+        "DRIV", u16 version 1, u16 prop count, then per prop:
+          u8 name length, the name (ASCII), f32 height (metres), f32 width/height,
+          u16 mask w, u16 mask h, the mask (u8 coverage, row by row),
+          u8 size count, then per size: u16 w, u16 h, u32 dots,
+            every x then every y in sixteenths of a px (u16), every radius in 64ths (u8)
+
+    A contact sheet of the largest size in both themes goes to
+    ~/.cache/stipple-plates/review/<name>.png."""
+    import struct
+
+    site = Path(out) if out else REPO / cfg["site"]
+    site.mkdir(parents=True, exist_ok=True)
+    props = cfg["props"]
+    files = {"light": bytearray(), "dark": bytearray()}
+    for f in files.values():
+        f += b"DRIV" + struct.pack("<HH", 1, len(props))
+    sheet = {"light": [], "dark": []}
+    for pname, p in props.items():
+        aspect = prop_aspect(p)
+        mh = DRIVE_MASK
+        mw = max(1, round(mh * aspect))
+        mask = (prop_mask(p, mw, mh) * 255).astype(np.uint8)
+        head = struct.pack("<B", len(pname)) + pname.encode("ascii")
+        # Tall props pass close to the car, so they get a larger drawing too.
+        lods = p.get("lods", cfg.get("lods", DRIVE_LODS))
+        head += struct.pack("<ffHH", p["metres"], aspect, mw, mh) + mask.tobytes() + struct.pack("<B", len(lods))
+        for theme, buf in files.items():
+            dark = theme == "dark"
+            buf += head
+            c = {**p, "fill": (1.0, 1.0), "cy": 0.5, "stones": False}
+            for H in lods:
+                W = max(4, round(H * aspect))
+                rho = field(c, W, H, dark)
+                rng = np.random.default_rng(11)
+                pts = lloyd(rho, dot_count(rho, DRIVE_PEN), 60, rng)
+                radii = dot_radii(pts, DRIVE_PEN, rng)
+                order = np.lexsort((pts[:, 0], pts[:, 1]))
+                pts, radii = pts[order], radii[order]
+                buf += struct.pack("<HHI", W, H, len(pts))
+                buf += np.clip(np.round(pts[:, 0] * 16), 0, 65535).astype("<u2").tobytes()
+                buf += np.clip(np.round(pts[:, 1] * 16), 0, 65535).astype("<u2").tobytes()
+                buf += np.clip(np.round(radii * 64), 1, 255).astype("u1").tobytes()
+                if H == min(lods[-1], 384):
+                    sheet[theme].append(draw(pts, radii, W, H))
+                print(f"{name}/{pname:10s} {theme:5s} {W:4d}x{H:<4d} {len(pts):6d} dots", flush=True)
+    (site / f"{name}.bin").write_bytes(bytes(files["light"]))
+    (site / f"{name}-dark.bin").write_bytes(bytes(files["dark"]))
+    rows = []
+    for theme in ("light", "dark"):
+        paper = (251, 250, 248) if theme == "light" else (18, 18, 17)
+        tiles = sheet[theme]
+        row = Image.new("RGB", (sum(t.shape[1] for t in tiles) + 16 * len(tiles), max(t.shape[0] for t in tiles)), paper)
+        x = 0
+        for a in tiles:
+            ink = Image.new("RGB", (a.shape[1], a.shape[0]), INK[theme])
+            row.paste(ink, (x, 0), Image.fromarray(a))
+            x += a.shape[1] + 16
+        rows.append(row)
+    review = CACHE / "review" / f"{name}.png"
+    review.parent.mkdir(parents=True, exist_ok=True)
+    out_im = Image.new("RGB", (max(r.width for r in rows), sum(r.height for r in rows) + 12), (190, 190, 190))
+    out_im.paste(rows[0], (0, 0))
+    out_im.paste(rows[1], (0, rows[0].height + 12))
+    out_im.save(review)
+    print(f"review sheet {review}", file=sys.stderr)
+
+
 def build(name, cfg, out, sizes=("card",), themes=("light", "dark"), frames=3):
+    if cfg.get("kind") == "drive":
+        return build_drive(name, cfg, out)
+    out = Path(out) if out else DEFAULT_OUT
     out.mkdir(parents=True, exist_ok=True)
     for theme in themes:
         dark = theme == "dark"
@@ -922,8 +1100,8 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description="Render stipple plates from photographs.")
     ap.add_argument("names", nargs="*", help="subjects to render (default: all)")
     ap.add_argument("--subjects", default=str(SKILL / "subjects.json"))
-    ap.add_argument("--out", default=str(DEFAULT_OUT))
-    ap.add_argument("--sizes", default="card,mini", help="comma list of: " + ", ".join(SIZES))
+    ap.add_argument("--out", default=None, help=f"where to write (default {DEFAULT_OUT}; drives: their `site`)")
+    ap.add_argument("--sizes", default="card,mini", help="comma list of: " + ", ".join(SIZES) + " (drives use their own)")
     ap.add_argument("--themes", default="light,dark")
     ap.add_argument("--frames", type=int, default=3, help="drawings per plate, for the hover boil")
     ap.add_argument("--list", action="store_true", help="list subjects and exit")
@@ -937,12 +1115,14 @@ def main(argv=None):
     unknown = [n for n in names if n not in subjects]
     if unknown:
         raise SystemExit(f"Unknown subject(s): {', '.join(unknown)}. Add them to {a.subjects}.")
-    out = Path(a.out)
-    if not out.is_absolute():
-        out = REPO / out
+    out = None
+    if a.out:
+        out = Path(a.out)
+        if not out.is_absolute():
+            out = REPO / out
     for n in names:
         build(n, subjects[n], out, tuple(a.sizes.split(",")), tuple(a.themes.split(",")), a.frames)
-    print(f"wrote {out}", file=sys.stderr)
+    print(f"wrote {out or DEFAULT_OUT}", file=sys.stderr)
 
 
 if __name__ == "__main__":
