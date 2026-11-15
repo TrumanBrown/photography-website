@@ -7,6 +7,7 @@ import {
   fitView,
   graticuleStep,
   levelFor,
+  projectAt,
   scaleBar,
 } from "./day-list-map";
 import relief from "./day-list-relief.json";
@@ -54,11 +55,27 @@ describe("fitView", () => {
   it("keeps the box left of the buttons when given a right-hand inset", () => {
     const box = { w: 20, e: 30, s: 40, n: 45 };
     const width = 400;
-    const v = fitView(box, width, 200, 20, FIT_MAX_ZOOM, 40);
+    const v = fitView(box, width, 200, 20, FIT_MAX_ZOOM, { right: 40 });
     const right = ((box.e + 180) / 360 - v.cu) * width * v.k + width / 2;
     expect(right).toBeLessThanOrEqual(width - 20 - 40 + 0.5);
     const left = ((box.w + 180) / 360 - v.cu) * width * v.k + width / 2;
     expect(left).toBeGreaterThanOrEqual(20 - 0.5);
+  });
+
+  it("keeps the box out of a band asked for at the top or the bottom", () => {
+    const box = { w: 0, e: 10, s: 10, n: 30 };
+    const [width, height, pad] = [390, 195, 28];
+    const top = fitView(box, width, height, pad, FIT_MAX_ZOOM, { top: 60 });
+    expect(projectAt(top, width, height, 0, box.n).y).toBeGreaterThan(
+      pad + 60 - 0.5,
+    );
+    expect(projectAt(top, width, height, 0, box.s).y).toBeLessThan(
+      height - pad + 0.5,
+    );
+    const low = fitView(box, width, height, pad, FIT_MAX_ZOOM, { bottom: 60 });
+    expect(projectAt(low, width, height, 0, box.s).y).toBeLessThan(
+      height - pad - 60 + 0.5,
+    );
   });
 });
 

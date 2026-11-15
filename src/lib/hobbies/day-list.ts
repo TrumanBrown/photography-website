@@ -31,16 +31,20 @@ import {
 } from "../motion";
 import {
   MAX_ZOOM,
+  answerPad,
   answerView,
   createWorldMap,
+  projectAt,
   scaleBar,
   type Box,
+  type Inset,
   type LonLat,
   type Point,
   type WorldMap,
 } from "./day-list-map";
 import puzzles from "./day-list.json";
 import { speciesName } from "../species-name";
+import { siteConfig } from "../../../site.config";
 
 interface Clue {
   id: number;
@@ -314,6 +318,358 @@ export function scoreGuess(
   };
 }
 
+/* ------------------------------------------------- the verdict stamp */
+
+/** How far the verdict stamp keeps from the answer, px. */
+export const STAMP_CLEAR = 6;
+/** How far the place name reaches above the place's box, px. */
+const LABEL_H = 18;
+/** How far the pin's cross reaches from its middle, px. */
+const PIN_R = 12;
+
+export interface Rect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export type Corner = "tl" | "tr" | "bl" | "br";
+const CORNERS: Corner[] = ["tl", "tr", "bl", "br"];
+
+/** What the answer draws on the map, in map pixels. */
+export interface AnswerMarks {
+  /** The pin, the boundary and the labels. */
+  rects: Rect[];
+  /** The dashed line, once for each copy of the world it's drawn in. */
+  lines: [Point, Point][];
+}
+
+type Project = (lon: number, lat: number) => Point;
+
+/** The place's boundary on the map, never smaller than a few pixels. */
+function boundaryRect(bbox: Box, at: Project): Rect {
+  const tl = at(bbox.w, bbox.n);
+  const br = at(bbox.e, bbox.s);
+  return {
+    x: tl.x - 1,
+    y: tl.y - 1,
+    w: Math.max(6, br.x - tl.x) + 2,
+    h: Math.max(6, br.y - tl.y) + 2,
+  };
+}
+
+/**
+ * The line runs to the nearest edge of the place, the point the distance is
+ * measured to, the short way round: a pin in Hawaii reaches Japan off one side
+ * of the map and back in at the other, so it's drawn once more a world over.
+ */
+function answerLine(
+  pin: LonLat,
+  bbox: Box,
+  at: Project,
+  worldWidth: number,
+): { from: Point; to: Point; shifts: number[] } {
+  const edge = nearestPoint(pin, bbox);
+  let toLon = edge.lon;
+  if (toLon - pin.lon > 180) toLon -= 360;
+  else if (pin.lon - toLon > 180) toLon += 360;
+  const shifts = [0];
+  if (toLon < -180) shifts.push(worldWidth);
+  if (toLon > 180) shifts.push(-worldWidth);
+  return { from: at(pin.lon, pin.lat), to: at(toLon, edge.lat), shifts };
+}
+
+/** The place name sits above its box, to the right unless that runs off. */
+function nameSpot(box: Rect, nameW: number, mapW: number): Point {
+  let x = box.x + box.w + 5;
+  if (x + nameW > mapW - 4) x = box.x - 5 - nameW;
+  return { x: clamp(x, 4, mapW - 4 - nameW), y: Math.max(13, box.y - 5) };
+}
+
+/** The distance sits on the middle of the line, kept on the map. */
+function kmSpot(
+  middle: Point,
+  textW: number,
+  size: { width: number; height: number },
+): Point {
+  return {
+    x: clamp(middle.x - textW / 2, 4, size.width - 4 - textW),
+    y: clamp(middle.y - 8, 13, size.height - 6),
+  };
+}
+
+/** An 11px label drawn from its baseline at `at`, with its paper rim. */
+function labelRect(at: Point, textW: number): Rect {
+  return { x: at.x - 2, y: at.y - 11, w: textW + 4, h: 15 };
+}
+
+/**
+ * Everything the answer puts on the map in a view, through `at`, so the stamp
+ * can be kept off it before the camera gets there: the pin's cross, the line,
+ * the boundary, the name, and the distance once the line can carry it.
+ * `labels` are the two labels' widths.
+ */
+export function answerMarks(
+  bbox: Box,
+  pin: LonLat,
+  at: Project,
+  size: { width: number; height: number; worldWidth: number },
+  labels: { name: number; km: number },
+): AnswerMarks {
+  const p = at(pin.lon, pin.lat);
+  const box = boundaryRect(bbox, at);
+  const rects: Rect[] = [
+    { x: p.x - PIN_R, y: p.y - PIN_R, w: 2 * PIN_R, h: 2 * PIN_R },
+    box,
+    labelRect(nameSpot(box, labels.name, size.width), labels.name),
+  ];
+  const lines: [Point, Point][] = [];
+  const { from, to, shifts } = answerLine(pin, bbox, at, size.worldWidth);
+  const length = Math.hypot(to.x - from.x, to.y - from.y);
+  if (length > 8) {
+    for (const shift of shifts) {
+      lines.push([
+        { x: from.x + shift, y: from.y },
+        { x: to.x + shift, y: to.y },
+      ]);
+    }
+    if (length > 110) {
+      const middle = { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 };
+      rects.push(labelRect(kmSpot(middle, labels.km, size), labels.km));
+    }
+  }
+  return { rects, lines };
+}
+
+/**
+ * The four places the verdict stamp can sit, one tucked into each corner of
+ * the map, clear of the zoom buttons at the top right (whose left edge is
+ * `zoomLeft`) and of the strip `footer` tall along the bottom, where the scale
+ * bar and "Whole world" sit. `stamp` is the stamp's footprint once tilted.
+ */
+export function stampSpots(
+  size: { width: number; height: number },
+  stamp: { w: number; h: number },
+  edge: number,
+  controls: { zoomLeft: number; footer: number },
+): Record<Corner, Rect> {
+  const { w, h } = stamp;
+  const right = Math.min(size.width - edge, controls.zoomLeft - edge) - w;
+  const bottom = size.height - controls.footer - edge - h;
+  return {
+    tl: { x: edge, y: edge, w, h },
+    tr: { x: right, y: edge, w, h },
+    bl: { x: edge, y: bottom, w, h },
+    br: { x: size.width - edge - w, y: bottom, w, h },
+  };
+}
+
+function rectGap(a: Rect, b: Rect): number {
+  const dx = Math.max(0, b.x - (a.x + a.w), a.x - (b.x + b.w));
+  const dy = Math.max(0, b.y - (a.y + a.h), a.y - (b.y + b.h));
+  return Math.hypot(dx, dy);
+}
+
+function pointGap(p: Point, a: Point, b: Point): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const t = clamp(
+    ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy || 1),
+    0,
+    1,
+  );
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+}
+
+/** How far a line segment stays from a box, 0 if it crosses it. */
+function segmentGap(r: Rect, a: Point, b: Point): number {
+  // Clip the segment to the box (Liang-Barsky): any part left means it crosses.
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const p = [-dx, dx, -dy, dy];
+  const q = [a.x - r.x, r.x + r.w - a.x, a.y - r.y, r.y + r.h - a.y];
+  let t0 = 0;
+  let t1 = 1;
+  let crosses = true;
+  for (let i = 0; i < 4 && crosses; i++) {
+    if (p[i] === 0) crosses = q[i] >= 0;
+    else if (p[i] < 0) t0 = Math.max(t0, q[i] / p[i]);
+    else t1 = Math.min(t1, q[i] / p[i]);
+    if (t0 > t1) crosses = false;
+  }
+  if (crosses) return 0;
+  const corners = [
+    { x: r.x, y: r.y },
+    { x: r.x + r.w, y: r.y },
+    { x: r.x, y: r.y + r.h },
+    { x: r.x + r.w, y: r.y + r.h },
+  ];
+  return Math.min(
+    rectGap(r, { ...a, w: 0, h: 0 }),
+    rectGap(r, { ...b, w: 0, h: 0 }),
+    ...corners.map((c) => pointGap(c, a, b)),
+  );
+}
+
+/** How far a stamp at `spot` stays from everything in `marks`, px. */
+function clearance(spot: Rect, marks: AnswerMarks): number {
+  let clear = Infinity;
+  for (const r of marks.rects) clear = Math.min(clear, rectGap(spot, r));
+  for (const [a, b] of marks.lines) {
+    clear = Math.min(clear, segmentGap(spot, a, b));
+  }
+  return clear;
+}
+
+/**
+ * The corner farthest from everything the answer draws, and how far that is
+ * in pixels. 0 means a stamp there would cover something.
+ */
+export function stampCorner(
+  spots: Record<Corner, Rect>,
+  marks: AnswerMarks,
+): { corner: Corner; clear: number } {
+  let best: { corner: Corner; clear: number } = { corner: "tl", clear: -1 };
+  for (const corner of CORNERS) {
+    const clear = clearance(spots[corner], marks);
+    if (clear > best.clear) best = { corner, clear };
+  }
+  return best;
+}
+
+/**
+ * Where the verdict stamp goes once the answer is framed: the corner farthest
+ * from the pin, the line and the place. A phone's map is short enough that
+ * sometimes no corner is clear. Then the framing leaves a band for the stamp
+ * along the top or the bottom (`room`, passed on to answerView), and when the
+ * answer spans so much of the world that the map can't move, the stamp slides
+ * along the top or bottom edge to the clearest spot.
+ */
+export function placeVerdict(input: {
+  bbox: Box;
+  pin: LonLat;
+  /** What the camera frames: the pin and the place together. */
+  frame: Box;
+  size: { width: number; height: number };
+  /** The stamp's footprint once tilted. */
+  stamp: { w: number; h: number };
+  controls: { zoomLeft: number; footer: number };
+  labels: { name: number; km: number };
+}): { room: Inset; corner: Corner; spot: Rect; clear: number } {
+  const { width, height } = input.size;
+  const { stamp, controls } = input;
+  const edge = width < 480 ? 6 : 10;
+  const corners = stampSpots(input.size, stamp, edge, controls);
+  const pad = answerPad(width);
+  const rooms: Inset[] = [
+    {},
+    {
+      top: Math.max(
+        0,
+        edge + stamp.h + STAMP_CLEAR + Math.max(LABEL_H, PIN_R) - pad,
+      ),
+    },
+    {
+      bottom: Math.max(
+        0,
+        controls.footer + edge + stamp.h + STAMP_CLEAR + PIN_R - pad,
+      ),
+    },
+  ];
+  const framings = rooms.map((room) => {
+    const view = answerView(input.frame, width, height, room);
+    const marks = answerMarks(
+      input.bbox,
+      input.pin,
+      (lon, lat) => projectAt(view, width, height, lon, lat),
+      { width, height, worldWidth: width * view.k },
+      input.labels,
+    );
+    return { room, marks };
+  });
+
+  type Pick = { room: Inset; corner: Corner; spot: Rect; clear: number };
+  let best: Pick | null = null;
+  const consider = (pick: Pick) => {
+    if (!best || pick.clear > best.clear) best = pick;
+    return pick.clear >= STAMP_CLEAR;
+  };
+  for (const { room, marks } of framings) {
+    const { corner, clear } = stampCorner(corners, marks);
+    if (consider({ room, corner, spot: corners[corner], clear })) return best!;
+  }
+  // Along the top, left of the zoom buttons, and along the bottom.
+  const steps = 12;
+  for (const { room, marks } of framings) {
+    for (const [left, right] of [
+      [corners.tl, corners.tr],
+      [corners.bl, corners.br],
+    ]) {
+      for (let i = 0; i <= steps; i++) {
+        const spot = { ...left, x: left.x + ((right.x - left.x) * i) / steps };
+        const top = spot.y === corners.tl.y;
+        const side = spot.x + spot.w / 2 < width / 2 ? "l" : "r";
+        const corner = `${top ? "t" : "b"}${side}` as Corner;
+        if (consider({ room, corner, spot, clear: clearance(spot, marks) })) {
+          return best!;
+        }
+      }
+    }
+  }
+  return best!;
+}
+
+/** Where to send people from the share text. */
+const SHARE_URL = `${siteConfig.domain}/hobbies/narrow-nature`;
+
+/**
+ * The daily result as text to paste: which list and day, a square per species
+ * (a book for each one read), one for how far and one for the month, the
+ * numbers, and where to play. The squares are the grid people expect from
+ * daily puzzles; the page itself never shows emoji.
+ */
+export function shareText(result: {
+  list: number;
+  date: Date;
+  km: number;
+  off: number;
+  used: number;
+  total: number;
+  score: number;
+}): string {
+  const { km, off, used, total, score } = result;
+  let read = "";
+  for (let i = 0; i < total; i++) read += i < used ? "\u{1F4D6}" : "\u2B1C";
+  const distance =
+    km === 0
+      ? "\u{1F3AF}"
+      : km < 400
+        ? "\u{1F7E9}"
+        : km < 1500
+          ? "\u{1F7E8}"
+          : km < 5000
+            ? "\u{1F7E7}"
+            : "\u{1F7E5}";
+  const season =
+    off === 0
+      ? "\u{1F7E9}"
+      : off <= 1
+        ? "\u{1F7E8}"
+        : off <= 3
+          ? "\u{1F7E7}"
+          : "\u2B1C";
+  const where =
+    km === 0 ? "inside the boundary" : `${count(Math.round(km))} km off`;
+  return [
+    `Narrow nature list ${result.list}, ${DATE_SHORT.format(result.date)}`,
+    read,
+    `${distance}${season}`,
+    `${where} \u00b7 ${used}/${total} species \u00b7 ${count(score)}`,
+    SHARE_URL,
+  ].join("\n");
+}
+
 const STANDING_LABEL: Record<Clue["standing"], string> = {
   native: "",
   introduced: "Introduced here",
@@ -503,6 +859,9 @@ export function initDayList(root: HTMLElement): void {
   let revealing = false;
   // The verdict stamped on the map once the answer is down.
   let verdictStamp: HTMLElement | null = null;
+  // Room the answer's framing keeps clear for that stamp, when a corner alone
+  // can't keep it off the answer.
+  let answerRoom: Inset = {};
   let extraPool: Round[] | null = null;
   let extra = readExtra(readStore(EXTRA_KEY), day);
 
@@ -535,24 +894,19 @@ export function initDayList(root: HTMLElement): void {
 
   function drawGame(ctx: CanvasRenderingContext2D, m: WorldMap): void {
     const { ink, ink2, paper } = m.palette;
-    const tl = m.project(round.bbox.w, round.bbox.n);
-    const br = m.project(round.bbox.e, round.bbox.s);
-    const boxW = Math.max(6, br.x - tl.x) + 2;
-    const boxH = Math.max(6, br.y - tl.y) + 2;
+    const at = m.project;
+    const box = boundaryRect(round.bbox, at);
     let middle: Point | null = null;
     let lineLength = 0;
 
-    // The line runs to the nearest edge of the place, the point the distance
-    // is measured to, and leaves from the rim of the pin rather than its
-    // middle. It goes the short way round, like the distance: a pin in Hawaii
-    // reaches Japan off one side of the map and back in at the other.
+    // The line leaves from the rim of the pin rather than its middle.
     if (done && pin && lineT > 0) {
-      const edge = nearestPoint(pin, round.bbox);
-      let toLon = edge.lon;
-      if (toLon - pin.lon > 180) toLon -= 360;
-      else if (pin.lon - toLon > 180) toLon += 360;
-      const from = m.project(pin.lon, pin.lat);
-      const to = m.project(toLon, edge.lat);
+      const { from, to, shifts } = answerLine(
+        pin,
+        round.bbox,
+        at,
+        m.worldWidth,
+      );
       const length = Math.hypot(to.x - from.x, to.y - from.y);
       if (length > 8) {
         const ux = (to.x - from.x) / length;
@@ -560,9 +914,6 @@ export function initDayList(root: HTMLElement): void {
         const reach = 7 + (length - 7) * lineT;
         const a = { x: from.x + ux * 7, y: from.y + uy * 7 };
         const b = { x: from.x + ux * reach, y: from.y + uy * reach };
-        const shifts = [0];
-        if (toLon < -180) shifts.push(m.worldWidth);
-        if (toLon > 180) shifts.push(-m.worldWidth);
         ctx.strokeStyle = ink2;
         ctx.lineWidth = 1.4;
         ctx.setLineDash([4, 4]);
@@ -581,11 +932,11 @@ export function initDayList(root: HTMLElement): void {
     // Show the real boundary, not just a dot, so the scoring is legible. While
     // the reveal plays it strokes in from its top-left corner.
     if (done && boxT > 0) {
-      const perimeter = 2 * (boxW + boxH);
+      const perimeter = 2 * (box.w + box.h);
       ctx.strokeStyle = ink;
       ctx.lineWidth = 1.6;
       if (boxT < 1) ctx.setLineDash([perimeter * boxT, perimeter]);
-      ctx.strokeRect(tl.x - 1, tl.y - 1, boxW, boxH);
+      ctx.strokeRect(box.x, box.y, box.w, box.h);
       ctx.setLineDash([]);
     }
 
@@ -622,12 +973,8 @@ export function initDayList(root: HTMLElement): void {
       ctx.fillText(text, x, y);
     };
 
-    // The name goes above the box, to its right, unless that runs off the map.
     const nameW = ctx.measureText(round.name).width;
-    let nx = tl.x - 1 + boxW + 5;
-    if (nx + nameW > m.width - 4) nx = tl.x - 6 - nameW;
-    nx = clamp(nx, 4, m.width - 4 - nameW);
-    const ny = Math.max(13, tl.y - 6);
+    const { x: nx, y: ny } = nameSpot(box, nameW, m.width);
     label(round.name, nx, ny);
 
     // How far, written on the line itself once it's long enough to carry it.
@@ -635,8 +982,7 @@ export function initDayList(root: HTMLElement): void {
       const km = distanceToPlace(pin, round.bbox);
       const text = `${count(Math.round(km))} km`;
       const tw = ctx.measureText(text).width;
-      const lx = clamp(middle.x - tw / 2, 4, m.width - 4 - tw);
-      const ly = clamp(middle.y - 8, 13, m.height - 6);
+      const { x: lx, y: ly } = kmSpot(middle, tw, m);
       const clear =
         Math.abs(ly - ny) > 16 || lx + tw < nx - 8 || lx > nx + nameW + 8;
       if (km > 0 && clear) label(text, lx, ly);
@@ -645,7 +991,7 @@ export function initDayList(root: HTMLElement): void {
 
   function isFramed(m: WorldMap): boolean {
     if (!done || !pin) return false;
-    const want = answerView(answerBox(), m.width, m.height);
+    const want = answerView(answerBox(), m.width, m.height, answerRoom);
     const v = m.view;
     return (
       Math.abs(Math.log(v.k / want.k)) < 0.08 &&
@@ -694,8 +1040,9 @@ export function initDayList(root: HTMLElement): void {
   });
   zoomOutBtn?.addEventListener("click", () => map.zoomBy(0.5));
   viewBtn?.addEventListener("click", () => {
-    if (viewBtn.dataset.action === "answer") void map.fit(answerBox());
-    else void map.reset();
+    if (viewBtn.dataset.action === "answer") {
+      void map.fit(answerBox(), { room: answerRoom });
+    } else void map.reset();
   });
 
   let hintTimer = 0;
@@ -927,41 +1274,88 @@ export function initDayList(root: HTMLElement): void {
 
   /* -------------------------------------------------------------- result */
 
-  function shareText(
-    km: number,
-    off: number,
-    used: number,
-    score: number,
-  ): string {
-    let read = "";
-    for (let i = 0; i < round.clues.length; i++) {
-      read += i < used ? "\u{1F4D6}" : "\u2B1C";
-    }
-    const distance =
-      km === 0
-        ? "\u{1F3AF}"
-        : km < 400
-          ? "\u{1F7E9}"
-          : km < 1500
-            ? "\u{1F7E8}"
-            : km < 5000
-              ? "\u{1F7E7}"
-              : "\u{1F7E5}";
-    const season =
-      off === 0
-        ? "\u{1F7E9}"
-        : off <= 1
-          ? "\u{1F7E8}"
-          : off <= 3
-            ? "\u{1F7E7}"
-            : "\u2B1C";
-    const where =
-      km === 0 ? "inside the boundary" : `${count(Math.round(km))} km off`;
-    return (
-      `Narrow nature, ${DATE_SHORT.format(new Date())}\n${read}\n${distance}${season}\n` +
-      `${where} \u00b7 ${used}/${round.clues.length} species \u00b7 ${count(score)}`
-    );
+  const STAMP_TILT = -6;
+  const STAMP_CLASS = "stamp-ink dl-verdict-stamp";
+
+  interface StampPlan {
+    corner: Corner;
+    spot: Rect;
+    room: Inset;
+    /** The stamp's own size before it's tilted. */
+    w: number;
+    h: number;
   }
+
+  let labelCtx: CanvasRenderingContext2D | null = null;
+  function labelWidth(text: string): number {
+    labelCtx ??= document.createElement("canvas").getContext("2d");
+    if (!labelCtx) return text.length * 7;
+    labelCtx.font = canvasFont(11);
+    return labelCtx.measureText(text).width;
+  }
+
+  /** Measure the stamp and the map's controls, and pick the corner. */
+  function planStamp(verdict: string, unit: string): StampPlan | null {
+    const box = surface!.parentElement;
+    const width = map!.width;
+    const height = map!.height;
+    if (!box || !pin || !width || !height) return null;
+    // Measure the stamp as it will be, then take it away again.
+    const probe = stamp(box, verdict, {
+      unit,
+      className: STAMP_CLASS,
+      stay: true,
+      animate: false,
+      tilt: STAMP_TILT,
+    });
+    const w = probe.offsetWidth;
+    const h = probe.offsetHeight;
+    probe.remove();
+    const turn = (Math.abs(STAMP_TILT) * Math.PI) / 180;
+    const origin = canvas!.getBoundingClientRect();
+    const zoom = zoomInBtn?.parentElement?.getBoundingClientRect();
+    const zoomTop = zoom ? Math.max(0, zoom.top - origin.top) : 8;
+    const km = Math.round(distanceToPlace(pin, round.bbox));
+    const pick = placeVerdict({
+      bbox: round.bbox,
+      pin,
+      frame: answerBox(),
+      size: { width, height },
+      stamp: {
+        w: w * Math.cos(turn) + h * Math.sin(turn),
+        h: w * Math.sin(turn) + h * Math.cos(turn),
+      },
+      controls: {
+        zoomLeft: zoom ? zoom.left - origin.left : width,
+        footer: (zoomInBtn?.offsetHeight || 32) + zoomTop,
+      },
+      labels: {
+        name: labelWidth(round.name),
+        km: labelWidth(`${count(km)} km`),
+      },
+    });
+    return { ...pick, w, h };
+  }
+
+  /** Pin a stamp to its corner, so it stays there if the map resizes. */
+  function placeStamp(mark: HTMLElement, plan: StampPlan): void {
+    const host = mark.parentElement?.getBoundingClientRect();
+    if (!host) return;
+    const origin = canvas!.getBoundingClientRect();
+    const { spot, w, h, corner } = plan;
+    const left = origin.left - host.left + spot.x + (spot.w - w) / 2;
+    const top = origin.top - host.top + spot.y + (spot.h - h) / 2;
+    const s = mark.style;
+    s.left = corner[1] === "l" ? `${left}px` : "auto";
+    s.right = corner[1] === "r" ? `${host.width - left - w}px` : "auto";
+    s.top = corner[0] === "t" ? `${top}px` : "auto";
+    s.bottom = corner[0] === "b" ? `${host.height - top - h}px` : "auto";
+  }
+
+  /** Share on a phone, where most plays are; copy everywhere else. */
+  const sharesNatively = () =>
+    typeof navigator.share === "function" &&
+    window.matchMedia("(pointer: coarse)").matches;
 
   /** Everything about the six, now that the answer is out. */
   function renderFullList(): void {
@@ -1073,18 +1467,23 @@ export function initDayList(root: HTMLElement): void {
         : `<span class="dl-num" data-daylist-km>${
             motion ? "0" : count(kmShown)
           }</span> km off`;
-    // The verdict lands on the map as the boundary closes, and stays.
+    const unit = km === 0 ? "inside the boundary" : `${count(kmShown)} km off`;
+    const plan = planStamp(verdict, unit);
+    answerRoom = plan?.room ?? {};
+    // The verdict lands on the map as the boundary closes, and stays, in the
+    // corner the plan picked.
     const stampVerdict = (slam: boolean) => {
       verdictStamp?.remove();
       const box = surface!.parentElement;
       if (!box) return;
       verdictStamp = stamp(box, verdict, {
-        unit: km === 0 ? "inside the boundary" : `${count(kmShown)} km off`,
-        className: "stamp-ink dl-verdict-stamp",
+        unit,
+        className: STAMP_CLASS,
         stay: true,
         animate: slam,
-        tilt: -6,
+        tilt: STAMP_TILT,
       });
+      if (plan) placeStamp(verdictStamp, plan);
     };
     const monthWhy =
       off === 0
@@ -1114,17 +1513,20 @@ export function initDayList(root: HTMLElement): void {
     syncLock();
 
     const canNext = mode === "extra" && extra.played.length < EXTRA_PER_DAY;
+    const shareLabel = sharesNatively() ? "Share result" : "Copy result";
     const actions =
       mode === "daily"
         ? `<button type="button" class="btn btn-ink" data-daylist-to-extra>Play more lists</button>
-           <button type="button" class="btn" data-daylist-copy>Copy result</button>`
+           <button type="button" class="btn" data-daylist-copy>${shareLabel}</button>`
         : canNext
           ? `<button type="button" class="btn btn-ink" data-daylist-next>Next list</button>`
           : "";
     guessPanel!.hidden = true;
     resultSlot!.hidden = false;
+    // While the answer lands, the verdict and the place are held back so the
+    // panel can't give away what the map is about to show.
     resultSlot!.innerHTML = `
-      <div>
+      <div class="dl-result__head${motion ? " is-held" : ""}" data-daylist-head>
         <p class="dl-verdict">${verdict}</p>
         <h3 class="dl-place" tabindex="-1" data-daylist-place>${escapeHtml(round.name)}</h3>
         <p class="dl-region">${escapeHtml(round.region)} &middot; ${
@@ -1163,16 +1565,34 @@ export function initDayList(root: HTMLElement): void {
       "[data-daylist-copy]",
     );
     copy?.addEventListener("click", async () => {
+      const text = shareText({
+        list: (day % ROUNDS.length) + 1,
+        date: new Date(),
+        km,
+        off,
+        used,
+        total: round.clues.length,
+        score,
+      });
+      if (sharesNatively()) {
+        try {
+          await navigator.share({ text });
+          return;
+        } catch (error) {
+          // Closing the share sheet is a choice, not a failure.
+          if ((error as DOMException)?.name === "AbortError") return;
+        }
+      }
       let copied = false;
       try {
-        await navigator.clipboard.writeText(shareText(km, off, used, score));
+        await navigator.clipboard.writeText(text);
         copied = true;
       } catch {
         copied = false;
       }
       copy.textContent = copied ? "Copied" : "Couldn't copy";
       window.setTimeout(() => {
-        copy.textContent = "Copy result";
+        copy.textContent = shareLabel;
       }, 1800);
     });
     resultSlot!
@@ -1200,8 +1620,8 @@ export function initDayList(root: HTMLElement): void {
       lineT = 1;
       boxT = 1;
       fillIn();
+      await map!.fit(answerBox(), { animate: false, room: answerRoom });
       stampVerdict(false);
-      await map!.fit(answerBox(), { animate: false });
       return;
     }
 
@@ -1226,13 +1646,20 @@ export function initDayList(root: HTMLElement): void {
     boxT = 0;
     map!.redraw();
     syncMapControls(map!);
-    await map!.fit(answerBox(), { animate: true, ms: CAMERA_MS });
+    await map!.fit(answerBox(), {
+      animate: true,
+      ms: CAMERA_MS,
+      room: answerRoom,
+    });
     if (mine !== generation) return;
 
     playReveal(lineMs, mine, () => {
       revealing = false;
       fillIn();
       stampVerdict(true);
+      resultSlot!
+        .querySelector("[data-daylist-head]")
+        ?.classList.remove("is-held");
       map!.redraw();
       syncMapControls(map!);
     });
@@ -1261,6 +1688,7 @@ export function initDayList(root: HTMLElement): void {
     revealing = false;
     verdictStamp?.remove();
     verdictStamp = null;
+    answerRoom = {};
     round = next;
     lines = clamp(progress?.lines ?? 1, 1, next.clues.length);
     shown = lines;

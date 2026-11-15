@@ -741,6 +741,14 @@ const MONTHS = [
   }
 
   /* ---------------- result ---------------- */
+  /* The verdict and the place wait for the boundary to land, then fade in
+     (is-held comes off in finish(), src/lib/hobbies/day-list.ts). */
+  .dl-result__head {
+    transition: opacity 200ms var(--ease);
+  }
+  .dl-result__head.is-held {
+    opacity: 0;
+  }
   .dl-verdict {
     margin: 0;
     font-size: 13px;
@@ -990,7 +998,8 @@ const MONTHS = [
     .dl-month__cell,
     .dl-zoom button,
     .dl-mapbtn,
-    .dl-wheelhint {
+    .dl-wheelhint,
+    .dl-result__head {
       transition: none;
     }
     .dl-slot.is-new .dl-slot__body {
@@ -998,8 +1007,9 @@ const MONTHS = [
     }
   }
 
-  /* The verdict, stamped on the map once the answer is down. The top left
-     is the one corner the map's own controls leave free. */
+  /* The verdict, stamped on the map once the answer is down. finish() puts it
+     in the corner farthest from the pin, the line and the place
+     (planStamp); this top left is where it sits if that can't be worked out. */
   .dl-mapbox > .dl-verdict-stamp {
     top: 12px;
     right: auto;
@@ -1029,7 +1039,7 @@ const MONTHS = [
       left: 8px;
     }
     .dl-mapbox > .dl-verdict-stamp > b {
-      font-size: 14px;
+      font-size: 13px;
     }
   }
 </style>

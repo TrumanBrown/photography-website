@@ -31,6 +31,9 @@ The long version, including every accuracy rule, is [docs/hobbies.md](../../../d
 - **Photographer names stay off the board.** Credits go in a closed footnote, because a name can give the place away (2026-10-13).
 - **More lists is capped at ten a day**, so places don't repeat and it doesn't cost much (2026-10-12).
 - **Every fact on the full list follows site-copy Species facts: one sentence, 12 to 25 words.** A species with no fact shows no fact line. day-list.test.ts fails on an empty or '...' fact (2026-11-15). An empty one passes only when day-list-facts.json says why: Wikipedia has nothing on that species but taxonomy.
+- **The share text names the list number and ends with the URL** (2026-11-15): "Narrow nature list 25, November 15", the squares, the numbers, then trumanbrown.com/hobbies/narrow-nature. On a phone the button says "Share result" and opens the share sheet. More lists has no share.
+- **On a phone the verdict stamp never covers the pin, the line or the answer** (2026-11-15).
+- **Hold the place name until the boundary lands** (2026-11-15). The panel's verdict and place fade in as the boundary closes, so the map tells you first.
 - **Feedback lands by what it's about, not in the middle of the screen**: the "-X points" stamp "slamming first like a stamp and slowly drifting down and away" (2026-10-14). It lands on the top-right corner of the clue photo it bought, since the score is often off screen on a phone, and he's fine with that: "its fine on the photo since the photo is large and this is small and in top right" (2026-10-25).
 
 ## Add places or rebuild the rounds
@@ -68,16 +71,18 @@ The long version, including every accuracy rule, is [docs/hobbies.md](../../../d
 4. **A photographer's name gave the place away** (Cyrillic on a Białowieża photo). Credits moved to a closed footnote (`887f540`).
 5. **On a phone the map was "a strip of flat continents with no way in".** It got zoom to 64x, double-tap, Ctrl or Cmd plus scroll (plain scroll scrolls the page and shows a hint), relief tiles and a scale bar (`3bf8d22`). The pin drops only on a click that didn't move, so a scroll that starts on the map can't drop one (`ba360e4`).
 6. **Borders from Natural Earth needed work**: its zoom limits left Mexico blank beside a fully drawn US, and state lines ran across bays such as the Chesapeake. Each country's zoom now comes from its states' sizes, and lines that cross water are dropped (`27fdb80`).
-7. **The reveal reads better in beats**: the line draws from the pin to the place over about 600 ms while the distance rolls up, then the boundary strokes in. Under reduced motion it all shows at once.
+7. **The reveal reads better in beats**: the line draws from the pin to the place over about 600 ms while the distance rolls up, then the boundary strokes in. Under reduced motion it all shows at once. The panel used to print the verdict and the place the moment you locked in, so 700 ms later it had already said "Table Mountain" while the map was still moving. They now wait under `is-held` and fade in over 200 ms as the boundary closes.
 8. **The rename went in two commits**, title and copy first (`dfca9e4`), then the URL with 301s from the old paths (`a9c0572`). The code kept the old name on purpose.
 9. **The full list printed Wikipedia as it came**: taxonomy ("a member of the duck, goose, and swan family Anatidae"), facts cut at "subspecies of P." and lines of nothing but "...". In the daily set 10 of 234 facts were empty or "..." and 136 ran over 25 words, because the builder kept the first 230 characters of each summary. The page now shows one sentence and hides a stub (`a5f11e7`). Every fact is written by hand in `day-list-facts.json`, checked against its article, and the test holds the data to the Species facts rule. Eleven species have only taxonomy on Wikipedia and show no fact rather than an invented one.
+10. **The verdict stamp covered the pin on a phone.** It always sat top left, and on a 390 by 195 map a stamp about 190 by 55 px covered a third of it, pin and line included. `placeVerdict` now picks before the camera moves: the corner farthest from the pin, the line, the boundary and both labels as they'll be once framed, clear of the zoom buttons and the scale bar. When no corner is clear, the framing leaves a band for it along the top or bottom (`room`, which "Back to your guess" reuses), and when the answer spans so much of the world that the map can't move, the stamp slides along an edge. Four rounds still had nowhere to go until the phone stamp's type went from 14 to 13 px. A test runs every round in both sets from a guess in each quarter of the world, at phone and desktop sizes measured on the page.
 
 ## Gotchas
 
 - Keep the `day-list-*` localStorage keys, the `dayList` block and the `data-daylist-*` hooks. Saved progress depends on them.
 - `day-list.test.ts` and `day-list-borders.test.ts` read the built data, so a bad rebuild fails `npm test`.
 - Everything built at runtime is styled through the namespaced global style block; scoped styles don't reach it.
-- The share string uses emoji squares because it goes to the clipboard; on-page copy never uses emoji.
+- The share string uses emoji squares because it goes to the clipboard or the share sheet; on-page copy never uses emoji. It's the one exception in site-copy's "Do not write".
+- The stamp's spots are measured from the page (its size, the zoom buttons, the bottom controls), so a CSS change to the stamp or the map's controls needs the sizes in the `placeVerdict` test measured again at 390x844 and 1440x900.
 - The docs still say the photo credits render under each photo on the board; the code puts them in a footnote.
 - Puzzle data ships as JSON and photos load from the iNaturalist CDNs, so playing costs nothing per visit and works if the API is down. Keep it that way.
 

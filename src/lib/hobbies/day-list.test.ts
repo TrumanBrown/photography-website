@@ -2,13 +2,16 @@ import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
 import {
   EXTRA_PER_DAY,
+  STAMP_CLEAR,
   bestPossible,
   photoCredits,
   photoSrcset,
   pickExtra,
+  placeVerdict,
   readDaily,
   readExtra,
   scoreGuess,
+  shareText,
   tidyFact,
   type Round,
 } from "./day-list";
@@ -134,6 +137,90 @@ describe("pickExtra", () => {
   it("goes back to the one started longest ago once all are seen", () => {
     expect(pickExtra([1, 2, 3], [2, 3, 1])).toBe(2);
   });
+});
+
+describe("shareText", () => {
+  const text = shareText({
+    list: 22,
+    date: new Date(2026, 10, 12),
+    km: 8024,
+    off: 4,
+    used: 4,
+    total: 6,
+    score: 371,
+  });
+
+  it("names the list on the first line and ends with where to play", () => {
+    const lines = text.split("\n");
+    expect(lines[0]).toBe("Narrow nature list 22, November 12");
+    expect(lines.at(-1)).toBe("trumanbrown.com/hobbies/narrow-nature");
+  });
+
+  it("keeps the grid and the numbers", () => {
+    expect(text).toContain("\u{1F4D6}".repeat(4) + "\u2B1C".repeat(2));
+    expect(text).toContain("8,024 km off \u00b7 4/6 species \u00b7 371");
+  });
+});
+
+describe("placeVerdict", () => {
+  // The map, the stamp's tilted footprint for the longest verdict ("Wrong
+  // side of the planet", with its distance), and the controls, as measured
+  // on the page at 390x844 and 1440x900.
+  const screens = {
+    phone: {
+      size: { width: 390, height: 193 },
+      stamp: { w: 179, h: 56 },
+      controls: { zoomLeft: 354, footer: 36 },
+    },
+    desktop: {
+      size: { width: 778, height: 388 },
+      stamp: { w: 227, h: 65 },
+      controls: { zoomLeft: 739, footer: 39 },
+    },
+  };
+  const near = (r: Round) => ({
+    lat: Math.min(85, r.bbox.n + 1.5),
+    lon: Math.min(180, r.bbox.e + 2),
+  });
+  // A guess in each quarter of the world, and one just off the place.
+  const guesses = (r: Round) => [
+    { lat: 45, lon: -100 },
+    { lat: 50, lon: 30 },
+    { lat: -15, lon: -55 },
+    { lat: -25, lon: 135 },
+    near(r),
+  ];
+
+  it.each(Object.entries(screens))(
+    "keeps the stamp off the pin, the line and the place on a %s",
+    (_, screen) => {
+      const covered: string[] = [];
+      for (const round of [...daily, ...extra]) {
+        for (const pin of guesses(round)) {
+          const b = round.bbox;
+          const frame = {
+            w: Math.min(b.w, pin.lon),
+            e: Math.max(b.e, pin.lon),
+            s: Math.min(b.s, pin.lat),
+            n: Math.max(b.n, pin.lat),
+          };
+          // The map's labels are 11px, about 6.5px a letter.
+          const labels = { name: round.name.length * 6.5, km: 52 };
+          const { clear } = placeVerdict({
+            bbox: b,
+            pin,
+            frame,
+            labels,
+            ...screen,
+          });
+          if (clear < STAMP_CLEAR) {
+            covered.push(`${round.name} from ${pin.lat},${pin.lon}: ${clear}`);
+          }
+        }
+      }
+      expect(covered).toEqual([]);
+    },
+  );
 });
 
 describe("photoCredits", () => {

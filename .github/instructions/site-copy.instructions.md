@@ -181,9 +181,10 @@ so a name fetched live goes through it too.
 - Rhetorical openers (`Ever wondered what's under that rock?`).
 - Exclamation marks outside the two established warm cases (`Message sent. Thank you!`,
   `I'll get back to you soon. Thanks for visiting!`).
-- Emoji, anywhere a visitor looks: prose, labels, buttons, errors. Hobby cards use their stipple
-  plates, the aquarium picker shows each fish's own sprite colors, and buttons are plain words
-  (`Take a selfie`, `Upload a photo`, `Shuffle`).
+- Emoji, anywhere a visitor looks: prose, labels, buttons, errors, except Narrow nature's copied
+  share grid, which uses the squares people expect from daily puzzles. Hobby cards use their
+  stipple plates, the aquarium picker shows each fish's own sprite colors, and buttons are plain
+  words (`Take a selfie`, `Upload a photo`, `Shuffle`).
 - Address the reader as "users" or "folks". They are "you".
 
 ## Before finishing a string

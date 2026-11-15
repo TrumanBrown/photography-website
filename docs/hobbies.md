@@ -472,10 +472,19 @@ with the rules and uses one set of words throughout:
   The panel is under the map, usually off screen when you ask, so the price is also stamped in red
   on the corner of the species it bought (`stamp()` in [motion.ts](../src/lib/motion.ts)). It slams
   down, sits for half a second, then drifts down toward the points and fades. Once the answer is down,
-  the verdict ("Spot on", "Not quite"...) is stamped in ink on the map's top left corner with the
-  distance under it, and stays there with the result.
+  the verdict ("Spot on", "Not quite"...) is stamped in ink with the distance under it, and stays
+  there with the result. It goes in the map corner farthest from your pin, the line and the place
+  (`placeVerdict`), worked out before the camera moves and clear of the zoom buttons and the scale
+  bar. A phone's map is short enough that sometimes no corner is clear: then the framing leaves a
+  band for the stamp along the top or bottom, and when the answer spans so much of the world that
+  the map can't move, the stamp slides along an edge to the clearest spot.
 - **The result is a receipt.** "Lock it in" swaps the panel for the verdict, the place and where the
-  points came from: Place (distance, and how many species were showing), Month, Total. The full list
+  points came from: Place (distance, and how many species were showing), Month, Total. On the
+  daily list, "Copy result" copies it as text: "Narrow nature list 25, November 15", a square per
+  species (a book for each one read), one for the distance and one for the month, the numbers,
+  then `trumanbrown.com/hobbies/narrow-nature`. The list number is today's place in the daily set,
+  so two people a time zone apart can tell they played the same list. On a phone the button says
+  "Share result" and opens the share sheet with the same text. The full list
   with facts follows under the board, one written sentence per species (see the accuracy rules).
   `tidyFact` still guards the page against a fact taken straight from Wikipedia: it trims a
   bracketed Latin name or IPA pronunciation, shows only the first sentence, and shows no line for a
@@ -487,7 +496,9 @@ with the rules and uses one set of words throughout:
   arrives and the boundary closes. The line goes the short way round, so a pin in Hawaii reaches
   Japan off one side of the map and back in the other, and the distance is written on it once it's
   long enough to carry a label. Then the boundary strokes in (`BOX_MS`, 300ms), the place name
-  appears, and the species still hidden fill in 70ms apart. Under `prefers-reduced-motion`, and for
+  appears on the map, the verdict and the place fade into the panel over 200ms, and the species
+  still hidden fill in 70ms apart. The panel holds them back until then, because it used to print
+  the answer while the map was still moving. Under `prefers-reduced-motion`, and for
   a finished round restored on load, everything is drawn at once. After locking in, the map scrolls
   into view if it's off screen, so on a phone the line can be watched with the result right under
   it.

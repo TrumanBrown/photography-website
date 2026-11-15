@@ -94,10 +94,32 @@ export function clampView(view: View, maxZoom = MAX_ZOOM): View {
   };
 }
 
+/** Where a point lands on a `width` by `height` map showing `view`. */
+export function projectAt(
+  view: View,
+  width: number,
+  height: number,
+  lon: number,
+  lat: number,
+): Point {
+  return {
+    x: ((lon + 180) / 360 - view.cu) * width * view.k + width / 2,
+    y: ((90 - lat) / 180 - view.cv) * height * view.k + height / 2,
+  };
+}
+
+/** CSS pixels to keep clear on a side, on top of the padding. */
+export interface Inset {
+  top?: number;
+  right?: number;
+  bottom?: number;
+}
+
 /**
  * The view that shows `box` with `pad` CSS pixels to spare on every side, and
- * `right` more on the right where the map's buttons sit, no closer than
- * `maxZoom`. The map is 2:1 like the world, so one zoom fits both directions.
+ * `inset` more where something sits over the map (the buttons on the right,
+ * the verdict stamp), no closer than `maxZoom`. The map is 2:1 like the world,
+ * so one zoom fits both directions.
  */
 export function fitView(
   box: Box,
@@ -105,31 +127,44 @@ export function fitView(
   height: number,
   pad: number,
   maxZoom = FIT_MAX_ZOOM,
-  right = 0,
+  inset: Inset = {},
 ): View {
+  const { top = 0, right = 0, bottom = 0 } = inset;
   const u0 = (box.w + 180) / 360;
   const u1 = (box.e + 180) / 360;
   const v0 = (90 - box.n) / 180;
   const v1 = (90 - box.s) / 180;
   const roomX = Math.max(0.1, 1 - (2 * pad + right) / width);
-  const roomY = Math.max(0.1, 1 - (2 * pad) / height);
+  const roomY = Math.max(0.1, 1 - (2 * pad + top + bottom) / height);
   const span = Math.max((u1 - u0) / roomX, (v1 - v0) / roomY, 1 / maxZoom);
-  // Shift the centre right by half the inset, so the box sits in the room
-  // that's left of the buttons.
-  const shift = (right / 2 / width) * span;
+  // Shift the centre by half of each inset, so the box sits in the room
+  // that's left of the buttons and clear of the stamp.
+  const shiftU = (right / 2 / width) * span;
+  const shiftV = ((top - bottom) / 2 / height) * span;
   return clampView(
-    { k: 1 / span, cu: (u0 + u1) / 2 + shift, cv: (v0 + v1) / 2 },
+    { k: 1 / span, cu: (u0 + u1) / 2 + shiftU, cv: (v0 + v1) / 2 - shiftV },
     maxZoom,
   );
 }
 
+/** The padding the reveal leaves round the pin and the place. */
+export const answerPad = (width: number): number => (width < 480 ? 28 : 44);
+
 /**
  * How the reveal frames the answer: room on every side, plus the width of the
- * zoom buttons on the right so the place never lands under them.
+ * zoom buttons on the right so the place never lands under them, plus any
+ * `room` asked for, such as a band for the verdict stamp.
  */
-export function answerView(box: Box, width: number, height: number): View {
-  const pad = width < 480 ? 28 : 44;
-  return fitView(box, width, height, pad, FIT_MAX_ZOOM, 40);
+export function answerView(
+  box: Box,
+  width: number,
+  height: number,
+  room: Inset = {},
+): View {
+  return fitView(box, width, height, answerPad(width), FIT_MAX_ZOOM, {
+    right: 40,
+    ...room,
+  });
 }
 
 /** The coarsest tile level with enough pixels for `need` device pixels across. */
@@ -259,7 +294,11 @@ export interface WorldMap {
   /** Slide the view by a number of CSS pixels. */
   panBy(dx: number, dy: number): void;
   reset(animate?: boolean): Promise<void>;
-  fit(box: Box, options?: { animate?: boolean; ms?: number }): Promise<void>;
+  /** Frame `box` the way the reveal does (answerView), `room` kept clear. */
+  fit(
+    box: Box,
+    options?: { animate?: boolean; ms?: number; room?: Inset },
+  ): Promise<void>;
   /** Pan just enough to bring a point into view. */
   show(at: LonLat): void;
   /** Kilometres per pixel across, at the latitude in the middle of the view. */
@@ -323,10 +362,8 @@ export function createWorldMap(options: WorldMapOptions): WorldMap | null {
     };
   }
 
-  const project = (lon: number, lat: number): Point => ({
-    x: ((lon + 180) / 360 - view.cu) * width * view.k + width / 2,
-    y: ((90 - lat) / 180 - view.cv) * height * view.k + height / 2,
-  });
+  const project = (lon: number, lat: number): Point =>
+    projectAt(view, width, height, lon, lat);
   const unproject = (x: number, y: number): LonLat => ({
     lon: ((x - width / 2) / (width * view.k) + view.cu) * 360 - 180,
     lat: 90 - ((y - height / 2) / (height * view.k) + view.cv) * 180,
@@ -857,8 +894,11 @@ export function createWorldMap(options: WorldMapOptions): WorldMap | null {
     },
     reset: (animate = true) =>
       animateTo({ k: 1, cu: 0.5, cv: 0.5 }, animate ? 420 : 0),
-    fit: (box, { animate = true, ms = 650 } = {}) =>
-      animateTo(answerView(box, width || 600, height || 300), animate ? ms : 0),
+    fit: (box, { animate = true, ms = 650, room } = {}) =>
+      animateTo(
+        answerView(box, width || 600, height || 300, room),
+        animate ? ms : 0,
+      ),
     show(at) {
       const p = project(at.lon, at.lat);
       const margin = 24;
