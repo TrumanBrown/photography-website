@@ -255,6 +255,14 @@ export function initBirding(root: HTMLElement): void {
   const btnDownload = $<HTMLButtonElement>('[data-bird-download]');
   const btnAgain = $<HTMLButtonElement>('[data-bird-again]');
   const btnAnother = $<HTMLButtonElement>('[data-bird-another]');
+  const photoLink = $<HTMLAnchorElement>('[data-bird-photo]');
+  type BirdPhoto = { href: string; full: string; w: number; h: number; caption: string; exif: string; file: string };
+  let photos: Record<string, BirdPhoto> = {};
+  try {
+    photos = JSON.parse(root.dataset.birdPhotos || '{}');
+  } catch {
+    // No photos: See the bird stays hidden.
+  }
 
   const source = document.createElement('canvas');
   let landmarker: Promise<FaceLandmarkerT> | null = null;
@@ -339,6 +347,20 @@ export function initBirding(root: HTMLElement): void {
     if (nameEl) nameEl.textContent = species.common;
     if (sciEl) sciEl.textContent = species.sci;
     if (fromEl) fromEl.textContent = `Bill and feathers from my photo, ${species.from}`;
+    // See the bird opens my photo of this bird in the lightbox.
+    const photo = photos[species.id];
+    if (photoLink) {
+      photoLink.hidden = !photo;
+      if (photo) {
+        photoLink.href = photo.href;
+        photoLink.dataset.pswpFull = photo.full;
+        photoLink.dataset.pswpWidth = String(photo.w);
+        photoLink.dataset.pswpHeight = String(photo.h);
+        photoLink.dataset.pswpCaption = photo.caption;
+        photoLink.dataset.pswpExif = photo.exif;
+        photoLink.dataset.pswpFilename = photo.file;
+      }
+    }
     performance.mark('bird:drawn');
   }
 

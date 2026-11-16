@@ -120,7 +120,9 @@ uses this skill's venv and cutout, and the parts stay in colour: no stipple.
    drawn: no feathers, throat or sky left on the bill, the base where it
    really meets the feathers, and only feathers in the plumage crops.
 5. Add the bird to `SPECIES` in `src/lib/hobbies/birding-bird.ts` (names,
-   where the photo is from, and bill length and width in face sizes) and its
+   where and when the photo is from, read off its EXIF date, `photo` with the
+   same session and file as `src`, for See the bird, and bill length and
+   width in face sizes) and its
    three imports to `PART_URLS` in `birding.ts`, then try it on a few
    selfies in both themes. docs/hobbies.md has how the bill and feathers are
    drawn from the parts.

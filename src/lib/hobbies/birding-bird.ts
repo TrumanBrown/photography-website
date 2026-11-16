@@ -174,6 +174,8 @@ export interface Species {
   sci: string;
   /** Where and when I took the photo its bill and feathers come from. */
   from: string;
+  /** That photo in the archive, for See the bird (the same one birds.json cuts from). */
+  photo: { session: string; file: string };
   /** Bill length below the nose, in face heights, before your nose length adjusts it. */
   length: number;
   /** Bill half-width at its base, in face widths. */
@@ -186,6 +188,7 @@ export const SPECIES: Species[] = [
     common: 'Black oystercatcher',
     sci: 'Haematopus bachmani',
     from: 'Olympic coast, February 2026',
+    photo: { session: 'olympic-winter-2026', file: 'DSC03599.JPEG' },
     length: 0.62,
     width: 0.15,
   },
@@ -194,6 +197,7 @@ export const SPECIES: Species[] = [
     common: 'Keel-billed toucan',
     sci: 'Ramphastos sulfuratus',
     from: 'El Zota, Costa Rica, September 2026',
+    photo: { session: 'costa-rica-el-zota-biological-station-sept-2026', file: 'DSC00164.JPEG' },
     length: 0.7,
     width: 0.19,
   },
@@ -201,7 +205,8 @@ export const SPECIES: Species[] = [
     id: 'yellow-crowned-night-heron',
     common: 'Yellow-crowned night heron',
     sci: 'Nyctanassa violacea',
-    from: 'Tortuguero, Costa Rica, August 2026',
+    from: 'Tortuguero, Costa Rica, September 2026',
+    photo: { session: 'costa-rica-tortuguero-national-park-canal-august-2026', file: 'DSC09984.JPEG' },
     length: 0.6,
     width: 0.14,
   },

@@ -8,6 +8,10 @@
  * in its own colours from one of my photos, and feathers in its plumage. Same
  * selfie, same bird to start; Another bird steps through the rest.
  *
+ * See the bird opens my photo of the bird in the lightbox, from its session
+ * in the archive. If that photo isn't in this build (the fixture builds), the
+ * button stays hidden for that bird.
+ *
  * All behaviour lives in @/lib/hobbies/birding, bound via [data-bird-*] hooks.
  * The client entry is an Astro module so it satisfies the strict CSP; the
  * heavy landmark model is dynamically imported on first use.
@@ -15,9 +19,41 @@
  * NOTE: this is the only island with a bundled dependency (@mediapipe/tasks-vision)
  * and large vendored assets (public/birding/). See docs/hobbies.md.
  */
+import { getCollection } from 'astro:content';
+import { getImage } from 'astro:assets';
+import type { ImageMetadata } from 'astro';
+import Lightbox from '@/components/Lightbox.astro';
+import { SPECIES } from '@/lib/hobbies/birding-bird';
+import { formatExif, sessionSlug } from '@/lib/sessions';
+
+// Lazy, so only the three photos below are loaded, not the whole archive.
+const sessionImages = import.meta.glob<{ default: ImageMetadata }>(
+  '/src/content/sessions/*/images/*.{jpg,jpeg,JPG,JPEG}',
+);
+const sessions = await getCollection('sessions');
+
+/** Each bird's photo for the lightbox: a 1600 px copy first, then the original, like a session page. */
+const photos: Record<string, { href: string; full: string; w: number; h: number; caption: string; exif: string; file: string }> = {};
+for (const sp of SPECIES) {
+  const entry = sessions.find((s) => sessionSlug(s) === sp.photo.session);
+  const img = entry?.data.images.find((i) => i.file === sp.photo.file);
+  const load = sessionImages[`/src/content/sessions/${sp.photo.session}/images/${sp.photo.file}`];
+  if (!img || !load) continue;
+  const meta = (await load()).default;
+  const view = await getImage({ src: meta, width: Math.min(1600, meta.width), format: 'webp' });
+  photos[sp.id] = {
+    href: view.src,
+    full: img.fullUrl ?? meta.src,
+    w: img.width,
+    h: img.height,
+    caption: `${sp.common} · ${sp.from}`,
+    exif: formatExif(img.exif),
+    file: img.file,
+  };
+}
 ---
 
-<section data-bird-root aria-label="Selfie to bird generator" class="not-prose">
+<section data-bird-root data-bird-photos={JSON.stringify(photos)} aria-label="Selfie to bird generator" class="not-prose">
   <div class="border border-rule bg-band p-4 sm:p-6">
     <!-- choose -->
     <div data-bird-choose class="flex flex-col items-center gap-4 py-6">
@@ -74,10 +110,14 @@
       <div class="flex flex-wrap justify-center gap-3">
         <button type="button" data-bird-download class="btn btn-ink">Download PNG</button>
         <button type="button" data-bird-another class="btn">Another bird</button>
+        <span id="bird-photo" class="contents">
+          <a data-bird-photo hidden class="btn" href="#">See the bird</a>
+        </span>
         <button type="button" data-bird-again class="btn">Another selfie</button>
       </div>
     </div>
   </div>
+  <Lightbox gallerySelector="#bird-photo" />
 </section>
 
 <style>

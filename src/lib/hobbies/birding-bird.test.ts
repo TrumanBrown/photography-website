@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
   featuresToBird,
@@ -145,6 +145,17 @@ describe('bird parts', () => {
         const url = new URL(`../../assets/birding/${sp.id}-${part}.webp`, import.meta.url);
         expect(existsSync(fileURLToPath(url)), `${sp.id}-${part}`).toBe(true);
       }
+    }
+  });
+});
+
+describe('See the bird', () => {
+  it('opens the same photo the bill and feathers were cut from', () => {
+    const birds = JSON.parse(
+      readFileSync(new URL('../../../.github/skills/stipple-plates/birds.json', import.meta.url), 'utf8'),
+    ) as Record<string, { src: string }>;
+    for (const sp of SPECIES) {
+      expect(`${sp.photo.session}/${sp.photo.file}`).toBe(birds[sp.id].src);
     }
   });
 });
