@@ -79,6 +79,12 @@ look. Everything below is about the public pages.
   cover into a session's banner reads as a glitch). A session card opens its page with a plain
   page change: a 200ms fade between the pages and the session rising 8px into place
   ([open.ts](../../src/lib/open.ts), [landing.ts](../../src/lib/landing.ts)).
+- New interactive UX ships with its motion. When a tap adds, reveals, moves or sends something,
+  build the motion the aquarium's fish jump set the standard for (the site-motion skill): it
+  starts at the control, varies its path, lands with a reaction in its own material, and every
+  tap is its own instance. Truman shouldn't have to ask: "these are good defaults and I
+  shouldn't have to tell you to animate everything if it a good candiadte already" (2026-11-15).
+  The photo archive, sessions, lightbox and front door stay calm.
 
 ## Layout, images, touch
 
