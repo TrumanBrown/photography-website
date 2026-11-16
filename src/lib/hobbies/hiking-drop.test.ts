@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  COUNT_OFF_MS,
   MARKERS,
   TERRAIN_S,
   bitAt,
+  countOffDelay,
+  countOffFrames,
   dropFlight,
   emerge,
   landingLength,
@@ -250,5 +253,22 @@ describe("markers", () => {
         }
       }
     }
+  });
+});
+
+describe("countOff", () => {
+  it("nudges each tag up and back to where it was, moving it only", () => {
+    const frames = countOffFrames();
+    expect(frames[0].transform).toBe("translateY(0px)");
+    expect(frames.at(-1)?.transform).toBe("translateY(0px)");
+    for (const frame of frames)
+      for (const key of Object.keys(frame))
+        expect(["offset", "transform", "easing"]).toContain(key);
+  });
+
+  it("goes along all ten moments left to right in well under a second", () => {
+    for (let i = 1; i < 10; i++)
+      expect(countOffDelay(i)).toBeGreaterThan(countOffDelay(i - 1));
+    expect(countOffDelay(9) + COUNT_OFF_MS).toBeLessThan(700);
   });
 });

@@ -34,12 +34,19 @@ import {
   momentColors,
   renderMomentArt,
 } from "./hiking-renderer";
-import { prefersReducedMotion, stampLandFrames } from "@/lib/motion";
-import { createDrops } from "./hiking-drop";
+import { prefersReducedMotion, stamp, stampLandFrames } from "@/lib/motion";
+import {
+  COUNT_OFF_MS,
+  countOffDelay,
+  countOffFrames,
+  createDrops,
+} from "./hiking-drop";
 
 const STORAGE_KEY = "trail-studio-v2";
 const LEGACY_STORAGE_KEY = "trail-studio-v1";
 const MAX_HISTORY = 32;
+const MAX_MOMENTS = 10;
+const FULL_NOTE = "Trail full. Remove a moment below to add another.";
 
 function required<T extends Element>(root: ParentNode, selector: string): T {
   const element = root.querySelector<T>(selector);
@@ -174,10 +181,42 @@ export function initHikeBuilder(root: HTMLElement): void {
     ink: (drawn) => momentColors(drawn),
     lake: (drawn, feature) => lakeSurface(drawn, feature, cssWidth, cssHeight),
     onLand: ({ type, x, id }) => commitFeature(type, x, id, true),
-    onBounce: () => {
-      saveState.textContent = "Trail has ten moments already";
-    },
+    onBounce: () => showFull(),
   });
+
+  /**
+   * One more moment than the trail holds bounced off. Say so where the eye
+   * is: a "Full" stamp on the scene, the ten moments on the trail nudging in
+   * turn, and the line under the scene saying how to make room.
+   */
+  let countOff: Animation[] = [];
+  /** A note that stays under the scene until the next change, in place of
+   *  "Saved on this device": the trail being full. */
+  let heldNote = "";
+  function showFull(): void {
+    heldNote = FULL_NOTE;
+    saveState.textContent = FULL_NOTE;
+    const stage = canvas.parentElement;
+    if (stage)
+      stamp(stage, "Full", {
+        unit: `${MAX_MOMENTS} of ${MAX_MOMENTS}`,
+        className: "stamp-ink hike-full-stamp",
+      });
+    if (reduceMotion || prefersReducedMotion()) return;
+    for (const run of countOff) run.cancel();
+    countOff = [];
+    itinerary
+      .querySelectorAll<HTMLElement>(".hike-tag")
+      .forEach((tag, index) => {
+        if (typeof tag.animate !== "function") return;
+        countOff.push(
+          tag.animate(countOffFrames(), {
+            duration: COUNT_OFF_MS,
+            delay: countOffDelay(index),
+          }),
+        );
+      });
+  }
 
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -194,13 +233,14 @@ export function initHikeBuilder(root: HTMLElement): void {
   }
 
   function scheduleSave(): void {
+    heldNote = "";
     saveState.textContent = "Saving locally...";
     window.clearTimeout(saveTimer);
     saveTimer = window.setTimeout(() => {
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
         localStorage.removeItem(LEGACY_STORAGE_KEY);
-        saveState.textContent = "Saved on this device";
+        saveState.textContent = heldNote || "Saved on this device";
       } catch {
         saveState.textContent = "Local save unavailable";
       }
@@ -291,7 +331,17 @@ export function initHikeBuilder(root: HTMLElement): void {
       empty.textContent = "An open trail";
       itinerary.append(empty);
     }
-    featureCount.textContent = `${state.features.length} / 10 moments`;
+    const full = state.features.length >= MAX_MOMENTS;
+    featureCount.textContent = full
+      ? `Full · ${MAX_MOMENTS} / ${MAX_MOMENTS} moments`
+      : `${state.features.length} / ${MAX_MOMENTS} moments`;
+    // A full trail shows on the buttons before anyone presses one: their "+"
+    // fades, and a screen reader hears the count with each button.
+    root.classList.toggle("is-full", full);
+    featureButtons.forEach((button) => {
+      if (full) button.setAttribute("aria-describedby", featureCount.id);
+      else button.removeAttribute("aria-describedby");
+    });
   }
 
   function terrainControlLabel(index: number): string {
@@ -522,7 +572,15 @@ export function initHikeBuilder(root: HTMLElement): void {
     if (landed && continuousSnapshot)
       inPressOrder(continuousSnapshot.features, { id, type, x });
     applyState(next, before, landed);
-    saveState.textContent = `${trailFeatureById(type).label} added. Drag it in the scene to move it.`;
+    const label = trailFeatureById(type).label;
+    if (state.features.length >= MAX_MOMENTS) {
+      // The one that fills the trail says so, before anyone presses an
+      // eleventh.
+      heldNote = `${label} added. That fills the trail at ten moments.`;
+      saveState.textContent = heldNote;
+    } else {
+      saveState.textContent = `${label} added. Drag it in the scene to move it.`;
+    }
   }
 
   /**
@@ -533,8 +591,9 @@ export function initHikeBuilder(root: HTMLElement): void {
     const animate =
       !reduceMotion && !prefersReducedMotion() && button != null && x == null;
     const planned = withInAir();
-    if (planned.features.length >= 10) {
-      // No room. It still goes over, then hops off and falls away.
+    if (planned.features.length >= MAX_MOMENTS) {
+      // No room. It still goes over, then hops off and falls away, and the
+      // bounce says why (showFull).
       if (animate) {
         drops.launch({
           type,
@@ -545,7 +604,7 @@ export function initHikeBuilder(root: HTMLElement): void {
         });
         return;
       }
-      saveState.textContent = "Trail has ten moments already";
+      showFull();
       return;
     }
     const normalizedX =

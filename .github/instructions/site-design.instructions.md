@@ -84,7 +84,9 @@ look. Everything below is about the public pages.
   starts at the control, varies its path, lands with a reaction in its own material, and every
   tap is its own instance. Truman shouldn't have to ask: "these are good defaults and I
   shouldn't have to tell you to animate everything if it a good candiadte already" (2026-11-15).
-  The photo archive, sessions, lightbox and front door stay calm.
+  The photo archive, sessions, lightbox and front door stay calm. A press that can't take (a
+  full trail) says why at that moment, beside what it hit, and the limit shows before anyone
+  reaches it (2026-11-16).
 
 ## Layout, images, touch
 

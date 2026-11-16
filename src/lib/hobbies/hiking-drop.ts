@@ -357,6 +357,33 @@ export function ripple(t: number): Array<{ spread: number; alpha: number }> {
   return rings;
 }
 
+/** How long one moment on a full trail takes to nudge, ms, and the gap
+ *  before the next one goes. */
+export const COUNT_OFF_MS = 260;
+export const COUNT_OFF_STEP = 32;
+
+/**
+ * The nudge the moments on a full trail give in turn, left to right, when
+ * one more bounces off: each tag hops a few pixels and settles, so the row
+ * reads as counted off, all ten taken.
+ */
+export function countOffFrames(): Keyframe[] {
+  return [
+    { offset: 0, transform: "translateY(0px)" },
+    {
+      offset: 0.35,
+      transform: "translateY(-4px)",
+      easing: "cubic-bezier(0.2, 0, 0.2, 1)",
+    },
+    { offset: 1, transform: "translateY(0px)" },
+  ];
+}
+
+/** When the `index`th tag along the row starts its nudge, ms. */
+export function countOffDelay(index: number): number {
+  return Math.max(0, index) * COUNT_OFF_STEP;
+}
+
 /**
  * A thrown bit (water, dust, snow, mist) `t` s after it left, worked out
  * from its start so drawing a frame twice never moves it twice. Null once

@@ -133,7 +133,11 @@ const hikerColors = ["#d5523f", "#e1a13a", "#247d72", "#355f9b", "#7d4f8f"];
       <div class="hike-trail">
         <div class="hike-trail-head">
           <p id="hike-trail-label" class="hike-trail-label">On your trail</p>
-          <span data-hike-feature-count class="hike-count">3 / 10 moments</span>
+          <span
+            id="hike-moment-count"
+            data-hike-feature-count
+            class="hike-count">3 / 10 moments</span
+          >
         </div>
         <div
           data-hike-itinerary
@@ -908,6 +912,23 @@ const hikerColors = ["#d5523f", "#e1a13a", "#247d72", "#355f9b", "#7d4f8f"];
     height: 100%;
     pointer-events: none;
     image-rendering: pixelated;
+  }
+
+  /* A full trail (ten moments). The buttons' "+" fades before anyone
+     presses one, the count says so in ink, and a moment that bounces off
+     stamps "Full" on the scene under the distance chip (hiking.ts
+     showFull). */
+  [data-pixel-hike].is-full .hike-plus {
+    color: var(--rule);
+  }
+
+  [data-pixel-hike].is-full .hike-count {
+    color: var(--ink);
+  }
+
+  [data-pixel-hike] .hike-full-stamp {
+    top: 48px;
+    right: 12px;
   }
 </style>
 
