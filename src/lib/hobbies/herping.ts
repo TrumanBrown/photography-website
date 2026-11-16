@@ -12,7 +12,8 @@
  * eyeshine glints in the headlights and is brightest when the spotlight is on
  * them. Tap one that's lit, or press Enter, and the car stops: the specimen
  * card shows its photo and a fact, and "Keep driving" sets off again. A field
- * journal in localStorage counts the species you've found.
+ * journal in localStorage counts the species you've found, and a first find
+ * hops into its count from the road as the card closes (journal-hop.ts).
  *
  * Dots go to the GPU through the scene renderer's WebGL sink (scenes/gl.ts),
  * or where WebGL2 isn't there, are stamped into a pixel buffer at 1x. Pauses
@@ -32,9 +33,9 @@ import {
   type HerpCategory,
 } from "./herping-species";
 import photoData from "./herping-photos.json";
-import { rollTo, setHair } from "@/lib/motion";
 import { revealFromPixels, stopPixelReveal } from "./pixel-reveal";
 import { stampFind, upgradePhoto } from "./specimen";
+import { journalHop, type HopSprite } from "./journal-hop";
 import {
   buildTile,
   type Camera,
@@ -366,6 +367,22 @@ export function initHerping(root: HTMLElement): void {
   ).matches;
   const total = SPECIES.length;
   const discovered = loadDiscovered();
+  // The find on the open card. The journal's count stays behind the real
+  // one while a first find is hopping in.
+  let cardFind: {
+    animal: Animal;
+    isNew: boolean;
+    at: { x: number; y: number; len: number };
+  } | null = null;
+  const journal = journalHop({
+    count: countEl,
+    bar: barEl,
+    total,
+    found: () => discovered.size,
+    grid: () => canvas!,
+    pix: 1,
+    smooth: true,
+  });
 
   let W = 0;
   let H = 0;
@@ -997,7 +1014,8 @@ export function initHerping(root: HTMLElement): void {
     if (isNew) {
       discovered.add(sp.id);
       saveDiscovered(discovered);
-      updateJournal();
+      // The count waits for the find to hop into it when the card closes.
+      if (reduceMotion) updateJournal();
     }
     showLastFind(sp);
     // It moves on while the card is open, so the road is clear behind it.
@@ -1006,7 +1024,80 @@ export function initHerping(root: HTMLElement): void {
       kick();
     }, 1400);
     showCard(sp, isNew);
+    cardFind = { animal: a, isNew, at: { x: a.sx, y: a.sy, len: a.len } };
     kick();
+  }
+
+  /**
+   * The animal as it lay on the road, on its own canvas: every dot as if the
+   * spotlight were on it, over its ring of paper, and the same shape in solid
+   * ink for the end of the hop.
+   */
+  function hopSprite(a: Animal, len: number): HopSprite {
+    const k = len / ART_PX;
+    const size = Math.ceil(len * 1.5 + 12);
+    const ratio = Math.min(window.devicePixelRatio || 1, 2);
+    const cs = Math.cos(a.ang);
+    const sn = Math.sin(a.ang);
+    const make = () => {
+      const cv = document.createElement("canvas");
+      cv.width = cv.height = Math.round(size * ratio);
+      const c = cv.getContext("2d")!;
+      c.setTransform(ratio, 0, 0, ratio, 0, 0);
+      c.translate(size / 2, size / 2);
+      return { cv, c };
+    };
+    const disc = (
+      c: CanvasRenderingContext2D,
+      lx: number,
+      ly: number,
+      r: number,
+    ) => {
+      const x = (lx * cs - ly * sn) * k;
+      const y = (lx * sn + ly * cs) * k * SQUASH;
+      c.moveTo(x + r, y);
+      c.arc(x, y, r, 0, Math.PI * 2);
+    };
+    const { cv: color, c } = make();
+    const h = a.art.holes;
+    c.fillStyle = palette.paper;
+    c.beginPath();
+    for (let i = 0; i < h.length; i += 3)
+      disc(c, h[i], h[i + 1], Math.max(1.2, h[i + 2] * k));
+    c.fill();
+    const fill = Math.min(1, Math.max(0.35, 2 * k * k));
+    const rs = Math.min(1.3, k);
+    const d = a.art.dots;
+    c.fillStyle = palette.ink;
+    c.beginPath();
+    for (let i = 0, j = 0; i < d.length; i += 3, j++) {
+      if (threshold(a.seed + j) >= (j < a.art.rim ? 1 : fill)) continue;
+      disc(c, d[i], d[i + 1], Math.max(PEN, d[i + 2] * rs));
+    }
+    c.fill();
+    const inked = make();
+    inked.c.setTransform(1, 0, 0, 1, 0, 0);
+    inked.c.drawImage(color, 0, 0);
+    inked.c.globalCompositeOperation = "source-in";
+    inked.c.fillStyle = palette.ink;
+    inked.c.fillRect(0, 0, inked.cv.width, inked.cv.height);
+    return { color, ink: inked.cv, size };
+  }
+
+  /** A first find hops from where it was on the road into the journal's
+   *  count, and the count rolls and the rule fills as it lands. */
+  function hopHome(f: NonNullable<typeof cardFind>): void {
+    const a = f.animal;
+    const dz = placeAnimal(cam(), a);
+    // Where it is now that the car has stopped, or where it was found if
+    // that's out of sight.
+    const at = dz >= 0.8 && dz <= FAR ? { x: a.sx, y: a.sy, len: a.len } : f.at;
+    const box = canvas!.getBoundingClientRect();
+    journal.hop({
+      sprite: hopSprite(a, at.len),
+      from: { x: box.left + at.x, y: box.top + at.y },
+      end: Math.min(0.8, 22 / (at.len * 1.5 + 12)),
+    });
   }
 
   function paintRevealStipple(sp: HerpSpecies): void {
@@ -1158,6 +1249,9 @@ export function initHerping(root: HTMLElement): void {
     card!.classList.remove("is-open");
     returnFocus?.focus({ preventScroll: true });
     returnFocus = null;
+    const f = cardFind;
+    cardFind = null;
+    if (f?.isNew && !reduceMotion) hopHome(f);
   }
 
   function showLastFind(sp: HerpSpecies): void {
@@ -1165,8 +1259,7 @@ export function initHerping(root: HTMLElement): void {
   }
 
   function updateJournal(): void {
-    rollTo(countEl!, discovered.size);
-    setHair(barEl!, discovered.size / total);
+    journal.show(discovered.size);
   }
 
   /**

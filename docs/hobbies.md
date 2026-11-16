@@ -104,6 +104,7 @@ A few interaction details come from React component libraries (Cult UI, Watermel
 | `makePostmark()`: a round postmark, a name round the top and the day in the middle, worn in places like a real one         | [postmark.ts](../src/lib/postmark.ts)                        | A post office's round date stamp                              | The hiking postcard's corner, and the envelope a message folds into once "Write to me" sends it       |
 | `stamp(host, text)`: a cost stamped in red ink on the thing it bought; it slams down, sits, then drifts down and fades     | `motion.ts`, `global.css`                                    | Games' floating score text (Krillion's point pops)            | Narrow nature, on each species you pay to see                                                         |
 | `stamp(host, text, { stay: true })`: the same slam in ink, staying put as the record of a result                           | `motion.ts`, `global.css`                                    | A rubber stamp                                                | Narrow nature's verdict, first finds in tide pooling and herping                                      |
+| `journalHop()`: a first find's copy arcs into the journal's count and goes to ink, and the count rolls as it lands         | [journal-hop.ts](../src/lib/hobbies/journal-hop.ts)          | The aquarium's fish jump (`jumpArc`)                          | Tide pooling and herping, as the card closes on a first find                                          |
 
 `.utabs` groups pick one value, so they're `role="radiogroup"` with `<button role="radio" aria-checked>` options. The bar follows `aria-checked` however it changes, so an engine that restores state (undo, start over) only has to set the attribute. Everything above settles instantly under `prefers-reduced-motion`.
 
@@ -271,6 +272,8 @@ A "flip a rock" beach: a pixel Pacific Northwest shoreline at low tide, scattere
 
 - [src/components/hobbies/TidePool.astro](../src/components/hobbies/TidePool.astro), the beach canvas and its caption, plus the shared [FieldJournal](../src/components/hobbies/FieldJournal.astro) row and [SpecimenCard](../src/components/hobbies/SpecimenCard.astro) reveal card, and the mounting `<script>`.
 - [src/lib/hobbies/tidepool.ts](../src/lib/hobbies/tidepool.ts), the engine: scene building, the flip mechanic, every pixel sprite, the reveal card, and the journal. It has no dependencies.
+- [src/lib/hobbies/tidepool-motion.ts](../src/lib/hobbies/tidepool-motion.ts), how a rock comes up and goes down, how the animal under it reacts, and the wave that brings a new beach, as pure functions of time. Tested in [tidepool-motion.test.ts](../src/lib/hobbies/tidepool-motion.test.ts).
+- [src/lib/hobbies/journal-hop.ts](../src/lib/hobbies/journal-hop.ts), a first find hopping into the journal's count, shared with the night drive.
 - [src/lib/hobbies/tidepool-species.ts](../src/lib/hobbies/tidepool-species.ts), the species dataset (the single source of truth).
 - [src/lib/hobbies/tidepool-photos.json](../src/lib/hobbies/tidepool-photos.json), optional real photos per species (see "Real photos in the reveal card" below).
 
@@ -295,6 +298,17 @@ Like the aquarium, the whole beach is drawn in code with canvas `fillRect`, and 
 - **Layout is seeded, stable, and reshuffleable.** Positions come from a seeded RNG keyed to the canvas width (so resizing doesn't reshuffle the beach), plus a "scene salt" the "New beach" button bumps to deal a fresh layout. The rock-to-log ratio is fixed (~78% rock) so every beach reads as a rocky flat instead of occasionally coming up all logs.
 - It pauses offscreen and when the tab is hidden, honors `prefers-reduced-motion`, and is touch-friendly (tap a rock to flip it).
 - **From the keyboard**, the beach takes focus as one stop. The arrow keys (and Home/End) walk the rocks and logs from left to right, Enter or Space flips the one they're on, and a ring marks it. A screen reader hears "Rock 3 of 14", and the reveal card hands focus back to the beach when it closes.
+
+### How a flip, a new beach and a first find move
+
+Added in November 2026, after a mock of each ([tidepool-motion.ts](../src/lib/hobbies/tidepool-motion.ts) for the beach, [journal-hop.ts](../src/lib/hobbies/journal-hop.ts) for the hop). Everything moves on the beach's 4px grid.
+
+- **Rocks are heavy.** A tap makes the rock shudder 2px as you take its weight, then it comes up on an ease-out, leans about 18% past its angle and settles back (`raisePose`, where bigger rocks take a touch longer to get going). Sand and drops of seawater fall off its underside with gravity and leave dark wet dots that soak in. The animal under it reacts by kind (`critterReact`): crabs and hermit crabs scuttle sideways and back, fish and the octopus dart, anemones squeeze shut and open again, shrimp flick back, and stars, urchins, nudibranchs, the sea cucumber and shells stay put. The card opens once the rock is up, 0.30 to 0.35 s after the tap, however heavy it is.
+- **A rock put back drops** in 0.15 s, squashes for a frame as it lands and puffs sand out from under it (`lowerPose`).
+- **New beach sends a wave in from the water** (`makeTide`, `tideCell`). Foam leads it, the old rocks give way to the new beach under the foam, and as it draws back it leaves wet sand that dries from the bottom up over about a second. The water is the offshore blue over the shorebreak and a deeper blue over the sand, so at about half strength it still reads as the same water instead of going grey-green. Every press sends its own wave and the beach changes under each one, so eight fast presses end on the same beach eight presses always gave.
+- **A first find hops into the journal.** The find is logged and "Last find" changes as the card opens, but the count waits. When the card closes, a pixel copy of the critter springs off it and arcs up to the count, shrinking and going to ink as it comes down, and the count rolls, the rule fills and the count dips 2px as it lands. The critter itself stays under its rock. "Found again" doesn't hop. On a phone with the count scrolled off the top, the copy hops off the top edge and the count changes as it goes.
+- **Rapid presses.** Rocks come up one at a time: taps wait the third of a second a rock takes to rise, then the card covers the beach. Putting rocks back isn't held up, so five fast taps drop five rocks. Taps and the arrow keys wait while a wave washes in. Each first find hops on its own, and the count goes up as each one lands.
+- **Reduced motion** keeps the information and drops the movement: a rock flips in a few frames and the card opens at once, New beach swaps the beach at once, and the count changes as the card opens.
 
 ### Real photos in the reveal card
 
@@ -422,6 +436,8 @@ Animals take their light from the same functions, and a ring of paper is cleared
 Like the other islands, the loop pauses offscreen and when the tab is hidden, and it honors `prefers-reduced-motion`: the car stays parked, nothing crawls, there's no rain or flicker, a found animal is replaced at once, and the beam jumps to where it's aimed instead of easing. Then the canvas only draws when something changes, so a still drive costs nothing.
 
 **From the keyboard**, the road takes focus as one stop: the arrow keys steer the beam in all four directions, and Enter or Space stops for the unfound animal nearest the middle of the spotlight, or failing that the one whose eyes shine brightest (or says "Nothing in the beam yet." through a polite live region).
+
+**A first find hops into the journal**, the same hop as tide pooling's ([journal-hop.ts](../src/lib/hobbies/journal-hop.ts)). The find is logged and "Last find" changes as the card opens, and the count waits. When "Keep driving" closes the card, a copy of the animal, stippled as it lay in the spotlight, hops from where it is on the road up to the count and goes to solid ink as it comes down, and the count rolls as it lands. "Found again" doesn't hop. On a phone with the count scrolled off the top, it hops off the top edge, and under reduced motion the count changes as the card opens.
 
 ## Reference implementation: Narrow nature (daily puzzle)
 
