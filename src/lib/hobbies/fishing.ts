@@ -22,6 +22,25 @@ import geo from './fishing-geo.json';
 import watersJson from './fishing-waters.json';
 import { FISH_BY_ID, type FishSpecies } from './fishing-species';
 import { drawFish } from './fishing-sprites';
+import {
+  aimLeap,
+  createAirLayer,
+  leapAt,
+  planLeap,
+  plungeTime,
+  ringAt,
+  ringPixels,
+  riseAt,
+  splashDrops,
+  dropAt,
+  surfaceAt,
+  RISE,
+  SURFACE,
+  UNDER,
+  type Drop,
+  type LeapPlan,
+  type Ring,
+} from './fishing-leap';
 
 interface Marker { id: string; fx: number; fy: number; }
 interface StateGeo { name: string; gw: number; gh: number; H: number; cells: string; markers: Marker[]; inset?: { x: number; y: number; w: number; h: number }; }
@@ -102,11 +121,34 @@ export function initFishing(root: HTMLElement): void {
       const f = FISH_BY_ID[id];
       if (f) pList.appendChild(speciesRow(f));
     }
-    if (!panel.classList.contains('is-open')) {
+    const opening = !panel.classList.contains('is-open');
+    if (opening) {
       returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     }
     panel.classList.add('is-open');
+    // A short fade, so the splash the fish just made shows through for a beat.
+    if (opening && !reduce) panel.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 180, easing: 'cubic-bezier(.4, 0, .2, 1)' });
     pClose?.focus({ preventScroll: true });
+  }
+
+  // A tap sends the fish up, and its panel opens as it goes back in. Taps
+  // before then each send their own fish, and the panel goes to the newest:
+  // a second tap on a fish still in the air just keeps it as the one. The
+  // panel waits for whichever fish was tapped last, so a run of taps across
+  // the map is a run of leaps, then one panel.
+  let pending = 0;
+  function pick(waterId: string, waitMs: number, canvas: HTMLCanvasElement): void {
+    clearTimeout(pending);
+    pending = 0;
+    if (waitMs <= 0) {
+      openPanel(waterId);
+      return;
+    }
+    pending = window.setTimeout(() => {
+      pending = 0;
+      // The phone's tabs may have hidden that map in the meantime.
+      if (canvas.offsetParent !== null) openPanel(waterId);
+    }, waitMs);
   }
   function closePanel(): void {
     if (!panel?.classList.contains('is-open')) return;
@@ -125,9 +167,18 @@ export function initFishing(root: HTMLElement): void {
   };
   let theme = readTheme();
   const views: Array<ReturnType<typeof makeView>> = [];
+  // Fish in the air and their drops, over every map at once.
+  const air = createAirLayer((c, dpr, now) => {
+    let busy = false;
+    for (const v of views) if (v.drawAir(c, dpr, now)) busy = true;
+    return busy;
+  });
   root.querySelectorAll<HTMLCanvasElement>('[data-fish-canvas]').forEach((cv) => {
     const key = cv.dataset.fishCanvas ?? '';
-    if (REGIONS[key]) views.push(makeView(key, cv, openPanel, reduce, key in INSET_KEYS, announce, () => theme));
+    if (REGIONS[key])
+      views.push(
+        makeView(key, cv, (id, ms) => pick(id, ms, cv), reduce, key in INSET_KEYS, announce, () => theme, air.wake),
+      );
   });
   const paintAll = () => {
     const now = performance.now();
@@ -202,11 +253,12 @@ export function initFishing(root: HTMLElement): void {
 function makeView(
   key: string,
   canvas: HTMLCanvasElement,
-  onPick: (id: string) => void,
+  onPick: (id: string, waitMs: number) => void,
   reduce: boolean,
   alwaysLabel: boolean,
   announce: (text: string) => void,
   theme: () => Theme,
+  wake: () => void,
 ) {
   const s = REGIONS[key];
   const ctx = canvas.getContext('2d')!;
@@ -262,6 +314,174 @@ function makeView(
     })
     .filter((m): m is NonNullable<typeof m> => !!m && !!m.sp);
 
+  // The leaps. Positions are art px on this map, and the motion itself comes
+  // from fishing-leap.ts in CSS px, so every map moves at the same pace.
+  type Mark = (typeof marks)[number];
+  const sizeOf = (m: Mark) => 1.05 + m.r * 1.05;
+  /** The waterline, art px under a fish's centre: where its shadow sits. */
+  const below = (u: number) => u * 2.6;
+  const bobOf = (m: Mark, now: number) => (reduce ? 0 : Math.sin(now / 520 + m.px) * 1.3);
+  interface Leap { plan: LeapPlan; born: number; u: number; y0: number; line: number; gone: number }
+  const leaps = new Map<Mark, Leap>();
+  const rises = new Map<Mark, number>();
+  type Owned = { born: number; delay: number; owner: Leap | null };
+  /** `shore`: stops at the shore. The rings round a fish's own spot don't. */
+  const rings: Array<Ring & Owned & { x: number; y: number; dot: number; shore: boolean }> = [];
+  const drops: Array<Owned & { x: number; y: number; u: number; d: Drop }> = [];
+  const isWater = (ax: number, ay: number) => {
+    const gx = Math.floor(ax / BAKE), gy = Math.floor(ay / BAKE);
+    if (gx < 0 || gy < 0 || gx >= s.gw || gy >= s.gh) return false;
+    const c = s.cells[gy * s.gw + gx];
+    return c === '2' || c === '3' || c === '4';
+  };
+  const spray = () => {
+    const { pal } = theme();
+    return [pal.lake2, pal.river, pal.lake2, pal.sound];
+  };
+  /** When the panel for a leap opens: as it goes back in, and never after 550 ms. */
+  const openAt = (lp: Leap) => lp.born + Math.min(lp.plan.air + 0.05, 0.55) * 1000;
+
+  /** Send a fish up. Returns how long until its panel should open, ms. */
+  function leap(m: Mark): number {
+    const now = performance.now();
+    const cur = leaps.get(m);
+    // Still in the air: let it finish, and its panel opens when it's in.
+    if (cur && (now - cur.born) / 1000 < cur.plan.air) return openAt(cur) - now;
+    if (cur) {
+      // Back under or coming up from an earlier leap: drop what that one had
+      // still to come, and go again from its spot.
+      for (const list of [rings, drops] as Array<Array<Owned>>) {
+        for (let i = list.length - 1; i >= 0; i--) {
+          if (list[i].owner === cur && list[i].born + list[i].delay * 1000 > now) list.splice(i, 1);
+        }
+      }
+    }
+    const k = cssW / W || 1;
+    const u = sizeOf(m) * (hover === m ? 1.3 : 1);
+    const len = 15 * u * k;
+    const y0 = m.py + bobOf(m, now);
+    const line = y0 + below(sizeOf(m));
+    // Water under where it would come down: anywhere from its middle to
+    // just under its waterline.
+    const wet = (dx: number) => {
+      const x = m.px + dx / k;
+      for (let y = m.py - u; y <= line + u; y += 1) if (isWater(x, y)) return true;
+      return false;
+    };
+    const plan = aimLeap(planLeap(len, -1), wet);
+    const lp: Leap = { plan, born: now, u, y0, line, gone: plan.air + plungeTime(plan, (line - y0) * k, len) };
+    leaps.set(m, lp);
+    rises.delete(m);
+    const bx = m.px + (plan.dir * plan.dist) / k;
+    // A little water as it leaves, a crown and two rings where it goes back
+    // in, and one more ring as it comes back up on its spot.
+    const dot = Math.max(1, Math.round(sizeOf(m)));
+    rings.push({ x: m.px, y: line - u, dot, shore: false, born: now, delay: 0, life: 0.45, reach: u * 5, owner: lp });
+    rings.push({ x: bx, y: line - u, dot, shore: true, born: now, delay: plan.air, life: 0.85, reach: u * 10, owner: lp });
+    rings.push({ x: bx, y: line - u, dot, shore: true, born: now, delay: plan.air + 0.15, life: 0.7, reach: u * 6.5, owner: lp });
+    rings.push({ x: m.px, y: line - u, dot, shore: false, born: now, delay: lp.gone + UNDER, life: 0.5, reach: u * 6, owner: lp });
+    for (const d of splashDrops(6, 0.55, plan.dir, spray())) drops.push({ x: m.px, y: line, u, born: now, delay: 0, owner: lp, d });
+    for (const d of splashDrops(16, 1, plan.dir * 0.6, spray()))
+      drops.push({ x: bx, y: line, u, born: now, delay: plan.air, owner: lp, d });
+    wake();
+    return openAt(lp) - now;
+  }
+
+  /** A rise: the fish lifts a touch and leaves one ring. Not again for 0.7 s. */
+  function rise(m: Mark): void {
+    if (reduce || leaps.has(m)) return;
+    const now = performance.now();
+    const last = rises.get(m);
+    if (last !== undefined && now - last < 700) return;
+    rises.set(m, now);
+    const u = sizeOf(m);
+    const dot = Math.max(1, Math.round(u));
+    rings.push({ x: m.px, y: m.py + bobOf(m, now) + below(u) - u, dot, shore: false, born: now, delay: 0.06, life: 0.6, reach: u * 7, owner: null });
+  }
+
+  // The fish in the air turn on the map's own pixel grid: each is drawn
+  // upright at art size, turned onto a scratch canvas with smoothing off,
+  // and only then scaled up to the screen.
+  const sprites = new Map<string, HTMLCanvasElement>();
+  function sprite(m: Mark, u: number, dir: 1 | -1): HTMLCanvasElement {
+    const id = `${m.id}|${u.toFixed(3)}|${dir}`;
+    let cv = sprites.get(id);
+    if (!cv) {
+      cv = document.createElement('canvas');
+      cv.width = 2 * Math.ceil(u * 10.5) + 2;
+      cv.height = 2 * Math.ceil(u * 5) + 2;
+      const c = cv.getContext('2d')!;
+      c.imageSmoothingEnabled = false;
+      drawFish(c, m.sp.category, cv.width / 2, cv.height / 2, u, m.sp.color, m.sp.accent, dir);
+      sprites.set(id, cv);
+    }
+    return cv;
+  }
+  const spin = document.createElement('canvas');
+  const sctx = spin.getContext('2d')!;
+  /** The fish turned, with anything more than `cut` art px under its centre left off. Returns its size. */
+  function turned(img: HTMLCanvasElement, angle: number, flip: number, cut: number): number {
+    const D = 2 * Math.ceil(Math.hypot(img.width, img.height) / 2) + 2;
+    if (spin.width < D) spin.width = spin.height = D;
+    sctx.setTransform(1, 0, 0, 1, 0, 0);
+    sctx.clearRect(0, 0, spin.width, spin.height);
+    sctx.imageSmoothingEnabled = false;
+    sctx.translate(D / 2, D / 2);
+    sctx.rotate(angle);
+    sctx.scale(1, flip);
+    sctx.drawImage(img, -img.width / 2, -img.height / 2);
+    sctx.setTransform(1, 0, 0, 1, 0, 0);
+    if (cut < D / 2) sctx.clearRect(0, D / 2 + cut, D, D);
+    return D;
+  }
+
+  /** Paint the fish in the air and the drops on the layer over the page. */
+  function drawAir(c: CanvasRenderingContext2D, ldpr: number, now: number): boolean {
+    if (!leaps.size && !drops.length) return false;
+    if (canvas.offsetParent === null) {
+      // The phone's tabs hid this map: whatever was in the air is gone.
+      leaps.clear();
+      drops.length = 0;
+      rings.length = 0;
+      return false;
+    }
+    const r = canvas.getBoundingClientRect();
+    const k = r.width / W;
+    const dev = (v: number) => Math.round(v * ldpr) / ldpr;
+    let busy = false;
+    for (const [m, lp] of leaps) {
+      const t = (now - lp.born) / 1000;
+      if (t >= lp.gone) continue;
+      busy = true;
+      const p = leapAt(lp.plan, t);
+      const ax = Math.round(m.px + p.x / k), ay = Math.round(lp.y0 + p.y / k);
+      const line = Math.round(lp.line);
+      const D = turned(sprite(m, lp.u, lp.plan.dir), p.angle, p.flip, line - ay);
+      const x0 = dev(r.left + (ax - D / 2) * k), y0 = dev(r.top + (ay - D / 2) * k);
+      c.drawImage(spin, 0, 0, D, D, x0, y0, dev(r.left + (ax + D / 2) * k) - x0, dev(r.top + (ay + D / 2) * k) - y0);
+    }
+    for (let i = drops.length - 1; i >= 0; i--) {
+      const e = drops[i];
+      const t = (now - e.born) / 1000 - e.delay;
+      if (t < 0) {
+        busy = true;
+        continue;
+      }
+      const at = dropAt(e.d, t);
+      if (!at) {
+        drops.splice(i, 1);
+        continue;
+      }
+      busy = true;
+      const size = Math.max(e.d.size, Math.round(e.u * (e.d.size === 2 ? 1.3 : 0.8)));
+      const ax = Math.round(e.x + at.x / k), ay = Math.round(e.y + at.y / k);
+      const x0 = dev(r.left + ax * k), y0 = dev(r.top + ay * k);
+      c.fillStyle = e.d.color;
+      c.fillRect(x0, y0, dev(r.left + (ax + size) * k) - x0, dev(r.top + (ay + size) * k) - y0);
+    }
+    return busy;
+  }
+
   let hover: (typeof marks)[number] | null = null;
   const toArt = (e: MouseEvent) => {
     const r = canvas.getBoundingClientRect();
@@ -282,6 +502,7 @@ function makeView(
     canvas.style.cursor = next ? 'pointer' : 'default';
     if (next === hover) return;
     hover = next;
+    if (next) rise(next);
     // With reduced motion there's no loop to show the name.
     if (reduce) frame(performance.now());
   });
@@ -293,9 +514,10 @@ function makeView(
   // Open on click, not pointerdown. The panel opens over the map, so a tap's
   // click would land on its scrim and close it again, and the mousedown that
   // follows a pointerdown would pull focus off the panel's button.
+  // The fish answers first: it leaps, and the panel opens as it goes back in.
   canvas.addEventListener('click', (e) => {
     const hit = pick(toArt(e));
-    if (hit) onPick(hit.id);
+    if (hit) onPick(hit.id, reduce ? 0 : leap(hit));
   });
 
   // Keyboard: the map's frame takes focus, the arrow keys walk its waters from
@@ -308,6 +530,7 @@ function makeView(
   const choose = (m: (typeof marks)[number]) => {
     chosen = m;
     hover = m;
+    rise(m);
     frame(performance.now());
     announce(`${WATERS[m.id].name}, ${order.indexOf(m) + 1} of ${order.length}`);
   };
@@ -330,7 +553,8 @@ function makeView(
       else if (e.key === 'End') choose(order[order.length - 1]);
       else if (e.key === 'Enter' || e.key === ' ') {
         if (!chosen) choose(order[0]);
-        if (chosen) onPick(chosen.id);
+        // Enter is a tap: the fish leaps and the panel opens as it lands.
+        if (chosen) onPick(chosen.id, reduce ? 0 : leap(chosen));
       } else return;
       e.preventDefault();
     });
@@ -383,15 +607,69 @@ function makeView(
       actx.fillStyle = pal.lake2;
       for (const w of water) if (Math.abs(w.gx + w.gy - band) < 2.2) actx.fillRect(w.gx * BAKE, w.gy * BAKE, BAKE, BAKE);
     }
+    // Rings on the water, under the fish, in the water's light colour.
+    actx.fillStyle = pal.lake2;
+    for (let i = rings.length - 1; i >= 0; i--) {
+      const g = rings[i];
+      const t = (now - g.born) / 1000;
+      const at = ringAt(g, t);
+      if (!at) {
+        if (t >= g.delay + g.life) rings.splice(i, 1);
+        continue;
+      }
+      // On a grid of the fish's own pixel size, so the ring is as chunky
+      // as the sprite it came from.
+      const q = g.dot;
+      const cx = Math.round(g.x / q), cy = Math.round(g.y / q);
+      ringPixels(at.rx / q, at.ry / q).forEach(([dx, dy], j) => {
+        if (j % at.every) return;
+        const x = (cx + dx) * q, y = (cy + dy) * q;
+        if (g.shore && !isWater(x + q / 2, y + q / 2)) return;
+        actx.fillRect(x, y, q, q);
+      });
+    }
     const bobs = new Map<(typeof marks)[number], number>();
     for (const m of marks) {
       const bob = reduce ? 0 : Math.sin(now / 520 + m.px) * 1.3;
       bobs.set(m, bob);
       const u = 1.05 + m.r * 1.05;
       const big = hover === m;
+      const lp = leaps.get(m);
+      let y = m.py + bob;
+      let cut = Infinity;
+      if (lp) {
+        const t = (now - lp.born) / 1000;
+        const back = lp.gone + UNDER;
+        if (t < lp.plan.air) {
+          // Out of the water: its shadow follows it along the surface,
+          // smaller the higher it is. The fish is on the layer above.
+          const p = leapAt(lp.plan, t);
+          const k = cssW / W;
+          const high = Math.min(1, Math.max(0, -p.y / lp.plan.lift));
+          const sw = u * 10 * (1 - 0.55 * high);
+          actx.fillStyle = 'rgba(15,30,45,0.16)';
+          actx.fillRect(Math.round(m.px + p.x / k - sw / 2), Math.round(lp.line), Math.round(sw), Math.round(Math.max(1, u)));
+          continue;
+        }
+        if (t < back) continue; // under the water
+        if (t < back + SURFACE) {
+          // Back up on its own spot, through the surface.
+          cut = Math.round(y + below(u));
+          y += surfaceAt(t - back) * (below(u) + u * 4.5);
+        } else leaps.delete(m);
+      }
+      const rt = rises.get(m);
+      if (rt !== undefined && now - rt < RISE * 1000) y -= riseAt((now - rt) / 1000) * u * 2.4;
       actx.fillStyle = 'rgba(15,30,45,0.16)';
       actx.fillRect(Math.round(m.px - u * 5), Math.round(m.py + u * 2.6 + bob), Math.round(u * 10), Math.round(Math.max(1, u)));
-      drawFish(actx, m.sp.category, m.px, m.py + bob, big ? u * 1.3 : u, m.sp.color, m.sp.accent, -1);
+      if (cut < Infinity) {
+        actx.save();
+        actx.beginPath();
+        actx.rect(0, 0, W, cut);
+        actx.clip();
+      }
+      drawFish(actx, m.sp.category, m.px, y, big ? u * 1.3 : u, m.sp.color, m.sp.accent, -1);
+      if (cut < Infinity) actx.restore();
     }
 
     // Onto the screen, pixels kept square.
@@ -446,7 +724,7 @@ function makeView(
       ctx.stroke();
     }
   }
-  return { canvas, frame, fit, retheme };
+  return { canvas, frame, fit, retheme, drawAir };
 }
 
 /** The map from its cells. Outside the state stays clear, so the page shows. */
