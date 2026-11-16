@@ -24,11 +24,18 @@
  */
 import { canvasFont, canvasFontReady } from "../canvas-font";
 import {
+  STAMP_TOUCH_MS,
   initUnderlineTabs,
   prefersReducedMotion,
   rollTo,
   stamp,
 } from "../motion";
+import {
+  DEAL_MS,
+  PRESS_DOWN_MS,
+  createPinMotion,
+  dealFrames,
+} from "./pin-drop";
 import {
   MAX_ZOOM,
   answerPad,
@@ -864,13 +871,15 @@ export function initDayList(root: HTMLElement): void {
   let answerRoom: Inset = {};
   let extraPool: Round[] | null = null;
   let extra = readExtra(readStore(EXTRA_KEY), day);
+  // The pin dropping in, its rings, and the press on Lock it in.
+  const pins = createPinMotion();
 
   /* ---------------------------------------------------------------- map */
 
   const map = createWorldMap({
     canvas,
     surface,
-    onTap: placePin,
+    onTap: (at) => placePin(at, "tap"),
     focusPoint: () => pin,
     drawOverlay: drawGame,
     onView: syncMapControls,
@@ -940,24 +949,9 @@ export function initDayList(root: HTMLElement): void {
       ctx.setLineDash([]);
     }
 
-    if (pin) {
-      const p = m.project(pin.lon, pin.lat);
-      ctx.strokeStyle = ink;
-      ctx.lineWidth = 1.6;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(p.x - 11, p.y);
-      ctx.lineTo(p.x - 3, p.y);
-      ctx.moveTo(p.x + 3, p.y);
-      ctx.lineTo(p.x + 11, p.y);
-      ctx.moveTo(p.x, p.y - 11);
-      ctx.lineTo(p.x, p.y - 3);
-      ctx.moveTo(p.x, p.y + 3);
-      ctx.lineTo(p.x, p.y + 11);
-      ctx.stroke();
-    }
+    // The rings taps left, any old pin lifting out, then the pin in its pose.
+    // While one of them moves, the map draws another frame.
+    if (pins.draw(ctx, m.project, ink, pin)) m.redraw();
 
     if (!done || boxT < 1) return;
 
@@ -1164,10 +1158,39 @@ export function initDayList(root: HTMLElement): void {
     lines += 1;
     shown = lines;
     paintSlot(lines - 1, true);
-    // The price lands on the species it bought: that's where the eye is, and
-    // the points total is usually down the page under the map.
-    stamp(slots[lines - 1], `\u2212${count(cost)}`, { unit: "points" });
     if (lines < round.clues.length) paintSlot(lines);
+    // The price lands on the species it bought: that's where the eye is, and
+    // the points total is usually down the page under the map. The species
+    // is dealt in from the square the next one sits in, and the stamp comes
+    // down so it touches as the card settles.
+    const host = slots[lines - 1];
+    const price = () => stamp(host, `\u2212${count(cost)}`, { unit: "points" });
+    const fig = host.querySelector<HTMLElement>(".dl-slot__fig");
+    if (fig && !prefersReducedMotion() && typeof fig.animate === "function") {
+      const here = host.getBoundingClientRect();
+      const from =
+        slots[lines]?.getBoundingClientRect() ??
+        new DOMRect(here.right, here.top, here.width, here.height);
+      let dx = from.left + from.width / 2 - (here.left + here.width / 2);
+      let dy = from.top + from.height / 2 - (here.top + here.height / 2);
+      const d = Math.hypot(dx, dy) || 1;
+      const reach = clamp(here.width * 0.1, 10, 18);
+      dx = (dx / d) * reach;
+      dy = (dy / d) * reach;
+      fig.animate(dealFrames(dx, dy, dx >= 0 ? 1.2 : -1.2), {
+        duration: DEAL_MS,
+        fill: "backwards",
+      });
+      const mine = generation;
+      window.setTimeout(
+        () => {
+          if (mine === generation) price();
+        },
+        Math.max(0, DEAL_MS - STAMP_TOUCH_MS),
+      );
+    } else {
+      price();
+    }
     paintCredits();
     syncWorth();
     preloadNext();
@@ -1214,9 +1237,28 @@ export function initDayList(root: HTMLElement): void {
     lockBtn!.disabled = done || !pin || month === null;
   }
 
-  function placePin(at: LonLat): void {
+  /** How close a tap can land to the pin and only shift it, CSS px. */
+  const NEAR_PX = 8;
+
+  /**
+   * Put the pin at `at`. A tap drops it in (or, right on top of the pin,
+   * just shifts it and rings); an arrow key slides it; the key press that
+   * places the first pin drops it like a tap.
+   */
+  function placePin(at: LonLat, how: "tap" | "key"): void {
     if (done) return;
+    const was = pin;
     pin = { lat: clamp(at.lat, -85, 85), lon: clamp(at.lon, -180, 180) };
+    if (!was) {
+      pins.drop(pin, null);
+    } else if (how === "key") {
+      pins.slide(pin);
+    } else {
+      const a = map!.project(was.lon, was.lat);
+      const b = map!.project(pin.lon, pin.lat);
+      if (Math.hypot(a.x - b.x, a.y - b.y) <= NEAR_PX) pins.tapNear(pin);
+      else pins.drop(pin, was);
+    }
     surface!.classList.add("is-placed");
     describeGuess();
     syncLock();
@@ -1258,7 +1300,7 @@ export function initDayList(root: HTMLElement): void {
       next = { ...next, lon: next.lon + step };
     else return;
     event.preventDefault();
-    placePin(next);
+    placePin(next, "key");
     if (pin) map.show(pin);
   });
 
@@ -1646,6 +1688,9 @@ export function initDayList(root: HTMLElement): void {
     boxT = 0;
     map!.redraw();
     syncMapControls(map!);
+    // The pin presses into the map as the camera settles on it, and the line
+    // leaves as it comes back up.
+    pins.press(CAMERA_MS - PRESS_DOWN_MS);
     await map!.fit(answerBox(), {
       animate: true,
       ms: CAMERA_MS,
@@ -1686,6 +1731,7 @@ export function initDayList(root: HTMLElement): void {
   function loadRound(next: Round, progress: Progress | null): void {
     generation++;
     revealing = false;
+    pins.clear();
     verdictStamp?.remove();
     verdictStamp = null;
     answerRoom = {};
@@ -1740,7 +1786,9 @@ export function initDayList(root: HTMLElement): void {
     extra.played = [...extra.played, id];
     extra.current = { placeId: id, lines: 1, done: false };
     writeStore(EXTRA_KEY, extra);
-    window.dispatchEvent(new CustomEvent("tb:nn", { detail: { mode: "more" } }));
+    window.dispatchEvent(
+      new CustomEvent("tb:nn", { detail: { mode: "more" } }),
+    );
     const next = extraPool.find((r) => r.placeId === id);
     if (!next) return;
     loadRound(next, extra.current);

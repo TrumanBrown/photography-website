@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { STAMP_MS, stampFrames, stampLandFrames } from "./motion";
+import {
+  STAMP_MS,
+  STAMP_TOUCH_MS,
+  stampFrames,
+  stampLandFrames,
+} from "./motion";
 
 describe("stampFrames", () => {
   for (const reduced of [false, true]) {
@@ -39,6 +44,12 @@ describe("stampFrames", () => {
     );
     expect(still.length).toBeGreaterThanOrEqual(2);
     expect(frames.at(-1)!.transform).toMatch(/translateY\(28px\)/);
+  });
+
+  it("touches the paper at STAMP_TOUCH_MS, pressed in", () => {
+    const touch = stampFrames(-6).find((frame) => frame.opacity === 1)!;
+    expect((touch.offset as number) * STAMP_MS).toBeCloseTo(STAMP_TOUCH_MS, 0);
+    expect(touch.transform).toContain("translateY(0px) scale(0.94)");
   });
 
   it("keeps still under reduced motion", () => {

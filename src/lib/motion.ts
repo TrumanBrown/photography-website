@@ -133,6 +133,11 @@ export interface StampOptions {
 
 /** How long a stamp is on screen, ms. */
 export const STAMP_MS = 1700;
+/** How far through a drifting stamp it touches the paper. */
+const STAMP_TOUCH = 0.07;
+/** When a drifting stamp touches the paper, ms after it's put down. Something
+ *  it lands on can time its own settle to this. */
+export const STAMP_TOUCH_MS = Math.round(STAMP_MS * STAMP_TOUCH);
 /** How long a stamp that stays takes to land, ms. */
 export const STAMP_LAND_MS = 260;
 
@@ -181,7 +186,7 @@ export function stampFrames(tilt: number, reduced = false): Keyframe[] {
       easing: "cubic-bezier(0.55, 0, 1, 0.45)",
     },
     {
-      offset: 0.07,
+      offset: STAMP_TOUCH,
       opacity: 1,
       transform: at(0, 0.94, tilt),
       easing: "cubic-bezier(0.2, 0, 0.2, 1)",

@@ -505,7 +505,13 @@ with the rules and uses one set of words throughout:
   guess can still score (`bestPossible`). It rolls down with each species you ask for (`rollTo`).
   The panel is under the map, usually off screen when you ask, so the price is also stamped in red
   on the corner of the species it bought (`stamp()` in [motion.ts](../src/lib/motion.ts)). It slams
-  down, sits for half a second, then drifts down toward the points and fades. Once the answer is down,
+  down, sits for half a second, then drifts down toward the points and fades. The species itself is
+  dealt into its square: it slides in 10 to 18px from the square the next one sits in, turned a
+  degree, and settles square over 230ms (`dealFrames` in
+  [pin-drop.ts](../src/lib/hobbies/pin-drop.ts)). The stamp waits about 110ms (`DEAL_MS` less
+  `STAMP_TOUCH_MS`, the moment a stamp touches the paper) so it lands as the card settles. Each fast
+  press deals its own card and stamp. Under reduced motion the species appears in place and the
+  stamp comes with it, as before. Once the answer is down,
   the verdict ("Spot on", "Not quite"...) is stamped in ink with the distance under it, and stays
   there with the result. It goes in the map corner farthest from your pin, the line and the place
   (`placeVerdict`), worked out before the camera moves and clear of the zoom buttons and the scale
@@ -524,8 +530,11 @@ with the rules and uses one set of words throughout:
   bracketed Latin name or IPA pronunciation, shows only the first sentence, and shows no line for a
   fact under 15 characters or cut off with "...". A species with no fact shows no fact line.
 - **The answer lands in one beat.** The map glides to frame the pin and the place together
-  (`CAMERA_MS`, 650ms, no closer than 48x), then a dashed line runs from the pin to the nearest edge
-  of the place over 600ms (`LINE_MS`), the same point the distance is measured to. The "km off"
+  (`CAMERA_MS`, 650ms, no closer than 48x). Over its last 80ms the pin presses into the map, a
+  fifth smaller with a heavier line. Then a dashed line runs from the pin to the nearest edge of
+  the place over 600ms (`LINE_MS`), the same point the distance is measured to, while the pin comes
+  back up over 130ms. The press fits inside the camera's and the line's time, so the reveal takes
+  no longer, and it only changes how the pin is drawn, never where the camera frames. The "km off"
   figure and the total start counting with `rollTo` as soon as you lock in, and land as the line
   arrives and the boundary closes. The line goes the short way round, so a pin in Hawaii reaches
   Japan off one side of the map and back in the other, and the distance is written on it once it's
@@ -539,6 +548,19 @@ with the rules and uses one set of words throughout:
 - **Native controls.** The months are radio inputs, so arrow keys and screen readers work with no
   extra code. The lock button stays outlined until there's a pin and a month, then turns ink. A pin
   drops on a tap that didn't move, so a scroll, pan or pinch that starts on the map never drops one.
+- **The pin drops in.** A tap drops the pin from 18 to 24px above the spot, up to 3px to one side,
+  under a steady pull, so it lands in 128 to 148ms. It squashes wide and flat for a frame as it
+  hits, and a 1px ink ring spreads from its circle (6px) to 22px and fades over 300ms. There's
+  only one pin: a tap somewhere else lifts the old one 8px as it fades over 140ms while the new
+  one drops, and a pin re-aimed mid-fall lifts out from wherever it got to. Every tap leaves its
+  own ring, so tapping around leaves a short trail. A tap within 8px of the pin moves it and rings
+  without lifting it, so a double-tap to zoom doesn't throw the pin about. Arrow keys slide the
+  pin with no drop, since a held arrow repeats about thirty times a second. The key that places
+  the first pin drops it like a tap. The pin, its rings and anything lifting out are drawn on the
+  map's canvas at their place on the globe, so they stay put if the map moves under them, and the
+  map only keeps redrawing while one of them moves ([pin-drop.ts](../src/lib/hobbies/pin-drop.ts):
+  `planDrop`, `dropPose`, `liftPose`, `ringPose`, `pressPose` and the `createPinMotion` driver).
+  Under reduced motion the pin appears where you tap, with no ring and no press.
 - **Keyboard and screen readers.** Revealing a species from the keyboard moves focus to the next
   square, and a polite live region reads out the new species and the new ceiling. Locking in moves
   focus to the result. A finished round restored on load doesn't move focus or replay anything.
