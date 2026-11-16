@@ -47,6 +47,9 @@ export interface PlacedFeature {
   id: string;
   type: FeatureId;
   x: number;
+  /** How far its reshaping of the ground has come in, 0 to 1. Only set for
+   *  drawing while a moment lands (hiking-drop.ts); never saved. */
+  grow?: number;
 }
 
 export interface HikeState {
@@ -520,12 +523,13 @@ export function featureAdjustedElevationAt(
   for (const feature of state.features) {
     const offset = x - feature.x;
     const distance = Math.abs(offset);
+    const grow = feature.grow ?? 1;
     if (feature.type === "lake") {
-      elevation -= influence(distance, 0.075) * 0.13;
+      elevation -= influence(distance, 0.075) * 0.13 * grow;
     } else if (feature.type === "lookout") {
-      elevation += influence(distance, 0.055) * 0.11;
+      elevation += influence(distance, 0.055) * 0.11 * grow;
     } else if (feature.type === "waterfall") {
-      const strength = influence(distance, 0.052);
+      const strength = influence(distance, 0.052) * grow;
       elevation += strength * (offset < 0 ? 0.045 : -0.085);
     } else if (
       feature.type === "camp" ||
@@ -539,10 +543,10 @@ export function featureAdjustedElevationAt(
       elevation = lerp(
         elevation,
         center,
-        influence(distance, radius) * flatten,
+        influence(distance, radius) * flatten * grow,
       );
     } else if (feature.type === "snowfield") {
-      elevation -= influence(distance, 0.07) * 0.018;
+      elevation -= influence(distance, 0.07) * 0.018 * grow;
     }
   }
   return clamp(elevation, 0.06, 0.99);

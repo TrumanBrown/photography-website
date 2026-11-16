@@ -15,6 +15,7 @@ import {
   type FeatureId,
   type HikeState,
   type LightId,
+  type PlacedFeature,
   type SeasonId,
   type WeatherId,
 } from "./hiking-model";
@@ -29,8 +30,12 @@ import {
   stampPostcard,
   terrainElevationFromCanvasY,
   terrainAnchorPoint,
+  lakeSurface,
+  momentColors,
+  renderMomentArt,
 } from "./hiking-renderer";
-import { stampLandFrames } from "@/lib/motion";
+import { prefersReducedMotion, stampLandFrames } from "@/lib/motion";
+import { createDrops } from "./hiking-drop";
 
 const STORAGE_KEY = "trail-studio-v2";
 const LEGACY_STORAGE_KEY = "trail-studio-v1";
@@ -158,6 +163,22 @@ export function initHikeBuilder(root: HTMLElement): void {
   let onscreen = true;
   const undoStack: HikeState[] = [];
 
+  // Trail moments thrown from their buttons onto the trail (hiking-drop.ts).
+  const drops = createDrops({
+    canvas,
+    view: () => ({ width: cssWidth, height: cssHeight, dpr }),
+    state: () => state,
+    ground: (drawn, x) => pointOnTrail(drawn, x, cssWidth, cssHeight),
+    art: (artCtx, drawn, feature) =>
+      renderMomentArt(artCtx, drawn, feature, cssWidth, cssHeight),
+    ink: (drawn) => momentColors(drawn),
+    lake: (drawn, feature) => lakeSurface(drawn, feature, cssWidth, cssHeight),
+    onLand: ({ type, x, id }) => commitFeature(type, x, id, true),
+    onBounce: () => {
+      saveState.textContent = "Trail has ten moments already";
+    },
+  });
+
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     localStorage.removeItem(LEGACY_STORAGE_KEY);
@@ -197,7 +218,10 @@ export function initHikeBuilder(root: HTMLElement): void {
     if (!cssWidth || !cssHeight) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.imageSmoothingEnabled = true;
-    renderHikeScene(ctx, state, {
+    // A moment that's just landed draws its ground part way reshaped and
+    // its art coming in (hiking-drop.ts). Everything else as it is.
+    const drawn = drops.drawn(state, now);
+    renderHikeScene(ctx, drawn, {
       width: cssWidth,
       height: cssHeight,
       mode: "builder",
@@ -207,7 +231,9 @@ export function initHikeBuilder(root: HTMLElement): void {
       hoveredAnchor,
       activeFeatureId: activePlacedFeatureId,
       hoveredFeatureId: hoveredPlacedFeatureId,
+      landing: drops.painter(drawn, now),
     });
+    drops.paintBits(ctx, now);
   }
 
   function syncComputed(): void {
@@ -358,13 +384,21 @@ export function initHikeBuilder(root: HTMLElement): void {
     syncItinerary();
   }
 
-  function applyState(next: HikeState, snapshot = cloneHike(state)): void {
+  function applyState(
+    next: HikeState,
+    snapshot = cloneHike(state),
+    landed = false,
+  ): void {
+    // Anything else that changes the trail finishes the landings first.
+    if (!landed) drops.settle();
     state = normalizeHikeState(next);
     remember(snapshot);
     resetWalk();
     syncUI();
     scheduleSave();
-    render();
+    // A landing is drawn by the frame loop, which runs every frame while one
+    // plays, so the scene isn't drawn twice in the frame it lands.
+    if (!landed) render();
   }
 
   function beginContinuous(): void {
@@ -448,23 +482,83 @@ export function initHikeBuilder(root: HTMLElement): void {
     render();
   }
 
-  function addFeature(type: FeatureId, x?: number): void {
-    if (state.features.length >= 10) {
+  /** The trail with the moments still in the air already on it, so each
+   *  new press picks its spot as it would once those have landed. */
+  function withInAir(): HikeState {
+    const inAir = drops.inAir;
+    if (!inAir.length) return state;
+    return { ...state, features: [...state.features, ...inAir] };
+  }
+
+  /** Press order of the moments sent out, so a short flight that lands
+   *  first still takes its place behind the ones pressed before it. */
+  const pressOrder = new Map<string, number>();
+  let presses = 0;
+
+  function inPressOrder(features: PlacedFeature[], feature: PlacedFeature) {
+    const order = pressOrder.get(feature.id);
+    const after =
+      order == null
+        ? -1
+        : features.findIndex((f) => (pressOrder.get(f.id) ?? -1) > order);
+    if (after < 0) features.push(feature);
+    else features.splice(after, 0, feature);
+  }
+
+  function commitFeature(
+    type: FeatureId,
+    x: number,
+    id: string,
+    landed = false,
+  ): void {
+    const next = cloneHike(state);
+    inPressOrder(next.features, { id, type, x });
+    // Landing mid-drag: the step undo takes back is the trail as it was
+    // before the drag, and undoing the drag keeps the moment.
+    const held = landed ? (dragSnapshot ?? continuousSnapshot) : null;
+    const before = cloneHike(held ?? state);
+    if (landed && dragSnapshot)
+      inPressOrder(dragSnapshot.features, { id, type, x });
+    if (landed && continuousSnapshot)
+      inPressOrder(continuousSnapshot.features, { id, type, x });
+    applyState(next, before, landed);
+    saveState.textContent = `${trailFeatureById(type).label} added. Drag it in the scene to move it.`;
+  }
+
+  /**
+   * Add a moment the way the visitor asked for it: thrown out of the button
+   * they pressed to land on its spot, or just there under reduced motion.
+   */
+  function addFeature(type: FeatureId, x?: number, button?: HTMLElement): void {
+    const animate =
+      !reduceMotion && !prefersReducedMotion() && button != null && x == null;
+    const planned = withInAir();
+    if (planned.features.length >= 10) {
+      // No room. It still goes over, then hops off and falls away.
+      if (animate) {
+        drops.launch({
+          type,
+          x: suggestFeaturePosition(planned, type),
+          id: "",
+          button,
+          overflow: true,
+        });
+        return;
+      }
       saveState.textContent = "Trail has ten moments already";
       return;
     }
     const normalizedX =
       x == null
-        ? suggestFeaturePosition(state, type)
+        ? suggestFeaturePosition(planned, type)
         : Math.min(0.93, Math.max(0.07, x / cssWidth));
-    const next = cloneHike(state);
-    next.features.push({
-      id: `${type}-${state.seed.toString(36)}-${Date.now().toString(36)}`,
-      type,
-      x: normalizedX,
-    });
-    applyState(next);
-    saveState.textContent = `${trailFeatureById(type).label} added. Drag it in the scene to move it.`;
+    const id = `${type}-${state.seed.toString(36)}-${Date.now().toString(36)}`;
+    if (!animate) {
+      commitFeature(type, normalizedX, id);
+      return;
+    }
+    pressOrder.set(id, presses++);
+    drops.launch({ type, x: normalizedX, id, button });
   }
 
   biomeButtons.forEach((button) => {
@@ -487,7 +581,7 @@ export function initHikeBuilder(root: HTMLElement): void {
   featureButtons.forEach((button) => {
     button.addEventListener("click", () => {
       const selected = button.dataset.hikeFeature as FeatureId;
-      addFeature(selected);
+      addFeature(selected, undefined, button);
     });
   });
 
@@ -572,6 +666,7 @@ export function initHikeBuilder(root: HTMLElement): void {
     const point = pointerPosition(event);
     const feature = nearestPlacedFeature(point.x, point.y);
     if (feature) {
+      drops.settle();
       activePlacedFeatureId = feature;
       dragSnapshot = cloneHike(state);
       canvas.dataset.dragging = "moment";
@@ -679,6 +774,7 @@ export function initHikeBuilder(root: HTMLElement): void {
   undoButton.addEventListener("click", () => {
     const previous = undoStack.pop();
     if (!previous) return;
+    drops.settle();
     state = normalizeHikeState(previous);
     resetWalk();
     syncUI();
@@ -687,11 +783,13 @@ export function initHikeBuilder(root: HTMLElement): void {
   });
 
   shuffleButton.addEventListener("click", () => {
+    drops.clear();
     const nextSeed = (Math.imul(state.seed + 1, 1664525) + 1013904223) >>> 0;
     applyState(randomizeHike(state, nextSeed));
   });
 
   resetButton.addEventListener("click", () => {
+    drops.clear();
     activePlacedFeatureId = null;
     hoveredPlacedFeatureId = null;
     applyState(createDefaultHike());
@@ -868,7 +966,14 @@ export function initHikeBuilder(root: HTMLElement): void {
 
   function frame(now: number): void {
     // Not under a scene that's still playing (src/lib/covered.ts).
-    if (onscreen && !document.hidden && !covered() && now - lastFrame >= 40) {
+    // 25 frames a second for the walk and the clouds, every frame while a
+    // moment is landing.
+    if (
+      onscreen &&
+      !document.hidden &&
+      !covered() &&
+      (now - lastFrame >= 40 || drops.busy(now))
+    ) {
       if (walkingSince != null) {
         const progress = Math.min(1, (now - walkingSince) / 6200);
         hikerProgress = progress * progress * (3 - 2 * progress);

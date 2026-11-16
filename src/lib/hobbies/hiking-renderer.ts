@@ -19,6 +19,11 @@ export interface HikeRenderOptions {
   hoveredAnchor?: number | null;
   activeFeatureId?: string | null;
   hoveredFeatureId?: string | null;
+  /** A moment still landing paints itself in place of its finished art, at
+   *  the same depth (hiking-drop.ts). Return null to draw it as usual. */
+  landing?: (
+    feature: PlacedFeature,
+  ) => ((ctx: CanvasRenderingContext2D) => void) | null;
 }
 
 interface SceneColors {
@@ -3542,7 +3547,9 @@ function drawScene(
   drawTrail(ctx, state, colors, width, height, detailed);
   if (detailed) drawPostcardTrailDetail(ctx, state, colors, width, height);
   for (const feature of state.features) {
-    drawFeature(ctx, state, feature, colors, width, height, detailed);
+    const landing = detailed ? null : options.landing?.(feature);
+    if (landing) landing(ctx);
+    else drawFeature(ctx, state, feature, colors, width, height, detailed);
     if (!detailed) {
       drawFeatureHandle(
         ctx,
@@ -3570,6 +3577,74 @@ function drawScene(
       options.hoveredAnchor ?? null,
     );
   }
+}
+
+/** One moment's finished art on its own, as the builder draws it: what a
+ *  landing grows, pours or pitches into place. */
+export function renderMomentArt(
+  ctx: CanvasRenderingContext2D,
+  state: HikeState,
+  feature: PlacedFeature,
+  width: number,
+  height: number,
+): void {
+  drawFeature(ctx, state, feature, colorsFor(state), width, height, false);
+}
+
+/** The colours a moment is drawn in, for its marker and what it throws up. */
+export function momentColors(state: HikeState): {
+  water: string;
+  tree: string;
+  treeLight: string;
+  ground: string;
+  groundLight: string;
+  accent: string;
+  snow: string;
+} {
+  const colors = colorsFor(state);
+  return {
+    water: colors.water,
+    tree: colors.tree,
+    treeLight: colors.treeLight,
+    ground: colors.ground,
+    groundLight: colors.groundLight,
+    accent: colors.accent,
+    snow: colors.snow,
+  };
+}
+
+/** Where a lake's water stands, as drawLakeFeature finds it. */
+export function lakeSurface(
+  state: HikeState,
+  feature: PlacedFeature,
+  width: number,
+  height: number,
+): { y: number; left: number; right: number } {
+  const radius = 0.045 * Math.max(0.72, worldObjectScale(state));
+  const scale =
+    Math.min(width / 900, height / 600) *
+    0.9 *
+    Math.max(0.72, worldObjectScale(state));
+  const samples = Array.from({ length: 41 }, (_, index) =>
+    pointOnTrail(
+      state,
+      feature.x - radius + (index / 40) * radius * 2,
+      width,
+      height,
+    ),
+  );
+  const lowerRimY = Math.max(samples[2].y, samples[samples.length - 3].y);
+  const basinFloorY = Math.max(...samples.map((sample) => sample.y));
+  const availableDepth = Math.max(8 * scale, basinFloorY - lowerRimY);
+  const y = Math.min(
+    basinFloorY - 3 * scale,
+    lowerRimY + availableDepth * 0.28,
+  );
+  let left = 20;
+  let right = 20;
+  while (left > 1 && samples[left - 1].y >= y) left -= 1;
+  while (right < samples.length - 2 && samples[right + 1].y >= y) right += 1;
+  return { y, left: samples[left].x, right: samples[right].x };
 }
 
 export function renderHikeScene(
