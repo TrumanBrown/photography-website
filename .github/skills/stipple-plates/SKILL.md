@@ -22,9 +22,17 @@ pipeline. It records which photos worked, which failed and why.
 
 ## Rules
 
-- **Truman's own photos only** (his sessions, hobby media, his iNaturalist).
-  Reference images from other artists are for technique. Never trace or copy
-  them; they're copyrighted.
+- **Card plates use Truman's own photos** (his sessions, hobby media, his
+  iNaturalist). Reference images from other artists are for technique. Never
+  trace or copy them; they're copyrighted.
+- **A toy's props and background use the best copyright-free photos there
+  are**: public domain or CC0, such as Wikimedia Commons and National Park
+  Service photos. Record each one's page, author and licence in
+  `subjects.json`. "it's good to use my own photos for like th ehobby
+  overviews like we did, but for these experience ones where it doesn't matter
+  as much because it's background details, use the best images you can find
+  that are copyright free so we can build better experiences" (2026-11-15). No
+  CC BY or other licences that need a credit, unless he says otherwise.
 - **Keep one look across the set.** Don't change `SIZES`, `INK`, the default
   `weight` or the Lloyd and render settings for a single subject. Tune that
   subject's entry in `subjects.json` instead.
@@ -179,8 +187,12 @@ polygon around any debris as well.
 | `kind: "globe"`, `lon0`, `lat0` | A lit globe from `src/lib/geo-land.json`                                                                               |
 | `kind: "drive"`                 | A toy's props, each cut out and drawn at several heights ([Drives](#drives)); `site` and `props` go with it            |
 | `mask: "green"`, `keep`         | Plants by colour, where rembg sees one texture; `keep` drops pieces smaller than that share of the largest             |
+| `v_min`, `h_max`                | Green mask: reach into shade (default 60) and blue-green (90), for dark fronds against red litter                      |
+| `mask: "darkest"`, `darkest`    | The darkest share of the crop (percent, default 45): branches against a bright canopy                                  |
+| `ragged`                        | Darkest mask: `{"bottom": 0.45, "right": 0.3}` frays those edges with noise instead of the crop's straight line        |
 | `mask: "grabcut"`, `core`       | GrabCut from a line of points down the subject's middle (`core_width` wide), for a trunk among trunks                  |
 | `metres`, `lods`, `fade_top`    | Drive props: height in the world, the heights drawn (CSS px), and how much of the top dissolves (a trunk into canopy)  |
+| `credit`                        | Drive props from someone else's photo: author, licence and the file's page. Required for anything not his              |
 
 ## Sizes
 
@@ -197,7 +209,8 @@ Drive props have their own sizes (`DRIVE_LODS`, 48 to 384 px tall, trunks to
 
 A drive is a set of props for a toy that moves through a scene, each cut out of
 one photo and drawn like a small plate. The first is `herping-drive`, the night
-drive's sword ferns and mossy trunks. The toy places them along a road it
+drive's sword fern, skunk cabbage, fir and cedar trunks and moss-hung limbs.
+The toy places them along a road it
 builds in code and draws only the dots its headlights reach
 ([docs/hobbies.md](../../../docs/hobbies.md#reference-implementation-the-herping-island-night-drive)).
 
@@ -212,6 +225,14 @@ builds in code and draws only the dots its headlights reach
   so each is drawn at several heights and the toy picks the smallest at least
   as tall as it needs. Scaling one drawing up spreads its dots into a grid.
 - **Cut props, never a whole photo.** See the lessons for why.
+- **The clearest free photos.** Props are background detail, so they come
+  from public-domain or CC0 photos (Wikimedia Commons, National Park Service)
+  chosen for clear outlines, each with a `credit` ([Rules](#rules)). Search
+  Commons with its API, keep only `LicenseShortName` public domain or CC0, and
+  send `download()`'s User-Agent: Wikimedia answers bare scripts with 429.
+- **Retouching works on props too.** `graft`, `inpaint` and `stretch` run
+  before a prop's framing and silhouette are taken (`prop_cut`), so a graft
+  can cover a mark on a trunk and a stretch can make it taller.
 
 ## Choosing a photo
 

@@ -2,16 +2,17 @@
  * "Night drive", the Herping hobby's toy.
  *
  * You drive slowly down a forest road at night. The roadside is drawn in
- * stipple from Truman's photos (herping-drive.ts): sword ferns and mossy
- * trunks along the verges, a post-and-rail fence on some stretches, edge
- * lines, centre dashes and puddles on the road. Only what the headlights
- * reach is drawn: the low beams light the road ahead and the near verges, and
- * a spotlight you steer draws the rest wherever it goes. Salamanders, newts
- * and the odd frog or snake cross the road ahead. Their eyeshine glints in
- * the headlights and is brightest when the spotlight is on them. Tap one
- * that's lit, or press Enter, and the car stops: the specimen card shows its
- * photo and a fact, and "Keep driving" sets off again. A field journal in
- * localStorage counts the species you've found.
+ * stipple from public-domain photos (herping-drive.ts): skunk cabbage in the
+ * ditch, sword ferns along the verges, Douglas fir and red cedar trunks, mossy
+ * limbs over the road, a post-and-rail fence on some stretches, edge lines,
+ * centre dashes and puddles on the road. Only what the headlights reach is
+ * drawn: the low beams light the road ahead and the near verges, and a
+ * spotlight you steer draws the rest wherever it goes. Salamanders, newts and
+ * the odd frog cross the road ahead, and snakes lie on the shoulder. Their
+ * eyeshine glints in the headlights and is brightest when the spotlight is on
+ * them. Tap one that's lit, or press Enter, and the car stops: the specimen
+ * card shows its photo and a fact, and "Keep driving" sets off again. A field
+ * journal in localStorage counts the species you've found.
  *
  * Dots go to the GPU through the scene renderer's WebGL sink (scenes/gl.ts),
  * or where WebGL2 isn't there, are stamped into a pixel buffer at 1x. Pauses
@@ -38,6 +39,7 @@ import {
   buildTile,
   type Camera,
   camera,
+  CANOPY_TOP,
   critterArt,
   type CritterArt,
   eyeshine,
@@ -76,14 +78,15 @@ const RARITY_WEIGHT: Record<Rarity, number> = {
 /**
  * Spawn bias by category. Herping this game is salamander night — you're out on
  * a wet road mainly for the caudates — so salamanders and newts dominate what
- * turns up in the beam, with the occasional frog/toad and a rare snake/lizard.
+ * turns up in the beam, with the occasional frog/toad and lizard. Garter
+ * snakes turn up about one animal in seven, on the shoulder.
  */
 const CATEGORY_WEIGHT: Record<HerpCategory, number> = {
   salamander: 10,
   newt: 7,
   frog: 2,
   toad: 2,
-  snake: 1.2,
+  snake: 5,
   lizard: 1.2,
 };
 /** Crawling speed across the road, metres a second. */
@@ -480,6 +483,7 @@ export function initHerping(root: HTMLElement): void {
   function spawnAnimal(initial: boolean): void {
     if (!W) return;
     const sp = pickSpecies();
+    const shoulder = sp.category === "snake";
     const c = cam();
     // Newcomers turn up far ahead and the car closes on them; parked (reduced
     // motion), they turn up anywhere in reach, out of the spotlight.
@@ -489,7 +493,10 @@ export function initHerping(root: HTMLElement): void {
       const z =
         carZ +
         (near ? nearest(c) + 4 + Math.random() * 26 : 48 + Math.random() * 26);
-      const x = (Math.random() * 2 - 1) * (ROAD.half - 0.4);
+      // Snakes lie at the road's edge, on the warm asphalt, and barely move.
+      const x = shoulder
+        ? dir * (ROAD.half - 0.65 + Math.random() * 0.6)
+        : (Math.random() * 2 - 1) * (ROAD.half - 0.4);
       const dz = z - carZ;
       const s = c.f / dz;
       const sx = W / 2 + (x - ROAD.camX) * s;
@@ -505,8 +512,16 @@ export function initHerping(root: HTMLElement): void {
         x,
         z,
         dir,
-        speed: CRAWL[sp.category] * (0.8 + 0.4 * Math.random()),
-        ang: (dir > 0 ? 0 : Math.PI) + (Math.random() - 0.5) * 0.9,
+        speed:
+          CRAWL[sp.category] *
+          (0.8 + 0.4 * Math.random()) *
+          (shoulder ? 0.2 : 1),
+        // On the shoulder, angled along the road's edge.
+        ang:
+          (dir > 0 ? 0 : Math.PI) +
+          (shoulder
+            ? (Math.random() < 0.5 ? -1 : 1) * (0.6 + Math.random() * 0.4)
+            : (Math.random() - 0.5) * 0.9),
         seed,
         art: critterArt(sp.category, ART_PX, inkTone(sp), seed, 1.6),
         sx,
@@ -610,6 +625,8 @@ export function initHerping(root: HTMLElement): void {
     scale: number,
     mirror: boolean,
     seed: number,
+    /** Metres above the road its foot hangs, for the canopy's limbs. */
+    lift = 0,
   ): void {
     const dz = pz - c.z;
     if (dz < 0.6 || dz > FAR) return;
@@ -618,7 +635,7 @@ export function initHerping(root: HTMLElement): void {
     const hPx = prop.metres * scale * s;
     const wPx = hPx * prop.aspect;
     const bx = W / 2 + (px - ROAD.camX) * s;
-    const by = c.horizon + ROAD.camH * s;
+    const by = c.horizon + (ROAD.camH - lift) * s;
     const left = bx - wPx / 2;
     const top = by - hPx;
     if (left > W || left + wPx < 0 || top > H || by < 0 || hPx < 3) return;
@@ -630,8 +647,9 @@ export function initHerping(root: HTMLElement): void {
     const keep = Math.min(1, fit * fit);
     const grow = fit > 1 ? Math.min(1.6, Math.sqrt(fit)) : 1;
 
-    // Clear paper where it stands, so nearer things hide what's behind.
-    if (hPx > 10) {
+    // Clear paper where it stands, so nearer things hide what's behind. Limbs
+    // overhead don't: the trunks show through their gaps.
+    if (!lift && hPx > 10) {
       // A coarser grid for big props: the ring of paper is wider than a cell.
       const g = hPx > 400 ? 6 : hPx > 150 ? 4 : 3;
       const { maskW: mw, maskH: mh } = prop;
@@ -672,7 +690,7 @@ export function initHerping(root: HTMLElement): void {
         c,
         beam,
         xr0 + (u - 0.5) * wm,
-        (1 - V[i]) * hm,
+        (1 - V[i]) * hm + lift,
         dz,
         x,
         y,
@@ -704,7 +722,10 @@ export function initHerping(root: HTMLElement): void {
     const s = c.f / Math.max(0.5, dz);
     a.sx = W / 2 + (a.x - ROAD.camX) * s;
     a.sy = c.horizon + ROAD.camH * s;
-    a.len = LENGTH_M * a.sp.size * s;
+    // Further off it's drawn larger than the road would make it, up to 1.7x
+    // from 26 m out, so you can tell what it is before it's at your bumper.
+    const t = Math.min(1, Math.max(0, (dz - 4) / 22));
+    a.len = LENGTH_M * a.sp.size * s * (1 + 0.7 * t * t * (3 - 2 * t));
     return dz;
   }
 
@@ -724,14 +745,19 @@ export function initHerping(root: HTMLElement): void {
       push(x, y, Math.max(1.2, h[i + 2] * k));
     }
     emit(o, palette.paper);
-    const keep = Math.min(1, k * k);
-    const rs = Math.max(0.55, Math.min(1.3, k));
+    // The whole outline as soon as a third of the light is on it, and enough
+    // of the inside to make a small animal a solid shape: a far one is
+    // denser than the art, never thinned to a few specks.
+    const rimShow = Math.min(1, lit * 3);
+    const fill = Math.min(1, Math.max(0.35, 2 * k * k)) * Math.min(1, lit * 2);
+    const rs = Math.min(1.3, k);
     const d = a.art.dots;
+    const rim = a.art.rim;
     for (let i = 0, j = 0; i < d.length; i += 3, j++) {
       const rank = threshold(a.seed + j);
-      if (rank >= keep * lit * 1.15) continue;
+      if (rank >= (j < rim ? rimShow : fill)) continue;
       const [x, y] = toScreen(a, d[i], d[i + 1], turn, k);
-      push(x, y, d[i + 2] * rs);
+      push(x, y, Math.max(PEN, d[i + 2] * rs));
     }
     emit(o, palette.ink);
   }
@@ -769,6 +795,16 @@ export function initHerping(root: HTMLElement): void {
             draw: () => drawProp(o, c, r, p.x, p.z, p.scale, p.mirror, p.seed),
           });
       }
+      for (const b of tile.canopy) {
+        const r = props[b.prop];
+        if (!r) continue;
+        const lift = CANOPY_TOP - r.prop.metres * b.scale;
+        order.push({
+          z: b.z,
+          draw: () =>
+            drawProp(o, c, r, b.x, b.z, b.scale, b.mirror, b.seed, lift),
+        });
+      }
       for (const post of tile.posts) {
         order.push({
           z: post.z,
@@ -791,50 +827,28 @@ export function initHerping(root: HTMLElement): void {
     order.sort((a, b) => b.z - a.z);
     for (const d of order) d.draw();
 
-    // Eyeshine over everything: a clear ring of paper round each eye, the
-    // eye, and when the light's on it, a burst of tiny dots.
+    // Eyeshine over everything: a pair of dots on the head with a ring of
+    // clear paper round each, larger and darker the more light is on them. The
+    // pair always sits side by side, so it reads as eyes even at a few pixels.
     for (const a of animals) {
       if (a.found) continue;
       const dz = placeAnimal(c, a);
       if (dz < 0.8 || dz > FAR) continue;
       const k = a.len / ART_PX;
       const e = a.art.eyes;
-      const [hx, hy] = toScreen(a, (e[0] + e[2]) / 2, 0, 0, k);
+      const [hx, hy] = toScreen(a, e[0], 0, 0, k);
       const shine = eyeshine(c, beam, a.x - ROAD.camX, dz, hx, hy);
       if (shine < 0.03) continue;
       const flick = reduceMotion
         ? 1
         : 0.85 + 0.15 * Math.sin(now / 110 + a.seed);
       const er =
-        Math.max(1.1, Math.min(3, e[3] * k * 0.62)) * (0.85 + 0.35 * shine);
-      const eyes: number[] = [];
-      for (let q = 0; q < 4; q += 2)
-        eyes.push(
-          ...toScreen(
-            a,
-            e[q],
-            Math.sign(e[q + 1]) * Math.max(Math.abs(e[q + 1]) * k, er * 1.3),
-            0,
-            1,
-          ),
-        );
-      for (let q = 0; q < 4; q += 2) push(eyes[q], eyes[q + 1], er + 2);
+        Math.max(1.1, Math.min(3, e[3] * k * 0.62)) * (0.8 + 0.5 * shine);
+      const gap = Math.max(e[3] * k, er * 1.5);
+      for (const side of [-1, 1]) push(hx + side * gap, hy, er + 2);
       emit(o, palette.paper);
-      for (let q = 0; q < 4; q += 2) push(eyes[q], eyes[q + 1], er);
+      for (const side of [-1, 1]) push(hx + side * gap, hy, er);
       emit(o, palette.ink, Math.min(1, (0.6 + 0.4 * shine) * flick));
-      if (shine > 0.45) {
-        const rr = er + 1.6 + shine * 2.4;
-        for (let q = 0; q < 4; q += 2)
-          for (let b = 0; b < 8; b++) {
-            const t = (b / 8) * Math.PI * 2 + a.seed;
-            push(
-              eyes[q] + Math.cos(t) * rr,
-              eyes[q + 1] + Math.sin(t) * rr,
-              0.55,
-            );
-          }
-        emit(o, palette.ink, shine);
-      }
     }
 
     // Rain shows only where the light catches it.
@@ -1184,7 +1198,7 @@ export function initHerping(root: HTMLElement): void {
       if (a.found) continue;
       const now = seen(c, a, beam);
       const then = seen(c, a, aim);
-      const rad = Math.max(20, a.len * 0.7);
+      const rad = Math.max(24, a.len * 0.75);
       const dd = Math.hypot(px - a.sx, py - a.sy);
       const lit =
         Math.max(now.body, then.body) >= 0.15 ||

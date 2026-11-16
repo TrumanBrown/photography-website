@@ -2,12 +2,13 @@
  * The night drive's world (herping.ts): a forest road you drive slowly down
  * at night, drawn in stipple only where the headlights reach.
  *
- * The roadside is made of props, each cut out of one of Truman's photos and
- * stippled like a small plate by the stipple-plates skill (`herping-drive` in
- * its subjects.json): a sword fern clump and three mossy trunks, at several
- * sizes so the pen stays the same from far ahead to right beside the car. The
- * road and fence are drawn here in the same pen: edge lines, centre dashes,
- * puddles, gravel, and a post-and-rail fence on some stretches.
+ * The roadside is made of props, each cut out of a public-domain or CC0 photo
+ * and stippled like a small plate by the stipple-plates skill (`herping-drive`
+ * in its subjects.json): a sword fern, skunk cabbage, a Douglas fir and a
+ * western red cedar trunk, and moss-hung limbs that reach over the road, at
+ * several sizes so the pen stays the same from far ahead to right beside the
+ * car. The road and fence are drawn here in the same pen: edge lines, centre
+ * dashes, puddles, gravel, and a post-and-rail fence on some stretches.
  *
  * Every dot has a fixed rank between 0 and 1 and shows when the light on it
  * (and its share of the density at that distance) is above its rank, so light
@@ -281,11 +282,17 @@ export interface Tile {
   count: number;
   placed: Placed[];
   posts: Post[];
+  /** Moss-hung limbs reaching over the road, hung from `CANOPY_TOP`. */
+  canopy: Placed[];
 }
 
 /** Kinds of prop the tile builder asks for, by name in the dot file. */
 export const FERNS = ["fern"];
-export const TRUNKS = ["maple", "alder", "mossy"];
+export const TRUNKS = ["fir", "cedar"];
+export const DITCH = ["cabbage"];
+export const LIMBS = ["bough"];
+/** How high the canopy's limbs hang from, metres above the road. */
+export const CANOPY_TOP = 9.5;
 
 /** Build one stretch of road. `index` is which stretch, `salt` which road. */
 export function buildTile(
@@ -380,22 +387,26 @@ export function buildTile(
       }
     }
   }
-  // The verges: sword ferns at the road's edge, trunks further back.
+  // The verges: skunk cabbage in the ditch, sword ferns along the edge,
+  // trunks further back, and limbs reaching over the road from both sides.
   const ids = (names: string[]) =>
     names
       .map((n) => props.findIndex((p) => p.name === n))
       .filter((i) => i >= 0);
   const ferns = ids(FERNS);
   const trunks = ids(TRUNKS);
+  const ditch = ids(DITCH);
+  const limbs = ids(LIMBS);
   const fenced = R() < 0.5;
   const placed: Placed[] = [];
   for (const side of [-1, 1]) {
     const fence = side > 0 && fenced;
-    // Two rows of ferns: one along the edge, one further back among the trees.
+    // Two rows of ferns: one along the edge, one further back among the
+    // trees, spaced so each clump keeps its outline.
     if (ferns.length)
       for (const [near, gap] of [
-        [fence ? 1.1 : 0.5, 1.9],
-        [3.2, 2.8],
+        [fence ? 1.1 : 0.5, 3.4],
+        [3.2, 4.6],
       ])
         for (let z = R() * gap; z < TILE; z += gap * (0.7 + R() * 0.7)) {
           placed.push({
@@ -418,7 +429,31 @@ export function buildTile(
           seed: Math.floor(R() * 1e6),
         });
       }
+    if (ditch.length)
+      for (let z = R() * 6; z < TILE; z += 5 + R() * 7)
+        placed.push({
+          prop: ditch[0],
+          x: side * (half + 0.15 + R() * 0.4),
+          z: z0 + z,
+          scale: 1.2 + R() * 0.4,
+          mirror: R() < 0.5,
+          seed: Math.floor(R() * 1e6),
+        });
   }
+  const canopy: Placed[] = [];
+  if (limbs.length)
+    for (let z = R() * 3; z < TILE; z += 2.5 + R() * 3)
+      for (const side of [-1, 1])
+        if (R() < 0.8)
+          canopy.push({
+            prop: limbs[Math.floor(R() * limbs.length)],
+            x: side * (half * 0.55 + R() * 3.5),
+            z: z0 + z,
+            scale: 0.8 + R() * 0.5,
+            // Mostly reaching in toward the road from its own side.
+            mirror: side > 0 ? R() < 0.7 : R() < 0.3,
+            seed: Math.floor(R() * 1e6),
+          });
   const posts: Post[] = [];
   if (fenced)
     for (let z = 0; z < TILE; z += 2.5)
@@ -429,6 +464,7 @@ export function buildTile(
     count: marks.length / MARK,
     placed,
     posts,
+    canopy,
   };
 }
 
@@ -500,8 +536,10 @@ export function keepShare(screenArea: number, tone: number): number {
 
 /** A stippled animal at one size: dots to draw and the paper it sits on, CSS px. */
 export interface CritterArt {
-  /** Dots x, y, r around the animal's middle, head toward +x. */
+  /** Dots x, y, r around the animal's middle, head toward +x: the outline's first. */
   dots: Float32Array;
+  /** How many dots, from the start, make the outline. */
+  rim: number;
   /** Discs of paper cleared under it and just round it. */
   holes: Float32Array;
   /** The two eyes, x, y. */
@@ -682,6 +720,7 @@ export function critterArt(
       (Math.abs(p.by) + r) * widen,
     );
   }
+  const edge: number[] = [];
   const dots: number[] = [];
   const holes: number[] = [];
   // A little bigger and closer than the roadside's dots, so the animal reads
@@ -704,14 +743,15 @@ export function critterArt(
       const d = dist(x / length, y / length);
       if (d < pad) holes.push(x, y, spacing * 1.1);
       if (d > 0) continue;
-      const rim = d > -spacing * 0.9;
-      if (rim || R() < inside) dots.push(x, y, dotR * (0.9 + 0.2 * R()));
+      if (d > -spacing * 0.9) edge.push(x, y, dotR * (0.9 + 0.2 * R()));
+      else if (R() < inside) dots.push(x, y, dotR * (0.9 + 0.2 * R()));
     }
   }
   // The eyes sit far enough apart to read as a pair, even on a small animal.
   const gap = Math.max(eye[1] * widen * length, 2.6);
   return {
-    dots: Float32Array.from(dots),
+    dots: Float32Array.from([...edge, ...dots]),
+    rim: edge.length / 3,
     holes: Float32Array.from(holes),
     eyes: [eye[0] * length, -gap, eye[0] * length, gap],
     length,

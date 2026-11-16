@@ -173,6 +173,22 @@ What failed, and why:
   light is full strength across most of the beam and thins only at its rim.
 - **Puddles drawn as rings read as targets.** A puddle at night is dark water
   with a lit rim and the headlights caught across it as short streaks.
+- **His dim forest photos made unclear props; free photos picked for clarity
+  read.** Truman: "i dont think using my pictures as mocks is the best
+  approahc, pull ones from online that are more clear, better pics"
+  (2026-11-15). The props now come from public-domain and CC0 photos.
+- **A trunk photographed looking up is noise.** A Douglas fir towering in old
+  growth, a Hoh Sitka spruce on its roots and a Quinault maple all came out
+  as slabs of speckle at drive size. A level, close shot of one trunk with lit
+  bark reads: the fir's furrows, the cedar's stringy bark and flared base.
+- **A fern needs separate fronds against a different colour.** A garden sword
+  fern, a dense mound against green, stippled as a mat. The Mount Rainier one,
+  a vase of fronds over red maple leaves, keeps every frond; its shaded
+  blue-green fronds needed `v_min` 28 and `h_max` 100 in the green mask.
+- **Limbs overhead are cut by darkness and frayed.** Moss-hung limbs against a
+  bright canopy come out with `"mask": "darkest"`; the crop's straight edges
+  read as a ruler line until `ragged` frays them. Drawn over the road, they
+  mustn't clear paper behind them, or every trunk top is cut off square.
 - **A prop seen close needs a bigger drawing.** Trunks passing the car were
   scaled past their largest drawing and the dots spread into a grid. They get
   a 768 px size; ferns, which stay smaller, stop at 384.

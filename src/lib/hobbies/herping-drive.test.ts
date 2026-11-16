@@ -4,10 +4,15 @@ import { describe, expect, it } from "vitest";
 import {
   buildTile,
   camera,
+  critterArt,
+  DITCH,
   eyeshine,
+  FERNS,
+  LIMBS,
   parseDrive,
   ROAD,
   spotDistance,
+  TRUNKS,
 } from "./herping-drive";
 
 const load = (name: string) => {
@@ -23,10 +28,10 @@ describe("the roadside props", () => {
   const light = load("herping-drive.bin");
   const dark = load("herping-drive-dark.bin");
 
-  it("read the same props in both themes, ferns and trunks", () => {
+  it("read the same props in both themes, every one the road asks for", () => {
     expect(light?.map((p) => p.name)).toEqual(dark?.map((p) => p.name));
     expect(light?.map((p) => p.name)).toEqual(
-      expect.arrayContaining(["fern", "maple", "alder", "mossy"]),
+      expect.arrayContaining([...FERNS, ...TRUNKS, ...DITCH, ...LIMBS]),
     );
   });
 
@@ -53,7 +58,7 @@ describe("the roadside props", () => {
 });
 
 describe("the road", () => {
-  const props = [{ name: "fern" }, { name: "maple" }];
+  const props = [{ name: "fern" }, { name: "fir" }, { name: "bough" }];
 
   // The car drives through the same stretch for several seconds, and it's
   // rebuilt whenever it comes back into range, so it has to come out the same.
@@ -63,6 +68,7 @@ describe("the road", () => {
     const c = buildTile(7, 2, props);
     expect(Array.from(a.marks)).toEqual(Array.from(b.marks));
     expect(a.placed).toEqual(b.placed);
+    expect(a.canopy).toEqual(b.canopy);
     expect(Array.from(c.marks)).not.toEqual(Array.from(a.marks));
   });
 
@@ -70,6 +76,17 @@ describe("the road", () => {
     for (let t = 0; t < 30; t++)
       for (const p of buildTile(t, 1, props).placed)
         expect(Math.abs(p.x)).toBeGreaterThan(ROAD.half);
+  });
+});
+
+describe("an animal's drawing", () => {
+  // The drive keeps every outline dot of a far animal so it keeps its shape.
+  it("lists its outline first, then the inside", () => {
+    for (const kind of ["salamander", "frog", "snake"] as const) {
+      const art = critterArt(kind, 64, 0.6, 3);
+      expect(art.rim).toBeGreaterThan(20);
+      expect(art.rim * 3).toBeLessThan(art.dots.length);
+    }
   });
 });
 

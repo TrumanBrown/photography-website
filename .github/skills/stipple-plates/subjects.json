@@ -369,66 +369,125 @@
     "lat0": 22.0
   },
   "herping-drive": {
-    "note": "Night drive roadside: sword ferns and mossy trunks · Olympic National Park, February 2026, and Western Washington, spring 2026",
+    "note": "Night drive roadside: sword fern, skunk cabbage, Douglas fir, western red cedar and moss-hung limbs · public-domain and CC0 photos from Wikimedia Commons",
     "kind": "drive",
     "site": "src/assets/hobbies/herping",
     "props": {
       "fern": {
-        "src": "olympic-winter-2026/DSC03802.JPEG",
-        "crop": [0.14, 0.5, 0.45, 0.86],
+        "src": "https://upload.wikimedia.org/wikipedia/commons/a/aa/Sword_Fern_%28127ccac0ccee4d66a513e34608fb61e3%29.JPG",
+        "crop": [0.0, 0.04, 0.86, 0.72],
         "mask": "green",
+        "v_min": 28,
+        "h_max": 100,
+        "exclude": [
+          [
+            [0.68, 0.0],
+            [1.0, 0.0],
+            [1.0, 0.22],
+            [0.68, 0.22]
+          ]
+        ],
         "keep": 0.05,
         "metres": 1.4,
         "detail": 0.3,
-        "light": { "weight": 0.3 }
+        "light": { "weight": 0.3 },
+        "credit": "Steve Redman, Mount Rainier National Park (NPS), public domain, https://commons.wikimedia.org/wiki/File:Sword_Fern_(127ccac0ccee4d66a513e34608fb61e3).JPG"
       },
-      "maple": {
-        "src": "olympic-winter-2026/DSC03806.JPEG",
-        "crop": [0.385, 0.0, 0.52, 0.95],
-        "mask": "grabcut",
-        "lods": [48, 96, 192, 384, 768],
-        "core": [
-          [0.296, 0.032],
-          [0.333, 0.526],
-          [0.481, 0.926]
+      "cabbage": {
+        "src": "https://upload.wikimedia.org/wikipedia/commons/8/81/WesternSkunkCabbage.JPG",
+        "crop": [0.12, 0.08, 0.95, 0.95],
+        "metres": 0.7,
+        "light": { "weight": 0.32 },
+        "credit": "Martin Bravenboer, public domain, https://commons.wikimedia.org/wiki/File:WesternSkunkCabbage.JPG"
+      },
+      "fir": {
+        "src": "https://upload.wikimedia.org/wikipedia/commons/a/af/MP_3_36515_05_Pseudotsuga_menziesii.jpg",
+        "crop": [0.2, 0.0, 0.7, 0.92],
+        "polygon": [
+          [
+            [0.39, 0.0],
+            [0.36, 0.163],
+            [0.34, 0.326],
+            [0.31, 0.489],
+            [0.29, 0.652],
+            [0.26, 0.761],
+            [0.21, 0.848],
+            [0.156, 0.935],
+            [0.144, 0.984],
+            [0.84, 0.984],
+            [0.824, 0.935],
+            [0.776, 0.87],
+            [0.736, 0.783],
+            [0.724, 0.652],
+            [0.728, 0.489],
+            [0.736, 0.326],
+            [0.752, 0.163],
+            [0.78, 0.0]
+          ]
         ],
-        "core_width": 0.11,
+        "graft": [
+          {
+            "from": [
+              [0, 0.27],
+              [1, 0.27],
+              [1, 0.47],
+              [0, 0.47]
+            ],
+            "src": [
+              [0.332, 0.37],
+              [0.734, 0.37]
+            ],
+            "dst": [
+              [0.3, 0.57],
+              [0.726, 0.57]
+            ],
+            "feather": 0.012
+          }
+        ],
+        "stretch": 1.5,
+        "metres": 8.5,
+        "lods": [48, 96, 192, 384, 768],
+        "fade_top": 0.2,
+        "light": { "weight": 0.34 },
+        "credit": "Yog Sot, CC0, https://commons.wikimedia.org/wiki/File:MP_3_36515_05_Pseudotsuga_menziesii.jpg"
+      },
+      "cedar": {
+        "src": "https://upload.wikimedia.org/wikipedia/commons/e/ef/Western_red_cedar_tree_%2816549eaf-7331-4e6d-a908-df02f7cc7611%29.tif",
+        "crop": [0.2, 0.0, 0.62, 0.86],
+        "polygon": [
+          [
+            [0.476, 0.0],
+            [0.476, 0.233],
+            [0.452, 0.419],
+            [0.333, 0.465],
+            [0.262, 0.535],
+            [0.214, 0.64],
+            [0.167, 0.756],
+            [0.131, 0.872],
+            [0.131, 0.977],
+            [0.869, 0.977],
+            [0.833, 0.907],
+            [0.833, 0.698],
+            [0.833, 0.465],
+            [0.829, 0.233],
+            [0.845, 0.0]
+          ]
+        ],
         "metres": 7.5,
-        "light": { "weight": 0.36 },
-        "fade_top": 0.2
-      },
-      "alder": {
-        "src": "spring-pnw-various-wildlife-2026/DSC05734.JPG",
-        "crop": [0.46, 0.0, 0.7, 0.82],
-        "mask": "grabcut",
         "lods": [48, 96, 192, 384, 768],
-        "core": [
-          [0.417, 0.037],
-          [0.417, 0.61],
-          [0.479, 0.878],
-          [0.292, 0.945],
-          [0.479, 0.878],
-          [0.667, 0.945]
-        ],
-        "core_width": 0.1,
-        "metres": 6.5,
-        "light": { "weight": 0.36 },
-        "fade_top": 0.25
+        "fade_top": 0.22,
+        "light": { "weight": 0.34 },
+        "credit": "North Cascades National Park Service Complex Museum Collection (NPS), public domain, https://commons.wikimedia.org/wiki/File:Western_red_cedar_tree_(16549eaf-7331-4e6d-a908-df02f7cc7611).tif"
       },
-      "mossy": {
-        "src": "olympic-winter-2026/DSC03806.JPEG",
-        "crop": [0.64, 0.0, 0.79, 0.98],
-        "mask": "grabcut",
-        "lods": [48, 96, 192, 384, 768],
-        "core": [
-          [0.533, 0.082],
-          [0.4, 0.51],
-          [0.4, 0.918]
-        ],
-        "core_width": 0.1,
-        "metres": 8.0,
-        "light": { "weight": 0.36 },
-        "fade_top": 0.2
+      "bough": {
+        "src": "https://upload.wikimedia.org/wikipedia/commons/0/0b/Quinault_Rainforest.jpg",
+        "crop": [0.0, 0.0, 0.42, 0.62],
+        "mask": "darkest",
+        "darkest": 42,
+        "ragged": { "bottom": 0.45, "right": 0.3 },
+        "metres": 5.0,
+        "light": { "weight": 0.3 },
+        "credit": "Entychologist, CC0, https://commons.wikimedia.org/wiki/File:Quinault_Rainforest.jpg"
       }
     }
   }

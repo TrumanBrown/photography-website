@@ -21,6 +21,7 @@ import json
 import os
 import re
 import sys
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -127,14 +128,25 @@ def download(url: str) -> Path:
     hits = [h for h in folder.glob(key + ".*") if h.suffix != ".part"]
     if hits:
         return hits[0]
-    req = urllib.request.Request(url, headers={"User-Agent": "stipple-plates"})
-    try:
-        with urllib.request.urlopen(req, timeout=60) as r:
-            if "text/html" in r.headers.get("Content-Type", ""):
-                raise SystemExit(f"{url} is a web page, not an image. Open the photo and copy its image address.")
-            data = r.read(MAX_DOWNLOAD + 1)
-    except urllib.error.URLError as exc:
-        raise SystemExit(f"Could not download {url} ({exc}).") from exc
+    # Wikimedia throttles bare user agents; its policy asks for a name and a
+    # way to reach whoever runs it.
+    req = urllib.request.Request(
+        url, headers={"User-Agent": "stipple-plates/1.0 (https://trumanbrown.com; github.com/TrumanBrown/photography-website)"}
+    )
+    for attempt in range(4):
+        try:
+            with urllib.request.urlopen(req, timeout=60) as r:
+                if "text/html" in r.headers.get("Content-Type", ""):
+                    raise SystemExit(f"{url} is a web page, not an image. Open the photo and copy its image address.")
+                data = r.read(MAX_DOWNLOAD + 1)
+            break
+        except urllib.error.HTTPError as exc:
+            if exc.code == 429 and attempt < 3:
+                time.sleep(int(exc.headers.get("Retry-After") or 0) or 5 * (attempt + 1))
+                continue
+            raise SystemExit(f"Could not download {url} ({exc}).") from exc
+        except urllib.error.URLError as exc:
+            raise SystemExit(f"Could not download {url} ({exc}).") from exc
     if len(data) > MAX_DOWNLOAD:
         raise SystemExit(f"{url} is larger than {MAX_DOWNLOAD // 2**20} MB.")
     try:
@@ -297,6 +309,8 @@ def subject_mask(cfg, rgb, key):
         return green_mask(rgb, cfg), None
     if cfg.get("mask") == "grabcut":
         return grabcut_mask(rgb, cfg, key), None
+    if cfg.get("mask") == "darkest":
+        return darkest_mask(rgb, cfg), None
     raw = poly_mask(rgb.shape[:2], cfg["polygon"]) if "polygon" in cfg else cutout(rgb, key)
     return clean_mask(raw, cfg, rgb), None
 
@@ -305,10 +319,14 @@ def green_mask(rgb, cfg):
     """Plants against forest litter, where rembg sees one texture: the green
     (and pale, lit) leaves by colour, small gaps between leaflets closed, the
     gaps between fronds left open so each keeps its outline. Polygons in
-    `exclude` take out anything else green."""
+    `exclude` take out anything else green. `v_min` and `h_max` reach into
+    shade and blue-green, for dark fronds against red litter."""
     hsv = cv2.cvtColor(cv2.GaussianBlur((rgb * 255).astype(np.uint8), (3, 3), 0), cv2.COLOR_RGB2HSV).astype(np.int16)
     h, s, v = hsv[..., 0], hsv[..., 1], hsv[..., 2]
-    g = ((h >= 28) & (h <= 90) & (s >= 45) & (v >= 60)) | ((h >= 25) & (h <= 100) & (v >= 140) & (s >= 12))
+    h_max = cfg.get("h_max", 90)
+    g = ((h >= 28) & (h <= h_max) & (s >= 45) & (v >= cfg.get("v_min", 60))) | (
+        (h >= 25) & (h <= max(100, h_max)) & (v >= 140) & (s >= 12)
+    )
     g = cv2.morphologyEx(g.astype(np.uint8), cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7)))
     g = cv2.morphologyEx(g, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))) > 0
     H, W = g.shape
@@ -319,6 +337,28 @@ def green_mask(rgb, cfg):
         sizes = ndimage.sum(g, lab, range(1, n + 1))
         g = np.isin(lab, 1 + np.where(sizes >= cfg.get("keep", 0.02) * sizes.max())[0])
     return cv2.GaussianBlur(g.astype(np.float32), (0, 0), 1.0)
+
+
+def darkest_mask(rgb, cfg):
+    """Branches against a bright canopy: the darkest `darkest` percent of the
+    crop. `ragged` ({"bottom": 0.45, "right": 0.3}, shares of the crop) frays
+    those edges with noise, so a limb cut from a bigger photo ends in hanging
+    moss instead of the crop's straight line."""
+    L = cv2.GaussianBlur(luminance(rgb), (0, 0), 1.2)
+    m = (L < np.percentile(L, cfg.get("darkest", 45))).astype(np.uint8)
+    m = cv2.morphologyEx(m, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
+    H, W = m.shape
+    ramp = np.ones((H, W), np.float32)
+    ys = np.arange(H, dtype=np.float32)[:, None] / H
+    xs = np.arange(W, dtype=np.float32)[None, :] / W
+    for side, t in (cfg.get("ragged") or {}).items():
+        d = {"top": ys, "bottom": 1 - ys, "left": xs, "right": 1 - xs}[side]
+        ramp = np.minimum(ramp, np.clip(d / t, 0, 1))
+    if cfg.get("ragged"):
+        noise = cv2.GaussianBlur(np.random.default_rng(7).random((H, W), dtype=np.float32), (0, 0), 0.012 * W)
+        noise = (noise - noise.min()) / (noise.max() - noise.min() + 1e-6)
+        m = m * (ramp > noise)
+    return cv2.GaussianBlur(m.astype(np.float32), (0, 0), 1.0)
 
 
 def grabcut_mask(rgb, cfg, key):
@@ -851,10 +891,19 @@ def subject_field(cfg, W, H, dark):
 
 
 # ----------------------------------------------------------------- drives
-def prop_aspect(cfg):
-    """Width over height of a prop's cut-out, so each size frames it exactly."""
+def prop_cut(cfg):
+    """A prop's cut-out after the same retouching and stretch its drawing gets."""
     rgb, key = source_rgb(cfg)
     m, _ = subject_mask(cfg, rgb, key)
+    rgb, m = retouch(rgb, m, cfg, key)
+    if cfg.get("stretch"):
+        (m,) = stretch([m], cfg["stretch"])
+    return m
+
+
+def prop_aspect(cfg):
+    """Width over height of a prop's cut-out, so each size frames it exactly."""
+    m = prop_cut(cfg)
     ys, xs = np.where(m > 0.5)
     return (xs.max() - xs.min() + 1) / (ys.max() - ys.min() + 1)
 
@@ -868,8 +917,7 @@ def fade_top(H, amount):
 
 def prop_mask(cfg, W, H):
     """A prop's silhouette at W x H, where the toy clears a ring of paper."""
-    rgb, key = source_rgb(cfg)
-    m, _ = subject_mask(cfg, rgb, key)
+    m = prop_cut(cfg)
     (m_p,) = place([m], m, W, H, (1.0, 1.0), 0.5)
     m_p = np.clip(m_p, 0, 1)
     if cfg.get("fade_top"):
