@@ -142,7 +142,7 @@ describe('bird parts', () => {
     for (const sp of SPECIES) {
       expect(geo[sp.id]).toBeDefined();
       for (const part of ['bill', 'crown', 'neck']) {
-        const url = new URL(`../../assets/birding/${sp.id}-${part}.webp`, import.meta.url);
+        const url = new URL(`../../../public/birding/parts/${sp.id}-${part}.webp`, import.meta.url);
         expect(existsSync(fileURLToPath(url)), `${sp.id}-${part}`).toBe(true);
       }
     }

@@ -113,7 +113,7 @@ uses this skill's venv and cutout, and the parts stay in colour: no stipple.
    no background or bill in the box: a corner of leaf turns into green barbs.
    Read coordinates off a grid of the cropped image after the cutout.
 3. **Cut**: `$PY .github/skills/stipple-plates/scripts/bird_parts.py <name>`.
-   It writes `src/assets/birding/<name>-bill.webp` (colour, outline as alpha),
+   It writes `public/birding/parts/<name>-bill.webp` (colour, outline as alpha),
    `<name>-crown.webp` and `<name>-neck.webp`, and the bill's size, base and
    tip to `src/lib/hobbies/bird-parts.json`.
 4. **Check each part on a light background** with the bill's base line

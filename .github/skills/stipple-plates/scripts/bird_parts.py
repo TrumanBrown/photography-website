@@ -10,7 +10,7 @@ against the feathers. Usage is in ../SKILL.md ("Bird parts for the selfie
 bird").
 
 Writes, for every bird and part:
-  src/assets/birding/<bird>-<part>.webp   the part in colour, alpha = its outline
+  public/birding/parts/<bird>-<part>.webp  the part in colour, alpha = its outline
                                           (crown and neck: plain plumage crops)
   src/lib/hobbies/bird-parts.json          size, base line and tip in patch pixels
 
@@ -34,7 +34,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import stipple as S  # noqa: E402
 
 BIRDS = S.SKILL / "birds.json"
-OUT_IMG = S.REPO / "src" / "assets" / "birding"
+OUT_IMG = S.REPO / "public" / "birding" / "parts"
 OUT_JSON = S.REPO / "src" / "lib" / "hobbies" / "bird-parts.json"
 # Longest side of a stored part. The selfie bird draws a bill up to about 600 px
 # long on its 1024 px download, so this keeps the photo's detail.

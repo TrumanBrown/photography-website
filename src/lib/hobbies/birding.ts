@@ -23,6 +23,7 @@ import {
   featuresToBird,
   pickSpecies,
   renderHybrid,
+  SPECIES,
   type FaceFeatures,
   type FacePalette,
   type PartGeometry,
@@ -30,27 +31,22 @@ import {
 } from './birding-bird';
 import { inkIn, type Inking } from './bird-ink';
 import geometry from './bird-parts.json';
-import oystercatcherBill from '../../assets/birding/black-oystercatcher-bill.webp?url';
-import oystercatcherCrown from '../../assets/birding/black-oystercatcher-crown.webp?url';
-import oystercatcherNeck from '../../assets/birding/black-oystercatcher-neck.webp?url';
-import toucanBill from '../../assets/birding/keel-billed-toucan-bill.webp?url';
-import toucanCrown from '../../assets/birding/keel-billed-toucan-crown.webp?url';
-import toucanNeck from '../../assets/birding/keel-billed-toucan-neck.webp?url';
-import nightHeronBill from '../../assets/birding/yellow-crowned-night-heron-bill.webp?url';
-import nightHeronCrown from '../../assets/birding/yellow-crowned-night-heron-crown.webp?url';
-import nightHeronNeck from '../../assets/birding/yellow-crowned-night-heron-neck.webp?url';
 
 /** Longest side we downscale the selfie to before detection (speed vs accuracy). */
 const MAX_SOURCE = 768;
 /** Pixel size of the rendered bird canvas. */
 const BIRD_PX = 768;
 
-/** Each bird's bill and plumage, cut from my photo by bird_parts.py. */
-const PART_URLS: Record<string, { bill: string; crown: string; neck: string }> = {
-  'black-oystercatcher': { bill: oystercatcherBill, crown: oystercatcherCrown, neck: oystercatcherNeck },
-  'keel-billed-toucan': { bill: toucanBill, crown: toucanCrown, neck: toucanNeck },
-  'yellow-crowned-night-heron': { bill: nightHeronBill, crown: nightHeronCrown, neck: nightHeronNeck },
-};
+/**
+ * Each bird's bill and plumage, cut from my photo by bird_parts.py. They're in
+ * public/, not src/assets: the deploy moves every webp under /_astro/ to Blob
+ * and only rewrites HTML and CSS, so a URL imported into this script 404s.
+ */
+const partUrls = (id: string) => ({
+  bill: `/birding/parts/${id}-bill.webp`,
+  crown: `/birding/parts/${id}-crown.webp`,
+  neck: `/birding/parts/${id}-neck.webp`,
+});
 // The JSON reads base points as number[][]; bird_parts.py writes them as pairs.
 const GEOMETRY = geometry as unknown as Record<string, { bill: PartGeometry }>;
 type Parts = { bill: PartPatch; crown: HTMLImageElement; neck: HTMLImageElement };
@@ -69,7 +65,7 @@ function loadImage(url: string): Promise<HTMLImageElement> {
 function loadParts(id: string): Promise<Parts> {
   let p = partsCache.get(id);
   if (!p) {
-    const urls = PART_URLS[id];
+    const urls = partUrls(id);
     p = Promise.all([loadImage(urls.bill), loadImage(urls.crown), loadImage(urls.neck)]).then(([b, crown, neck]) => {
       const g = GEOMETRY[id].bill;
       const c = document.createElement('canvas');
@@ -456,7 +452,7 @@ export function initBirding(root: HTMLElement): void {
   // picks a photo (about 15 MB the first time, cached after that).
   const warm = () => {
     ensureLandmarker().catch(() => {});
-    for (const id of Object.keys(PART_URLS)) loadParts(id).catch(() => {});
+    for (const sp of SPECIES) loadParts(sp.id).catch(() => {});
   };
   btnCamera?.addEventListener('click', () => {
     warm();
