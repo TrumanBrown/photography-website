@@ -31,6 +31,12 @@ pipeline. It records which photos worked, which failed and why.
   gourami's bubbles or the stone bed. Say what you added.
 - **Show work in progress.** Render one or two plates and show them before
   doing a whole set.
+- Stipple is the section's illustration language. When a toy needs drawn
+  props (a bird's bill, a roadside, a map's density), try the plates' pen
+  first, and say why if it uses another style. The selfie bird is the
+  exception: redrawn in the pen, the selfie plate was "horrible" next to the
+  old photo version, and "everything doesnt need otbe dots" (2026-11-15), so
+  it stays a photo composite with bills and feathers from his photos (below).
 
 ## Setup (once per machine)
 
@@ -86,6 +92,38 @@ Each render writes `<name>-<size>[-dark].webp` plus two re-inked frames,
 `-b1` and `-b2`, for the hover "boil". `PlateArt.astro` cycles the three
 frames every 125 ms while a card is pointed at or focused, never on touch and
 not under reduced motion.
+
+## Bird parts for the selfie bird
+
+The selfie bird on /hobbies/birding/ gives the visitor's face a real bird's
+bill and feathers. Each bird's parts are cut from one of Truman's own photos
+by `scripts/bird_parts.py`, from an entry in [birds.json](./birds.json). It
+uses this skill's venv and cutout, and the parts stay in colour: no stipple.
+
+1. **Pick the photo**: a sharp side-on head on a plain or blurred background,
+   bill clear of twigs. Search his sessions first, since iNaturalist copies
+   are capped at 2048 px. The bill has to read at a face's scale: a long or
+   bright one (oystercatcher, toucan, night heron) works, a stubby one
+   (California quail) is a smudge over the mouth.
+2. **Add the entry**: `src` and `crop` as in subjects.json, `flip` so the
+   bill points right, the bill's `box` and its `base`, two points on the line
+   where it meets the head (top then bottom). `exclude` polygons cut a throat
+   or chin that bulges past the base line. `plumage` takes its own `crop` of
+   the whole bird and a `crown` and `neck` box of plain feathers in it, with
+   no background or bill in the box: a corner of leaf turns into green barbs.
+   Read coordinates off a grid of the cropped image after the cutout.
+3. **Cut**: `$PY .github/skills/stipple-plates/scripts/bird_parts.py <name>`.
+   It writes `src/assets/birding/<name>-bill.webp` (colour, outline as alpha),
+   `<name>-crown.webp` and `<name>-neck.webp`, and the bill's size, base and
+   tip to `src/lib/hobbies/bird-parts.json`.
+4. **Check each part on a light background** with the bill's base line
+   drawn: no feathers, throat or sky left on the bill, the base where it
+   really meets the feathers, and only feathers in the plumage crops.
+5. Add the bird to `SPECIES` in `src/lib/hobbies/birding-bird.ts` (names,
+   where the photo is from, and bill length and width in face sizes) and its
+   three imports to `PART_URLS` in `birding.ts`, then try it on a few
+   selfies in both themes. docs/hobbies.md has how the bill and feathers are
+   drawn from the parts.
 
 ## subjects.json fields
 

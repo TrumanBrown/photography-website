@@ -169,3 +169,18 @@ What failed, and why:
   stale in someone's browser.
 - **Minis for the home band.** A card plate's ten thousand dots are too many
   to stay separate at 150px wide; `mini` plates carry about 1,000-2,500.
+
+## Bird parts for the selfie bird
+
+From cutting bills and plumage for /hobbies/birding/ (November 2026, TTT-5).
+
+- **A bill has to read at a face's scale.** A California quail's stubby
+  bill, scaled to a face, was a dark smudge over the mouth however it was
+  placed. Wood duck and boat-billed heron cuts came out messy (a twig across
+  the bill). Pick birds whose bill is long or loud and clear of twigs.
+- **Base lines go where the bill leaves the feathers.** A first grebe cut took
+  the pale lore and the eye stripe with the bill because its base line sat on
+  the eye. Zoom on the base (a 0.01 grid, like `review.py zoom`) before
+  setting it.
+- **Plumage crops are only feathers.** The night heron's first neck crop had
+  a corner of dark leaf, which came through as green barbs.

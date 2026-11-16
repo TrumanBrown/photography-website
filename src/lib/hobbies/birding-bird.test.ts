@@ -1,13 +1,19 @@
 import { describe, it, expect } from 'vitest';
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import {
   featuresToBird,
   birdSeed,
   birdStyleSeed,
-  makeHybridStyle,
-  describeFeatures,
+  pickSpecies,
+  billProfile,
+  lightGain,
+  SPECIES,
   type FaceFeatures,
   type FacePalette,
+  type PartPatch,
 } from './birding-bird';
+import geometry from './bird-parts.json';
 
 const baseFeatures: FaceFeatures = {
   eyeOpenness: 0.5,
@@ -110,68 +116,65 @@ describe('birdSeed', () => {
   });
 });
 
-describe('describeFeatures', () => {
-  it('labels wide and wide-set eyes', () => {
-    const tags = describeFeatures({ ...baseFeatures, eyeOpenness: 0.8, eyeSpacing: 0.8 });
-    expect(tags).toContain('wide eyes');
-    expect(tags).toContain('wide-set eyes');
-  });
-
-  it('always returns at least one tag', () => {
-    expect(describeFeatures(baseFeatures).length).toBeGreaterThan(0);
-  });
-});
-
-describe('makeHybridStyle', () => {
-  const pal = (hex: string, eye?: string): FacePalette => ({
-    body: hex,
-    belly: '#cccccc',
-    accent: '#cc3344',
-    beak: '#e2a04a',
-    eye,
-  });
-
-  it('is deterministic: same selfie -> same style', () => {
-    const a = makeHybridStyle(baseFeatures, palette);
-    const b = makeHybridStyle({ ...baseFeatures }, { ...palette });
-    expect(a).toEqual(b);
-  });
-
-  it('produces a name and valid beak + feather hexes', () => {
-    const s = makeHybridStyle(baseFeatures, palette);
-    expect(s.name.length).toBeGreaterThan(0);
-    expect(s.beak).toMatch(/^#[0-9a-f]{6}$/i);
-    expect(s.beakDark).toMatch(/^#[0-9a-f]{6}$/i);
-    expect(s.feather).toMatch(/^#[0-9a-f]{6}$/i);
-  });
-
-  it('uses the sampled iris colour for the eyes when provided', () => {
-    expect(makeHybridStyle(baseFeatures, pal('#445566', '#5a8f3c')).eyeColor).toBe('#5a8f3c');
-    // falls back to a default when no iris colour is available
-    expect(makeHybridStyle(baseFeatures, pal('#445566')).eyeColor).toMatch(/^#[0-9a-f]{6}$/i);
-  });
-
-  it('changes the seed when any feature shifts', () => {
+describe('birdStyleSeed', () => {
+  it('changes when any feature shifts', () => {
     expect(birdStyleSeed(withFeature('eyeOpenness', 0.1), palette)).not.toBe(
       birdStyleSeed(withFeature('eyeOpenness', 0.9), palette),
     );
   });
+});
 
-  it('yields a variety of beak colours across many different selfies', () => {
-    const beaks = new Set<string>();
-    for (let i = 0; i < 60; i += 1) {
-      const f: FaceFeatures = {
-        eyeOpenness: (i % 7) / 7,
-        eyeSpacing: (i % 5) / 5,
-        mouthWidth: (i % 4) / 4,
-        faceRoundness: (i % 6) / 6,
-        browRaise: (i % 3) / 3,
-        noseLength: (i % 8) / 8,
-        smile: ((i % 9) / 9) * 2 - 1,
-      };
-      const hex = `#${(i * 4 + 20).toString(16).padStart(2, '0')}${(i * 7 + 30).toString(16).padStart(2, '0')}66`;
-      beaks.add(makeHybridStyle(f, pal(hex.slice(0, 7))).beak);
+describe('pickSpecies', () => {
+  it('gives the same selfie the same bird', () => {
+    expect(pickSpecies(baseFeatures, palette)).toBe(pickSpecies({ ...baseFeatures }, { ...palette }));
+  });
+
+  it('steps through every bird with Another bird, then wraps', () => {
+    const seen = SPECIES.map((_, v) => pickSpecies(baseFeatures, palette, v).id);
+    expect(new Set(seen).size).toBe(SPECIES.length);
+    expect(pickSpecies(baseFeatures, palette, SPECIES.length)).toBe(pickSpecies(baseFeatures, palette, 0));
+  });
+});
+
+describe('bird parts', () => {
+  it('has a bill, crown and neck from my photos for every bird', () => {
+    const geo = geometry as Record<string, unknown>;
+    for (const sp of SPECIES) {
+      expect(geo[sp.id]).toBeDefined();
+      for (const part of ['bill', 'crown', 'neck']) {
+        const url = new URL(`../../assets/birding/${sp.id}-${part}.webp`, import.meta.url);
+        expect(existsSync(fileURLToPath(url)), `${sp.id}-${part}`).toBe(true);
+      }
     }
-    expect(beaks.size).toBeGreaterThan(3);
+  });
+});
+
+describe('billProfile', () => {
+  // A wedge pointing right: 40 px deep at its base, coming to a point at the right edge.
+  const w = 100;
+  const h = 40;
+  const data = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y += 1) {
+    for (let x = 0; x < w; x += 1) {
+      if (Math.abs(y + 0.5 - 20) < 20 * (1 - x / w)) data[(y * w + x) * 4 + 3] = 255;
+    }
+  }
+  const wedge: PartPatch = { w, h, base: [[0, 0], [0, 40]], tip: [99, 20], data };
+
+  it('reads the depth of the bill along its length, tapering to the tip', () => {
+    const p = billProfile(wedge, 10);
+    const depth = (i: number) => p.bot[i] - p.top[i];
+    expect(depth(0)).toBeGreaterThan(35);
+    expect(depth(5)).toBeLessThan(depth(1));
+    expect(depth(9)).toBeLessThan(10);
+    expect(p.axis.x).toBeCloseTo(1, 2);
+  });
+});
+
+describe('lightGain', () => {
+  it('darkens the parts for a dark selfie, within limits', () => {
+    expect(lightGain(0.1)).toBeLessThan(lightGain(0.5));
+    expect(lightGain(0)).toBeGreaterThanOrEqual(0.6);
+    expect(lightGain(1)).toBeLessThanOrEqual(1.12);
   });
 });

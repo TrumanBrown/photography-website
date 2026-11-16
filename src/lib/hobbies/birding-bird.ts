@@ -5,11 +5,14 @@
  * and the DOM) so the mapping part is dependency-free and unit-testable, the
  * same way stocking.ts is split out of the aquarium engine.
  *
- * The result is a smoothly-shaded, species-accurate illustration of a real bird.
- * Your selfie picks WHICH species you are (so the bird's signature field marks
- * stay accurate and identifiable) and your facial features drive its proportions
- * (eye colour, eye size/spacing, crest height, beak size, head roundness). Same
- * selfie -> same bird (deterministic). Everything runs on-device.
+ * Your own face, warped a little toward a bird (rounder eyes, a narrower jaw,
+ * the nose and mouth drawn into a beak), with a real bird's bill and feathers:
+ * the bill is cut from one of my photos and drawn head on with its real shape,
+ * colours and shading, and the crown and neck feathers are textured with that
+ * bird's own plumage from the same photo (bird-parts.json, made by the
+ * stipple-plates skill's bird_parts.py). Your features set the bill's length
+ * and the crest's height. Same selfie, same bird; Another bird steps through
+ * the rest. Everything runs on the device.
  */
 
 /** Normalized facial measurements, each already squashed to a 0..1 range by the
@@ -119,50 +122,6 @@ export function birdSeed(features: FaceFeatures, palette: FacePalette): number {
   return h >>> 0;
 }
 
-/** Short, human-readable tags describing the detected features (shown for fun). */
-export function describeFeatures(f: FaceFeatures): string[] {
-  const tags: string[] = [];
-  if (f.eyeOpenness >= 0.62) tags.push('wide eyes');
-  else if (f.eyeOpenness <= 0.32) tags.push('sleepy eyes');
-  if (f.eyeSpacing >= 0.62) tags.push('wide-set eyes');
-  else if (f.eyeSpacing <= 0.34) tags.push('close-set eyes');
-  if (f.faceRoundness >= 0.6) tags.push('round face');
-  else if (f.faceRoundness <= 0.35) tags.push('long face');
-  if (f.mouthWidth >= 0.62) tags.push('wide beak');
-  if (f.noseLength >= 0.62) tags.push('long beak');
-  if (f.browRaise >= 0.6) tags.push('tall crest');
-  if (f.smile >= 0.2) tags.push('cheerful');
-  return tags.length ? tags : ['one-of-a-kind'];
-}
-
-// ---------------------------------------------------------------------------
-// Colour helpers
-// ---------------------------------------------------------------------------
-
-interface RGB {
-  r: number;
-  g: number;
-  b: number;
-}
-function hexToRgb(hex: string): RGB {
-  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex.trim());
-  if (!m) return { r: 128, g: 128, b: 128 };
-  return { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16) };
-}
-function rgbToHex(c: RGB): string {
-  const h = (v: number) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0');
-  return `#${h(c.r)}${h(c.g)}${h(c.b)}`;
-}
-const shade = (hex: string, f: number): string => {
-  const c = hexToRgb(hex);
-  return rgbToHex({ r: c.r * f, g: c.g * f, b: c.b * f });
-};
-const mix = (a: string, b: string, t: number): string => {
-  const x = hexToRgb(a);
-  const y = hexToRgb(b);
-  return rgbToHex({ r: x.r + (y.r - x.r) * t, g: x.g + (y.g - x.g) * t, b: x.b + (y.b - x.b) * t });
-};
-
 // ---------------------------------------------------------------------------
 // Seed + species selection
 // ---------------------------------------------------------------------------
@@ -206,54 +165,131 @@ export function birdStyleSeed(features: FaceFeatures, palette: FacePalette): num
 }
 
 // ---------------------------------------------------------------------------
-// Hybrid style (pure): picks the beak palette + feather tones from the seed.
+// The birds: each one's bill and plumage come from one of my photos.
 // ---------------------------------------------------------------------------
 
-export interface HybridStyle {
-  seed: number;
-  /** Playful label for the tag, e.g. "Ember-billed". */
-  name: string;
-  beak: string;
-  beakLight: string;
-  beakDark: string;
-  feather: string;
-  featherDark: string;
-  featherLight: string;
-  eyeColor: string;
+export interface Species {
+  id: string;
+  common: string;
+  sci: string;
+  /** Where and when I took the photo its bill and feathers come from. */
+  from: string;
+  /** Bill length below the nose, in face heights, before your nose length adjusts it. */
+  length: number;
+  /** Bill half-width at its base, in face widths. */
+  width: number;
 }
 
-const BEAKS: [string, string][] = [
-  ['#ef8a1f', 'Ember'],
-  ['#f3b81c', 'Golden'],
-  ['#e0532a', 'Sunset'],
-  ['#cf3b2c', 'Scarlet'],
-  ['#5b5f66', 'Slate'],
-  ['#26262c', 'Onyx'],
-  ['#c79a44', 'Horn'],
+export const SPECIES: Species[] = [
+  {
+    id: 'black-oystercatcher',
+    common: 'Black oystercatcher',
+    sci: 'Haematopus bachmani',
+    from: 'Olympic coast, February 2026',
+    length: 0.62,
+    width: 0.15,
+  },
+  {
+    id: 'keel-billed-toucan',
+    common: 'Keel-billed toucan',
+    sci: 'Ramphastos sulfuratus',
+    from: 'El Zota, Costa Rica, September 2026',
+    length: 0.7,
+    width: 0.19,
+  },
+  {
+    id: 'yellow-crowned-night-heron',
+    common: 'Yellow-crowned night heron',
+    sci: 'Nyctanassa violacea',
+    from: 'Tortuguero, Costa Rica, August 2026',
+    length: 0.6,
+    width: 0.14,
+  },
 ];
 
 /**
- * Decide the beak colour and feather tones for a face. Pure + deterministic.
- * The beak colour is seeded (variety); the feathers come from the person's hair.
- * `variant` lets the UI re-roll (the "shuffle" button) without a new selfie.
+ * Which bird a selfie gets: the same selfie always starts on the same bird,
+ * and Another bird (variant + 1) steps through the rest in turn.
  */
-export function makeHybridStyle(features: FaceFeatures, palette: FacePalette, variant = 0): HybridStyle {
-  const seed = (birdStyleSeed(features, palette) ^ Math.imul(variant, 0x9e3779b1)) >>> 0;
-  const rng = mulberry32(seed);
-  const [beak, beakName] = BEAKS[Math.floor(rng() * BEAKS.length) % BEAKS.length];
-  const feather = /^#[0-9a-f]{6}$/i.test(palette.body) ? palette.body : '#3a2a1f';
-  const eyeColor = palette.eye && /^#[0-9a-f]{6}$/i.test(palette.eye) ? palette.eye : '#3a2a1f';
-  return {
-    seed,
-    name: `${beakName}-billed`,
-    beak,
-    beakLight: mix(beak, '#ffffff', 0.32),
-    beakDark: shade(beak, 0.6),
-    feather,
-    featherDark: shade(feather, 0.66),
-    featherLight: mix(feather, '#ffffff', 0.26),
-    eyeColor,
+export function pickSpecies(features: FaceFeatures, palette: FacePalette, variant = 0): Species {
+  const start = birdStyleSeed(features, palette) % SPECIES.length;
+  return SPECIES[(start + variant) % SPECIES.length];
+}
+
+/** A bill as cut from the photo: pointing right, base line where it meets the head. */
+export interface PartGeometry {
+  w: number;
+  h: number;
+  /** Top then bottom of the base. */
+  base: [number, number][];
+  tip: [number, number];
+}
+
+export interface PartPatch extends PartGeometry {
+  /** RGBA, w x h. */
+  data: Uint8ClampedArray;
+}
+
+/**
+ * The bill's side outline, read from its cut-out: along the line from the
+ * middle of its base to its tip, the top (culmen) and bottom of the bill at
+ * each step, as signed distances across that line in patch pixels.
+ */
+export interface BillProfile {
+  origin: Pt;
+  /** Unit vector from the base toward the tip. */
+  axis: Pt;
+  /** Unit vector across the bill, pointing toward its underside. */
+  across: Pt;
+  length: number;
+  top: Float32Array;
+  bot: Float32Array;
+}
+
+export function billProfile(p: PartPatch, steps = 48): BillProfile {
+  const origin = { x: (p.base[0][0] + p.base[1][0]) / 2, y: (p.base[0][1] + p.base[1][1]) / 2 };
+  const length = Math.hypot(p.tip[0] - origin.x, p.tip[1] - origin.y) || 1;
+  const axis = { x: (p.tip[0] - origin.x) / length, y: (p.tip[1] - origin.y) / length };
+  let across = { x: -axis.y, y: axis.x };
+  if ((p.base[1][0] - origin.x) * across.x + (p.base[1][1] - origin.y) * across.y < 0) {
+    across = { x: -across.x, y: -across.y };
+  }
+  const solid = (x: number, y: number): boolean => {
+    const xi = Math.round(x);
+    const yi = Math.round(y);
+    return xi >= 0 && yi >= 0 && xi < p.w && yi < p.h && p.data[(yi * p.w + xi) * 4 + 3] > 128;
   };
+  const top = new Float32Array(steps + 1);
+  const bot = new Float32Array(steps + 1);
+  const reach = Math.max(p.w, p.h);
+  for (let i = 0; i <= steps; i++) {
+    const t = Math.min(i / steps, 0.99) * length;
+    const cx = origin.x + axis.x * t;
+    const cy = origin.y + axis.y * t;
+    let lo = Infinity;
+    let hi = -Infinity;
+    for (let d = -reach; d <= reach; d += 0.5) {
+      if (solid(cx + across.x * d, cy + across.y * d)) {
+        if (d < lo) lo = d;
+        if (d > hi) hi = d;
+      }
+    }
+    if (!isFinite(lo)) {
+      lo = i ? top[i - 1] : -1;
+      hi = i ? bot[i - 1] : 1;
+    }
+    top[i] = lo;
+    bot[i] = hi;
+  }
+  return { origin, axis, across, length, top, bot };
+}
+
+/**
+ * How to light the bird's parts like the selfie: a gain toward the face's
+ * brightness, held in a range so a dark selfie doesn't turn the bill black.
+ */
+export function lightGain(faceLum: number): number {
+  return Math.min(1.12, Math.max(0.6, Math.pow(Math.max(0.05, faceLum) / 0.55, 0.6)));
 }
 
 // ---------------------------------------------------------------------------
@@ -271,9 +307,12 @@ export interface HybridInput {
   source: HTMLCanvasElement;
   /** MediaPipe face landmarks (478), normalized to [0,1] over the source. */
   landmarks: LandmarkXY[];
-  palette: FacePalette;
   params: BirdParams;
-  style: HybridStyle;
+  species: Species;
+  /** The bird's bill (pixels and geometry) and its crown and neck plumage. */
+  parts: { bill: PartPatch; crown: CanvasImageSource & { width: number; height: number }; neck: CanvasImageSource & { width: number; height: number } };
+  /** Varies the feathers between selfies. */
+  seed: number;
 }
 
 // FaceMesh indices used to anchor the bird features.
@@ -286,31 +325,94 @@ const M = {
 const dist2 = (a: Pt, b: Pt): number => Math.hypot(a.x - b.x, a.y - b.y);
 const midp = (a: Pt, b: Pt): Pt => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
 
-/** A tapered feather with a length gradient + soft midrib, for crest/neck. */
-function shadedPlume(o: CanvasRenderingContext2D, base: Pt, tip: Pt, halfW: number, col: string, colDark: string): void {
-  const m = midp(base, tip);
-  const ang = Math.atan2(tip.y - base.y, tip.x - base.x);
-  const nx = Math.cos(ang + Math.PI / 2);
-  const ny = Math.sin(ang + Math.PI / 2);
-  const g = o.createLinearGradient(base.x, base.y, tip.x, tip.y);
-  g.addColorStop(0, colDark);
-  g.addColorStop(0.55, col);
-  g.addColorStop(1, mix(col, '#ffffff', 0.2));
-  o.fillStyle = g;
-  o.beginPath();
-  o.moveTo(base.x + nx * halfW, base.y + ny * halfW);
-  o.quadraticCurveTo(m.x + nx * halfW * 0.9, m.y + ny * halfW * 0.9, tip.x, tip.y);
-  o.quadraticCurveTo(m.x - nx * halfW * 0.9, m.y - ny * halfW * 0.9, base.x - nx * halfW, base.y - ny * halfW);
-  o.closePath();
-  o.fill();
-  o.strokeStyle = colDark;
-  o.lineWidth = Math.max(0.5, halfW * 0.16);
-  o.globalAlpha = 0.5;
+type Texture = CanvasImageSource & { width: number; height: number };
+
+/** A few colours read from a plumage patch, to draw its feathers in. */
+function plumageColours(tex: Texture, rng: () => number): [number, number, number][] {
+  const c = document.createElement('canvas');
+  c.width = 32;
+  c.height = 32;
+  const x = c.getContext('2d', { willReadFrequently: true });
+  if (!x) return [[40, 36, 32]];
+  x.drawImage(tex, 0, 0, 32, 32);
+  const d = x.getImageData(0, 0, 32, 32).data;
+  const out: [number, number, number][] = [];
+  for (let i = 0; i < 24; i += 1) {
+    const q = Math.floor(rng() * 1024) * 4;
+    out.push([d[q], d[q + 1], d[q + 2]]);
+  }
+  return out;
+}
+
+/**
+ * One feather drawn the way a feather is built: a curved shaft with fine
+ * barbs either side, swept toward the tip, darker and downy at the root,
+ * in colours from the bird's own plumage.
+ */
+function drawPlume(
+  o: CanvasRenderingContext2D,
+  base: Pt,
+  tip: Pt,
+  halfW: number,
+  bend: number,
+  cols: [number, number, number][],
+  rng: () => number,
+): void {
+  const len = dist2(base, tip);
+  if (len < 2) return;
+  const ux = (tip.x - base.x) / len;
+  const uy = (tip.y - base.y) / len;
+  const nx = -uy;
+  const ny = ux;
+  const ctrl = { x: (base.x + tip.x) / 2 + nx * bend * len, y: (base.y + tip.y) / 2 + ny * bend * len };
+  const at = (s: number): Pt => {
+    const a = (1 - s) * (1 - s);
+    const b = 2 * (1 - s) * s;
+    const c = s * s;
+    return { x: a * base.x + b * ctrl.x + c * tip.x, y: a * base.y + b * ctrl.y + c * tip.y };
+  };
+  const barbs = Math.max(8, Math.round(len / 1.6));
+  const lw = Math.max(0.6, halfW * 0.09);
+  o.lineCap = 'round';
+  for (let i = 0; i < barbs; i += 1) {
+    const s = (i + rng() * 0.6) / barbs;
+    const p = at(s);
+    const q = at(Math.min(1, s + 0.01));
+    const tx = q.x - p.x || ux * 0.01;
+    const ty = q.y - p.y || uy * 0.01;
+    const tl = Math.hypot(tx, ty) || 1;
+    // Widest a little past the middle, rounded at the tip.
+    const env = Math.pow(Math.sin(Math.PI * Math.min(1, s * 0.9 + 0.05)), 0.55) * (s > 0.85 ? Math.sqrt((1 - s) / 0.15) : 1);
+    const col = cols[Math.floor(rng() * cols.length)];
+    const dark = 0.55 + 0.45 * Math.min(1, s * 1.6);
+    const down = s < 0.22;
+    for (const side of [-1, 1]) {
+      const w = halfW * env * (0.75 + rng() * 0.4) * (down ? 1.25 : 1);
+      // Barbs leave the shaft at about 40 degrees, toward the tip.
+      const sweep = down ? 0.9 : 0.62;
+      const bx = (tx / tl) * Math.cos(sweep) + side * (-ty / tl) * Math.sin(sweep);
+      const by = (ty / tl) * Math.cos(sweep) + side * (tx / tl) * Math.sin(sweep);
+      const e = { x: p.x + bx * w * 1.3, y: p.y + by * w * 1.3 };
+      const m = { x: p.x + bx * w * 0.6 + (tx / tl) * w * 0.1, y: p.y + by * w * 0.6 + (ty / tl) * w * 0.1 };
+      const k = dark * (0.85 + rng() * 0.3);
+      // Faded at the root, so the feather grows out of the head without an edge.
+      const alpha = (down ? 0.5 : 0.82) * Math.min(1, 0.15 + s * 5);
+      o.strokeStyle = `rgba(${Math.min(255, col[0] * k) | 0},${Math.min(255, col[1] * k) | 0},${Math.min(255, col[2] * k) | 0},${alpha.toFixed(3)})`;
+      o.lineWidth = lw;
+      o.beginPath();
+      o.moveTo(p.x, p.y);
+      o.quadraticCurveTo(m.x, m.y, e.x, e.y);
+      o.stroke();
+    }
+  }
+  // The shaft.
+  const c0 = cols[0];
+  o.strokeStyle = `rgba(${Math.min(255, c0[0] * 1.25 + 20) | 0},${Math.min(255, c0[1] * 1.25 + 20) | 0},${Math.min(255, c0[2] * 1.25 + 20) | 0},0.55)`;
+  o.lineWidth = lw * 1.3;
   o.beginPath();
   o.moveTo(base.x, base.y);
-  o.lineTo(tip.x, tip.y);
+  o.quadraticCurveTo(ctrl.x, ctrl.y, at(0.92).x, at(0.92).y);
   o.stroke();
-  o.globalAlpha = 1;
 }
 
 /**
@@ -344,6 +446,177 @@ function warpTri(
   o.restore();
 }
 
+/** Bilinear sample of a part's colour at (x, y), un-premultiplied; [r, g, b, a] 0-255. */
+function sampleColour(p: PartPatch, x: number, y: number, out: Float64Array): void {
+  const xc = Math.min(p.w - 1, Math.max(0, x));
+  const yc = Math.min(p.h - 1, Math.max(0, y));
+  const x0 = Math.floor(xc);
+  const y0 = Math.floor(yc);
+  const x1 = Math.min(p.w - 1, x0 + 1);
+  const y1 = Math.min(p.h - 1, y0 + 1);
+  const fx = xc - x0;
+  const fy = yc - y0;
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  let a = 0;
+  const tap = (xx: number, yy: number, w: number) => {
+    const o = (yy * p.w + xx) * 4;
+    const al = p.data[o + 3] * w;
+    r += p.data[o] * al;
+    g += p.data[o + 1] * al;
+    b += p.data[o + 2] * al;
+    a += al;
+  };
+  tap(x0, y0, (1 - fx) * (1 - fy));
+  tap(x1, y0, fx * (1 - fy));
+  tap(x0, y1, (1 - fx) * fy);
+  tap(x1, y1, fx * fy);
+  out[0] = a > 0 ? r / a : 0;
+  out[1] = a > 0 ? g / a : 0;
+  out[2] = a > 0 ? b / a : 0;
+  out[3] = a;
+}
+
+/**
+ * The bird's bill seen head on, pointing down from between the eyes: its
+ * real taper (the depth of the bill in my side-on photo, along its length),
+ * and its real colours wrapped round it, the ridge (culmen) down the middle
+ * and the sides of the upper bill either side, so the nostril and colour
+ * bands sit where they do on the bird. Shaded like a rounded surface lit from
+ * above, faded in at the root so it grows out of the face. Returns a canvas
+ * with the root at the top centre.
+ */
+export function renderBillHeadOn(p: PartPatch, length: number, halfWidth: number, gain: number): HTMLCanvasElement {
+  const prof = billProfile(p);
+  const n = prof.top.length - 1;
+  const ref = prof.bot[Math.round(0.06 * n)] - prof.top[Math.round(0.06 * n)] || 1;
+  // The bill's own colours at each step along it: the ridge, the side and
+  // the edge, averaged across each band and lightly smoothed along the bill, so the
+  // colour bands are the bird's and the photo's grain and glare are not.
+  // Head on, you see the upper bill, so the bands stay in its half of the depth.
+  const zones = [
+    [0.03, 0.14],
+    [0.18, 0.32],
+    [0.36, 0.5],
+  ];
+  const band = zones.map(() => new Float32Array((n + 1) * 3));
+  const col = new Float64Array(4);
+  for (let i = 0; i <= n; i += 1) {
+    const along = (Math.min(i, n - 1) / n) * prof.length;
+    const ax = prof.origin.x + prof.axis.x * along;
+    const ay = prof.origin.y + prof.axis.y * along;
+    const depth = Math.max(1, prof.bot[i] - prof.top[i]);
+    zones.forEach(([z0, z1], zi) => {
+      let r = 0;
+      let g = 0;
+      let b = 0;
+      let w = 0;
+      for (let k = 0; k <= 6; k += 1) {
+        const acrossPx = prof.top[i] + (z0 + ((z1 - z0) * k) / 6) * depth;
+        sampleColour(p, ax + prof.across.x * acrossPx, ay + prof.across.y * acrossPx, col);
+        const a = col[3] / 255;
+        r += col[0] * a;
+        g += col[1] * a;
+        b += col[2] * a;
+        w += a;
+      }
+      const prev = i ? band[zi].subarray((i - 1) * 3, i * 3) : null;
+      band[zi][i * 3] = w ? r / w : prev ? prev[0] : 0;
+      band[zi][i * 3 + 1] = w ? g / w : prev ? prev[1] : 0;
+      band[zi][i * 3 + 2] = w ? b / w : prev ? prev[2] : 0;
+    });
+  }
+  const smooth = (a: Float32Array) => {
+    const out = new Float32Array(a.length);
+    for (let i = 0; i <= n; i += 1) {
+      for (let ch = 0; ch < 3; ch += 1) {
+        let sum = 0;
+        let cnt = 0;
+        for (let j = Math.max(0, i - 2); j <= Math.min(n, i + 2); j += 1) {
+          sum += a[j * 3 + ch];
+          cnt += 1;
+        }
+        out[i * 3 + ch] = sum / cnt;
+      }
+    }
+    return out;
+  };
+  // Averaging and the photo's glare dull a bill, so give its colour back.
+  const bands = band.map((bb) => {
+    const sm = smooth(bb);
+    for (let i = 0; i < sm.length; i += 3) {
+      const l = 0.3 * sm[i] + 0.59 * sm[i + 1] + 0.11 * sm[i + 2];
+      for (let ch = 0; ch < 3; ch += 1) sm[i + ch] = Math.max(0, Math.min(255, l + (sm[i + ch] - l) * 1.45));
+    }
+    return sm;
+  });
+  const Wc = Math.ceil(halfWidth * 2.2) + 4;
+  const Hc = Math.ceil(length) + 2;
+  const c = document.createElement('canvas');
+  c.width = Wc;
+  c.height = Hc;
+  const ctx = c.getContext('2d');
+  if (!ctx) return c;
+  const img = ctx.createImageData(Wc, Hc);
+  const d = img.data;
+  const cx = Wc / 2;
+  // Fine grain running along the bill, like keratin.
+  const grain = new Float32Array(Wc);
+  for (let x = 0; x < Wc; x += 1) grain[x] = Math.sin(x * 1.7) * 0.5 + Math.sin(x * 0.63 + 1.3) * 0.5;
+  const k0 = Math.min(1, gain);
+  const rgb = [0, 0, 0];
+  for (let y = 0; y < Hc; y++) {
+    const t = y / length;
+    if (t > 1) break;
+    const f = Math.min(n - 1, t * n);
+    const i0 = Math.floor(f);
+    const w = f - i0;
+    const top = prof.top[i0] * (1 - w) + prof.top[i0 + 1] * w;
+    const bot = prof.bot[i0] * (1 - w) + prof.bot[i0 + 1] * w;
+    const depth = Math.max(0, bot - top);
+    // The real bill's taper from my photo, broad and rounded where it meets
+    // the face, narrowing to its tip.
+    const root = t < 0.1 ? 0.75 + 0.25 * Math.sin((t / 0.1) * (Math.PI / 2)) : 1;
+    const hw = halfWidth * Math.pow(Math.min(1.15, depth / ref), 0.6) * (1 - 0.4 * t) * root;
+    if (hw < 0.3) continue;
+    for (let x = 0; x < Wc; x++) {
+      const sxy = (x + 0.5 - cx) / hw;
+      const as = Math.abs(sxy);
+      if (as > 1.02) continue;
+      // Round cross-section: how far round the bill this point is, ridge to edge.
+      const arc = Math.asin(Math.min(1, as)) / (Math.PI / 2);
+      const zf = Math.min(1.999, arc * 2);
+      const za = Math.floor(zf);
+      const zw = zf - za;
+      for (let ch = 0; ch < 3; ch += 1) {
+        const A = bands[za][i0 * 3 + ch] * (1 - w) + bands[za][(i0 + 1) * 3 + ch] * w;
+        const B = bands[za + 1][i0 * 3 + ch] * (1 - w) + bands[za + 1][(i0 + 1) * 3 + ch] * w;
+        rgb[ch] = A * (1 - zw) + B * zw;
+      }
+      const nz = Math.sqrt(Math.max(0, 1 - as * as));
+      // Lit from above and a little left, a soft highlight along the ridge.
+      const lambert = 0.62 + 0.38 * Math.max(0, 0.85 * nz - 0.3 * sxy + 0.25 * (1 - t));
+      const spec = Math.exp(-(((sxy + 0.16) / 0.14) ** 2)) * 0.16 * (1 - t * 0.5);
+      const edge = as > 0.8 ? 1 - 0.4 * ((as - 0.8) / 0.22) : 1;
+      // The nostrils: a slit each side near the root.
+      const ny = (t - 0.14) / 0.04;
+      const nx = (as - 0.42) / 0.08;
+      const nostril = 1 - 0.7 * Math.exp(-(nx * nx + ny * ny));
+      const kk = k0 * lambert * edge * nostril * (1 + 0.035 * grain[x]);
+      const o = (y * Wc + x) * 4;
+      d[o] = Math.min(255, rgb[0] * kk + 255 * spec);
+      d[o + 1] = Math.min(255, rgb[1] * kk + 255 * spec);
+      d[o + 2] = Math.min(255, rgb[2] * kk + 255 * spec);
+      const aa = Math.min(1, Math.max(0, (1.02 - as) * hw));
+      const fade = Math.min(1, t / 0.07);
+      d[o + 3] = 255 * aa * fade * fade * (3 - 2 * fade);
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return c;
+}
+
 /**
  * Composite a bird beak + feathers onto the real selfie. Keeps the person's
  * actual face (real human features) and grafts on avian parts anchored to the
@@ -352,7 +625,7 @@ function warpTri(
 export function renderHybrid(canvas: HTMLCanvasElement, input: HybridInput, sizePx: number): void {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
-  const { source, landmarks, style } = input;
+  const { source, landmarks, species, parts } = input;
   const W = source.width;
   const H = source.height;
   if (!W || !H || landmarks.length < 468) return;
@@ -363,7 +636,7 @@ export function renderHybrid(canvas: HTMLCanvasElement, input: HybridInput, size
   const o = ctx;
   o.imageSmoothingEnabled = true;
   o.clearRect(0, 0, S, S);
-  const rng = mulberry32(style.seed);
+  const rng = mulberry32(input.seed);
 
   // Source-pixel landmark.
   const lp = (i: number): Pt => ({ x: landmarks[i].x * W, y: landmarks[i].y * H });
@@ -382,12 +655,12 @@ export function renderHybrid(canvas: HTMLCanvasElement, input: HybridInput, size
   const offY = S * 0.42 - eyeMidSrc.y * scale;
   const T = (p: Pt): Pt => ({ x: p.x * scale + offX, y: p.y * scale + offY });
 
-  // Background fill (so any uncovered edge is a soft backdrop, not transparent).
-  const bgGrad = o.createLinearGradient(0, 0, 0, S);
-  bgGrad.addColorStop(0, mix(style.featherDark, '#000000', 0.2));
-  bgGrad.addColorStop(1, shade(style.featherDark, 0.5));
-  o.fillStyle = bgGrad;
-  o.fillRect(0, 0, S, S);
+  // Where the photo doesn't reach, an out-of-focus copy of it fills the square.
+  const tiny = document.createElement('canvas');
+  tiny.width = 24;
+  tiny.height = 24;
+  tiny.getContext('2d')?.drawImage(source, 0, 0, 24, 24);
+  o.drawImage(tiny, 0, 0, S, S);
 
   // The selfie itself (real human features).
   o.drawImage(source, offX, offY, W * scale, H * scale);
@@ -492,122 +765,98 @@ export function renderHybrid(canvas: HTMLCanvasElement, input: HybridInput, size
     }
   }
 
-  // Shade the warped beak for 3D form (no hard outline, so it stays part of the face).
-  const axisX = noseTipO.x;
-  const topY = T({ x: noseTipS.x, y: midp(eyeMidSrc, bridgeS).y }).y;
-  const tipY = T(mouthCS).y + Q * 0.85;
-  const halfWOut = faceWOut * 0.19;
-  const beakLen = tipY - topY;
-
-  // Ambient-occlusion: a soft dark contour just outside the beak sides to lift it
-  // off the face (drawn before the fill so it reads as a cast/contact shadow).
-  o.save();
-  o.strokeStyle = 'rgba(0,0,0,0.3)';
-  o.lineWidth = halfWOut * 0.22;
-  o.lineCap = 'round';
-  for (const s of [-1, 1]) {
-    o.beginPath();
-    o.moveTo(axisX + s * halfWOut * 0.5, topY + beakLen * 0.12);
-    o.quadraticCurveTo(axisX + s * halfWOut * 0.62, topY + beakLen * 0.45, axisX, tipY);
-    o.stroke();
+  // How bright the face is, so the bird's parts can be lit to match.
+  let faceLum = 0.55;
+  const sctx = source.getContext('2d', { willReadFrequently: true });
+  if (sctx) {
+    const px = sctx.getImageData(0, 0, W, H).data;
+    let sum = 0;
+    let n = 0;
+    const r = faceW * 0.3;
+    for (let y = Math.max(0, Math.round(noseTipS.y - r)); y < Math.min(H, noseTipS.y + r); y += 2) {
+      for (let x = Math.max(0, Math.round(faceCx - r)); x < Math.min(W, faceCx + r); x += 2) {
+        const q = (y * W + x) * 4;
+        sum += (0.2126 * px[q] + 0.7152 * px[q + 1] + 0.0722 * px[q + 2]) / 255;
+        n += 1;
+      }
+    }
+    if (n) faceLum = sum / n;
   }
+  const gain = lightGain(faceLum);
+  const lit = (tex: Texture): HTMLCanvasElement => {
+    const c = document.createElement('canvas');
+    c.width = tex.width;
+    c.height = tex.height;
+    const x = c.getContext('2d', { willReadFrequently: true });
+    if (x) {
+      x.drawImage(tex, 0, 0);
+      const im = x.getImageData(0, 0, c.width, c.height);
+      for (let q = 0; q < im.data.length; q += 4) {
+        im.data[q] = Math.min(255, im.data[q] * gain);
+        im.data[q + 1] = Math.min(255, im.data[q + 1] * gain);
+        im.data[q + 2] = Math.min(255, im.data[q + 2] * gain);
+      }
+      x.putImageData(im, 0, 0);
+    }
+    return c;
+  };
+
+  // --- The bill: the bird's real bill, head on, growing from between the eyes ---
+  const roll = Math.atan2(TcheekL.y - TcheekR.y, TcheekL.x - TcheekR.x);
+  const topO = T(midp(eyeMidSrc, bridgeS));
+  const billLen =
+    dist2(topO, T(mouthCS)) * 0.4 +
+    species.length * dist2(Tfore, Tchin) * lerp(0.9, 1.2, clamp01((input.params.beakLength - 7) / 9));
+  const bill = renderBillHeadOn(parts.bill, billLen, species.width * faceWOut, gain);
+  o.save();
+  o.translate(topO.x, topO.y);
+  o.rotate(roll);
+  o.shadowColor = 'rgba(25, 14, 6, 0.4)';
+  o.shadowBlur = faceWOut * 0.05;
+  o.shadowOffsetX = faceWOut * 0.01;
+  o.shadowOffsetY = faceWOut * 0.035;
+  o.drawImage(bill, -bill.width / 2, 0);
   o.restore();
 
+  // --- Crest: a scattered tuft of the bird's feathers blended into the hairline ---
+  const crownCols = plumageColours(lit(parts.crown), rng);
+  const neckCols = plumageColours(lit(parts.neck), rng);
+  const crest = lerp(0.85, 1.35, clamp01((input.params.crestHeight - 4) / 18));
+  const crownY = Tfore.y - ery * 0.06;
+  const halfSpan = erx * 0.95;
   o.save();
-  o.beginPath();
-  o.ellipse(axisX, (topY + tipY) / 2, halfWOut * 0.96, beakLen / 2 * 1.04, 0, 0, Math.PI * 2);
-  o.clip();
-  // tint toward the bill colour while keeping skin texture
-  o.globalCompositeOperation = 'soft-light';
-  o.globalAlpha = 0.9;
-  o.fillStyle = style.beak;
-  o.fillRect(axisX - halfWOut, topY - beakLen * 0.1, halfWOut * 2, beakLen * 1.25);
-  // a second, gentler colour pass for saturation
-  o.globalCompositeOperation = 'overlay';
-  o.globalAlpha = 0.28;
-  o.fillRect(axisX - halfWOut, topY - beakLen * 0.1, halfWOut * 2, beakLen * 1.25);
-  o.globalCompositeOperation = 'source-over';
-  // a low-alpha solid pass so the bill reads as a solid surface, not see-through
-  o.globalAlpha = 0.32;
-  o.fillStyle = style.beak;
-  o.fillRect(axisX - halfWOut, topY - beakLen * 0.1, halfWOut * 2, beakLen * 1.25);
-  o.globalAlpha = 1;
-  // side shading -> rounded cross-section
-  const sg = o.createLinearGradient(axisX - halfWOut, 0, axisX + halfWOut, 0);
-  sg.addColorStop(0, 'rgba(0,0,0,0.44)');
-  sg.addColorStop(0.5, 'rgba(255,255,255,0.1)');
-  sg.addColorStop(1, 'rgba(0,0,0,0.44)');
-  o.fillStyle = sg;
-  o.fillRect(axisX - halfWOut, topY, halfWOut * 2, beakLen);
-  // under-tip shadow
-  const ug = o.createLinearGradient(0, (topY + tipY) / 2, 0, tipY);
-  ug.addColorStop(0, 'rgba(0,0,0,0)');
-  ug.addColorStop(1, 'rgba(0,0,0,0.5)');
-  o.fillStyle = ug;
-  o.fillRect(axisX - halfWOut, (topY + tipY) / 2, halfWOut * 2, beakLen / 2);
-  // culmen highlight ridge
-  o.strokeStyle = 'rgba(255,255,255,0.42)';
-  o.lineWidth = halfWOut * 0.16;
-  o.lineCap = 'round';
-  o.beginPath();
-  o.moveTo(axisX, topY + beakLen * 0.1);
-  o.lineTo(axisX, topY + beakLen * 0.66);
-  o.stroke();
-  o.restore();
-
-  // nostrils high on the bill
-  o.fillStyle = 'rgba(0,0,0,0.5)';
-  for (const s of [-1, 1]) {
-    o.save();
-    o.translate(axisX + s * halfWOut * 0.28, topY + beakLen * 0.16);
-    o.rotate(s * 0.3);
-    o.beginPath();
-    o.ellipse(0, 0, halfWOut * 0.055, beakLen * 0.05, 0, 0, Math.PI * 2);
-    o.fill();
-    o.restore();
-  }
-
-  // --- Crest: a dense, scattered tuft of feathers blended into the hairline ---
-  const crownY = Tfore.y - ery * 0.08;
-  const halfSpan = erx * 1.02;
-  const crestN = 44;
+  o.shadowColor = 'rgba(0,0,0,0.25)';
+  o.shadowBlur = faceWOut * 0.012;
+  const crestN = 46;
   for (let i = 0; i < crestN; i += 1) {
-    const x = ecx + (rng() - 0.5) * halfSpan * 2;
-    const norm = (x - ecx) / halfSpan;
-    const arc = Math.max(0, 1 - norm * norm); // 1 in the middle, 0 at the temples
-    const baseY = crownY - arc * ery * 0.16 + (rng() - 0.5) * ery * 0.22;
-    const len = faceWOut * (0.1 + arc * 0.17) * (0.7 + rng() * 0.6);
-    const lean = norm * 1.2 + (rng() - 0.5) * 0.5;
-    const base = { x, y: baseY + faceWOut * 0.05 };
-    const tip = { x: x + lean * faceWOut * 0.11, y: baseY - len };
-    const pick = Math.floor(rng() * 3);
-    const col = pick === 0 ? style.featherLight : pick === 1 ? style.feather : style.featherDark;
-    o.globalAlpha = 0.88;
-    shadedPlume(o, base, tip, faceWOut * (0.018 + arc * 0.01), col, shade(style.featherDark, 0.8));
+    const norm = (rng() * 2 - 1) * Math.sqrt(rng() * 0.5 + 0.5);
+    const x = ecx + norm * halfSpan;
+    const arc = Math.max(0, 1 - norm * norm);
+    const baseY = crownY - arc * ery * 0.14 + (rng() - 0.5) * ery * 0.16 + faceWOut * 0.04;
+    const len = faceWOut * (0.1 + arc * 0.18) * (0.75 + rng() * 0.5) * crest;
+    const lean = norm * 1.1 + (rng() - 0.5) * 0.45;
+    const tip = { x: x + lean * len * 0.45, y: baseY - len };
+    drawPlume(o, { x, y: baseY }, tip, faceWOut * (0.03 + arc * 0.012), (rng() - 0.5) * 0.25 - norm * 0.12, crownCols, rng);
   }
-  o.globalAlpha = 1;
 
-  // --- Jaw / neck feathers feathering the face into plumage (scattered rows) ---
-  const jawN = 52;
+  // --- Jaw and neck: short feathers under the jaw, feathering the face into plumage ---
+  const jawN = 110;
   for (let i = 0; i < jawN; i += 1) {
-    const tt = rng();
-    const a = (15 + tt * 150) * (Math.PI / 180); // lower arc, left -> right
-    const bx = ecx + Math.cos(a) * erx * (0.94 + rng() * 0.14);
-    const by = ecy + Math.sin(a) * ery * (1.0 + rng() * 0.16);
-    if (by < ecy + ery * 0.4) continue; // jaw + neck only
-    const len = faceWOut * (0.05 + rng() * 0.06);
-    const tip = { x: bx + Math.cos(a) * len * 0.3, y: by + len };
-    const pick = Math.floor(rng() * 3);
-    const col = pick === 0 ? style.featherDark : pick === 1 ? shade(style.feather, 0.82) : style.feather;
-    o.globalAlpha = 0.86;
-    shadedPlume(o, { x: bx, y: by }, tip, faceWOut * 0.02, col, shade(style.featherDark, 0.72));
+    const a = (22 + rng() * 136) * (Math.PI / 180);
+    const ring = rng();
+    const bx = ecx + Math.cos(a) * erx * (0.88 + ring * 0.2);
+    const by = ecy + Math.sin(a) * ery * (0.95 + ring * 0.2);
+    if (by < ecy + ery * 0.45) continue;
+    const len = faceWOut * (0.055 + rng() * 0.05) * (1 + ring * 0.4);
+    const tip = { x: bx + Math.cos(a) * len * 0.5, y: by + len * (0.6 + Math.sin(a) * 0.4) };
+    drawPlume(o, { x: bx, y: by }, tip, faceWOut * 0.034, (rng() - 0.5) * 0.35, neckCols, rng);
   }
-  o.globalAlpha = 1;
+  o.restore();
 
   // --- Vignette for cohesion ---
   const vg = o.createRadialGradient(S / 2, S * 0.45, S * 0.25, S / 2, S * 0.5, S * 0.72);
   vg.addColorStop(0, 'rgba(0,0,0,0)');
-  vg.addColorStop(1, 'rgba(0,0,0,0.32)');
+  vg.addColorStop(1, 'rgba(0,0,0,0.22)');
   o.fillStyle = vg;
   o.fillRect(0, 0, S, S);
 }

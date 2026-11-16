@@ -19,19 +19,72 @@
  */
 import type { FaceLandmarker as FaceLandmarkerT, NormalizedLandmark } from '@mediapipe/tasks-vision';
 import {
+  birdStyleSeed,
   featuresToBird,
-  makeHybridStyle,
+  pickSpecies,
   renderHybrid,
-  describeFeatures,
   type FaceFeatures,
   type FacePalette,
+  type PartGeometry,
+  type PartPatch,
 } from './birding-bird';
 import { inkIn, type Inking } from './bird-ink';
+import geometry from './bird-parts.json';
+import oystercatcherBill from '../../assets/birding/black-oystercatcher-bill.webp?url';
+import oystercatcherCrown from '../../assets/birding/black-oystercatcher-crown.webp?url';
+import oystercatcherNeck from '../../assets/birding/black-oystercatcher-neck.webp?url';
+import toucanBill from '../../assets/birding/keel-billed-toucan-bill.webp?url';
+import toucanCrown from '../../assets/birding/keel-billed-toucan-crown.webp?url';
+import toucanNeck from '../../assets/birding/keel-billed-toucan-neck.webp?url';
+import nightHeronBill from '../../assets/birding/yellow-crowned-night-heron-bill.webp?url';
+import nightHeronCrown from '../../assets/birding/yellow-crowned-night-heron-crown.webp?url';
+import nightHeronNeck from '../../assets/birding/yellow-crowned-night-heron-neck.webp?url';
 
 /** Longest side we downscale the selfie to before detection (speed vs accuracy). */
 const MAX_SOURCE = 768;
 /** Pixel size of the rendered bird canvas. */
-const BIRD_PX = 512;
+const BIRD_PX = 768;
+
+/** Each bird's bill and plumage, cut from my photo by bird_parts.py. */
+const PART_URLS: Record<string, { bill: string; crown: string; neck: string }> = {
+  'black-oystercatcher': { bill: oystercatcherBill, crown: oystercatcherCrown, neck: oystercatcherNeck },
+  'keel-billed-toucan': { bill: toucanBill, crown: toucanCrown, neck: toucanNeck },
+  'yellow-crowned-night-heron': { bill: nightHeronBill, crown: nightHeronCrown, neck: nightHeronNeck },
+};
+// The JSON reads base points as number[][]; bird_parts.py writes them as pairs.
+const GEOMETRY = geometry as unknown as Record<string, { bill: PartGeometry }>;
+type Parts = { bill: PartPatch; crown: HTMLImageElement; neck: HTMLImageElement };
+const partsCache = new Map<string, Promise<Parts>>();
+
+function loadImage(url: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error(url));
+    img.src = url;
+  });
+}
+
+/** A bird's bill as pixels plus its plumage, fetched once (same origin, so the canvas can read them). */
+function loadParts(id: string): Promise<Parts> {
+  let p = partsCache.get(id);
+  if (!p) {
+    const urls = PART_URLS[id];
+    p = Promise.all([loadImage(urls.bill), loadImage(urls.crown), loadImage(urls.neck)]).then(([b, crown, neck]) => {
+      const g = GEOMETRY[id].bill;
+      const c = document.createElement('canvas');
+      c.width = g.w;
+      c.height = g.h;
+      const ctx = c.getContext('2d', { willReadFrequently: true });
+      if (!ctx) throw new Error('canvas');
+      ctx.drawImage(b, 0, 0, g.w, g.h);
+      return { bill: { ...g, data: ctx.getImageData(0, 0, g.w, g.h).data }, crown, neck };
+    });
+    p.catch(() => partsCache.delete(id));
+    partsCache.set(id, p);
+  }
+  return p;
+}
 
 // MediaPipe FaceMesh canonical landmark indices.
 const IDX = {
@@ -196,18 +249,20 @@ export function initBirding(root: HTMLElement): void {
   const errorMsg = $('[data-bird-error-msg]');
   const btnRetry = $<HTMLButtonElement>('[data-bird-retry]');
   const birdCanvas = $<HTMLCanvasElement>('[data-bird-canvas]');
-  const tagsEl = $('[data-bird-tags]');
+  const nameEl = $('[data-bird-name]');
+  const sciEl = $('[data-bird-sci]');
+  const fromEl = $('[data-bird-from]');
   const btnDownload = $<HTMLButtonElement>('[data-bird-download]');
   const btnAgain = $<HTMLButtonElement>('[data-bird-again]');
-  const btnShuffle = $<HTMLButtonElement>('[data-bird-shuffle]');
+  const btnAnother = $<HTMLButtonElement>('[data-bird-another]');
 
   const source = document.createElement('canvas');
-  let landmarker: FaceLandmarkerT | null = null;
+  let landmarker: Promise<FaceLandmarkerT> | null = null;
   let stream: MediaStream | null = null;
-  // Last successful detection, kept so "Shuffle" can re-roll without a new selfie.
+  // Last successful detection, kept so "Another bird" works without a new selfie.
   let last: { lm: NormalizedLandmark[]; features: FaceFeatures; palette: FacePalette } | null = null;
   let variant = 0;
-  // The bird being inked in, so a download or a shuffle can finish it first.
+  // The bird being inked in, so a download or another bird can finish it first.
   let inking: Inking | null = null;
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -223,15 +278,22 @@ export function initBirding(root: HTMLElement): void {
     show('error');
   }
 
-  async function ensureLandmarker(): Promise<FaceLandmarkerT> {
-    if (landmarker) return landmarker;
-    const vision = await import('@mediapipe/tasks-vision');
-    const fileset = await vision.FilesetResolver.forVisionTasks('/birding/wasm');
-    landmarker = await vision.FaceLandmarker.createFromOptions(fileset, {
-      baseOptions: { modelAssetPath: '/birding/face_landmarker.task' },
-      runningMode: 'IMAGE',
-      numFaces: 1,
-    });
+  /** The face model, loaded once; safe to call again while it's still loading. */
+  function ensureLandmarker(): Promise<FaceLandmarkerT> {
+    if (!landmarker) {
+      landmarker = (async () => {
+        const vision = await import('@mediapipe/tasks-vision');
+        const fileset = await vision.FilesetResolver.forVisionTasks('/birding/wasm');
+        return vision.FaceLandmarker.createFromOptions(fileset, {
+          baseOptions: { modelAssetPath: '/birding/face_landmarker.task' },
+          runningMode: 'IMAGE',
+          numFaces: 1,
+        });
+      })();
+      landmarker.catch(() => {
+        landmarker = null;
+      });
+    }
     return landmarker;
   }
 
@@ -245,37 +307,39 @@ export function initBirding(root: HTMLElement): void {
     sctx.drawImage(img, 0, 0, source.width, source.height);
   }
 
-  /** Render the bird for the current `last` detection + `variant` (shuffle). */
-  function renderResult(): void {
+  /** Draw the bird for the current `last` detection and `variant` (Another bird). */
+  async function renderResult(): Promise<void> {
     if (!last) return;
-    const bird = featuresToBird(last.features, last.palette);
-    const style = makeHybridStyle(last.features, last.palette, variant);
+    const now = last;
+    const species = pickSpecies(now.features, now.palette, variant);
+    const parts = await loadParts(species.id);
+    if (now !== last) return;
     if (birdCanvas) {
       inking?.finish();
       inking = null;
-      renderHybrid(birdCanvas, { source, landmarks: last.lm, palette: last.palette, params: bird, style }, BIRD_PX);
+      renderHybrid(
+        birdCanvas,
+        {
+          source,
+          landmarks: now.lm,
+          params: featuresToBird(now.features, now.palette),
+          species,
+          parts,
+          seed: birdStyleSeed(now.features, now.palette),
+        },
+        BIRD_PX,
+      );
+      birdCanvas.setAttribute('aria-label', `Your selfie with a ${species.common.toLowerCase()}'s bill and feathers`);
       // Put back dot by dot, like the stipple plates on the hobby cards.
       if (!reduceMotion) {
         const paper = getComputedStyle(document.documentElement).getPropertyValue('--paper').trim() || '#fbfaf8';
         inking = inkIn(birdCanvas, paper);
       }
     }
-    if (tagsEl) {
-      const nameSpan = document.createElement('span');
-      nameSpan.className =
-        'basis-full text-center text-[15px] text-ink';
-      nameSpan.textContent = style.name;
-      tagsEl.replaceChildren(
-        nameSpan,
-        ...describeFeatures(last.features).map((t) => {
-          const span = document.createElement('span');
-          span.className =
-            'u-label';
-          span.textContent = t;
-          return span;
-        }),
-      );
-    }
+    if (nameEl) nameEl.textContent = species.common;
+    if (sciEl) sciEl.textContent = species.sci;
+    if (fromEl) fromEl.textContent = `Bill and feathers from my photo, ${species.from}`;
+    performance.mark('bird:drawn');
   }
 
   async function processSource(): Promise<void> {
@@ -299,7 +363,7 @@ export function initBirding(root: HTMLElement): void {
       const palette = computePalette(lm, data);
       last = { lm, features, palette };
       variant = 0;
-      renderResult();
+      await renderResult();
       show('result');
     } catch (err) {
       console.error('[birding] generation failed', err);
@@ -366,8 +430,20 @@ export function initBirding(root: HTMLElement): void {
     show('choose');
   }
 
-  btnCamera?.addEventListener('click', () => void startCamera());
-  btnUpload?.addEventListener('click', () => fileInput?.click());
+  // Load the face model and the birds' parts while the visitor frames or
+  // picks a photo (about 15 MB the first time, cached after that).
+  const warm = () => {
+    ensureLandmarker().catch(() => {});
+    for (const id of Object.keys(PART_URLS)) loadParts(id).catch(() => {});
+  };
+  btnCamera?.addEventListener('click', () => {
+    warm();
+    void startCamera();
+  });
+  btnUpload?.addEventListener('click', () => {
+    warm();
+    fileInput?.click();
+  });
   fileInput?.addEventListener('change', () => {
     const f = fileInput.files?.[0];
     if (f) loadFile(f);
@@ -380,10 +456,10 @@ export function initBirding(root: HTMLElement): void {
   btnCancel?.addEventListener('click', reset);
   btnRetry?.addEventListener('click', reset);
   btnAgain?.addEventListener('click', reset);
-  btnShuffle?.addEventListener('click', () => {
+  btnAnother?.addEventListener('click', () => {
     if (!last) return;
     variant += 1;
-    renderResult();
+    void renderResult();
   });
   btnDownload?.addEventListener('click', () => {
     if (!birdCanvas) return;

@@ -1,0 +1,71 @@
+{
+  "$comment": "Bills and plumage for the selfie bird, cut from Truman's own photos by scripts/bird_parts.py. Coordinates are 0-1 of the image after crop and flip. Every part faces right. box: the region the part sits in. base: two points on the line where it meets the head; the cutout on the far side of that line, inside box, is the part. exclude: polygons cut out of the part (a throat bulging past the base line). include: polygons added back (a dark bill tip the cutout lost against a shadow). hue: optional OpenCV hue window [h0, h1, s_min] that narrows the part to one colour. plumage: feather texture for the crown and neck, as boxes in its own crop of the whole bird (crop, flip as above).",
+  "black-oystercatcher": {
+    "src": "olympic-winter-2026/DSC03599.JPEG",
+    "crop": [0.55, 0.33, 0.72, 0.53],
+    "bill": {
+      "box": [0.44, 0.38, 0.92, 0.95],
+      "base": [
+        [0.566, 0.443],
+        [0.468, 0.503]
+      ],
+      "exclude": [
+        [
+          [0.4, 0.515],
+          [0.47, 0.515],
+          [0.66, 0.73],
+          [0.78, 0.86],
+          [0.78, 1.0],
+          [0.4, 1.0]
+        ]
+      ]
+    },
+    "plumage": {
+      "crop": [0.4, 0.25, 0.8, 0.75],
+      "crown": [0.1, 0.48, 0.4, 0.7],
+      "neck": [0.12, 0.62, 0.42, 0.85]
+    }
+  },
+  "keel-billed-toucan": {
+    "src": "costa-rica-el-zota-biological-station-sept-2026/DSC00164.JPEG",
+    "crop": [0.04, 0.26, 0.52, 0.47],
+    "flip": true,
+    "bill": {
+      "box": [0.38, 0.12, 0.99, 0.62],
+      "base": [
+        [0.445, 0.215],
+        [0.412, 0.505]
+      ],
+      "exclude": [
+        [
+          [0.38, 0.51],
+          [0.455, 0.51],
+          [0.47, 0.53],
+          [0.47, 0.65],
+          [0.38, 0.65]
+        ]
+      ]
+    },
+    "plumage": {
+      "crop": [0.0, 0.15, 1.0, 0.85],
+      "crown": [0.545, 0.42, 0.6, 0.53],
+      "neck": [0.598, 0.29, 0.635, 0.38]
+    }
+  },
+  "yellow-crowned-night-heron": {
+    "src": "costa-rica-tortuguero-national-park-canal-august-2026/DSC09984.JPEG",
+    "crop": [0.5, 0.22, 0.9, 0.42],
+    "bill": {
+      "box": [0.52, 0.36, 0.93, 0.69],
+      "base": [
+        [0.565, 0.385],
+        [0.535, 0.66]
+      ]
+    },
+    "plumage": {
+      "crop": [0.3, 0.15, 0.95, 0.85],
+      "crown": [0.44, 0.258, 0.555, 0.284],
+      "neck": [0.03, 0.56, 0.17, 0.85]
+    }
+  }
+}
