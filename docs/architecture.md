@@ -248,7 +248,7 @@ which is why a Logic App starts the posting workflow on time.
 | Build pipeline | `.github/workflows/build-and-deploy.yml`, `scripts/prebuild.mjs`, `scripts/sync-variants.mjs` | [cicd.md](cicd.md), [image-pipeline.md](image-pipeline.md) |
 | Blob containers (`originals`, `derivatives`, `variants`, `metadata`, `hobby-media`) | Azure Storage, defined in `infra/modules/storage.bicep` | [image-pipeline.md](image-pipeline.md) |
 | Front door and About me | `src/pages/index.astro` (Weekends and Weekdays), `src/components/about/`, `src/lib/about.ts`, the live flight radar in `src/lib/radar.ts` and `src/lib/led-radar.ts`. The archive is `src/pages/photographs/index.astro` | [product-experience.md](product-experience.md#a-front-door-with-me-in-it-november-2026) |
-| Contact form | `src/components/ContactForm.astro` + `api/contact/` (writes `contactmessages`, throttled via `contactratelimit`, emails a copy through Communication Services, `infra/modules/email.bicep`) | [security.md](security.md), [azure.md](azure.md#contact-form-email) |
+| Contact form | `src/components/ContactForm.astro` (a sent message folds into an envelope and leaves the drawer: `src/lib/post-letter.ts`, `src/lib/postmark.ts`) + `api/contact/` (writes `contactmessages`, throttled via `contactratelimit`, emails a copy through Communication Services, `infra/modules/email.bicep`) | [security.md](security.md), [azure.md](azure.md#contact-form-email) |
 | Analytics | `src/lib/analytics.ts` + `api/track/` (writes `pageviews`) | [analytics.md](analytics.md) |
 | Admin panel | `src/pages/admin/`, `src/lib/admin.ts` + `api/sessionmgr/` | [admin.md](admin.md) |
 | Interactive hobbies | `src/components/hobbies/`, `src/lib/hobbies/` | [hobbies.md](hobbies.md) |

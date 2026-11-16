@@ -4,7 +4,9 @@
  * (the footer, the rails, the Weekdays side, /prints) or the contact:open
  * event (the lightbox's Prints button), either of which can start the
  * message. Posts to /api/contact, which keeps the message in Table Storage
- * and emails me a copy. A hidden "website" field catches bots.
+ * and emails me a copy. A hidden "website" field catches bots. Once it's
+ * sent, the message folds into an envelope, takes a postmark and slides out
+ * of the drawer (src/lib/post-letter.ts).
  */
 ---
 
@@ -117,6 +119,7 @@
     flex-direction: column;
     gap: 16px;
     padding: 22px 26px 28px;
+    overflow-x: hidden;
     overflow-y: auto;
     background: var(--paper);
     border-left: 1px solid var(--rule);
@@ -159,6 +162,7 @@
     color: var(--ink-3);
   }
   .cf-form {
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: 16px;
@@ -195,6 +199,11 @@
     box-shadow: none;
     border-color: var(--ink);
   }
+  /* The words show on the paper that folds up over the box, not under it. */
+  .cf-field textarea.posting {
+    color: transparent;
+    overflow: hidden;
+  }
   .cf-count {
     margin: -8px 0 0;
     text-align: right;
@@ -229,7 +238,72 @@
   }
 </style>
 
+<style is:global>
+  /* The sent message as paper, built by post-letter.ts: flat paper with 1px
+     ink edges, and the envelope's flap. */
+  .post {
+    position: absolute;
+    z-index: 2;
+    pointer-events: none;
+  }
+  .post-paper {
+    position: absolute;
+    inset: 0;
+  }
+  .post-piece {
+    position: absolute;
+    overflow: hidden;
+    background: var(--paper);
+  }
+  .post-piece::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border: 0 solid var(--ink-2);
+    pointer-events: none;
+  }
+  .post-piece[data-edges*="t"]::after {
+    border-top-width: 1px;
+  }
+  .post-piece[data-edges*="r"]::after {
+    border-right-width: 1px;
+  }
+  .post-piece[data-edges*="b"]::after {
+    border-bottom-width: 1px;
+  }
+  .post-piece[data-edges*="l"]::after {
+    border-left-width: 1px;
+  }
+  .post-words {
+    position: absolute;
+    color: var(--ink);
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+  }
+  .post-envelope {
+    overflow: visible;
+  }
+  .post-flap {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    fill: none;
+    stroke: var(--ink-2);
+    stroke-width: 1px;
+  }
+  .post-mark {
+    position: absolute;
+    display: block;
+    max-width: none;
+    height: auto;
+  }
+</style>
+
 <script>
+  import { prefersReducedMotion } from "../lib/motion";
+  import type { Posting, PostOptions } from "../lib/post-letter";
+
   const drawer = document.getElementById("contact-drawer")!;
   const backdrop = document.getElementById("contact-backdrop")!;
   const closeBtn = document.getElementById("contact-close")!;
@@ -243,6 +317,7 @@
   const pageShell = document.getElementById("page-shell");
 
   let isOpen = false;
+  let posting: Posting | null = null;
   let opener: HTMLElement | null = null;
   let previousBodyOverflow = "";
 
@@ -274,6 +349,9 @@
   function closeDrawer() {
     if (!isOpen) return;
     isOpen = false;
+    // Closing partway through posting skips to the end, so the form is reset
+    // and thanked by the time it opens again.
+    posting?.finish();
     drawer.classList.remove("on");
     backdrop.classList.remove("on");
     document.body.style.overflow = previousBodyOverflow;
@@ -347,6 +425,9 @@
   messageField.addEventListener("input", () => {
     charCount.textContent = String(messageField.value.length);
   });
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) posting?.finish();
+  });
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -358,9 +439,20 @@
     const originalText = btn.textContent;
     btn.disabled = true;
     btn.textContent = "Sending...";
+    // After a send that posts the letter, the button stays on Sending... until
+    // the envelope has gone and the form is empty, so a press during the fold
+    // can't send it twice.
+    let release = true;
+    const releaseButton = () => {
+      btn.disabled = false;
+      btn.textContent = originalText;
+    };
 
     try {
       const data = Object.fromEntries(new FormData(form));
+      // The letter's parts load and its postmark is drawn while the message
+      // is on its way.
+      const letter = prefersReducedMotion() ? null : prepareLetter();
       const res = await fetch("/api/contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -372,10 +464,32 @@
       const json = await res.json();
 
       if (json.ok) {
-        feedback.textContent = "Message sent. Thank you!";
-        form.reset();
-        charCount.textContent = "0";
-        lastPrefill = "";
+        const sent = () => {
+          feedback.textContent = "Message sent. Thank you!";
+          form.reset();
+          charCount.textContent = "0";
+          lastPrefill = "";
+          messageField.classList.remove("posting");
+        };
+        const ready = letter && isOpen ? await letter : null;
+        if (ready && isOpen && !prefersReducedMotion()) {
+          release = false;
+          messageField.classList.add("posting");
+          const post = ready.postLetter({
+            field: messageField,
+            host: form,
+            exit: drawer,
+            mark: ready.mark,
+          });
+          posting = post;
+          void post.leaving.then(sent);
+          void post.done.then(() => {
+            if (posting === post) posting = null;
+            releaseButton();
+          });
+        } else {
+          sent();
+        }
       } else {
         feedback.textContent =
           json.errors?.join(" ") ??
@@ -384,8 +498,35 @@
     } catch {
       feedback.textContent = "Network error. Please try again.";
     } finally {
-      btn.disabled = false;
-      btn.textContent = originalText;
+      if (release) releaseButton();
     }
   });
+
+  /** The posting motion, loaded only once someone sends (the drawer is on
+   *  every page), and the hiking postcard's round postmark with this site and
+   *  today's date in the page's ink. Null if a part fails to load, and the
+   *  thank-you line shows at once instead. */
+  async function prepareLetter(): Promise<{
+    postLetter: (options: PostOptions) => Posting;
+    mark: HTMLCanvasElement;
+  } | null> {
+    try {
+      const [{ postLetter }, { makePostmark }, { canvasFontReady }] =
+        await Promise.all([
+          import("../lib/post-letter"),
+          import("../lib/postmark"),
+          import("../lib/canvas-font"),
+        ]);
+      await canvasFontReady();
+      const mark = makePostmark(
+        "trumanbrown.com",
+        new Date(),
+        document.documentElement.classList.contains("dark"),
+        1 + Math.floor(Math.random() * 1000),
+      );
+      return { postLetter, mark };
+    } catch {
+      return null;
+    }
+  }
 </script>
