@@ -801,23 +801,6 @@ export function renderHybrid(canvas: HTMLCanvasElement, input: HybridInput, size
     return c;
   };
 
-  // --- The bill: the bird's real bill, head on, growing from between the eyes ---
-  const roll = Math.atan2(TcheekL.y - TcheekR.y, TcheekL.x - TcheekR.x);
-  const topO = T(midp(eyeMidSrc, bridgeS));
-  const billLen =
-    dist2(topO, T(mouthCS)) * 0.4 +
-    species.length * dist2(Tfore, Tchin) * lerp(0.9, 1.2, clamp01((input.params.beakLength - 7) / 9));
-  const bill = renderBillHeadOn(parts.bill, billLen, species.width * faceWOut, gain);
-  o.save();
-  o.translate(topO.x, topO.y);
-  o.rotate(roll);
-  o.shadowColor = 'rgba(25, 14, 6, 0.4)';
-  o.shadowBlur = faceWOut * 0.05;
-  o.shadowOffsetX = faceWOut * 0.01;
-  o.shadowOffsetY = faceWOut * 0.035;
-  o.drawImage(bill, -bill.width / 2, 0);
-  o.restore();
-
   // --- Crest: a scattered tuft of the bird's feathers blended into the hairline ---
   const crownCols = plumageColours(lit(parts.crown), rng);
   const neckCols = plumageColours(lit(parts.neck), rng);
@@ -851,6 +834,24 @@ export function renderHybrid(canvas: HTMLCanvasElement, input: HybridInput, size
     const tip = { x: bx + Math.cos(a) * len * 0.5, y: by + len * (0.6 + Math.sin(a) * 0.4) };
     drawPlume(o, { x: bx, y: by }, tip, faceWOut * 0.034, (rng() - 0.5) * 0.35, neckCols, rng);
   }
+  o.restore();
+
+  // --- The bill: the bird's real bill, head on, growing from between the eyes.
+  //     Drawn last, so its tip lies over the neck feathers, never under them. ---
+  const roll = Math.atan2(TcheekL.y - TcheekR.y, TcheekL.x - TcheekR.x);
+  const topO = T(midp(eyeMidSrc, bridgeS));
+  const billLen =
+    dist2(topO, T(mouthCS)) * 0.4 +
+    species.length * dist2(Tfore, Tchin) * lerp(0.9, 1.2, clamp01((input.params.beakLength - 7) / 9));
+  const bill = renderBillHeadOn(parts.bill, billLen, species.width * faceWOut, gain);
+  o.save();
+  o.translate(topO.x, topO.y);
+  o.rotate(roll);
+  o.shadowColor = 'rgba(25, 14, 6, 0.4)';
+  o.shadowBlur = faceWOut * 0.05;
+  o.shadowOffsetX = faceWOut * 0.01;
+  o.shadowOffsetY = faceWOut * 0.035;
+  o.drawImage(bill, -bill.width / 2, 0);
   o.restore();
 
   // --- Vignette for cohesion ---
