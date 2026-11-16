@@ -34,6 +34,7 @@ Where the patterns came from: Cult UI (rolling number, direction-aware tabs, the
 - **Never morph one photograph into a different one** across a page change; the cover and the banner are almost always different photos (2026-10-16).
 - **Nothing covers the animal**, and feedback sits by the thing it's about, never in the middle of the screen: "not in middle of screen, but subtly and noticeably by the score" (2026-10-14). A small stamp in the corner of a large photo is fine, as Narrow nature's price is (2026-10-25); a stamp across the subject isn't, as the first-find stamp was (2026-10-15).
 - **Decide what rapid clicks do** before building (below). "if they spam, it should just have multiple jump in, keep it smooth" (2026-10-14).
+- **A tap that adds something works like the fish jump**, the one he called "a success" (2026-11-15): the thing starts at the control you pressed and turns into itself on the way, takes a slightly different path each time, lands with a reaction in its own material (a splash, droplets falling back, sinking to its depth), and every tap is its own instance, so spamming sends a run of them while the counts update as each lands. Short (about 0.55 to 0.95 s in the air), on the toy's own pixel grid, on one canvas that exists only while something moves (`aquarium-jump.ts`).
 - **Hover is a bonus for a mouse.** Nothing a phone needs sits behind hover.
 - **Reduced motion keeps the information and drops the movement.**
 - **If a request contradicts an earlier verdict, say so before building.** He turned down the card-to-header morph on 2026-10-12, suggested something like it himself two days later, and rejected it once he saw it.
@@ -80,6 +81,7 @@ When he sends a reel or a video, get the video itself, transcribe the audio, sam
 - 2026-10-16: "the session load animation is bad. it cuts poorly from the cover image to the header image (which are almost always different)... just a smooth website animation nothing to do with the images themselves" (`fe3d302`).
 - 2026-10-25: Narrow nature's price stamp may sit on the corner of the clue photo: "its fine on the photo since the photo is large and this is small and in top right."
 - 2026-11-05: of the page-change mocks (`mocks/portfolio/motion.html`), "lands on their cards for both looks best": the Photographs row's prints land on the first five session cards, the Things to try row's drawings land on the hobby cards, and the rail steps aside for the Things to try header.
+- 2026-11-15: the aquarium's fish jump, "really good. really good. the different paths they take, the little splash they make, how they fall into the tank, it feels really satisfying to click that button and spam it. that's a success." It's the model for any tap that adds something to a scene (rule above).
 
 ## Hard-won lessons
 
