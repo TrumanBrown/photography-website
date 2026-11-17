@@ -67,11 +67,12 @@ export const WORK: Job[] = [
       "Launched general availability of Azure Migrate for VMware to Azure Local migrations in Oct 2025, writing the exit criteria and a three-option proposal that avoided a 6-month wait, with 32,000+ VMs migrated since",
       "Cut customer-reported incidents nearly 40%, from 6.9 to 4.2 per 1,000 migrated VMs in 2026, with new validation checks, safeguards and retry fixes, while holding a 97.5% migration success rate",
       "Ran 18 monthly releases since Mar 2025 with no release manager, using AI agents to mock up features from approved UX assets for engineering, without a designer, and to write or update 25 Learn articles",
-      "Shipped SAN migration support, unblocking a dental insurer that has moved 1,900+ of a planned 5,500 VMs",
+      "Shipped SAN migration support, unblocking a dental insurer that has moved 2,000+ of a planned 5,500 VMs",
+      "Released Azure Migrate for Azure Local in Azure Government, with a U.S. military branch as anchor customer",
       "Proposed and shipped Azure Arc reuse during migration, so Arc-managed VMs keep their configuration, monitoring and extensions with no re-onboarding, unblocking enterprises with hundreds to 10,000 Arc VMs",
       "Shipped Secure Boot retention (9,300+ VMs, 377 customers), PowerShell, CLI and Terraform automation (PowerShell alone moved 2,000 VMs for 15 customers) and migration support for Trusted Launch VMs",
-      "Partnered with five enterprises (17,000+ cores) before, during and after migration, unblocking hundreds of SQL Server VMs with fast analysis, proposed fixes and release coordination, and gave 4 executive briefings",
-      "Delivered a private preview of a new VMware migration path to six large enterprises two months after a third-party licensing change halted new migrations, leading the impact analysis, options and execution",
+      "Partnered with five enterprises (20,000+ cores) before, during and after migration, unblocking hundreds of SQL Server VMs with fast analysis, proposed fixes and release coordination, and gave 4 executive briefings",
+      "Delivered a new VMware migration path in private preview to six large enterprises two months after a licensing block",
       "Shipped VM Connect console access for Azure Local VMs and designed live migration of VMs across clusters",
     ],
   },
@@ -83,7 +84,7 @@ export const WORK: Job[] = [
     to: "2025-09",
     lines: [
       "Onboarded 40 private preview customers and launched public preview of Azure Migrate for VMware to Azure Local in Oct 2024, with 73 customers moving 1,700+ VMs at 97% success, winning an organization Impact Award",
-      "Shipped static IP retention for Windows and Linux VMs, used on 19,000+ VMs by 422 customers since release",
+      "Shipped static IP retention for Windows and Linux VMs, used on 20,000+ VMs by 423 customers since release",
       "Unblocked a grocery chain's VMware exit with custom disk sector size, critical for SQL Server (1,150+ VMs)",
     ],
   },
@@ -132,12 +133,12 @@ export const SCHOOL = {
 
 export const SKILLS: Array<[label: string, list: string]> = [
   [
-    "Product and data",
-    "Product strategy, roadmaps, go-to-market, customer discovery, Kusto (KQL), Power BI, Python",
-  ],
-  [
     "Platform and AI",
     "Azure, hybrid cloud, Kubernetes, virtualization, on-premises hardware, AI agents, MCP",
+  ],
+  [
+    "Product and data",
+    "Product strategy, roadmaps, go-to-market, customer discovery, Kusto (KQL), Power BI, Python",
   ],
 ];
 
