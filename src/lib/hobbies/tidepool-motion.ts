@@ -2,9 +2,10 @@
  * Motion for the tide pool beach, as pure functions of time. The engine
  * (tidepool.ts) only samples these and draws.
  *
- * - raisePose / lowerPose: a heavy rock strains for a moment, comes up on an
- *   ease-out with a slight over-tilt that settles, and drops back a bit faster
- *   than it rose, squashing for a frame as it lands.
+ * - overAngle / backAngle: a loose rock turns over about the edge it tips
+ *   toward, standing on end halfway, landing on its back and rocking once,
+ *   and goes back the same way. heaveAngle: the big boulder comes up and
+ *   slips back on each heave before the last.
  * - critterReact: what the animal under it does when the light hits it.
  * - tideAt: a wave washing in over the beach from the water's side, foam
  *   leading, then drawing back and leaving wet sand that dries.
@@ -21,109 +22,83 @@ const easeOutQuad = (k: number) => 1 - (1 - k) ** 2;
 const easeInQuad = (k: number) => k * k;
 const easeInOut = (k: number) =>
   k < 0.5 ? 2 * k * k : 1 - 2 * (1 - k) * (1 - k);
-/** Ease-out that runs about 18% past the end and comes back. */
-function backOut(k: number, c1 = 2.4): number {
-  const u = k - 1;
-  return 1 + (c1 + 1) * u * u * u + c1 * u * u;
-}
-
 // ------------------------------------------------------------- the rocks
+//
+// Seen from above, a rock turns over about the edge it tips toward (its
+// hinge): the far edge comes up, it stands on end, and it goes over onto its
+// back beside where it lay. `angle` is how far it has turned, 0 lying as it
+// was to PI on its back. The toy draws the top face squashed by cos(angle)
+// toward the hinge and, past PI/2, the underside on the other side.
 
-/** How far a flipped stone leans back, radians. Today's `lift * -0.5`. */
-export const TILT = -0.5;
+/** On its back. */
+export const OVER = Math.PI;
+/** Turning over, s: up through standing at about 0.36s, down at 0.6. */
+export const OVER_S = 0.66;
+/** Putting it back, s. */
+export const BACK_S = 0.56;
+/** One heave of a rock too heavy to turn at once, s, up and slipping back. */
+export const HEAVE_S = 0.95;
 
-export interface Pose {
-  /** 0 resting, 1 all the way up (today's `lift`). */
-  lift: number;
-  tilt: number;
-  /** Sideways shudder while it strains, px. */
-  dx: number;
-  /** 1 on the frames it lands, else 0. */
-  squash: number;
+/** A rock `t` s after it was tapped to go over, from `from` (0 lying down,
+ *  or partway up from a heave). It takes the strain, comes up faster as it
+ *  passes standing, lands on its back, rocks a little and settles. */
+export function overAngle(t: number, from = 0): number {
+  if (t <= 0) return from;
+  if (t >= OVER_S) return OVER;
+  const k = t / OVER_S;
+  if (k < 0.12) return from - 0.03 * Math.sin((k / 0.12) * Math.PI); // takes the weight
+  if (k < 0.86) {
+    const u = (k - 0.12) / 0.74;
+    const e = u < 0.5 ? 2 * u * u : 1 - 2 * (1 - u) * (1 - u);
+    return from + (OVER + 0.09 - from) * e;
+  }
+  // Lands past flat, rocks back, settles.
+  const u = (k - 0.86) / 0.14;
+  return OVER + 0.09 * Math.cos(u * Math.PI * 1.5) * (1 - u);
 }
 
-export const REST: Pose = { lift: 0, tilt: 0, dx: 0, squash: 0 };
-export const UP: Pose = { lift: 1, tilt: TILT, dx: 0, squash: 0 };
-
-/** 0 for the smallest rock, 1 for the biggest, from its drawn size. */
-export function heaviness(w: number, h: number): number {
-  return clamp((w * h - 800) / 4800, 0, 1);
-}
-
-export interface RaiseTiming {
-  strain: number;
-  rise: number;
-  settle: number;
+/** Putting it back: up off its back, over, and down where it was, with a
+ *  small rock as it settles. */
+export function backAngle(t: number, from = OVER): number {
+  if (t <= 0) return from;
+  if (t >= BACK_S) return 0;
+  const k = t / BACK_S;
+  if (k < 0.85) {
+    const u = k / 0.85;
+    const e = u < 0.5 ? 2 * u * u : 1 - 2 * (1 - u) * (1 - u);
+    return from + (-0.06 - from) * e;
+  }
+  const u = (k - 0.85) / 0.15;
+  return -0.06 * Math.cos(u * Math.PI * 1.5) * (1 - u);
 }
 
 /**
- * Seconds for each part of a lift. A stone that's already partway up (caught
- * as it fell) skips the strain and has less far to go.
+ * One heave of the big boulder that doesn't take it over: it comes up to
+ * `peak` radians, trembles there as you hold its weight, and slips back down
+ * with a thud. Every heave ends where it started, lying down.
  */
-export function raiseTiming(heavy: number, from = 0): RaiseTiming {
-  return {
-    strain: from > 0.02 ? 0 : 0.09 + 0.03 * heavy,
-    rise: (0.21 + 0.02 * heavy) * (1 - 0.6 * from),
-    settle: 0.16,
-  };
+export function heaveAngle(t: number, peak: number): number {
+  if (t <= 0 || t >= HEAVE_S) return 0;
+  const k = t / HEAVE_S;
+  if (k < 0.3) return peak * easeOutQuad(k / 0.3);
+  if (k < 0.62)
+    return peak + 0.02 * Math.sin(((k - 0.3) / 0.32) * Math.PI * 7) * peak;
+  const u = (k - 0.62) / 0.38;
+  // Falls back faster as it goes, bounces once on landing.
+  if (u < 0.7) return peak * (1 - easeInQuad(u / 0.7));
+  return 0.06 * peak * Math.sin(((u - 0.7) / 0.3) * Math.PI);
 }
 
-/** When the stone is all the way up, s: the card opens then. 0.30 to 0.35. */
-export function upAt(heavy: number, from = 0): number {
-  const t = raiseTiming(heavy, from);
-  return t.strain + t.rise;
+/** How far heave `n` (0 first) of `heavy` gets the rock up. The last one
+ *  takes it over, so this is only for the ones before it. */
+export function heavePeak(n: number, heavy: number): number {
+  return Math.min(1.25, 0.32 + (0.9 * n) / Math.max(1, heavy - 1));
 }
 
-/** When a lift has settled completely, s. */
-export function raiseEnd(heavy: number, from = 0): number {
-  const t = raiseTiming(heavy, from);
-  return t.strain + t.rise + t.settle;
-}
-
-/** A stone `t` seconds after it was tapped to come up. */
-export function raisePose(t: number, heavy: number, from = 0): Pose {
-  const { strain, rise, settle } = raiseTiming(heavy, from);
-  if (t < strain) {
-    // A shudder, two px either way and back, twice: it's heavy.
-    const k = t / strain;
-    return {
-      lift: from,
-      tilt: TILT * from,
-      dx: Math.round(Math.sin(k * Math.PI * 4)) * 2,
-      squash: 0,
-    };
-  }
-  const k = clamp((t - strain) / rise, 0, 1);
-  const kt = clamp((t - strain) / (rise + settle), 0, 1);
-  return {
-    lift: from + (1 - from) * easeOutCubic(k),
-    tilt: TILT * (from + (1 - from) * backOut(kt)),
-    dx: 0,
-    squash: 0,
-  };
-}
-
-/** Fall time from all the way up, s. It rose in 0.21 to 0.23. */
-export const DROP = 0.15;
-/** How long it sits squashed on landing, s: a frame or two. */
-export const SQUASH = 0.035;
-
-export function dropTime(from: number): number {
-  return DROP * Math.sqrt(clamp(from, 0, 1));
-}
-
-/** A stone `t` seconds after it was tapped to go back down from `from`. */
-export function lowerPose(t: number, from: number): Pose {
-  const drop = dropTime(from);
-  if (t < drop) {
-    const lift = from * (1 - easeInQuad(t / drop));
-    return { lift, tilt: TILT * lift, dx: 0, squash: 0 };
-  }
-  return { ...REST, squash: from > 0.2 && t < drop + SQUASH ? 1 : 0 };
-}
-
-export function lowerEnd(from: number): number {
-  return dropTime(from) + SQUASH;
+/** How high its far edge is, as a share of its reach to the hinge: 0 lying
+ *  down, 1 standing on end. Drives the shadow and the drips. */
+export function edgeHeight(angle: number): number {
+  return Math.max(0, Math.sin(Math.min(Math.max(angle, 0), Math.PI)));
 }
 
 // ----------------------------------------------------------- the critters

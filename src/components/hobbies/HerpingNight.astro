@@ -25,6 +25,7 @@ import { SPECIES } from "@/lib/hobbies/herping-species";
     ></canvas>
   </div>
   <p class="sr-only" aria-live="polite" data-hp-live></p>
+  <div class="hp-switch" data-hp-reveal-switch hidden></div>
   <p class="hp-note">
     Steer with the mouse, by dragging on touch, or with the arrow keys, then tap
     an animal in the beam or press Enter to stop for it. Please never handle
@@ -36,6 +37,19 @@ import { SPECIES } from "@/lib/hobbies/herping-species";
 </section>
 
 <style>
+  .hp-switch:not([hidden]) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 16px;
+    margin: 6px 0 0;
+    font-size: 13px;
+  }
+  .hp-switch :global(button[aria-pressed="true"] > span) {
+    color: var(--ink);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
   .hp-frame {
     overflow: hidden;
     border: 1px solid var(--rule);

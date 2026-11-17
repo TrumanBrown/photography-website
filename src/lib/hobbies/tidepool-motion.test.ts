@@ -1,22 +1,21 @@
 import { describe, expect, it } from "vitest";
 import {
-  DROP,
-  REST,
-  TILT,
-  UP,
+  BACK_S,
+  HEAVE_S,
+  OVER,
+  OVER_S,
+  backAngle,
   critterReact,
-  heaviness,
-  lowerEnd,
-  lowerPose,
+  edgeHeight,
+  heaveAngle,
+  heavePeak,
   makeTide,
-  raiseEnd,
-  raisePose,
+  overAngle,
   reactionFor,
   reactionLength,
   tideAt,
   tideFront,
   tideWashing,
-  upAt,
   type Reaction,
 } from "./tidepool-motion";
 
@@ -26,81 +25,73 @@ function seq(seed: number): () => number {
   return () => (s = (s * 16807) % 2147483647) / 2147483647;
 }
 
-describe("raisePose", () => {
-  const weights = [0, 0.5, 1];
+describe("overAngle", () => {
+  it("starts lying down and ends on its back", () => {
+    expect(overAngle(0)).toBe(0);
+    expect(overAngle(OVER_S)).toBe(OVER);
+    expect(overAngle(OVER_S + 1)).toBe(OVER);
+  });
 
-  it("starts at rest, shudders 2px in place, and settles all the way up", () => {
-    for (const heavy of weights) {
-      const first = raisePose(0, heavy);
-      expect(first.lift).toBe(0);
-      expect(first.tilt).toBeCloseTo(0, 9);
-      for (let t = 0; t < 0.09; t += 0.005) {
-        const p = raisePose(t, heavy);
-        expect(p.lift).toBe(0);
-        expect(Math.abs(p.dx)).toBeLessThanOrEqual(2);
-      }
-      expect(raisePose(raiseEnd(heavy), heavy)).toMatchObject(UP);
+  it("stands on end about halfway, and rocks past flat as it lands", () => {
+    const mid = overAngle(OVER_S * 0.5);
+    expect(mid).toBeGreaterThan(Math.PI * 0.35);
+    expect(mid).toBeLessThan(Math.PI * 0.65);
+    let past = 0;
+    for (let t = OVER_S * 0.8; t < OVER_S; t += 0.005)
+      past = Math.max(past, overAngle(t));
+    expect(past).toBeGreaterThan(OVER);
+    expect(past).toBeLessThan(OVER + 0.12);
+  });
+
+  it("never jumps between frames", () => {
+    let prev = overAngle(0);
+    for (let t = 1 / 120; t <= OVER_S + 0.02; t += 1 / 120) {
+      const a = overAngle(t);
+      expect(Math.abs(a - prev)).toBeLessThan(0.16);
+      prev = a;
     }
   });
 
-  it("is up 0.30 to 0.35s after the tap, however heavy, when the card opens", () => {
-    for (const heavy of weights) {
-      const at = upAt(heavy);
-      expect(at).toBeGreaterThanOrEqual(0.3);
-      expect(at).toBeLessThanOrEqual(0.35);
-      expect(raisePose(at, heavy).lift).toBeCloseTo(1, 9);
-    }
-    expect(upAt(heaviness(30, 20))).toBeLessThan(upAt(heaviness(100, 56)));
-  });
-
-  it("leans about 18% past its angle, then comes back", () => {
-    let most = 0;
-    for (let t = 0; t <= raiseEnd(1); t += 0.002) {
-      most = Math.min(most, raisePose(t, 1).tilt);
-    }
-    expect(most / TILT).toBeGreaterThan(1.15);
-    expect(most / TILT).toBeLessThan(1.22);
-  });
-
-  it("never jumps between frames once it's moving", () => {
-    const dt = 1 / 240;
-    for (const heavy of weights) {
-      let prev = raisePose(0.13, heavy);
-      for (let t = 0.13; t <= raiseEnd(heavy) + dt; t += dt) {
-        const p = raisePose(t, heavy);
-        expect(Math.abs(p.lift - prev.lift)).toBeLessThan(0.06);
-        expect(Math.abs(p.tilt - prev.tilt)).toBeLessThan(0.05);
-        prev = p;
-      }
-    }
-  });
-
-  it("caught on its way down, it goes straight back up from there", () => {
-    const p = raisePose(0, 0.5, 0.6);
-    expect(p.lift).toBeCloseTo(0.6, 9);
-    expect(p.dx).toBe(0);
-    expect(upAt(0.5, 0.6)).toBeLessThan(upAt(0.5));
+  it("carries on from where a heave left it", () => {
+    expect(overAngle(0.001, 0.8)).toBeCloseTo(0.8, 1);
+    expect(overAngle(OVER_S, 0.8)).toBe(OVER);
   });
 });
 
-describe("lowerPose", () => {
-  it("drops in 0.15s, squashes as it lands, and ends at rest", () => {
-    expect(lowerPose(0, 1).lift).toBe(1);
-    expect(lowerPose(DROP - 0.001, 1).lift).toBeLessThan(0.05);
-    expect(lowerPose(DROP + 0.01, 1)).toMatchObject({ lift: 0, squash: 1 });
-    expect(lowerPose(lowerEnd(1), 1)).toEqual(REST);
-  });
-
-  it("falls faster as it goes, the way a dropped thing does", () => {
-    const a = 1 - lowerPose(DROP / 4, 1).lift;
-    const b = lowerPose(DROP / 4, 1).lift - lowerPose(DROP / 2, 1).lift;
-    expect(b).toBeGreaterThan(a);
-  });
-
-  it("doesn't squash a stone that was barely up", () => {
-    for (let t = 0; t <= lowerEnd(0.1); t += 0.005) {
-      expect(lowerPose(t, 0.1).squash).toBe(0);
+describe("backAngle", () => {
+  it("goes from its back to lying where it was", () => {
+    expect(backAngle(0)).toBe(OVER);
+    expect(backAngle(BACK_S)).toBe(0);
+    let prev = backAngle(0);
+    for (let t = 1 / 120; t <= BACK_S; t += 1 / 120) {
+      const a = backAngle(t);
+      expect(Math.abs(a - prev)).toBeLessThan(0.2);
+      prev = a;
     }
+  });
+});
+
+describe("heaveAngle", () => {
+  it("comes up to its peak and slips back to lying down", () => {
+    const peak = heavePeak(0, 3);
+    expect(heaveAngle(0, peak)).toBe(0);
+    expect(heaveAngle(HEAVE_S, peak)).toBe(0);
+    let top = 0;
+    for (let t = 0; t < HEAVE_S; t += 0.01)
+      top = Math.max(top, heaveAngle(t, peak));
+    expect(top).toBeGreaterThan(peak * 0.95);
+    expect(top).toBeLessThan(peak * 1.05);
+  });
+
+  it("gets further up with each heave, but never over before the last", () => {
+    expect(heavePeak(1, 3)).toBeGreaterThan(heavePeak(0, 3));
+    expect(heavePeak(1, 3)).toBeLessThan(Math.PI / 2);
+  });
+
+  it("lifts its far edge highest when it stands on end", () => {
+    expect(edgeHeight(0)).toBe(0);
+    expect(edgeHeight(Math.PI / 2)).toBeCloseTo(1);
+    expect(edgeHeight(OVER)).toBeCloseTo(0);
   });
 });
 

@@ -87,10 +87,10 @@ rather than only writing it down here.
 
 - Always use contractions: `it's`, `you've`, `doesn't`, `that's`, `I've`.
 - One to three short sentences per block of microcopy. No paragraphs in UI chrome.
-- Instructions are second-person imperatives: `Tap a rock or driftwood log to look underneath.`
+- Instructions are second-person imperatives: `Tap a loose rock to turn it over.`
 - Say **Tap**, not Click, for anything on a canvas or touch surface. `Click` only for a
   desktop-only affordance (`Click to remove.`).
-- Prefer concrete nouns from the hobby — rocks, driftwood, headlight beam, eyeshine, bull kelp —
+- Prefer concrete nouns from the hobby — rocks, surfgrass, headlight beam, eyeshine, bull kelp —
   over abstractions like "experience", "content", "elements".
 - Spaced em dash ` — ` is banned (see the top of this file). Older strings that still
   have one lose it the next time their component gets a pass. Use a comma, a colon,
@@ -116,7 +116,7 @@ rather than only writing it down here.
 - A hobby page's facts line is counts and plain nouns joined by `·`: `40 critters to find`,
   `37 waters · 2 states`, `Selfie · nothing uploads` (`src/lib/hobby-facts.ts`).
 - `aria-label` describes the scene and the action in one sentence, same voice as visible copy:
-  `A pixel beach at low tide. Tap rocks and driftwood logs to find the creatures hiding underneath.`
+  `Looking down at a patch of shore at low tide. Tap a loose rock to turn it over and again to put it back.`
 
 ## Empty, status, and error strings
 

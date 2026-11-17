@@ -2,6 +2,7 @@ import type { CollectionEntry } from "astro:content";
 import { SPECIES as AQUARIUM_SPECIES } from "@/lib/hobbies/aquarium-species";
 import { SPECIES as HERP_SPECIES } from "@/lib/hobbies/herping-species";
 import { SPECIES as TIDEPOOL_SPECIES } from "@/lib/hobbies/tidepool-species";
+import { BEACHES as TIDEPOOL_BEACHES } from "@/lib/hobbies/tidepool-beaches";
 import fishingWaters from "@/lib/hobbies/fishing-waters.json";
 
 type Hobby = CollectionEntry<"hobbies">;
@@ -14,7 +15,7 @@ export function hobbyFacts(entry: Hobby): string | undefined {
   const { interactive, dayList } = entry.data;
   switch (interactive) {
     case "tidepool":
-      return `${TIDEPOOL_SPECIES.length} critters to find`;
+      return `${TIDEPOOL_SPECIES.length} critters to find · ${TIDEPOOL_BEACHES.length} beaches`;
     case "aquarium":
       return `${AQUARIUM_SPECIES.length} species to stock`;
     case "fishing": {

@@ -1,9 +1,10 @@
 ---
 /**
- * Tide-pooling "flip a rock" game. Static markup + the reveal card; all
- * behaviour (beach, flipping, sprites, journal) lives in @/lib/hobbies/tidepool,
- * bound via the [data-tp-*] hooks. The mounting script is an Astro-processed module
- * (served from /_astro/), so it satisfies the strict `script-src 'self'` CSP.
+ * Tide pooling: turn the rocks. Static markup, the field journal, today's
+ * three and the reveal card; everything else (the six beaches, the water,
+ * turning rocks, brushing seaweed, finds) lives in @/lib/hobbies/tidepool,
+ * bound through the [data-tp-*] hooks. The mounting script is processed by
+ * Astro (served from /_astro/), so it meets the strict script-src CSP.
  */
 import FieldJournal from "@/components/hobbies/FieldJournal.astro";
 import SpecimenCard from "@/components/hobbies/SpecimenCard.astro";
@@ -13,24 +14,27 @@ import { SPECIES } from "@/lib/hobbies/tidepool-species";
 <section data-tidepool aria-label="Tide pooling game" class="not-prose">
   <FieldJournal prefix="tp" total={SPECIES.length} resetLabel="New beach" />
 
+  <div class="tp-three" data-tp-three aria-live="polite"></div>
+
   <div
     class="tp-frame"
     data-tp-frame
     tabindex="0"
     role="application"
-    aria-label="A pixel beach at low tide. Tap rocks and driftwood logs to find the creatures hiding underneath. Arrow keys pick one, Enter looks underneath."
+    aria-label="Looking down at a patch of shore at low tide. Tap a loose rock to turn it over and again to put it back, brush seaweed aside, and tap an animal to meet it. Arrow keys step through rocks and animals, Enter picks."
   >
-    <canvas
-      data-tp-canvas
-      class="block w-full touch-manipulation"
-      style="image-rendering: pixelated"
-      aria-hidden="true"></canvas>
+    <canvas data-tp-water class="tp-layer" aria-hidden="true"></canvas>
+    <canvas data-tp-canvas class="tp-layer tp-top" aria-hidden="true"></canvas>
   </div>
+  <div class="tp-pan" aria-hidden="true"><i data-tp-pan></i></div>
+  <p class="tp-say" data-tp-say></p>
   <p class="sr-only" aria-live="polite" data-tp-live></p>
+  <div class="tp-switch" data-tp-reveal-switch hidden></div>
   <p class="tp-note">
-    Pick a rock or log with the arrow keys and press Enter to look underneath.
-    Your field journal remembers what you've found. Just like IRL, put the rocks
-    back where you found them.
+    Pick a rock or an animal with the arrow keys and press Enter. Your field
+    journal remembers what you've found. Just like IRL, put the rocks back the
+    way you found them. The beaches are built from CC0 scans of rock, gravel and
+    sand by Poly Haven, and the animals on them are CC0 photos from iNaturalist.
   </p>
 
   <SpecimenCard prefix="tp" closeLabel="Keep looking" />
@@ -38,9 +42,49 @@ import { SPECIES } from "@/lib/hobbies/tidepool-species";
 
 <style>
   .tp-frame {
+    position: relative;
     overflow: hidden;
     border: 1px solid var(--rule);
     background: var(--band);
+    outline-offset: 2px;
+  }
+  .tp-layer {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+  }
+  .tp-top {
+    touch-action: pan-y;
+  }
+  .tp-frame:global(.is-grab) .tp-top {
+    cursor: grabbing;
+  }
+  .tp-pan {
+    display: none;
+    position: relative;
+    height: 1px;
+    margin-top: 8px;
+    background: var(--rule);
+  }
+  .tp-pan i {
+    position: absolute;
+    top: -1px;
+    height: 3px;
+    background: var(--ink);
+  }
+  @media (max-width: 559px) {
+    .tp-pan {
+      display: block;
+    }
+  }
+  .tp-say {
+    min-height: 2.9em;
+    margin: 10px 0 0;
+    max-width: 72ch;
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--ink-3);
   }
   .tp-note {
     margin: 8px 0 0;
@@ -48,6 +92,75 @@ import { SPECIES } from "@/lib/hobbies/tidepool-species";
     font-size: 12px;
     line-height: 1.5;
     color: var(--ink-2);
+  }
+  .tp-switch:not([hidden]) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 16px;
+    margin: 6px 0 0;
+    font-size: 13px;
+  }
+  .tp-switch :global(button[aria-pressed="true"] > span) {
+    color: var(--ink);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .tp-three {
+    margin: 0 0 12px;
+    border-top: 1px solid var(--rule);
+  }
+  .tp-three :global(.tp-three-head) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 2px 14px;
+    padding-top: 10px;
+  }
+  .tp-three :global(.tp-three-where) {
+    font-size: 12px;
+    color: var(--ink-2);
+  }
+  .tp-three :global(.tp-three-list) {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0;
+    margin: 6px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .tp-three :global(.tp-clue) {
+    padding: 4px 14px 4px 0;
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--ink-3);
+  }
+  .tp-three :global(.tp-clue + .tp-clue) {
+    padding-left: 14px;
+    border-left: 1px solid var(--rule);
+  }
+  .tp-three :global(.tp-clue.is-found .tp-clue-text) {
+    color: var(--ink-2);
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+  }
+  .tp-three :global(.tp-clue-name) {
+    display: block;
+    margin-top: 2px;
+    color: var(--ink);
+  }
+  @media (max-width: 639px) {
+    .tp-three :global(.tp-three-list) {
+      grid-template-columns: 1fr;
+    }
+    .tp-three :global(.tp-clue + .tp-clue) {
+      padding-left: 0;
+      border-left: 0;
+      border-top: 1px solid var(--rule-soft);
+    }
+    .tp-three :global(.tp-clue) {
+      padding: 6px 0;
+    }
   }
 </style>
 

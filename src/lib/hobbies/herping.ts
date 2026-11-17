@@ -33,7 +33,12 @@ import {
   type HerpCategory,
 } from "./herping-species";
 import photoData from "./herping-photos.json";
-import { revealFromPixels, stopPixelReveal } from "./pixel-reveal";
+import {
+  mountRevealSwitch,
+  playReveal,
+  revealStyle,
+  stopReveal,
+} from "./specimen-reveal";
 import { stampFind, upgradePhoto } from "./specimen";
 import { journalHop, type HopSprite } from "./journal-hop";
 import {
@@ -1023,7 +1028,7 @@ export function initHerping(root: HTMLElement): void {
       animals = animals.filter((o) => o !== a);
       kick();
     }, 1400);
-    showCard(sp, isNew);
+    showCard(sp, isNew, a);
     cardFind = { animal: a, isNew, at: { x: a.sx, y: a.sy, len: a.len } };
     kick();
   }
@@ -1176,48 +1181,36 @@ export function initHerping(root: HTMLElement): void {
     else setTimeout(run, 400);
   }
 
-  function showCard(sp: HerpSpecies, isNew: boolean): void {
+  function showCard(sp: HerpSpecies, isNew: boolean, a: Animal): void {
     const override = PHOTOS[sp.id];
     const photo = sp.photo ?? override?.photo;
     const credit = sp.photoCredit ?? override?.credit ?? "";
-    stopPixelReveal(revealCanvas!);
-    if (photo && photoEl) {
-      // The square stays empty until the photo has loaded (usually at once,
-      // they're preloaded), then the photo resolves out of pixels.
-      photoEl.classList.add("is-hidden");
-      revealCanvas!.classList.add("is-hidden");
-      revealCanvas!.style.imageRendering = "pixelated";
-      photoEl.onerror = () => {
-        upgradePhoto(photoEl, "");
-        paintRevealStipple(sp);
-        if (creditEl) creditEl.classList.add("is-hidden");
-      };
-      photoEl.onload = () => revealFromPixels(revealCanvas!, photoEl);
+    stopReveal();
+    revealCanvas!.classList.add("is-hidden");
+    if (photoEl) photoEl.classList.add("is-hidden");
+    const loaded = new Promise<void>((res, rej) => {
+      if (!photo || !photoEl) return rej(new Error("no photo"));
+      photoEl.onload = () => res();
+      photoEl.onerror = () => rej(new Error(photo));
       photoEl.alt = sp.common;
       if (
         photoEl.getAttribute("src") === photo &&
         photoEl.complete &&
         photoEl.naturalWidth
-      ) {
-        revealFromPixels(revealCanvas!, photoEl);
-      } else {
-        photoEl.src = photo;
-      }
-      upgradePhoto(photoEl, photo);
-      if (creditEl) {
-        creditEl.textContent = credit;
-        creditEl.classList.toggle("is-hidden", !credit);
-      }
-    } else {
-      // A photo still loading for an earlier animal mustn't land on this one.
-      if (photoEl) {
-        photoEl.onload = null;
-        upgradePhoto(photoEl, "");
-      }
-      paintRevealStipple(sp);
-      if (creditEl) creditEl.classList.add("is-hidden");
+      )
+        res();
+      else photoEl.src = photo;
+    });
+    if (photoEl) upgradePhoto(photoEl, photo ?? "");
+    if (creditEl) {
+      creditEl.textContent = credit;
+      creditEl.classList.toggle("is-hidden", !credit || !photo);
     }
-
+    // The photo comes out of the animal as it lay on the road (specimen-reveal.ts).
+    const box = canvas!.getBoundingClientRect();
+    const sprite = hopSprite(a, a.len);
+    const size = sprite.size;
+    const pic = photoEl?.parentElement;
     nameEl!.textContent = sp.common;
     sciEl!.textContent = sp.scientific;
     factEl!.textContent = sp.facts[Math.floor(Math.random() * sp.facts.length)];
@@ -1229,6 +1222,31 @@ export function initHerping(root: HTMLElement): void {
     badgeEl!.classList.toggle("is-warn", !!sp.nonNative);
     if (markEl) stampFind(markEl, badgeEl!, isNew && !sp.nonNative);
     openCard();
+    if (!photoEl || !pic) return;
+    playReveal({
+      card: card!.querySelector<HTMLElement>(".specimen") ?? card!,
+      pic,
+      img: photoEl,
+      photo: loaded,
+      from: {
+        rect: {
+          x: box.left + a.sx - size / 2,
+          y: box.top + a.sy - size / 2,
+          w: size,
+          h: size,
+        },
+        // The drive draws in WebGL, which can't be copied outside a frame, so
+        // the lens magnifies the animal itself.
+        sprite: sprite.color,
+      },
+      style: revealStyle(),
+      reduced: reduceMotion,
+      onFail: () => {
+        upgradePhoto(photoEl, "");
+        paintRevealStipple(sp);
+        if (creditEl) creditEl.classList.add("is-hidden");
+      },
+    });
   }
 
   // The card is a modal: focus moves to its button, Escape or the scrim
@@ -1246,6 +1264,7 @@ export function initHerping(root: HTMLElement): void {
   }
   function closeCard(): void {
     if (!card!.classList.contains("is-open")) return;
+    stopReveal();
     card!.classList.remove("is-open");
     returnFocus?.focus({ preventScroll: true });
     returnFocus = null;
@@ -1390,6 +1409,7 @@ export function initHerping(root: HTMLElement): void {
     e.preventDefault();
   });
 
+  mountRevealSwitch(root.querySelector<HTMLElement>("[data-hp-reveal-switch]"));
   closeBtn.addEventListener("click", closeCard);
   card.addEventListener("click", (e) => {
     if (e.target === card) closeCard();

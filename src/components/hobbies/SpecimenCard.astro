@@ -5,7 +5,8 @@
  * Latin name, one fact and the photo credit, with one button that stays in
  * the fiction. The engine fills it through the data-<prefix>-* hooks, opens
  * it by adding "is-open" to the [data-<prefix>-card] scrim, and hides the
- * photo or sprite with "is-hidden".
+ * photo or its stand-in with "is-hidden". The photo comes in through one of
+ * the reveals in src/lib/hobbies/specimen-reveal.ts.
  */
 interface Props {
   /** Hook prefix the engine queries: "tp" for tide pooling, "hp" for herping. */
@@ -27,15 +28,11 @@ const nameId = `${prefix}-specimen-name`;
     aria-labelledby={nameId}
   >
     <div class="specimen-pic">
-      <canvas
-        {...hook("reveal")}
-        width="160"
-        height="120"
-        style="image-rendering: pixelated"
-        aria-hidden="true"></canvas>
+      <canvas {...hook("reveal")} width="160" height="120" aria-hidden="true"
+      ></canvas>
       {
         /* Not lazy: it has no src until a card opens, and it stays hidden
-          until the photo loads (the pixel reveal). Chrome never fetches a
+          until the photo loads (specimen-reveal.ts). Chrome never fetches a
           lazy image that isn't displayed. */
       }
       <img

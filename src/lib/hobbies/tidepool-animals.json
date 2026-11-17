@@ -1,0 +1,482 @@
+{
+  "acorn-barnacle": {
+    "cm": 3,
+    "view": "top",
+    "w": 582,
+    "h": 600,
+    "box": [0.01, 0.008, 0.991, 0.992],
+    "credit": {
+      "author": "Guerric Hach\u00e9",
+      "page": "https://www.inaturalist.org/observations/315962938",
+      "license": "CC0"
+    }
+  },
+  "aggregating-anemone": {
+    "cm": 12,
+    "view": "top",
+    "w": 462,
+    "h": 600,
+    "box": [0.011, 0.008, 0.989, 0.992],
+    "credit": {
+      "author": "Todd Folsom",
+      "page": "https://www.inaturalist.org/observations/80824366",
+      "license": "CC0"
+    }
+  },
+  "black-katy-chiton": {
+    "cm": 7,
+    "view": "top",
+    "w": 600,
+    "h": 470,
+    "box": [0.008, 0.011, 0.992, 0.991],
+    "credit": {
+      "author": "Rod",
+      "page": "https://www.inaturalist.org/observations/28945437",
+      "license": "CC0"
+    }
+  },
+  "black-turban-snail": {
+    "cm": 3,
+    "view": "top",
+    "w": 600,
+    "h": 524,
+    "box": [0.008, 0.01, 0.992, 0.99],
+    "credit": {
+      "author": "Jesse Rorabaugh",
+      "page": "https://www.inaturalist.org/observations/6818413",
+      "license": "CC0"
+    }
+  },
+  "blood-star": {
+    "cm": 10,
+    "view": "top",
+    "w": 600,
+    "h": 578,
+    "box": [0.008, 0.007, 0.993, 1.0],
+    "credit": {
+      "author": "Randal",
+      "page": "https://www.inaturalist.org/observations/48594453",
+      "license": "CC0"
+    }
+  },
+  "california-mussel": {
+    "cm": 18,
+    "view": "top",
+    "w": 600,
+    "h": 455,
+    "box": [0.008, 0.011, 0.992, 0.996],
+    "credit": {
+      "author": "Diego Blanco",
+      "page": "https://www.inaturalist.org/observations/268012607",
+      "license": "CC0"
+    }
+  },
+  "california-sea-cucumber": {
+    "cm": 25,
+    "view": "top",
+    "w": 224,
+    "h": 600,
+    "box": [0.022, 0.008, 0.978, 0.992],
+    "credit": {
+      "author": "Carolyn Prentice",
+      "page": "https://www.inaturalist.org/observations/214908385",
+      "license": "CC0"
+    }
+  },
+  "checkered-periwinkle": {
+    "cm": 1.2,
+    "view": "angled",
+    "w": 600,
+    "h": 461,
+    "box": [0.008, 0.011, 0.992, 0.989],
+    "credit": {
+      "author": "Steph Brulot-Sawchyn",
+      "page": "https://www.inaturalist.org/observations/272352881",
+      "license": "CC0"
+    }
+  },
+  "clown-nudibranch": {
+    "cm": 6,
+    "view": "top",
+    "w": 553,
+    "h": 600,
+    "box": [0.009, 0.0, 0.991, 0.992],
+    "credit": {
+      "author": "Guerric Hach\u00e9",
+      "page": "https://www.inaturalist.org/observations/204951611",
+      "license": "CC0"
+    }
+  },
+  "frilled-dogwinkle": {
+    "cm": 5,
+    "view": "angled",
+    "w": 600,
+    "h": 576,
+    "box": [0.008, 0.009, 0.992, 0.993],
+    "credit": {
+      "author": "Randal",
+      "page": "https://www.inaturalist.org/observations/209327145",
+      "license": "CC0"
+    }
+  },
+  "giant-green-anemone": {
+    "cm": 18,
+    "view": "top",
+    "w": 599,
+    "h": 600,
+    "box": [0.008, 0.008, 0.992, 0.993],
+    "credit": {
+      "author": "Dario Taraborelli",
+      "page": "https://www.inaturalist.org/observations/36207357",
+      "license": "CC0"
+    }
+  },
+  "giant-pacific-octopus": {
+    "cm": 30,
+    "view": "top",
+    "w": 600,
+    "h": 392,
+    "box": [0.008, 0.013, 0.992, 0.987],
+    "credit": {
+      "author": "Randal",
+      "page": "https://www.inaturalist.org/observations/24841727",
+      "license": "CC0"
+    }
+  },
+  "gooseneck-barnacle": {
+    "cm": 10,
+    "view": "top",
+    "w": 600,
+    "h": 571,
+    "box": [0.008, 0.009, 0.992, 0.991],
+    "credit": {
+      "author": "emcaselli",
+      "page": "https://www.inaturalist.org/observations/38494636",
+      "license": "CC0"
+    }
+  },
+  "grainyhand-hermit-crab": {
+    "cm": 4,
+    "view": "angled",
+    "w": 338,
+    "h": 600,
+    "box": [0.015, 0.008, 0.985, 0.993],
+    "credit": {
+      "author": "Alex Heyman",
+      "page": "https://www.inaturalist.org/observations/70176124",
+      "license": "CC0"
+    }
+  },
+  "green-sea-urchin": {
+    "cm": 7,
+    "view": "top",
+    "w": 600,
+    "h": 422,
+    "box": [0.007, 0.012, 0.992, 0.988],
+    "credit": {
+      "author": "Ellyne Geurts",
+      "page": "https://www.inaturalist.org/observations/130453643",
+      "license": "CC0"
+    }
+  },
+  "green-shore-crab": {
+    "cm": 7,
+    "view": "top",
+    "w": 600,
+    "h": 434,
+    "box": [0.008, 0.012, 0.997, 0.988],
+    "credit": {
+      "author": "Joshua",
+      "page": "https://www.inaturalist.org/observations/174591936",
+      "license": "CC0"
+    }
+  },
+  "gumboot-chiton": {
+    "cm": 20,
+    "view": "top",
+    "w": 600,
+    "h": 322,
+    "box": [0.008, 0.016, 0.992, 0.984],
+    "credit": {
+      "author": "Al Kordesch",
+      "page": "https://www.inaturalist.org/observations/156660079",
+      "license": "CC0"
+    }
+  },
+  "hairy-hermit-crab": {
+    "cm": 3,
+    "view": "top",
+    "w": 597,
+    "h": 600,
+    "box": [0.008, 0.01, 0.99, 0.99],
+    "credit": {
+      "author": "saintaardvark",
+      "page": "https://www.inaturalist.org/observations/183730056",
+      "license": "CC0"
+    }
+  },
+  "high-cockscomb": {
+    "cm": 12,
+    "view": "top",
+    "w": 600,
+    "h": 406,
+    "box": [0.008, 0.012, 0.99, 0.988],
+    "credit": {
+      "author": "Ben Keen",
+      "page": "https://www.inaturalist.org/observations/44325846",
+      "license": "CC0"
+    }
+  },
+  "kelp-crab": {
+    "cm": 16,
+    "view": "top",
+    "w": 600,
+    "h": 533,
+    "box": [0.007, 0.008, 0.992, 0.991],
+    "credit": {
+      "author": "Al Kordesch",
+      "page": "https://www.inaturalist.org/observations/54327375",
+      "license": "CC0"
+    }
+  },
+  "leather-star": {
+    "cm": 20,
+    "view": "top",
+    "w": 572,
+    "h": 600,
+    "box": [0.009, 0.008, 0.991, 0.993],
+    "credit": {
+      "author": "Alex Heyman",
+      "page": "https://www.inaturalist.org/observations/87041991",
+      "license": "CC0"
+    }
+  },
+  "leopard-dorid": {
+    "cm": 6,
+    "view": "top",
+    "w": 458,
+    "h": 600,
+    "box": [0.011, 0.008, 0.989, 0.992],
+    "credit": {
+      "author": "Alex Heyman",
+      "page": "https://www.inaturalist.org/observations/39127876",
+      "license": "CC0"
+    }
+  },
+  "lined-chiton": {
+    "cm": 4,
+    "view": "top",
+    "w": 600,
+    "h": 499,
+    "box": [0.008, 0.01, 0.992, 0.99],
+    "credit": {
+      "author": "Carolyn Prentice",
+      "page": "https://www.inaturalist.org/observations/176682561",
+      "license": "CC0"
+    }
+  },
+  "moon-snail": {
+    "cm": 10,
+    "view": "top",
+    "w": 600,
+    "h": 476,
+    "box": [0.008, 0.011, 0.99, 0.989],
+    "credit": {
+      "author": "Lauren Bosch",
+      "page": "https://www.inaturalist.org/observations/192280780",
+      "license": "CC0"
+    }
+  },
+  "ochre-star": {
+    "cm": 25,
+    "view": "top",
+    "w": 521,
+    "h": 600,
+    "box": [0.01, 0.008, 0.99, 0.992],
+    "credit": {
+      "author": "laiet17",
+      "page": "https://www.inaturalist.org/observations/144656380",
+      "license": "CC0"
+    }
+  },
+  "opalescent-nudibranch": {
+    "cm": 4,
+    "view": "top",
+    "w": 600,
+    "h": 353,
+    "box": [0.008, 0.014, 0.992, 0.986],
+    "credit": {
+      "author": "Sunny Zhang \u5f20\u8fce\u65b0",
+      "page": "https://www.inaturalist.org/observations/362889362",
+      "license": "CC0"
+    }
+  },
+  "painted-anemone": {
+    "cm": 10,
+    "view": "top",
+    "w": 600,
+    "h": 583,
+    "box": [0.012, 0.01, 0.99, 0.988],
+    "credit": {
+      "author": "Charlie O'Brien",
+      "page": "https://www.inaturalist.org/observations/199239391",
+      "license": "CC0"
+    }
+  },
+  "penpoint-gunnel": {
+    "cm": 20,
+    "view": "angled",
+    "w": 600,
+    "h": 188,
+    "box": [0.008, 0.021, 0.992, 0.973],
+    "credit": {
+      "author": "Andrew Nunns",
+      "page": "https://www.inaturalist.org/observations/336519747",
+      "license": "CC0"
+    }
+  },
+  "plate-limpet": {
+    "cm": 4,
+    "view": "top",
+    "w": 474,
+    "h": 600,
+    "box": [0.008, 0.007, 0.992, 0.993],
+    "credit": {
+      "author": "Irene",
+      "page": "https://www.inaturalist.org/observations/94379975",
+      "license": "CC0"
+    }
+  },
+  "porcelain-crab": {
+    "cm": 4,
+    "view": "top",
+    "w": 600,
+    "h": 452,
+    "box": [0.008, 0.011, 0.992, 0.989],
+    "credit": {
+      "author": "Sunny Zhang \u5f20\u8fce\u65b0",
+      "page": "https://www.inaturalist.org/observations/236853537",
+      "license": "CC0"
+    }
+  },
+  "purple-sea-urchin": {
+    "cm": 9,
+    "view": "top",
+    "w": 600,
+    "h": 570,
+    "box": [0.008, 0.009, 0.992, 0.991],
+    "credit": {
+      "author": "Dan Horowitz",
+      "page": "https://www.inaturalist.org/observations/35107101",
+      "license": "CC0"
+    }
+  },
+  "purple-shore-crab": {
+    "cm": 8,
+    "view": "top",
+    "w": 600,
+    "h": 212,
+    "box": [0.008, 0.024, 0.992, 0.976],
+    "credit": {
+      "author": "Yann Kemper",
+      "page": "https://www.inaturalist.org/observations/237922043",
+      "license": "CC0"
+    }
+  },
+  "red-rock-crab": {
+    "cm": 16,
+    "view": "top",
+    "w": 417,
+    "h": 600,
+    "box": [0.014, 0.008, 0.986, 0.992],
+    "credit": {
+      "author": "Dave Miller",
+      "page": "https://www.inaturalist.org/observations/237057830",
+      "license": "CC0"
+    }
+  },
+  "red-sea-urchin": {
+    "cm": 20,
+    "view": "top",
+    "w": 600,
+    "h": 544,
+    "box": [0.01, 0.009, 0.99, 0.991],
+    "credit": {
+      "author": "Steph Brulot-Sawchyn",
+      "page": "https://www.inaturalist.org/observations/230851386",
+      "license": "CC0"
+    }
+  },
+  "ribbed-limpet": {
+    "cm": 2.5,
+    "view": "top",
+    "w": 600,
+    "h": 482,
+    "box": [0.008, 0.01, 0.992, 0.99],
+    "credit": {
+      "author": "Randal",
+      "page": "https://www.inaturalist.org/observations/43023371",
+      "license": "CC0"
+    }
+  },
+  "sea-lemon": {
+    "cm": 10,
+    "view": "top",
+    "w": 600,
+    "h": 572,
+    "box": [0.008, 0.009, 0.992, 0.99],
+    "credit": {
+      "author": "Steph Brulot-Sawchyn",
+      "page": "https://www.inaturalist.org/observations/277133259",
+      "license": "CC0"
+    }
+  },
+  "six-rayed-star": {
+    "cm": 5,
+    "view": "top",
+    "w": 568,
+    "h": 600,
+    "box": [0.009, 0.008, 0.991, 0.992],
+    "credit": {
+      "author": "Braden J. Judson",
+      "page": "https://www.inaturalist.org/observations/107152822",
+      "license": "CC0"
+    }
+  },
+  "sunflower-star": {
+    "cm": 30,
+    "view": "top",
+    "w": 551,
+    "h": 600,
+    "box": [0.009, 0.008, 0.991, 0.992],
+    "credit": {
+      "author": "davidbroadland",
+      "page": "https://www.inaturalist.org/observations/371836165",
+      "license": "CC0"
+    }
+  },
+  "tidepool-sculpin": {
+    "cm": 6,
+    "view": "side",
+    "w": 600,
+    "h": 312,
+    "box": [0.008, 0.016, 0.993, 0.984],
+    "credit": {
+      "author": "Ellyne Geurts",
+      "page": "https://www.inaturalist.org/observations/78523377",
+      "license": "CC0"
+    }
+  },
+  "tidepool-shrimp": {
+    "cm": 4.5,
+    "view": "top",
+    "w": 460,
+    "h": 600,
+    "box": [0.013, 0.008, 0.989, 0.992],
+    "credit": {
+      "author": "Andy Kleinhesselink",
+      "page": "https://www.inaturalist.org/observations/19780243",
+      "license": "CC0"
+    }
+  }
+}

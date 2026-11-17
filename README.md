@@ -59,7 +59,7 @@ The docs explain why each piece exists ([docs/architecture.md](docs/architecture
 The site is a static Astro build on Azure Static Web Apps, with the photos in Azure Blob Storage. Drop a folder of photos into Blob and the next build picks them up.
 
 - Frontend: Astro 7 and Tailwind v3, built to static pages ([docs/architecture.md](docs/architecture.md)).
-- Things to try: canvas toys drawn in code (aquarium, tide pooling, fishing, birding selfie-to-bird, herping night drive, hiking trail studio) and the Narrow nature daily puzzle. Each card shows a stipple drawing made from my own photos, and the night drive's ferns and trees are cut from them too, drawn only where the headlights reach ([docs/hobbies.md](docs/hobbies.md)).
+- Things to try: canvas toys drawn in code (aquarium, tide pooling, fishing, birding selfie-to-bird, herping night drive, hiking trail studio) and the Narrow nature daily puzzle. Each card shows a stipple drawing made from my own photos. The night drive's ferns and trees are stippled from public-domain photos and drawn only where the headlights reach, and the tide pool's six beaches are built from CC0 scans of rock and sand with a WebGL water pass over them ([docs/hobbies.md](docs/hobbies.md)).
 - Dynamic API: the Functions in `api/`, bundled with Static Web Apps: the contact form, the admin API, the analytics beacon, link-preview images and the resume PDF ([docs/architecture.md](docs/architecture.md)).
 - Admin and analytics: a browser `/admin` panel behind GitHub sign-in, and cookieless traffic metrics ([docs/admin.md](docs/admin.md), [docs/analytics.md](docs/analytics.md)).
 - Hosting: Azure Static Web Apps, Free tier ([docs/azure.md](docs/azure.md)).
@@ -183,8 +183,8 @@ photography-website/
 │   └── track/                 # the analytics beacon
 ├── docs/                      # detailed docs (this README is the index), images/ holds its screenshots
 ├── infra/                     # Bicep IaC, see docs/iac-bicep.md
-├── public/                    # files served as they are: the resume PDF, fonts, the birding face model, map tiles
-├── scripts/                   # prebuild, upload + bootstrap scripts, photos/ (captions), social/ (Instagram)
+├── public/                    # files served as they are: the resume PDF, fonts, the birding face model, map tiles, the tide pool beaches
+├── scripts/                   # prebuild, upload + bootstrap scripts, photos/ (captions), social/ (Instagram), tidepool/ (beaches)
 ├── src/
 │   ├── assets/                # committed images: stipple drawings, my portrait, fishing catch photos
 │   ├── components/            # Astro components (Header, ArchiveRail, Lightbox, PlateArt, …)
@@ -220,4 +220,4 @@ The **source code** in this repository is licensed under the MIT License. See [L
 
 The **photographs, graphics, and written content** are not covered by that license. All photographs and images on the site are © Truman Brown, all rights reserved, and are not licensed for reuse. The photos themselves are not stored in this repository; they live in Azure Blob Storage and are served to the site at build time.
 
-Third-party content carries its own terms: the tide-pooling reveal cards can show Creative Commons photos from iNaturalist with attribution shown in the card, and those remain under their respective CC licenses. See [docs/hobbies.md](docs/hobbies.md) for details.
+Third-party content carries its own terms: the tide-pooling and herping reveal cards show Creative Commons photos from iNaturalist with attribution shown in the card, and those remain under their respective CC licenses. The tide pool's beaches and animals and the night drive's roadside are built from CC0 and public-domain images, credited in [docs/hobbies.md](docs/hobbies.md).
