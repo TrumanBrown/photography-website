@@ -68,7 +68,7 @@ export const WORK: Job[] = [
       "Cut customer-reported incidents nearly 40%, from 6.9 to 4.2 per 1,000 migrated VMs in 2026, with new validation checks, safeguards and retry fixes, while holding a 97.5% migration success rate",
       "Ran 18 monthly releases since Mar 2025 with no release manager, using AI agents to mock up features from approved UX assets for engineering, without a designer, and to write or update 25 Learn articles",
       "Shipped SAN migration support, unblocking a dental insurer that has moved 2,000+ of a planned 5,500 VMs",
-      "Released Azure Migrate for Azure Local in Azure Government, with a U.S. military branch as anchor customer",
+      "Released Azure Migrate for Azure Local in Azure Government, with a national military branch as anchor customer",
       "Proposed and shipped Azure Arc reuse during migration, so Arc-managed VMs keep their configuration, monitoring and extensions with no re-onboarding, unblocking enterprises with hundreds to 10,000 Arc VMs",
       "Shipped Secure Boot retention (9,300+ VMs, 377 customers), PowerShell, CLI and Terraform automation (PowerShell alone moved 2,000 VMs for 15 customers) and migration support for Trusted Launch VMs",
       "Partnered with five enterprises (20,000+ cores) before, during and after migration, unblocking hundreds of SQL Server VMs with fast analysis, proposed fixes and release coordination, and gave 4 executive briefings",
