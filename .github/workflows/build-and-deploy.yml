@@ -209,6 +209,19 @@ jobs:
           api_location: 'api'
           skip_app_build: true
 
+      # A deploy starts a new Functions process, which loads only on its first
+      # request. Make that this one, so a resume opened right after a deploy
+      # doesn't wait for the process to start (docs/analytics.md, "Warm-up
+      # ping"). The warm-up timer would otherwise get there within a minute.
+      - name: Warm the new Functions process
+        if: env.CAN_USE_AZURE == 'true' && github.event_name != 'pull_request'
+        continue-on-error: true
+        env:
+          SITE: ${{ steps.swa.outputs.static_web_app_url }}
+        run: |
+          [ -n "$SITE" ] || exit 0
+          curl -fsS -o /dev/null --max-time 60 --retry 3 --retry-all-errors "$SITE/api/track?warm=1"
+
       # New photos are live now, without captions. The photo pipeline analyses
       # them, writes their captions and the session description, and starts
       # another build when it's done (docs/photos.md).
