@@ -86,6 +86,7 @@ When he sends a reel or a video, get the video itself, transcribe the audio, sam
 - 2026-11-15: the aquarium's fish jump, "really good. really good. the different paths they take, the little splash they make, how they fall into the tank, it feels really satisfying to click that button and spam it. that's a success." It's the model for any tap that adds something to a scene (rule above).
 - 2026-11-15: of the five mocks that followed (`mocks/satisfying/`: hiking moments, tide pooling, the fishing leap, Narrow nature's pin, the posted letter), "these are all good. do all of them. push them to live don't wait for me", and make it the default for new UX (rule above).
 - 2026-11-16: on the hiking bounce, "it's unclear why moments are bouncing off... you need to make that clear why it is failing, maybe give a clean animation or emphasis on the moments maxed out. remember this lesson too" (the rule on refusals above).
+- 2026-11-17: the tide pool's lift reveal on the live site, "it will show their species picture on tide pooling before the animation finishes and lands ont he actual popout image revealing the species. it is not smooth and looks unprofessioanl." Something that flies into place arrives before what it turns into: the animal lands, then its photo comes up (hobby-pages lesson 27).
 
 ## Hard-won lessons
 

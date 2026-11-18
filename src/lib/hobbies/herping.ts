@@ -1230,14 +1230,15 @@ export function initHerping(root: HTMLElement): void {
       photo: loaded,
       from: {
         rect: {
-          x: box.left + a.sx - size / 2,
-          y: box.top + a.sy - size / 2,
-          w: size,
-          h: size,
+          x: box.left + a.sx - a.len / 2,
+          y: box.top + a.sy - a.len / 2,
+          w: a.len,
+          h: a.len,
         },
         // The drive draws in WebGL, which can't be copied outside a frame, so
         // the lens magnifies the animal itself.
         sprite: sprite.color,
+        fill: a.len / size,
       },
       style: revealStyle(),
       reduced: reduceMotion,

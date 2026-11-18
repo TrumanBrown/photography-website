@@ -4,8 +4,9 @@
  * `?reveal=lift|lens|print` while Truman chooses one:
  *
  * - lift: the animal comes up off the scene, its shadow dropping away, arcs
- *   into the card's frame and turns into its photograph as it lands, like the
- *   aquarium's fish jump (site-motion).
+ *   into the card's frame and lands in the middle of it, like the aquarium's
+ *   fish jump (site-motion). Only once it has landed does the photograph come
+ *   up under it as it fades, so the photo never shows while it's in the air.
  * - lens: a hand lens slides over the animal and magnifies it, then opens out
  *   into the card's frame as the photograph comes up through it.
  * - print: the photograph drops onto the card like a print laid on paper, a
@@ -31,8 +32,11 @@ export interface Box {
 export interface RevealSource {
   /** Where the animal is on screen, viewport px. */
   rect: Box;
-  /** The animal as it looks in the scene, on a transparent canvas, centred. */
+  /** The animal as it looks in the scene, on a transparent canvas, centred.
+   *  Drawn larger than on screen keeps the lift sharp as it grows. */
   sprite: HTMLCanvasElement;
+  /** How much of the sprite's width the animal itself spans, 0 to 1. */
+  fill?: number;
   /** The visible scene, and where it is on screen, for the lens to magnify. */
   scene?: { canvas: HTMLCanvasElement; rect: Box };
 }
@@ -121,11 +125,48 @@ export function arcPoint(
   };
 }
 
-/** How much of the photograph shows during a lift, by `k`: none until
- *  halfway, all of it just before it lands. */
-export function liftPhoto(k: number): number {
-  const u = Math.min(1, Math.max(0, (k - 0.5) / 0.36));
-  return u * u * (3 - 2 * u);
+/** How big a lifted animal lands, as a share of the frame's shorter side:
+ *  about the size its photograph shows it. */
+export const LAND = 0.62;
+
+/**
+ * The lift's keyframes for the animal and its shadow, both on a layer that
+ * sits where the animal lands (`to`, its centre, `s1` px across). It starts
+ * over the animal in the scene (`from`, `s0` px across), comes up a little
+ * larger first, then arcs over and shrinks or grows to land. The shadow is
+ * placed in screen px, so it falls away as the animal rises and tucks back
+ * under it as it comes down.
+ */
+export function liftFrames(
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+  s0: number,
+  s1: number,
+  steps = 16,
+): { fly: Keyframe[]; shadow: Keyframe[] } {
+  const lift = Math.min(160, 40 + Math.abs(from.y - to.y) * 0.25);
+  const fly: Keyframe[] = [];
+  const shadow: Keyframe[] = [];
+  for (let i = 0; i <= steps; i++) {
+    const k = i / steps;
+    const p = arcPoint(from, to, k, lift);
+    const e = k < 0.5 ? 2 * k * k : 1 - 2 * (1 - k) * (1 - k);
+    // Up off the ground first: a little larger before it travels.
+    const pop = 1 + 0.12 * Math.sin(Math.min(1, k / 0.35) * Math.PI) * (1 - k);
+    const sc = ((s0 + (s1 - s0) * e) / s1) * pop;
+    fly.push({
+      offset: k,
+      transform: `translate(${p.x - to.x}px, ${p.y - to.y}px) scale(${sc})`,
+    });
+    const up = Math.sin(k * Math.PI);
+    const off = (3 + 22 * up) / sc;
+    shadow.push({
+      offset: k,
+      opacity: 1 - 0.45 * up,
+      transform: `translate(${off}px, ${off * 1.2}px) scale(${1 - 0.15 * up})`,
+    });
+  }
+  return { fly, shadow };
 }
 
 /** The print's drop: keyframes for the photo. */
@@ -150,7 +191,9 @@ export function printFrames(): Keyframe[] {
   ];
 }
 
-export const LIFT_MS = 640;
+export const LIFT_MS = 600;
+/** After a lift lands: the photo comes up as the animal fades. */
+export const DEVELOP_MS = 260;
 export const LENS_MS = 780;
 export const PRINT_MS = 380;
 const EASE = "cubic-bezier(0.2, 0, 0.2, 1)";
@@ -213,6 +256,8 @@ function fitted(
 export function playReveal(o: RevealOptions): void {
   stopReveal();
   const hidden = o.hiddenClass ?? "is-hidden";
+  // Stopping an older reveal shows its photo, and it's the same image.
+  o.img.classList.add(hidden);
   const anims: Animation[] = [];
   const nodes: HTMLElement[] = [];
   let done = false;
@@ -247,6 +292,9 @@ export function playReveal(o: RevealOptions): void {
     }, failed);
     return;
   }
+  // Measured before the card starts its rise, or the flight would land 8px
+  // low and jump when the photo takes over.
+  const end = rectOf(o.pic);
   anims.push(
     o.card.animate(
       [
@@ -257,7 +305,6 @@ export function playReveal(o: RevealOptions): void {
     ),
   );
 
-  const end = rectOf(o.pic);
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   const style = o.from ? o.style : "print";
 
@@ -276,6 +323,69 @@ export function playReveal(o: RevealOptions): void {
   }
 
   const from = o.from!;
+
+  if (style === "lift") {
+    // The animal flies on its own and lands in the middle of the frame at
+    // about the size its photo shows it. The photo stays hidden until then.
+    const fill = Math.min(1, Math.max(0.1, from.fill ?? 1));
+    const s1 = (Math.min(end.w, end.h) * LAND) / fill;
+    const s0 = Math.max(from.rect.w, from.rect.h) / fill;
+    const to = { x: end.x + end.w / 2, y: end.y + end.h / 2 };
+    const fly = layer({ x: to.x - s1 / 2, y: to.y - s1 / 2, w: s1, h: s1 });
+    fly.style.transformOrigin = "50% 50%";
+    nodes.push(fly);
+    const spr = fitted(
+      from.sprite,
+      s1,
+      s1,
+      from.sprite.width,
+      from.sprite.height,
+      "contain",
+      dpr,
+    );
+    const shadow = document.createElement("div");
+    const inset = ((1 - fill * 0.86) / 2) * 100;
+    shadow.style.cssText = `position:absolute;inset:${inset}%;border-radius:50%;background:rgba(10,12,10,0.36);filter:blur(${Math.max(4, s1 * fill * 0.05)}px);`;
+    fly.append(shadow, spr);
+    const f = liftFrames(
+      { x: from.rect.x + from.rect.w / 2, y: from.rect.y + from.rect.h / 2 },
+      to,
+      s0,
+      s1,
+    );
+    const t = {
+      duration: LIFT_MS,
+      easing: "linear",
+      fill: "forwards" as FillMode,
+    };
+    const flight = fly.animate(f.fly, t);
+    anims.push(flight, shadow.animate(f.shadow, t));
+    // Landed, and the photo is in: it comes up under the animal, settling
+    // from a touch large, while the animal and its shadow fade off it.
+    const develop = () => {
+      if (done) return;
+      showPhoto();
+      const up = o.img.animate(
+        [
+          { opacity: 0, transform: "scale(1.02)" },
+          { opacity: 1, transform: "none" },
+        ],
+        { duration: DEVELOP_MS, easing: EASE },
+      );
+      anims.push(
+        up,
+        fly.animate([{ opacity: 1 }, { opacity: 0 }], {
+          duration: DEVELOP_MS * 0.75,
+          easing: "linear",
+          fill: "forwards",
+        }),
+      );
+      up.onfinish = finish;
+    };
+    whenLanded(flight, o.photo, () => {}, develop, develop, failed);
+    return;
+  }
+
   const fly = layer(end);
   nodes.push(fly);
   const photoLayer = document.createElement("img");
@@ -283,116 +393,6 @@ export function playReveal(o: RevealOptions): void {
   photoLayer.style.cssText =
     "position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;";
   photoLayer.src = o.img.src;
-
-  if (style === "lift") {
-    // The sprite fills the card's frame at the end, at its in-scene size at
-    // the start: one uniform scale, from the animal's box to the frame.
-    const spr = fitted(
-      from.sprite,
-      end.w,
-      end.h,
-      from.sprite.width,
-      from.sprite.height,
-      "contain",
-      dpr,
-    );
-    const shadow = document.createElement("div");
-    shadow.style.cssText =
-      "position:absolute;left:18%;right:18%;top:20%;bottom:20%;border-radius:50%;background:rgba(10,12,10,0.38);filter:blur(10px);";
-    fly.append(shadow, spr, photoLayer);
-    // How big the sprite's own content is inside the frame at the end.
-    const fit = Math.min(end.w / from.sprite.width, end.h / from.sprite.height);
-    const s0 =
-      Math.max(from.rect.w, from.rect.h) /
-      (Math.max(from.sprite.width, from.sprite.height) * fit);
-    const a = {
-      x: from.rect.x + from.rect.w / 2,
-      y: from.rect.y + from.rect.h / 2,
-    };
-    const b = { x: end.x + end.w / 2, y: end.y + end.h / 2 };
-    const lift = Math.min(160, 40 + Math.abs(a.y - b.y) * 0.25);
-    const frames: Keyframe[] = [];
-    const shadowFrames: Keyframe[] = [];
-    const steps = 12;
-    for (let i = 0; i <= steps; i++) {
-      const k = i / steps;
-      const p = arcPoint(a, b, k, lift);
-      const s =
-        s0 + (1 - s0) * (k < 0.5 ? 2 * k * k : 1 - 2 * (1 - k) * (1 - k));
-      // Up off the ground first: a little larger before it travels.
-      const pop =
-        1 + 0.12 * Math.sin(Math.min(1, k / 0.35) * Math.PI) * (1 - k);
-      const sc = s * pop;
-      frames.push({
-        offset: k,
-        transform: `translate(${p.x - (end.w * sc) / 2 - end.x}px, ${p.y - (end.h * sc) / 2 - end.y}px) scale(${sc})`,
-      });
-      const off = 4 + 26 * Math.sin(k * Math.PI);
-      shadowFrames.push({
-        offset: k,
-        opacity: k < 0.85 ? 1 : (1 - k) / 0.15,
-        transform: `translate(${off}px, ${off * 1.2}px) scale(${1 - 0.15 * Math.sin(k * Math.PI)})`,
-      });
-    }
-    const t = {
-      duration: LIFT_MS,
-      easing: "linear",
-      fill: "forwards" as FillMode,
-    };
-    const flight = fly.animate(frames, t);
-    anims.push(flight, shadow.animate(shadowFrames, t));
-    const photoFrames = Array.from({ length: 11 }, (_, i) => ({
-      offset: i / 10,
-      opacity: liftPhoto(i / 10),
-    }));
-    const spriteFrames = Array.from({ length: 11 }, (_, i) => ({
-      offset: i / 10,
-      opacity: 1 - liftPhoto(i / 10) * 0.999,
-    }));
-    const land = () => {
-      if (done) return;
-      showPhoto();
-      anims.push(
-        o.img.animate([{ transform: "scale(1.012)" }, { transform: "none" }], {
-          duration: 180,
-          easing: EASE,
-        }),
-      );
-      finish();
-    };
-    whenLanded(
-      flight,
-      o.photo,
-      () => {
-        // The photo is in: fade it up on the flight's own clock.
-        for (const [el, fr] of [
-          [photoLayer, photoFrames],
-          [spr, spriteFrames],
-        ] as const) {
-          const a = el.animate(fr, t);
-          a.currentTime = flight.currentTime;
-          anims.push(a);
-        }
-      },
-      () => {
-        // It landed before the photo came: cross over now.
-        anims.push(
-          photoLayer.animate([{ opacity: 0 }, { opacity: 1 }], {
-            duration: 200,
-            fill: "forwards",
-          }),
-          spr.animate([{ opacity: 1 }, { opacity: 0 }], {
-            duration: 200,
-            fill: "forwards",
-          }),
-        );
-        window.setTimeout(land, 200);
-      },
-      land,
-      failed,
-    );
-    return;
-  }
 
   // lens
   const scene = from.scene;

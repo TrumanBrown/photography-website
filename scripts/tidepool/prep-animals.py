@@ -26,7 +26,7 @@ import numpy as np
 from PIL import Image
 
 # Keep in step with VERSION in build-beaches.py.
-VERSION = "v1"
+VERSION = "v2"
 REPO = Path(__file__).resolve().parents[2]
 SRC = Path(os.environ.get("TIDEPOOL_STAGING", REPO / "staging" / "tide-pooling" / "top"))
 OUT = REPO / "public" / "tidepool" / VERSION / "animals"

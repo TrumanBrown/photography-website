@@ -186,8 +186,10 @@ const nameId = `${prefix}-specimen-name`;
     padding-inline: 18px;
     border-color: var(--ink);
   }
+  /* Astro scopes with attribute selectors, so `.specimen-pic img` outranks a
+     plain class. Without !important the photo shows before its reveal lands. */
   .is-hidden {
-    display: none;
+    display: none !important;
   }
 
   @media (max-width: 520px) {

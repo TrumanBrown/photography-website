@@ -36,7 +36,7 @@ import cv2
 import numpy as np
 from PIL import Image
 
-VERSION = "v1"
+VERSION = "v2"
 REPO = Path(__file__).resolve().parents[2]
 OUT = REPO / "public" / "tidepool" / VERSION
 TEX = Path(os.environ.get("TIDEPOOL_TEX", Path.home() / ".cache" / "tidepool" / "tex"))
@@ -669,7 +669,7 @@ def ribbon(F, path, width, colour, label, rng, *, ruffle=0.18, thick=3.0, streak
     paint_patch(F, box, m, alb, hh, label, wet=wet)
 
 
-def bull_kelp(F, x, y, ang, rng, *, length=1300, label="bull-kelp"):
+def bull_kelp(F, x, y, ang, rng, *, length=1300, label="bull-kelp", blades=(500, 1000)):
     """A whole washed-up bull kelp: holdfast, a long tapering stipe, the bulb
     and a tangle of long flat blades from it."""
     stipe = wavy_path(x, y, ang, length, rng, step=8, curl=0.025)
@@ -682,7 +682,7 @@ def bull_kelp(F, x, y, ang, rng, *, length=1300, label="bull-kelp"):
     end_ang = math.atan2(stipe[-1, 1] - stipe[-8, 1], stipe[-1, 0] - stipe[-8, 0])
     for _ in range(int(rng.integers(7, 11))):
         a = end_ang + rng.normal(0, 0.45)
-        L = rng.uniform(500, 1000)
+        L = rng.uniform(*blades)
         path = wavy_path(bx + math.cos(a) * 30, by + math.sin(a) * 30, a, L, rng, step=8, curl=0.035)
         tone = rng.uniform(0.85, 1.15)
         ribbon(F, path, rng.uniform(70, 120), tuple(c * tone for c in (0.3, 0.23, 0.1)), label, rng, ruffle=0.28, thick=4, edge_dark=0.45, streak=0.25)
@@ -999,8 +999,10 @@ def build_boulder():
 
 
 def build_sand():
-    """Sandy beach: rippled wet sand, half-buried rocks, a runnel of water and
-    a wrack line of washed-up bull kelp and eelgrass."""
+    """Sandy beach, the one the toy opens on: rippled wet sand with one big
+    rock too heavy to turn in one go, a small pool scoured out at its foot,
+    loose rocks around them and a thin wrack line of washed-up bull kelp and
+    eelgrass along the top."""
     F = Field("sand", "Sandy beach", pxcm=20, seed=73)
     rng = F.rng
     F.lay(np.ones((H, W), bool), "damp_beach_sand", 0.9, gain=1.2, tint=(1.04, 1.0, 0.92), soft=0)
@@ -1011,37 +1013,40 @@ def build_sand():
     F.alb *= (0.86 + 0.2 * dry)[..., None]
     F.lab[:] = LID["sand"]
     F.wet[:] = 0.75 - 0.5 * dry
-    # A runnel draining across the lower beach.
-    run = wavy_path(-40, 1180, -0.08, 2600, rng, step=10, curl=0.02)
-    rw = (np.full(len(run), 110) + 40 * np.sin(np.linspace(0, 6, len(run)))).astype(np.float32)
-    d, r, _ = centreline_field(run, rw / 2, (0, 0, W, H))
-    runnel = d < r
-    depth = np.clip((r - d) / np.maximum(r, 1), 0, 1) ** 0.6 * 0.35 * runnel
-    F.h -= depth * 40
-    F.water = np.maximum(F.water, depth)
-    F.lab[runnel] = LID["water"]
-    wet_rim(F, runnel, 50, 0.25)
-    # The wrack line along the top: bull kelp, eelgrass and shells.
-    bull_kelp(F, -60, 300, 0.1, rng, length=1250)
-    for x in (700, 1300, 1900):
-        eelgrass(F, x, 380 + rng.uniform(-60, 60), rng, n=10)
-    shells(F, (F.lab == LID["sand"]) & (F.yy < 900), rng, n=22)
-    # Half-buried rocks.
-    blocked = runnel | (F.lab != LID["sand"])
+    # The big rock sits near the middle, so a phone sees it first, and the
+    # pool the waves scoured round its foot holds water at low tide. The
+    # boulder tips over to its left, onto open sand kept clear for it.
+    bx, by, brx, bry = 1100, 690, 300, 245
+    pool = fill(blob(1485, 1015, 340, 195, 21, wob=0.12, rot=-0.35))
+    pool &= ~fill(blob(bx, by, brx * 1.04, bry * 1.04, 22))
+    # Deepest against the boulder, where the waves dig, and shallow away from it.
+    near = smoothstep(460, 40, clearance(~fill(blob(bx, by, brx, bry, 22))))
+    depth = np.clip(clearance(pool) / 100, 0, 1) ** 0.8 * (0.42 + 0.5 * near)
+    pool_floor(F, pool, depth, 75, pebbles=0.45, coralline=-1.2, film=0.5, rock="damp_beach_sand", rock_gain=1.05,
+               carve=90, peb_scale=0.55)
+    wet_rim(F, pool, 44, 0.3)
+    keep_clear = fill(blob(bx - 2 * brx - 10, by + 20, brx * 1.15, bry * 1.2, 23))
+    # A thin wrack line along the top: bull kelp, eelgrass and broken shell.
+    bull_kelp(F, -50, 200, -0.04, rng, length=880, blades=(260, 520))
+    for x, y in ((1450, 150), (2050, 240)):
+        eelgrass(F, x, y, rng, n=9, spread=110)
+    shells(F, (F.lab == LID["sand"]) & (F.yy < 1100) & ~pool & ~keep_clear, rng, n=26)
+    blocked = pool | (F.lab != LID["sand"])
     blocked = cv2.dilate(blocked.astype(np.uint8), np.ones((25, 25), np.uint8)) > 0
-    placed = 0
-    for _ in range(900):
-        if placed >= 9:
-            break
-        r = rng.uniform(70, 150)
-        x, y = rng.uniform(150, W - 150), rng.uniform(550, H - 120)
-        if blocked[int(y), int(x)] or any(math.hypot(x - o["cx"], y - o["cy"]) < (r + o["rx"]) * 1.8 for o in F.rocks):
+    add_rock(F, bx, by, brx, bry, 0.2, 2, blocked, barn=0.8, film=0.5, heavy=3, wob=0.08, thick=220)
+    blocked |= fill(blob(bx, by, brx * 1.25, bry * 1.25, 24))
+    # Loose rocks you can turn, set into the sand around them.
+    spots = [(235, 385, 112), (215, 1075, 128), (585, 1295, 98), (960, 1205, 118), (1880, 330, 96),
+             (2160, 600, 136), (2190, 1255, 108), (1320, 1360, 84)]
+    for k, (x, y, r) in enumerate(spots):
+        if blocked[int(y), int(x)] or keep_clear[int(y), int(x)]:
             continue
-        add_rock(F, x, y, r, r * rng.uniform(0.62, 0.9), rng.uniform(0, 3), placed, blocked, barn=0.4 if placed % 3 == 0 else 0, film=0.5 if placed % 3 == 1 else 0, thick=r * 0.35)
-        blocked |= fill(blob(x, y, r * 1.3, r * 1.3, 2))
-        placed += 1
-    free_slots(F, "sand", (F.lab == LID["sand"]) & (clearance(~blocked) > 40) & (F.yy > 520), 30, spacing=140)
-    free_slots(F, "runnel", clearance(runnel) > 22, 14, spacing=150)
+        add_rock(F, x, y, r, r * rng.uniform(0.62, 0.88), rng.uniform(0, 3), k + 1, blocked,
+                 barn=0.4 if k % 3 == 0 else 0, film=0.5 if k % 3 == 1 else 0, thick=r * 0.35)
+        blocked |= fill(blob(x, y, r * 1.3, r * 1.3, 30 + k))
+    F._blocked |= cv2.dilate(pool.astype(np.uint8), np.ones((31, 31), np.uint8)) > 0
+    free_slots(F, "sand", (F.lab == LID["sand"]) & (clearance(~blocked) > 40) & (F.yy > 380) & ~keep_clear, 30, spacing=140)
+    free_slots(F, "runnel", clearance(pool) > 26, 12, spacing=110)
     free_slots(F, "wrack", (F.lab == LID["bull-kelp"]) | (F.lab == LID["eelgrass"]), 12, spacing=160)
     finish(F)
 

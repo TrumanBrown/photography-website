@@ -15,7 +15,7 @@
  * A find opens the reveal card (SpecimenCard.astro) through one of three
  * reveals (specimen-reveal.ts), a first find hops into the field journal when
  * the card closes (journal-hop.ts), and today's three are three animals on
- * today's beach, found from their clues.
+ * the sandy beach it opens on, found from their clues.
  *
  * Layers: the beach and everything on it draws into an offscreen canvas; the
  * water pass draws that onto the bottom canvas with water over the pools; the
@@ -33,6 +33,7 @@ import animalData from "./tidepool-animals.json";
 import { stampFind, upgradePhoto } from "./specimen";
 import { journalHop } from "./journal-hop";
 import {
+  LAND,
   mountRevealSwitch,
   playReveal,
   revealStyle,
@@ -43,6 +44,7 @@ import {
   ART_BASE,
   BEACHES,
   GROUND_SAYS,
+  HOME_BEACH,
   LABEL_SPECIES,
   OTHER_LIFE,
   WET_SLOTS,
@@ -51,7 +53,6 @@ import {
   deal,
   hingeReach,
   landing,
-  todaysBeach,
   todaysThree,
   type BeachData,
   type BeachId,
@@ -495,7 +496,7 @@ export function initTidepool(root: HTMLElement): void {
 
   // ------------------------------------------------------------ today
   const day = dayNumber(new Date());
-  const todayId = todaysBeach(day);
+  const homeId = HOME_BEACH;
   let three: string[] = [];
   const foundToday: Set<string> = (() => {
     try {
@@ -521,7 +522,7 @@ export function initTidepool(root: HTMLElement): void {
 
   // ------------------------------------------------------------ state
   let cur: BeachArt | null = null;
-  let beachId: BeachId = todayId;
+  let beachId: BeachId = homeId;
   let animals: Animal[] = [];
   let rocks: RockState[] = [];
   let clumps: WeedClump[] = [];
@@ -597,10 +598,9 @@ export function initTidepool(root: HTMLElement): void {
   }
 
   async function setBeach(id: BeachId, seed: number): Promise<void> {
-    if (!three.length)
-      three = todaysThree(day, (await loadBeach(todayId)).data);
+    if (!three.length) three = todaysThree(day, (await loadBeach(homeId)).data);
     const art = await loadBeach(id);
-    const isToday = id === todayId && seed === day;
+    const isToday = id === homeId && seed === day;
     const must = isToday ? three : [];
     const sizes = Object.fromEntries(SPECIES.map((s) => [s.id, cmFor(s)]));
     const placed = deal(art.data, seed, sizes, must);
@@ -765,6 +765,17 @@ export function initTidepool(root: HTMLElement): void {
    */
   function bake(a: Animal): void {
     const k = view.s * view.dpr;
+    const col = bakeAt(a, k);
+    const size = col.width;
+    a.baked = col;
+    a.shade = softShadow(col, size, size, Math.max(3, Math.round(size / 40)));
+    a.bakedK = k;
+    a.half = size / 2 / k;
+  }
+
+  /** The animal lit and turned as it lies, drawn at `k` device px per field
+   *  px, on a square canvas centred on it. */
+  function bakeAt(a: Animal, k: number): HTMLCanvasElement {
     const meta = ANIMALS[a.sp.id];
     const im = a.art.img;
     const iw = im.naturalWidth;
@@ -832,10 +843,28 @@ export function initTidepool(root: HTMLElement): void {
       }
     }
     cc.putImageData(cd, 0, 0);
-    a.baked = col;
-    a.shade = softShadow(col, size, size, Math.max(3, Math.round(size / 40)));
-    a.bakedK = k;
-    a.half = size / 2 / k;
+    return col;
+  }
+
+  /** The animal drawn sharp at the size it lands in the card (LAND of the
+   *  frame), capped at its cutout's own resolution, for the lift. */
+  function liftSprite(a: Animal): { sprite: HTMLCanvasElement; fill: number } {
+    const meta = ANIMALS[a.sp.id];
+    const im = a.art.img;
+    const box = meta?.box ?? [0, 0, 1, 1];
+    const art = Math.max(
+      (box[2] - box[0]) * im.naturalWidth,
+      (box[3] - box[1]) * im.naturalHeight,
+    );
+    const frameH = Math.min(
+      450,
+      window.innerHeight * 0.56,
+      Math.min(600, window.innerWidth - 34) * 0.75,
+    );
+    const want = LAND * frameH * view.dpr;
+    const k = Math.max(view.s * view.dpr, Math.min(want, art) / a.len);
+    const sprite = bakeAt(a, k);
+    return { sprite, fill: (a.len * k) / sprite.width };
   }
 
   // ------------------------------------------------------------ drawing
@@ -1754,7 +1783,8 @@ export function initTidepool(root: HTMLElement): void {
       : a.wet
         ? "In the water."
         : "Out on the rock.";
-    open(a.sp, { a, rect, sprite: a.baked, where });
+    const { sprite, fill } = liftSprite(a);
+    open(a.sp, { a, rect, sprite, fill, where });
   }
   function findLabel(id: string, x: number, y: number): void {
     const sp = BY_ID.get(id);
@@ -1783,6 +1813,8 @@ export function initTidepool(root: HTMLElement): void {
       a: Animal | null;
       rect: Box;
       sprite: HTMLCanvasElement | null;
+      /** How much of the sprite's width the animal spans. */
+      fill?: number;
       where: string;
     },
   ): void {
@@ -1838,6 +1870,7 @@ export function initTidepool(root: HTMLElement): void {
         ? {
             rect: o.rect,
             sprite: o.sprite,
+            fill: o.fill,
             scene: { canvas: scene, rect: frameRect() },
           }
         : null,
@@ -1981,8 +2014,8 @@ export function initTidepool(root: HTMLElement): void {
   // ------------------------------------------------------------ today's three
   function paintThree(justFound?: string): void {
     if (!threeEl) return;
-    const away = beachId !== todayId;
-    const today = BEACHES.find((b) => b.id === todayId)!;
+    const away = beachId !== homeId;
+    const today = BEACHES.find((b) => b.id === homeId)!;
     threeEl.innerHTML =
       `<div class="tp-three-head"><span class="u-label">Today's three</span><span class="tp-three-where">${today.title}${
         away
@@ -1999,7 +2032,7 @@ export function initTidepool(root: HTMLElement): void {
       "</ol>";
     threeEl
       .querySelector("[data-tp-today]")
-      ?.addEventListener("click", () => newBeach(todayId, day));
+      ?.addEventListener("click", () => newBeach(homeId, day));
     if (justFound && !reduced()) {
       const li = threeEl.querySelector<HTMLElement>(".is-new .tp-clue-name");
       li?.animate(
@@ -2254,8 +2287,8 @@ export function initTidepool(root: HTMLElement): void {
   const lastSp = lastId ? BY_ID.get(lastId) : undefined;
   if (lastSp && lastEl) lastEl.textContent = `Last find: ${lastSp.common}`;
   const q = new URLSearchParams(location.search).get("beach") as BeachId | null;
-  const startId = q && BEACHES.some((b) => b.id === q) ? q : todayId;
-  void setBeach(startId, startId === todayId ? day : day + 1).catch(() =>
+  const startId = q && BEACHES.some((b) => b.id === q) ? q : homeId;
+  void setBeach(startId, startId === homeId ? day : day + 1).catch(() =>
     say("The beach didn't load. Try reloading the page."),
   );
   t0 = performance.now();

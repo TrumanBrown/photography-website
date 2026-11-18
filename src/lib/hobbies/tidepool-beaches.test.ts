@@ -2,18 +2,19 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { SPECIES } from "./tidepool-species";
+import animalData from "./tidepool-animals.json";
 import {
   ART_VERSION,
   BEACHES,
   CLUE_FACT,
   HABITAT,
+  HOME_BEACH,
   LABEL_SPECIES,
   OTHER_LIFE,
   beachesFor,
   clueFor,
   deal,
   landing,
-  todaysBeach,
   todaysThree,
   type BeachData,
   type BeachId,
@@ -29,6 +30,12 @@ const beaches = Object.fromEntries(
   ]),
 ) as Record<BeachId, BeachData>;
 const sizes = Object.fromEntries(SPECIES.map((s) => [s.id, 5]));
+// What the toy deals with: each cutout's own size, 1.2 cm to 30 cm.
+const realSizes = Object.fromEntries(
+  Object.entries(animalData as Record<string, { cm: number }>).map(
+    ([id, a]) => [id, a.cm],
+  ),
+);
 
 function inside(pts: [number, number][], x: number, y: number): boolean {
   let hit = false;
@@ -55,6 +62,15 @@ describe("the beaches", () => {
 
   it("has one boulder too heavy to turn in one go", () => {
     expect(beaches.boulder.rocks.some((r) => r.heavy > 1)).toBe(true);
+  });
+
+  it("opens on sand with rocks to turn, one big rock and a little pool", () => {
+    const home = beaches[HOME_BEACH];
+    expect(BEACHES[0].id).toBe(HOME_BEACH);
+    expect(home.slots.sand?.length).toBeGreaterThan(0);
+    expect(home.rocks.filter((r) => r.heavy > 1)).toHaveLength(1);
+    expect(home.rocks.filter((r) => r.heavy === 1).length).toBeGreaterThan(4);
+    expect(home.slots.runnel?.length).toBeGreaterThan(0);
   });
 
   it("names every label a tap can land on", () => {
@@ -125,13 +141,15 @@ describe("deal", () => {
     }
   });
 
-  it("puts a crowd under the big boulder", () => {
-    const i = beaches.boulder.rocks.findIndex((r) => r.heavy > 1);
-    for (const seed of [1, 2, 3, 4]) {
-      const n = deal(beaches.boulder, seed, sizes).filter(
-        (p) => p.rock === i,
-      ).length;
-      expect(n).toBeGreaterThanOrEqual(2);
+  it("puts a crowd under each big boulder", () => {
+    for (const id of ["boulder", "sand"] as const) {
+      const i = beaches[id].rocks.findIndex((r) => r.heavy > 1);
+      for (const seed of [1, 2, 3, 4]) {
+        const n = deal(beaches[id], seed, sizes).filter(
+          (p) => p.rock === i,
+        ).length;
+        expect(n, `${id} seed ${seed}`).toBeGreaterThanOrEqual(2);
+      }
     }
   });
 
@@ -143,21 +161,16 @@ describe("deal", () => {
 });
 
 describe("today's three", () => {
-  it("visits every beach in turn", () => {
-    const days = Array.from({ length: BEACHES.length }, (_, i) =>
-      todaysBeach(20000 + i),
-    );
-    expect(new Set(days).size).toBe(BEACHES.length);
-  });
-
   it("are three different animals that today's deal always includes", () => {
-    for (let day = 20400; day < 20412; day++) {
-      const beach = beaches[todaysBeach(day)];
+    const beach = beaches[HOME_BEACH];
+    for (let day = 20400; day < 20500; day++) {
       const three = todaysThree(day, beach);
       expect(new Set(three).size).toBe(3);
-      const placed = deal(beach, day, sizes, three).map((p) => p.id);
-      for (const id of three)
-        expect(placed, `${id} on ${beach.name}`).toContain(id);
+      for (const s of [sizes, realSizes]) {
+        const placed = deal(beach, day, s, three).map((p) => p.id);
+        for (const id of three)
+          expect(placed, `${id} on ${beach.name}, day ${day}`).toContain(id);
+      }
     }
   });
 

@@ -14,7 +14,7 @@
 import { SPECIES, type TidepoolSpecies } from "./tidepool-species";
 
 /** Bump with scripts/tidepool/build-beaches.py's VERSION. */
-export const ART_VERSION = "v1";
+export const ART_VERSION = "v2";
 export const ART_BASE = `/tidepool/${ART_VERSION}`;
 
 export type BeachId =
@@ -29,6 +29,11 @@ export interface Beach {
 
 export const BEACHES: Beach[] = [
   {
+    id: "sand",
+    title: "Sandy beach",
+    line: "Rippled sand with loose rocks to turn. The big one takes a few heaves, and the waves dug a little pool at its foot.",
+  },
+  {
     id: "cobble",
     title: "Cobble beach",
     line: "Rounded stones of every size. The big loose ones have the most under them.",
@@ -42,11 +47,6 @@ export const BEACHES: Beach[] = [
     id: "boulder",
     title: "The big boulder",
     line: "One boulder too big to turn in one go. Big crabs, and now and then a young octopus, hide under rocks like this.",
-  },
-  {
-    id: "sand",
-    title: "Sandy beach",
-    line: "Rippled sand, a few half-buried rocks and a line of washed-up kelp.",
   },
   {
     id: "bench",
@@ -113,10 +113,11 @@ export interface BeachData {
 
 /**
  * Where each animal turns up, by slot kind, with a weight. `under` is under a
- * loose rock, `under-big` under the big boulder only. Slot kinds come from
- * build-beaches.py: cobble (stone, gap, puddle), potholes (pothole, bench),
- * boulder (pool, gravel), sand (sand, runnel, wrack), bench (crack, bed-edge,
- * pool, rock) and channel (floor, boulder, ledge).
+ * loose rock, `under-big` under a boulder too heavy to turn in one go. Slot
+ * kinds come from build-beaches.py: cobble (stone, gap, puddle), potholes
+ * (pothole, bench), boulder (pool, gravel), sand (sand, wrack, and runnel for
+ * the shallow pool at the big rock's foot), bench (crack, bed-edge, pool,
+ * rock) and channel (floor, boulder, ledge).
  */
 export const HABITAT: Record<string, Partial<Record<string, number>>> = {
   "purple-shore-crab": { under: 6, crack: 1 },
@@ -411,53 +412,68 @@ export function deal(
       r: Math.max(rock.rx, rock.ry) * 1.1,
     });
   }
+  const clearOfRocks = (x: number, y: number, r: number) =>
+    !keepOut.some((k) => Math.hypot(k.x - x, k.y - y) < k.r + r * 0.6);
   const clear = (x: number, y: number, r: number) =>
-    !keepOut.some((k) => Math.hypot(k.x - x, k.y - y) < k.r + r * 0.6) &&
+    clearOfRocks(x, y, r) &&
     !out.some(
       (p) =>
         p.rock === null &&
         Math.hypot(p.x - x, p.y - y) < (drawCm(p.id, sizes) * px) / 2 + r * 0.9,
     );
 
-  // Under each rock.
-  const underFor = (rock: Rock, i: number, ids: string[]) => {
+  const lives = (id: string, rock: Rock) =>
+    (HABITAT[id]?.under ?? 0) +
+      (rock.heavy > 1 ? (HABITAT[id]?.["under-big"] ?? 0) : 0) >
+    0;
+  const fits = (id: string, rock: Rock) =>
+    drawCm(id, sizes) * px < Math.min(rock.rx, rock.ry) * 1.6;
+
+  // Today's three that hide under rocks each get their rock first: a loose
+  // one they fit under if they live under loose rocks, else the boulder, so
+  // a small crab can't take the room a sea cucumber needs under the boulder.
+  const assigned = new Map<number, string[]>();
+  for (const id of must) {
+    const room = (r: Rock) => Math.min(r.rx, r.ry);
+    const used = (i: number) => assigned.get(i)?.length ?? 0;
+    const pick = beach.rocks
+      .map((rock, i) => ({ rock, i }))
+      .filter(({ rock }) => lives(id, rock))
+      .sort(
+        (a, b) =>
+          Number(b.rock.heavy === 1 && fits(id, b.rock)) -
+            Number(a.rock.heavy === 1 && fits(id, a.rock)) ||
+          Number(fits(id, b.rock)) - Number(fits(id, a.rock)) ||
+          used(a.i) - used(b.i) ||
+          room(b.rock) - room(a.rock),
+      )[0];
+    if (pick) assigned.set(pick.i, [...(assigned.get(pick.i) ?? []), id]);
+  }
+
+  // Under each rock, the biggest first so they get the room.
+  const underFor = (rock: Rock, i: number) => {
     const big = rock.heavy > 1;
-    const n = big ? 3 + Math.floor(R() * 3) : R() < 0.2 ? 0 : R() < 0.6 ? 1 : 2;
-    const pool = SPECIES.filter(
-      (s) =>
-        (HABITAT[s.id]?.under ?? 0) +
-          (big ? (HABITAT[s.id]?.["under-big"] ?? 0) : 0) >
-        0,
+    const wants = (assigned.get(i) ?? []).sort(
+      (a, b) => drawCm(b, sizes) - drawCm(a, sizes),
     );
+    const n = Math.max(
+      wants.length,
+      big ? 3 + Math.floor(R() * 3) : R() < 0.2 ? 0 : R() < 0.6 ? 1 : 2,
+    );
+    const pool = SPECIES.filter((s) => lives(s.id, rock));
     const placedHere: Placed[] = [];
-    for (let k = 0; k < n; k++) {
-      const want = ids.find(
-        (id) => pool.some((s) => s.id === id) && !out.some((p) => p.id === id),
-      );
-      const sp = want
-        ? SPECIES.find((s) => s.id === want)!
-        : weighted(
-            pool.filter(
-              (s) =>
-                drawCm(s.id, sizes) * px < Math.min(rock.rx, rock.ry) * 1.6 &&
-                !placedHere.some((p) => p.id === s.id),
-            ),
-            (s) =>
-              RARITY[s.rarity] *
-              ((HABITAT[s.id]?.under ?? 0) +
-                (big ? (HABITAT[s.id]?.["under-big"] ?? 0) : 0)),
-            R,
-          );
-      if (!sp) break;
-      // Spread out under the rock, inside its outline.
-      for (let tries = 0; tries < 20; tries++) {
+    // Spread out under the rock, inside its outline. One of today's three
+    // still goes in if there's no room left, a little crowded.
+    const put = (sp: TidepoolSpecies, tries: number, crowd: boolean) => {
+      for (let t = 0; t < tries; t++) {
         const a = R() * Math.PI * 2;
-        const d = Math.sqrt(R()) * 0.55;
+        const d = Math.sqrt(R()) * (big ? 0.72 : 0.55);
         const x = rock.cx + Math.cos(a) * rock.rx * d;
         const y = rock.cy + Math.sin(a) * rock.ry * d;
         const r = (drawCm(sp.id, sizes) * px) / 2;
         if (!inside(rock.pts, x, y)) continue;
         if (
+          !crowd &&
           placedHere.some(
             (p) =>
               Math.hypot(p.x - x, p.y - y) <
@@ -476,23 +492,41 @@ export function deal(
         };
         placedHere.push(p);
         out.push(p);
-        break;
+        return true;
       }
+      return false;
+    };
+    for (let k = 0; k < n; k++) {
+      const want = wants[k];
+      const sp = want
+        ? SPECIES.find((s) => s.id === want)!
+        : weighted(
+            pool.filter(
+              (s) => fits(s.id, rock) && !placedHere.some((p) => p.id === s.id),
+            ),
+            (s) =>
+              RARITY[s.rarity] *
+              ((HABITAT[s.id]?.under ?? 0) +
+                (big ? (HABITAT[s.id]?.["under-big"] ?? 0) : 0)),
+            R,
+          );
+      if (!sp) break;
+      if (!put(sp, 20, false) && want) put(sp, 40, true);
     }
   };
-  beach.rocks.forEach((rock, i) => underFor(rock, i, must));
+  beach.rocks.forEach((rock, i) => underFor(rock, i));
 
   // Out in the open, kind by kind. Today's three first, where they can live.
   const kinds = Object.keys(beach.slots).filter((k) => (PER_KIND[k] ?? 0) > 0);
   const spots: Record<string, number[][]> = {};
   for (const k of kinds) spots[k] = [...beach.slots[k]];
-  const place = (sp: TidepoolSpecies, kind: string): boolean => {
+  const place = (sp: TidepoolSpecies, kind: string, crowd = false): boolean => {
     const list = spots[kind];
     const r = (drawCm(sp.id, sizes) * px) / 2;
     for (let j = 0; j < list.length; j++) {
       const [x, y, room] = list[j];
       if (room !== undefined && r > room * 1.4 && kind !== "pothole") continue;
-      if (!clear(x, y, r)) continue;
+      if (crowd ? !clearOfRocks(x, y, r) : !clear(x, y, r)) continue;
       list.splice(j, 1);
       out.push({
         id: sp.id,
@@ -511,8 +545,11 @@ export function deal(
     if (out.some((p) => p.id === id)) continue;
     const sp = SPECIES.find((s) => s.id === id);
     if (!sp) continue;
-    const ks = kinds.filter((k) => (HABITAT[id]?.[k] ?? 0) > 0);
-    for (const k of ks.sort(() => R() - 0.5)) if (place(sp, k)) break;
+    const ks = kinds
+      .filter((k) => (HABITAT[id]?.[k] ?? 0) > 0)
+      .sort(() => R() - 0.5);
+    // If every spot it lives in is taken, it shares one rather than go missing.
+    if (!ks.some((k) => place(sp, k))) ks.some((k) => place(sp, k, true));
   }
   for (const kind of kinds) {
     const want = PER_KIND[kind];
@@ -561,18 +598,12 @@ export function dayNumber(d: Date): number {
   );
 }
 
-/** Today's beach: every beach in turn, in a shuffled order that repeats. */
-export function todaysBeach(day: number): BeachId {
-  const order: BeachId[] = [
-    "potholes",
-    "cobble",
-    "bench",
-    "boulder",
-    "channel",
-    "sand",
-  ];
-  return order[((day % order.length) + order.length) % order.length];
-}
+/**
+ * The beach the toy opens on, and where today's three live: sand, loose
+ * rocks, one big rock and a small pool, so a first visit has a bit of
+ * everything (Truman, 2026-11-17). New beach goes through the rest.
+ */
+export const HOME_BEACH: BeachId = "sand";
 
 /**
  * The clue for each animal in today's three: one of its own facts, the one
@@ -625,7 +656,7 @@ export function clueFor(sp: TidepoolSpecies): string {
   return sp.facts[CLUE_FACT[sp.id] ?? 0] ?? sp.facts[0];
 }
 
-/** Three animals that live on today's beach, the same for everyone that day. */
+/** Three animals that live on the home beach, the same for everyone that day. */
 export function todaysThree(day: number, beach: BeachData): string[] {
   const R = rng(day * 2654435761);
   const kinds = new Set(
