@@ -199,7 +199,7 @@ async function main() {
   }
 
   data.$comment =
-    "Personal 'fish I've caught' gallery. fishId references fishing-species.ts (the same pixel sprite is drawn on each card). state splits the gallery into Washington and Minnesota. photo is the basename of the committed display copy, src/assets/hobbies/fishing/<photo>.jpg, which Astro turns into the thumbnail and the lightbox's quick preview. full is the full-size original in Blob Storage that the lightbox ends on, written by scripts/upload-fishing-catches.mjs.";
+    "Personal 'fish I've caught' gallery. fishId references fishing-species.ts (the same pixel sprite is drawn on each card). state splits the gallery into Washington and Minnesota. photo is the basename of the committed display copy, src/assets/hobbies/fishing/<photo>.jpg, which Astro turns into the thumbnail and the lightbox's quick preview. focus, when set, is the CSS object-position of the card's 4:3 crop, for a tall photo whose fish sits off centre. full is the full-size original in Blob Storage that the lightbox ends on, written by scripts/upload-fishing-catches.mjs.";
   await writeFile(CATCHES, formatCatches(data));
   console.log(
     `\nUploaded ${uploaded} full-size photo(s) to the private ${INBOX} container and updated ${CATCHES}.`,

@@ -20,6 +20,8 @@ interface Catch {
   state: string;
   where: string;
   photo: string;
+  /** object-position for the card's 4:3 crop, e.g. "center 70%" when a tall photo's fish sits low. */
+  focus?: string;
   /** The full-size original in Blob Storage (scripts/upload-fishing-catches.mjs). */
   full?: { src: string; width: number; height: number };
 }
@@ -60,6 +62,7 @@ async function buildCard(c: Catch) {
     // "Near Mt. Adams" reads mid-sentence in the alt text.
     alt: `${f?.common ?? c.fishId} from ${c.where.replace(/^(A|Near) /, (m) => m.toLowerCase())}`,
     thumb: thumb.src,
+    focus: c.focus,
     view: view.src,
     full: c.full?.src,
     // The lightbox is sized to the full original, so zooming isn't capped.
@@ -187,6 +190,7 @@ const groups = [
                       src={card.thumb}
                       alt={card.alt}
                       loading="lazy"
+                      style={card.focus ? `object-position:${card.focus}` : undefined}
                       class="block aspect-[4/3] w-full bg-band object-cover transition-opacity duration-300 group-hover:opacity-90"
                     />
                   </a>
