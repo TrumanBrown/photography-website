@@ -11,6 +11,7 @@
  * captions never means paying to look at every photo again.
  */
 import { GROUPS } from "./groups.mjs";
+import { refusedByFilter } from "./model.mjs";
 import { captureWhen, displayName, lint, tidy } from "./text.mjs";
 
 /** Bump when the prompt or fields change enough that old analyses should be redone. */
@@ -144,6 +145,38 @@ ${labels.map((l, i) => `- Image ${i + 2}: observation of ${l}`).join("\n")}
 Does any of them show the same animal or plant as image 1 (the same individual, or at least clearly the same species with matching markings)? Reply with JSON only:
 {"match": <image number 2-${labels.length + 1}, or null>, "confidence": "high" | "medium" | "low"}
 Answer null if image 1's main subject isn't an organism or if none clearly match.`;
+}
+
+/**
+ * The same-moment candidate the photo shows, or null. `ask(list)` sends the
+ * photo with those candidates' photos (comparePrompt) and resolves to the
+ * model's verdict. The image filter can refuse a candidate's photo rather than
+ * the one being looked at (a dead flicker logged a minute after a canyon shot,
+ * 2026-11-18), so after a refusal each candidate is asked about alone, closest
+ * first, and the ones it won't look at are skipped. Only the main look decides
+ * that the photo itself can't be read.
+ */
+export async function sameMomentMatch(candidates, ask) {
+  // null: no match. undefined: the filter refused the request.
+  const attempt = async (list) => {
+    try {
+      const verdict = await ask(list);
+      const n = Number(verdict?.match);
+      return verdict?.confidence === "high" && Number.isInteger(n)
+        ? (list[n - 2] ?? null)
+        : null;
+    } catch (e) {
+      if (refusedByFilter(e)) return undefined;
+      throw e;
+    }
+  };
+  const together = await attempt(candidates);
+  if (together !== undefined || candidates.length < 2) return together ?? null;
+  for (const candidate of candidates) {
+    const hit = await attempt([candidate]);
+    if (hit) return hit;
+  }
+  return null;
 }
 
 const SKIPS = new Set(["blurry", "people", "unclear"]);

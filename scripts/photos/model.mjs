@@ -90,6 +90,16 @@ async function post(url, headers, body, fetchImpl) {
   }
 }
 
+/**
+ * Whether the provider's content filter turned a request down: Azure answers
+ * 400 with `content_policy_violation` for an image, `content_filter` for text.
+ */
+export function refusedByFilter(error) {
+  return /content_policy_violation|content_filter/i.test(
+    String(error?.message ?? ""),
+  );
+}
+
 /** "https://x.openai.azure.com" or ".../openai/v1" -> the v1 chat completions URL. */
 export function azureChatUrl(endpoint) {
   const base = String(endpoint).trim().replace(/\/+$/, "");

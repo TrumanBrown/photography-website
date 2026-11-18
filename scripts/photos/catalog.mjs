@@ -57,7 +57,13 @@ import {
   timeCandidates,
   unseenCandidates,
 } from "./inat.mjs";
-import { askJson, encodeForModel, modelFor, providerFor } from "./model.mjs";
+import {
+  askJson,
+  encodeForModel,
+  modelFor,
+  providerFor,
+  refusedByFilter,
+} from "./model.mjs";
 import {
   ANALYSIS_VERSION,
   analysisPrompt,
@@ -65,6 +71,7 @@ import {
   idLevel,
   mockAnalysis,
   normaliseAnalysis,
+  sameMomentMatch,
 } from "./analyse.mjs";
 import {
   allowedNames,
@@ -502,8 +509,7 @@ async function main() {
         analyseFailed++;
         s.failures = (s.failures ?? 0) + 1;
         s.failedAt = new Date().toISOString();
-        if (/content_policy_violation|content_filter/i.test(String(e?.message)))
-          s.unreadable = "content-filter";
+        if (refusedByFilter(e)) s.unreadable = "content-filter";
         warn(
           s.unreadable
             ? "The model's content filter refused a photo, so it won't be tried again. It keeps any caption its iNaturalist ID gives it."
@@ -558,23 +564,20 @@ async function main() {
         }
       }
       if (shown.length) {
-        const verdict = await askJson({
-          provider,
-          model,
-          prompt: comparePrompt(
-            shown.map((x) =>
-              x.taxon.common
-                ? `${x.taxon.common} (${x.taxon.name})`
-                : x.taxon.name,
+        const hit = await sameMomentMatch(shown, (list) =>
+          askJson({
+            provider,
+            model,
+            prompt: comparePrompt(
+              list.map((x) =>
+                x.taxon.common
+                  ? `${x.taxon.common} (${x.taxon.name})`
+                  : x.taxon.name,
+              ),
             ),
-          ),
-          images: [photo64, ...shown.map((x) => x.b64)],
-        });
-        const n = Number(verdict?.match);
-        const hit =
-          verdict?.confidence === "high" && Number.isInteger(n)
-            ? shown[n - 2]
-            : null;
+            images: [photo64, ...list.map((x) => x.b64)],
+          }),
+        );
         if (hit)
           s.inat = {
             obs: hit.c.obsId,

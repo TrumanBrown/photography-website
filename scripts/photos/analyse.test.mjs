@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { analysisPrompt, idLevel, normaliseAnalysis } from "./analyse.mjs";
+import {
+  analysisPrompt,
+  idLevel,
+  normaliseAnalysis,
+  sameMomentMatch,
+} from "./analyse.mjs";
 
 const snake = {
   name: "Thamnophis ordinoides",
@@ -64,5 +69,45 @@ describe("photo analysis", () => {
       idCheck: "fits",
     });
     expect(problems.join(" ")).toMatch(/scene.*stunning/);
+  });
+});
+
+describe("same-moment match", () => {
+  const refused = () =>
+    new Error(
+      'model request failed (400): {"error":{"code":"content_policy_violation"}}',
+    );
+  const deadFlicker = { id: "dead flicker" };
+  const rockWren = { id: "rock wren" };
+
+  it("asks about each observation alone when the filter refuses one, and keeps the match", async () => {
+    const asked = [];
+    const hit = await sameMomentMatch([deadFlicker, rockWren], async (list) => {
+      asked.push(list.map((c) => c.id));
+      if (list.includes(deadFlicker)) throw refused();
+      return { match: 2, confidence: "high" };
+    });
+    expect(hit).toBe(rockWren);
+    expect(asked).toEqual([
+      ["dead flicker", "rock wren"],
+      ["dead flicker"],
+      ["rock wren"],
+    ]);
+  });
+
+  it("finds no match, rather than failing the photo, when every observation is refused", async () => {
+    const ask = async () => {
+      throw refused();
+    };
+    expect(await sameMomentMatch([deadFlicker], ask)).toBe(null);
+    expect(await sameMomentMatch([deadFlicker, rockWren], ask)).toBe(null);
+  });
+
+  it("still fails on any other error, so the run tries again", async () => {
+    await expect(
+      sameMomentMatch([rockWren], async () => {
+        throw new Error("model request failed (500): busy");
+      }),
+    ).rejects.toThrow("500");
   });
 });
