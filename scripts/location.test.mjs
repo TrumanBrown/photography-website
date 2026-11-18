@@ -1,12 +1,15 @@
+import { execFileSync } from "node:child_process";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { extname, join, relative } from "node:path";
+import { fileURLToPath } from "node:url";
 import exifr from "exifr";
 import sharp from "sharp";
 import {
   exiftoolVersion,
   filesWithLocation,
   hasLocation,
+  IMAGE_EXTS,
   metadataHasLocation,
   probeBytes,
   PUBLIC_CONTAINERS,
@@ -108,6 +111,26 @@ describe("settings", () => {
   });
 });
 
+// Committed images never pass through the private inbox: public/ deploys as
+// is, and Astro copies some of src/ byte for byte into variants/. Without
+// exiftool, WebP and AVIF go unchecked (exifr can't read them); CI has it.
+describe("committed images", () => {
+  it("record no location", async () => {
+    const root = fileURLToPath(new URL("..", import.meta.url));
+    const images = execFileSync("git", ["ls-files", "-z"], {
+      cwd: root,
+      encoding: "utf8",
+      maxBuffer: 64 * 1024 * 1024,
+    })
+      .split("\0")
+      .filter((file) => IMAGE_EXTS.has(extname(file).toLowerCase()))
+      .map((file) => join(root, file));
+    expect(images.length).toBeGreaterThan(0);
+    const located = await filesWithLocation(images);
+    expect([...located].map((file) => relative(root, file))).toEqual([]);
+  }, 60_000);
+});
+
 // A JPEG's compressed image data: everything from the start-of-scan marker on.
 // Stripping metadata must leave it byte for byte, i.e. no re-compression.
 function scanData(jpeg) {
@@ -158,5 +181,26 @@ describe.skipIf(!exiftoolVersion())("stripLocation (needs exiftool)", () => {
     expect(await hasLocation(odd)).toBe(true);
     stripLocation(odd);
     expect(await hasLocation(odd)).toBe(false);
+  });
+
+  it("finds a WebP's position in the part the blob scan reads, though it comes after the image", async () => {
+    const webp = await sharp({
+      create: {
+        width: 640,
+        height: 640,
+        channels: 3,
+        noise: { type: "gaussian", mean: 128, sigma: 60 },
+      },
+    })
+      .webp({ quality: 95 })
+      .withExif({ IFD3: GPS })
+      .toBuffer();
+    expect(webp.length).toBeGreaterThan(128 * 1024);
+    const probe = join(dir, "probe.webp");
+    await writeFile(
+      probe,
+      webp.subarray(0, Math.min(webp.length, probeBytes(".webp"))),
+    );
+    expect(await hasLocation(probe)).toBe(true);
   });
 });

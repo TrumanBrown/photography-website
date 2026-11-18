@@ -22,7 +22,7 @@ Related skills: [image-delivery](../image-delivery/SKILL.md) for resolution, siz
 ## Truman's rules for sessions
 
 - Full resolution from upload to the lightbox, 1:1. Nothing in the pipeline may degrade a photo ("That is unacceptable", 2026-10-07). See image-delivery.
-- No location data in anything public. Photos are published only through `incoming/`, which strips GPS, and globe pins come from the session's `location` text, never from a photo.
+- No location data in anything public. Photos are published only through `incoming/`, which strips GPS, and globe pins come from the session's `location` text, never from a photo. He asked again on 2026-11-18: "make sure you're always stripping exif gps data so people cant download the pictures from anywhere on my site and get the coords." Images committed to the repo skip `incoming/`, so `scripts/location.test.mjs` fails on any that records a location.
 - Titles read `Place, Region, Month Year` with commas, never an em dash ("so telling of AI", 2026-10-06). The caption pipeline checks the shape (`TITLE_SHAPE` in `scripts/photos/website.mjs`). Descriptions show only on the session page, not on cards.
 - Don't name an animal or a place unless iNaturalist or Truman says so, and never guess at what people were doing ("you cant infer they are breeding and releasing", 2026-10-07).
 - The header and the rotation are his picks. Rotation shows only photos he chose, so a session he picked nothing from shows nothing (2026-10-14). Never swap out a header he chose (2026-10-12).

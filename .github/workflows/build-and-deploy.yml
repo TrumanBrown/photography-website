@@ -68,15 +68,16 @@ jobs:
       - name: Install API dependencies
         run: cd api && npm ci
 
-      - name: Unit tests
-        run: npm test
-
       # libraw-bin, exiftool and pillow-heif for prebuild, installed from a
       # cache so a normal build doesn't depend on Ubuntu's mirrors (the
-      # action's description has the details).
+      # action's description has the details). Before the unit tests, so the
+      # check that no committed image records a location reads WebP too.
       - name: Install image tools
         if: env.CAN_USE_AZURE == 'true'
         uses: ./.github/actions/image-tools
+
+      - name: Unit tests
+        run: npm test
 
       # Signs in as the build identity (Blob access on the site's storage
       # account only) once AZURE_DEPLOY_CLIENT_ID is set; see docs/cicd.md.

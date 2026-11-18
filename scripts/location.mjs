@@ -86,12 +86,18 @@ const LARGE_HEADER_EXTS = new Set([
   ".raf",
 ]);
 
+// WebP keeps its EXIF and XMP chunks after the image data, and a PNG writer
+// may put them after IDAT, so the blob scan reads these whole. Few are
+// published (Astro's resized WebP variants carry no metadata and aren't read).
+const TRAILING_METADATA_EXTS = new Set([".png", ".webp"]);
+
 /**
- * How much of a file the blob scan reads. JPEG, PNG and WebP keep their
- * metadata in the first segments (a JPEG's EXIF and XMP blocks are at most
- * 64 KB each); HEIC and RAW files can put it further in.
+ * How much of a file the blob scan reads. A JPEG keeps its metadata in the
+ * first segments (its EXIF and XMP blocks are at most 64 KB each); HEIC and
+ * RAW files can put it further in; PNG and WebP are read to the end.
  */
 export function probeBytes(ext) {
+  if (TRAILING_METADATA_EXTS.has(ext)) return Infinity;
   return LARGE_HEADER_EXTS.has(ext) ? 2 * 1024 * 1024 : 128 * 1024;
 }
 
