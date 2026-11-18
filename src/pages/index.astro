@@ -583,4 +583,22 @@ const pageSchema = sitePhoto && {
     /* "About me" in the rail while already here. */
     window.addEventListener("hashchange", () => show(fromHash(), true));
   }
+
+  /* Both Resume (PDF) links open through a function that counts each open
+     (api/resume). Static Web Apps sometimes swaps in a new Functions process,
+     and the first request to it waits a second or more for it to start. A HEAD
+     while the visitor reads wakes it first, and a HEAD isn't counted. */
+  const resumeLink = document.querySelector<HTMLAnchorElement>(
+    'a[data-track="resume-pdf"]',
+  );
+  if (resumeLink) {
+    const wake = () => {
+      fetch(resumeLink.href, { method: "HEAD", cache: "no-store" }).catch(
+        () => {},
+      );
+    };
+    if ("requestIdleCallback" in window)
+      requestIdleCallback(wake, { timeout: 2000 });
+    else setTimeout(wake, 500);
+  }
 </script>
