@@ -10,7 +10,12 @@
 // in memory for the life of the Functions instance.
 
 const zlib = require("zlib");
+const { promisify } = require("util");
 const { orgKind } = require("./org-kind");
+
+// Unpacking 137 MB on the main thread froze every function in the process,
+// the resume PDF included, for a second or more. This runs it off the thread.
+const gunzip = promisify(zlib.gunzip);
 
 const POINTER = "geo/current.json";
 const RETRY_AFTER_MS = 10 * 60 * 1000;
@@ -99,10 +104,8 @@ function createGeo({ download, openReader, now = Date.now, log = () => {} }) {
     ]);
     if (!cityGz || !asnGz)
       throw new Error("geo files named in geo/current.json are missing");
-    readers = {
-      city: openReader(zlib.gunzipSync(cityGz)),
-      asn: openReader(zlib.gunzipSync(asnGz)),
-    };
+    const [city, asn] = await Promise.all([gunzip(cityGz), gunzip(asnGz)]);
+    readers = { city: openReader(city), asn: openReader(asn) };
     month = pointer.month;
     loadedAt = now();
     failedAt = null;

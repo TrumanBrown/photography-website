@@ -5,6 +5,10 @@
 // When Slack, Teams or LinkedIn fetch it to preview a pasted link, that's a
 // `share` row instead. The file is a copy of public/Truman-Brown-Resume.pdf
 // that the build puts next to this file (build-and-deploy.yml).
+//
+// The PDF goes out before the open is counted. Fresh Functions instances come
+// up every few minutes without the lookup or the Table SDK loaded, and when
+// the response waited on them the new tab sat blank for seconds.
 
 const fs = require("node:fs");
 const path = require("node:path");
@@ -19,7 +23,8 @@ const { writeRow } = require("../shared/rows");
 const { cleanVia } = require("../track/payload");
 
 const PAGE = "/Truman-Brown-Resume.pdf";
-const LOOKUP_WAIT_MS = 2000;
+// Long enough for a cold load (about five seconds), since nobody waits on it.
+const LOOKUP_WAIT_MS = 10000;
 
 let pdf;
 function loadPdf() {
@@ -33,10 +38,9 @@ function loadPdf() {
   return pdf;
 }
 
-async function record(context, req) {
+async function record(req, log) {
   const headers = req.headers || {};
   const ua = headers["user-agent"] || "";
-  const log = (message) => context.log.warn(message);
   const app = shareApp(ua);
   if (app && app !== "Search engine") {
     await writeRow("share", { app, page: PAGE, agent: "" }, log);
@@ -75,11 +79,12 @@ module.exports = async function (context, req) {
     return;
   }
   if (req.method === "GET") {
-    try {
-      await record(context, req);
-    } catch {
-      // Counting must never stand between someone and the resume.
-    }
+    // Counting must never stand between someone and the resume. It starts on
+    // the next turn, after the response is handed back, so even loading the
+    // SDKs can't hold it up. The context can't log once the call has ended.
+    setImmediate(() => {
+      record(req, (message) => console.warn(message)).catch(() => {});
+    });
   }
   context.res = {
     status: 200,

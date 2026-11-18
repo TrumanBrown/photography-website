@@ -239,7 +239,10 @@ describe("createGeo", () => {
     clock.now = 25 * 60 * 60 * 1000;
     // The re-check runs in the background; this lookup still answers from November.
     expect(await geo.lookup("8.8.8.8")).toMatchObject({ org: "Owner asn-11" });
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(await geo.lookup("8.8.8.8")).toMatchObject({ org: "Owner asn-12" });
+    await vi.waitFor(async () =>
+      expect(await geo.lookup("8.8.8.8")).toMatchObject({
+        org: "Owner asn-12",
+      }),
+    );
   });
 });
