@@ -1,9 +1,13 @@
-// Keeps the site's managed Functions warm. A cold instance takes about five
-// seconds to load the analytics network lookup (api/shared/geo.js), and the
-// resume PDF now goes through a function, so this pings GET /api/track?warm=1
-// every five minutes. It holds no secrets, unlike the scheduler, so it keeps
-// running when the GitHub token expires. A few hundred runs a day cost well
-// under a dollar a month (docs/analytics.md).
+// Keeps the site's managed Functions warm. All of them share one process, and
+// Static Web Apps stops it after about five minutes without a request. The
+// next visitor then waits for a new one to start, and for the analytics
+// network lookup (api/shared/geo.js) to load again, about five seconds. With
+// a ping every five minutes, every other ping found a new process, so a
+// resume opened in that gap sat blank. A ping every minute keeps the one
+// process alive. It calls GET /api/track?warm=1, which loads the lookup if
+// needed and records nothing. It holds no secrets, unlike the scheduler, so it
+// keeps running when the GitHub token expires. About 44,000 runs a month cost
+// about two dollars (docs/azure.md).
 
 @description('Logic App name.')
 param name string
@@ -14,8 +18,8 @@ param location string
 @description('The site whose API is kept warm, like https://example.com.')
 param siteUrl string
 
-@description('Minutes between pings.')
-param everyMinutes int = 5
+@description('Minutes between pings. Keep it well under the five-minute idle timeout.')
+param everyMinutes int = 1
 
 @description('Tags.')
 param tags object

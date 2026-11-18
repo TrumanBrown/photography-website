@@ -28,7 +28,7 @@ On the engineering side:
 - The site sends a strict Content Security Policy (hashed inline scripts, no `'unsafe-inline'` scripts) and HSTS preload, deploys through two least-privilege Azure identities with no stored keys, and pins every GitHub action to a commit. CodeQL, Dependabot and secret scanning with push protection watch the repo, and photos lose their GPS position before they're published ([docs/security.md](docs/security.md)).
 - Every Azure resource is in Bicep and deploys from a manual workflow behind a GitHub environment ([docs/iac-bicep.md](docs/iac-bicep.md)).
 - Builds run on every push and every hour, pick up new photos from Blob Storage, and move the image variants back to Blob so the Static Web Apps deploy stays a few megabytes. Azure sign-ins retry, so a GitHub token hiccup doesn't fail a deploy ([docs/cicd.md](docs/cicd.md)).
-- It costs about $5 a month, domain included ([What it costs](#what-it-costs)).
+- It costs about $7 a month, domain included ([What it costs](#what-it-costs)).
 
 ## Quick links
 
@@ -68,7 +68,7 @@ The site is a static Astro build on Azure Static Web Apps, with the photos in Az
 - Domain and DNS: Azure App Service Domain and Azure DNS.
 - IaC: Bicep ([docs/iac-bicep.md](docs/iac-bicep.md)).
 - CI/CD: GitHub Actions with OIDC federation and no long-lived secrets, a blob-only identity for builds and a separate one for the manual infra deploy ([docs/cicd.md](docs/cicd.md)).
-- Cost: about $5 a month at personal traffic, `.com` domain included ([What it costs](#what-it-costs), [docs/azure.md](docs/azure.md#monthly-cost)).
+- Cost: about $7 a month at personal traffic, `.com` domain included ([What it costs](#what-it-costs), [docs/azure.md](docs/azure.md#monthly-cost)).
 - My name and other personal details in this repo: [docs/privacy.md](docs/privacy.md).
 
 ## The Instagram pipeline
@@ -112,15 +112,15 @@ Setting up your own copy on Azure, from an empty subscription to a live domain: 
 
 ## What it costs
 
-The site costs about $5 a month to run. That's the bill for the month to
-October 15, 2026, without the build's old downloads (below), plus a twelfth of
-the domain's yearly fee. About $1.65 is photos sent to visitors, $1.50 is the
+The site costs about $7 a month to run. About $5 of that is the bill for the
+month to October 15, 2026, without the build's old downloads (below), plus a
+twelfth of the domain's yearly fee. About $1.65 is photos sent to visitors, $1.50 is the
 `.com` domain and its DNS zone, about $1.35 is storage requests, and the
 remaining 55 cents is storage space, the caption model, an alert rule and the
 posting timer. Emailing me a copy of each contact message adds a fraction of a
 cent a message, and it sends at most ten an hour, so spam can't run it up.
-Analytics adds about 40 cents: a timer that pings the site every five minutes
-so the resume PDF and the visitor lookup are always ready, and resume alerts,
+Analytics adds about $2.10: a timer that pings the site every minute so the
+resume PDF opens without waiting for a server to start, and resume alerts,
 which share the contact email's hourly limit.
 Details are in [docs/azure.md](docs/azure.md#monthly-cost).
 

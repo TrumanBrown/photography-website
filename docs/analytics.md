@@ -103,11 +103,11 @@ the app fetches og:image = /api/og?p=<page>&i=<image>
 Someone opens /Truman-Brown-Resume.pdf, from anywhere
   ↓
 staticwebapp.config.json rewrites it to /api/resume
-  - writes a "pdf" row (source, network, place, device), serves the PDF
+  - serves the PDF, then writes a "pdf" row (source, network, place, device)
 
-Logic App, every five minutes
+Logic App, every minute
   ↓
-GET /api/track?warm=1 loads the lookup so no visitor waits for it
+GET /api/track?warm=1 keeps the Functions process alive and loads the lookup, so no visitor waits for them
 ```
 
 ### The network and place lookup
@@ -171,7 +171,7 @@ Apps cache previews (LinkedIn for about a week), so repeat shares of a page may 
 
 ### Resume PDF opens
 
-`staticwebapp.config.json` rewrites `/Truman-Brown-Resume.pdf` to [api/resume](../api/resume/index.js), so every link to the PDF keeps working and each open is counted. The function serves a copy of `public/Truman-Brown-Resume.pdf` that Build and Deploy puts beside it (`api/resume/resume.pdf`, gitignored), with `Cache-Control: no-store` so each open reaches it. A `pdf` row keeps `via`, the referrer host (or `fromSite` when it was the site's own button), the network owner and place and the device. The PDF is sent first and the row is written after, so the open never waits on the lookup or the table. The lookup gets up to ten seconds, enough for a cold load. Bots are dropped; preview fetches by chat apps become `share` rows. An open is greyed as a likely scanner when the owner is a mail-security service, or a cloud or mixed owner with no referrer. The short addresses `/resume` and `/cv` redirect to `/Truman-Brown-Resume.pdf?via=typed`, so an open from someone who typed one has `via` set to `typed`.
+`staticwebapp.config.json` rewrites `/Truman-Brown-Resume.pdf` to [api/resume](../api/resume/index.js), so every link to the PDF keeps working and each open is counted. The function serves a copy of `public/Truman-Brown-Resume.pdf` that Build and Deploy puts beside it (`api/resume/resume.pdf`, gitignored), with `Cache-Control: no-cache` and an ETag, so each open still reaches it but a browser that already has this copy gets a 304 instead of the whole file. A `pdf` row keeps `via`, the referrer host (or `fromSite` when it was the site's own button), the network owner and place and the device. The PDF is sent first and the row is written a second later, so the open never waits on the lookup or the table, and nothing heavy runs in the process while the file goes out. The lookup gets up to ten seconds, enough for a cold load. Bots are dropped; preview fetches by chat apps become `share` rows. An open is greyed as a likely scanner when the owner is a mail-security service, or a cloud or mixed owner with no referrer. The short addresses `/resume` and `/cv` redirect to `/Truman-Brown-Resume.pdf?via=typed`, so an open from someone who typed one has `via` set to `typed`.
 
 To replace the PDF, replace `public/Truman-Brown-Resume.pdf` only; the build copies it.
 
@@ -189,7 +189,7 @@ Every page loads Google's [web-vitals](https://github.com/GoogleChrome/web-vital
 
 ### Warm-up ping
 
-The lookup takes about five seconds to load on a cold Functions instance, and the PDF goes through a function, so a Logic App ([infra/modules/warmup.bicep](../infra/modules/warmup.bicep), `enableApiWarmup`) calls `GET /api/track?warm=1` every five minutes. It loads the lookup if needed and records nothing. It holds no secrets, so it keeps running when the scheduler's GitHub token expires. All the Functions share one process, so `/api/resume` uses the same loaded copy ([api/shared/geo-service.js](../api/shared/geo-service.js)). The ping doesn't catch every fresh instance: in November 2026 about every other run took five seconds, a new process loading the lookup again. That's why the PDF doesn't wait on the lookup, and why the files are unpacked off the main thread, so a load never stalls the other functions.
+All the Functions share one process, and Static Web Apps stops it after about five minutes without a request. The next request then waits for a new process to start, and the lookup takes about five more seconds to load. So a Logic App ([infra/modules/warmup.bicep](../infra/modules/warmup.bicep), `enableApiWarmup`) calls `GET /api/track?warm=1` every minute. It loads the lookup and the Table SDK if needed and records nothing, and `/api/resume` uses the same loaded copies ([api/shared/geo-service.js](../api/shared/geo-service.js)). It holds no secrets, so it keeps running when the scheduler's GitHub token expires. Until November 2026 it ran every five minutes, right at the idle limit, and about every other run took five seconds on a new process. A resume opened in that gap sat blank. The PDF also doesn't wait on the lookup, and the files are unpacked off the main thread, so a load never stalls the other functions.
 
 ### Names on the Weekdays side
 

@@ -6,12 +6,13 @@
 // `share` row instead. The file is a copy of public/Truman-Brown-Resume.pdf
 // that the build puts next to this file (build-and-deploy.yml).
 //
-// The PDF goes out before the open is counted. Fresh Functions instances come
-// up every few minutes without the lookup or the Table SDK loaded, and when
-// the response waited on them the new tab sat blank for seconds.
+// The PDF goes out before the open is counted, and a browser that already has
+// it gets a 304. When the response waited on the count, the new tab sat blank
+// for seconds on any process that hadn't loaded the lookup or the Table SDK.
 
 const fs = require("node:fs");
 const path = require("node:path");
+const crypto = require("node:crypto");
 const { shareApp } = require("../shared/share-app");
 const { isBot } = require("../shared/bots");
 const { clientIp } = require("../shared/client-ip");
@@ -25,17 +26,31 @@ const { cleanVia } = require("../track/payload");
 const PAGE = "/Truman-Brown-Resume.pdf";
 // Long enough for a cold load (about five seconds), since nobody waits on it.
 const LOOKUP_WAIT_MS = 10000;
+const COUNT_AFTER_MS = 1000;
 
 let pdf;
+let etag;
 function loadPdf() {
   if (pdf === undefined) {
     try {
       pdf = fs.readFileSync(path.join(__dirname, "resume.pdf"));
+      const hash = crypto.createHash("sha256").update(pdf).digest("base64url");
+      etag = `"${hash.slice(0, 22)}"`;
     } catch {
       pdf = null;
     }
   }
   return pdf;
+}
+
+function alreadyHas(req) {
+  const asked = (req.headers || {})["if-none-match"];
+  if (typeof asked !== "string") return false;
+  return asked
+    .split(",")
+    .some(
+      (tag) => tag.trim().replace(/^W\//, "") === etag || tag.trim() === "*",
+    );
 }
 
 async function record(req, log) {
@@ -79,22 +94,33 @@ module.exports = async function (context, req) {
     return;
   }
   if (req.method === "GET") {
-    // Counting must never stand between someone and the resume. It starts on
-    // the next turn, after the response is handed back, so even loading the
-    // SDKs can't hold it up. The context can't log once the call has ended.
-    setImmediate(() => {
+    // Counting must never stand between someone and the resume. It waits a
+    // second after the response is handed back, so nothing heavy runs in the
+    // process while the file is still going out. The first count on a process
+    // loads the Table SDK, a second or more on the Functions' disk. The
+    // context can't log once the call has ended.
+    setTimeout(() => {
       record(req, (message) => console.warn(message)).catch(() => {});
-    });
+    }, COUNT_AFTER_MS);
+  }
+  const headers = {
+    "Content-Type": "application/pdf",
+    "Content-Disposition": 'inline; filename="Truman-Brown-Resume.pdf"',
+    // Every open still comes here to be counted, but a browser that already
+    // has this copy gets a 304 instead of the whole file again, which a phone
+    // on a slow connection notices.
+    "Cache-Control": "no-cache",
+    ETag: etag,
+    "X-Content-Type-Options": "nosniff",
+  };
+  if (alreadyHas(req)) {
+    context.res = { status: 304, headers };
+    return;
   }
   context.res = {
     status: 200,
     isRaw: true,
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": 'inline; filename="Truman-Brown-Resume.pdf"',
-      "Cache-Control": "no-store",
-      "X-Content-Type-Options": "nosniff",
-    },
+    headers,
     body: req.method === "HEAD" ? undefined : body,
   };
 };

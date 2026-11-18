@@ -4,7 +4,7 @@
 
 ## The 30-second version
 
-Photos live in **cloud storage** (Azure Blob). The website is **pre-built into a folder of HTML/CSS/JS** by a tool called **Astro**, then served from a **CDN** (Azure Static Web Apps). When you upload new photos, a **scheduled job on GitHub** notices and rebuilds the site. There is no always-on app server or CMS database; the Functions in `api/` and small Table Storage records handle the dynamic features. Cost is about $5/month ([README](../README.md#what-it-costs)).
+Photos live in **cloud storage** (Azure Blob). The website is **pre-built into a folder of HTML/CSS/JS** by a tool called **Astro**, then served from a **CDN** (Azure Static Web Apps). When you upload new photos, a **scheduled job on GitHub** notices and rebuilds the site. There is no always-on app server or CMS database; the Functions in `api/` and small Table Storage records handle the dynamic features. Cost is about $7/month ([README](../README.md#what-it-costs)).
 
 You drop a folder of photos. The site updates itself.
 

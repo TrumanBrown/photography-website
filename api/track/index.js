@@ -6,7 +6,8 @@
 // reading the resume can email Truman (api/shared/alert.js).
 //
 // GET /api/track?warm=1 is the warm-up ping from the Logic App timer: it loads
-// the lookup so no visitor waits for it, and records nothing.
+// the lookup and the Table SDK so no visitor waits for them, and records
+// nothing.
 
 const { todayUtc, visitorHash } = require("../shared/visitor-hash");
 const { clientIp } = require("../shared/client-ip");
@@ -47,6 +48,7 @@ module.exports = async function (context, req) {
 
   if (req.method === "GET") {
     try {
+      getTableClient();
       await warmGeo((message) => context.log.warn(message));
     } catch {}
     context.res = { status: 204, headers: { "Cache-Control": "no-store" } };
