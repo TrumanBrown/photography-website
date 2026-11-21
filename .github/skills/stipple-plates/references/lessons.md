@@ -109,7 +109,12 @@ What failed, and why:
   colour (`review.py plates`), not as thumbnails on grey.
 - **The icon size is too small for subjects.** At 120x90 (60 CSS px) most
   subjects become grey blobs; only the boldest outline survives. Don't use
-  stipple plates as tab or list icons below about 120 CSS px wide.
+  stipple plates as tab or list icons below about 120 CSS px wide. Truman
+  called a 40 px birding plate on a welcome mock's menu "dot slop" and asked
+  for "a cleaner logo, or the full dot image of something so it looks
+  clearer" (2026-11-20). A close crop of a plate's dots on a 200 px card read
+  the same way; show the whole plate, and use a solid mark for anything
+  smaller (design-mocks lesson 23).
 - **rembg (isnet-general-use) is good but not psychic.** It keeps hands,
   nets, twigs and leaves the subject touches. Check `review.py masks` and fix
   with `exclude`, `skin_out` or `green_out` before tuning tone.
