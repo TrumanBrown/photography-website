@@ -87,8 +87,6 @@ export function adapt(
 ): void {
   const map = lumOf(photo, g);
   if (!map) return;
-  // The dusk grade (dark mode) dims the photo to about a quarter.
-  const dim = document.documentElement.classList.contains("dark") ? 0.26 : 1;
   const tintL = 0.008; // the tint's own luminance
   const target = 0.165; // white on this is about 4.9:1
   for (const el of els) {
@@ -99,9 +97,7 @@ export function adapt(
         const u = mirror((x - g.x) / g.w);
         const v = (y - g.y) / g.h;
         if (v < 0 || v >= 1) continue;
-        vals.push(
-          map.L[Math.floor(v * map.h) * map.w + Math.floor(u * map.w)] * dim,
-        );
+        vals.push(map.L[Math.floor(v * map.h) * map.w + Math.floor(u * map.w)]);
       }
     }
     if (!vals.length) continue;

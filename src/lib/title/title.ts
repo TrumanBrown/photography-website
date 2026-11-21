@@ -291,11 +291,9 @@ function boot(root: HTMLElement): void {
     menu.style.top = `${Math.round(g.vh - menu.offsetHeight - 16)}px`;
   }
 
-  let laid = false;
   function place(g: Geo): void {
     if (g.kind === "tall") layoutPhone(g);
     else layoutDesk(g);
-    laid = true;
     // Over the grass and the tarn a phone's keys sit on busy ground: a little
     // more tint there (Apple suggests dimming glass over busy content).
     adapt(scene.photo, g, items, {
@@ -625,14 +623,6 @@ function boot(root: HTMLElement): void {
       wasOpen = open;
     }).observe(drawer, { attributes: true, attributeFilter: ["class"] });
   }
-  // The glass tint depends on the theme (the dusk grade dims the photo).
-  let dark = html.classList.contains("dark");
-  new MutationObserver(() => {
-    const now = html.classList.contains("dark");
-    if (now === dark) return;
-    dark = now;
-    if (on && laid) place(scene.geo);
-  }).observe(html, { attributes: true, attributeFilter: ["class"] });
 
   /* ---------- The entrance: the name rises from behind the summit ---------- */
 

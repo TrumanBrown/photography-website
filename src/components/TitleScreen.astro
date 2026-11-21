@@ -423,9 +423,8 @@ const photoLine = `${fmt(photos)} photos from ${fmt(trips)} trips, ${fmt(places)
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
-  html.dark #title-screen {
-    background: #0c1424;
-  }
+  /* The same in light and dark: the photo is shown at its own colours, as
+     the mock was approved, and never dimmed for the dark theme (2026-11-21). */
 
   /* ---------- The scene ---------- */
 
@@ -495,17 +494,6 @@ const photoLine = `${fmt(photos)} photos from ${fmt(trips)} trips, ${fmt(places)
     will-change: transform;
   }
 
-  /* Dark: the same photo after sunset. Every layer gets the same grade so
-     they still match: darker, cooler, a little more contrast. */
-  html.dark #title-screen .t-photo,
-  html.dark #title-screen .t-front,
-  html.dark #title-screen .t-sky,
-  html.dark #title-screen .t-him,
-  html.dark #title-screen .t-plate,
-  html.dark #title-screen .t-bird {
-    filter: brightness(0.5) saturate(0.85) contrast(1.12) hue-rotate(6deg);
-  }
-
   /* The name and the controls wait until the summit is over the name, then
      the entrance plays from its first frame. If the script never gets there,
      they show anyway after a few seconds. */
@@ -545,9 +533,6 @@ const photoLine = `${fmt(photos)} photos from ${fmt(trips)} trips, ${fmt(places)
       var(--fp) var(--fp) 0 var(--slate),
       calc(2 * var(--fp)) calc(2 * var(--fp)) 0 rgb(18 42 91 / 0.55);
     pointer-events: none;
-  }
-  html.dark #title-screen .t-name {
-    --slate: #0b1a3a;
   }
 
   /* ---------- Glass ---------- */
@@ -609,11 +594,6 @@ const photoLine = `${fmt(photos)} photos from ${fmt(trips)} trips, ${fmt(places)
       rgb(255 255 255 / 0.16),
       rgb(255 255 255 / 0) 62%
     );
-  }
-  html.dark #title-screen .t-key,
-  html.dark #title-screen .t-small,
-  html.dark #title-screen .t-info-card {
-    --g-tint: 8 14 30;
   }
 
   /* ---------- The controls ---------- */

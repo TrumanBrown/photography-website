@@ -118,8 +118,8 @@ export function createScene(
 ): Scene {
   const { root, world, photo, me, sky, him, plane } = p;
   // On a window too wide for the photo, its own edges carried on beside it.
-  // They follow the photo's rules (hidden until placed, the dusk grade, gone
-  // once the moving layers, which have them built in, take over).
+  // They follow the photo's rules (hidden until placed, gone once the moving
+  // layers, which have them built in, take over).
   const after =
     photo.parentElement?.tagName === "PICTURE" ? photo.parentElement : photo;
   const sides = (["L", "R"] as const).map((side) => {

@@ -16,7 +16,8 @@ look. Everything below is about the public pages.
 The title screen at `/` ([TitleScreen.astro](../../src/components/TitleScreen.astro),
 `src/lib/title/`) is the one public screen with its own look, picked after four rounds of mocks
 (2026-11-20): his name in Jersey 25 pixel type, rounded glass keys tinted from the photo under
-them, a cursor on a spring, a pixel eagle, and the photo moving against the pointer. Its rules
+them, a cursor on a spring, a pixel eagle, and the photo moving against the pointer. It ignores the
+theme: the photo always shows at its own colours, in light and dark (2026-11-21). Its rules
 are in the front-door skill. Don't copy any of it onto other pages, and don't pull it back toward
 ink and paper either. The front door under it, and every page after it, follow the rules below.
 
