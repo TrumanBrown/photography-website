@@ -9,13 +9,13 @@ I'm [Truman Brown](https://trumanbrown.com/#weekdays), a product manager on Azur
 <a href="https://trumanbrown.com/#weekdays"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/weekdays-dark.jpg"><img src="docs/images/weekdays-light.jpg" alt="The Weekdays side of the front door at trumanbrown.com: my resume under the Weekends and Weekdays switch, beside a rail with my portrait at Everest and links to GitHub, LinkedIn and the resume PDF" width="49%"></picture></a>
 <a href="https://trumanbrown.com/photographs/"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/photographs-dark.jpg"><img src="docs/images/photographs-light.jpg" alt="The photo archive at trumanbrown.com/photographs/: the session list and globe in the rail, a rotating lead photograph, and the first row of session cards" width="49%"></picture></a>
 
-Try it: [the front door](https://trumanbrown.com/) (Weekends and Weekdays), [the photo archive](https://trumanbrown.com/photographs/), [Things to try](https://trumanbrown.com/hobbies/) (small interactive nature toys) and [Narrow nature](https://trumanbrown.com/hobbies/narrow-nature/), a daily puzzle where you guess where and when six species were seen together.
+Try it: [the title screen](https://trumanbrown.com/), [my resume](https://trumanbrown.com/#weekdays) on the front door's Weekdays side, [the photo archive](https://trumanbrown.com/photographs/), [Things to try](https://trumanbrown.com/hobbies/) (small interactive nature toys) and [Narrow nature](https://trumanbrown.com/hobbies/narrow-nature/), a daily puzzle where you guess where and when six species were seen together.
 
 ## What's worth a look
 
 Three product calls, with why I made each one and what came of it.
 
-Until November 2026 the site opened straight onto my photo archive, so someone coming from my resume or LinkedIn saw no picture of me and no line on what I do. I made `/` a front door with one switch, Weekends for the photographs and hobbies and Weekdays for my resume and side projects, and moved the archive to `/photographs/` ([the decisions](docs/product-experience.md#a-front-door-with-me-in-it-november-2026)). Its first four days had 60 views in 37 visits (some of them mine), a median of 13 seconds on the page, no referrer on 23 and nothing from LinkedIn, so a click from my resume looked the same as someone typing the address. Now the resume's links carry `?via=resume`, and the Analytics tab in `/admin` shows each Weekdays visit: how long it was on screen, how far down it got, what was clicked or copied, and the company when someone reads from their company's network. It emails me while a company is reading. None of it uses cookies or stores anyone's IP address ([docs/analytics.md](docs/analytics.md)).
+Until November 2026 the site opened straight onto my photo archive, so someone coming from my resume or LinkedIn saw no picture of me and no line on what I do. I made `/` a front door with one switch, Weekends for the photographs and hobbies and Weekdays for my resume and side projects, and moved the archive to `/photographs/` ([the decisions](docs/product-experience.md#a-front-door-with-me-in-it-november-2026)). Later that month a title screen went over it: my name in pixel type over a photo of me above a tarn in the Cascades, with the summit rising between the two words, and three doors, where Work opens the Weekdays side ([the title screen](docs/product-experience.md#a-title-screen-over-the-front-door-november-2026)). The front door's first four days had 60 views in 37 visits (some of them mine), a median of 13 seconds on the page, no referrer on 23 and nothing from LinkedIn, so a click from my resume looked the same as someone typing the address. Now the resume's links carry `?via=resume`, and the Analytics tab in `/admin` shows each Weekdays visit: how long it was on screen, how far down it got, what was clicked or copied, and the company when someone reads from their company's network. It emails me while a company is reading. None of it uses cookies or stores anyone's IP address ([docs/analytics.md](docs/analytics.md)).
 
 Under the photographs, a vision model looks at each photo once, takes the species from my own iNaturalist observations and checks its facts against Wikipedia. That one record writes the site's captions and session descriptions, and three Instagram posts a day. The first Instagram captions read like alt text, so I rewrote a dozen of them by hand, and the generator learns from those rewrites ([two of them](#the-instagram-pipeline)). From October 10, 2026, when posting started, to October 27, the Instagram bio link sent 21 of the site's 208 visits, against 5 from every other site put together ([docs/photos.md](docs/photos.md), [docs/social.md](docs/social.md)).
 
@@ -183,7 +183,7 @@ photography-website/
 │   └── track/                 # the analytics beacon
 ├── docs/                      # detailed docs (this README is the index), images/ holds its screenshots
 ├── infra/                     # Bicep IaC, see docs/iac-bicep.md
-├── public/                    # files served as they are: the resume PDF, fonts, the birding face model, map tiles, the tide pool beaches
+├── public/                    # files served as they are: the resume PDF, fonts, the title screen's photo layers, the birding face model, map tiles, the tide pool beaches
 ├── scripts/                   # prebuild, upload + bootstrap scripts, photos/ (captions), social/ (Instagram), tidepool/ (beaches)
 ├── src/
 │   ├── assets/                # committed images: stipple drawings, my portrait, fishing catch photos
@@ -194,7 +194,8 @@ photography-website/
 │   ├── layouts/               # the page shell
 │   ├── lib/                   # blob URLs, sessions, archive + globe, theme, admin, analytics
 │   │   ├── hobbies/           # canvas engines and their data (zero runtime dependencies)
-│   │   └── scenes/            # the scene each hobby card plays when it's clicked
+│   │   ├── scenes/            # the scene each hobby card plays when it's clicked
+│   │   └── title/             # the title screen at /: its photo's moving layers, the name, the glass keys, the eagle
 │   ├── pages/                 # one file or folder per route
 │   │   ├── .well-known/       # security.txt
 │   │   ├── admin/             # /admin/, the admin panel (its API needs GitHub sign-in)
@@ -203,7 +204,7 @@ photography-website/
 │   │   ├── photographs/       # /photographs/, the photo archive
 │   │   ├── places/            # /places/<region>/, sessions by place
 │   │   ├── sessions/          # /sessions/<slug>/, one page per session
-│   │   ├── index.astro        # /, the front door with its Weekends and Weekdays sides
+│   │   ├── index.astro        # /, the title screen over the front door with its Weekends and Weekdays sides
 │   │   ├── prints.astro       # /prints/, prints and licensing
 │   │   └── privacy.astro      # /privacy/
 │   └── styles/                # global.css, the Tailwind entry and the site's own styles

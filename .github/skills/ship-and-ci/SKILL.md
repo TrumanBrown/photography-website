@@ -49,12 +49,12 @@ He pastes `.../actions/runs/<id>` and asks why it failed.
 
 ## Inline scripts and the CSP
 
-`script-src` allows `'self'`, `'wasm-unsafe-eval'` and four SHA-256 hashes: `themeBootstrap` (`src/lib/theme.ts`), `landingBootstrap` (`src/lib/landing.ts`), and the inline scripts in `ThemeToggle.astro` and `LeadPhoto.astro`. `npm run check:csp` (`scripts/csp-hash.mjs`, also run by `check` and `build`) checks all four, and that the CSP's storage host matches `blobHost` in `site.config.ts`.
+`script-src` allows `'self'`, `'wasm-unsafe-eval'` and five SHA-256 hashes: `themeBootstrap` (`src/lib/theme.ts`), `landingBootstrap` (`src/lib/landing.ts`), and the inline scripts in `ThemeToggle.astro`, `LeadPhoto.astro` and `TitleScreen.astro`. `npm run check:csp` (`scripts/csp-hash.mjs`, also run by `check` and `build`) checks all five, and that the CSP's storage host matches `blobHost` in `site.config.ts`.
 
 1. Prefer a normal bundled `<script>`, which is served from `/_astro/` and covered by `'self'`. Inline only what must run before first paint.
 2. Edit, run `npm run check:csp`, replace the stale `'sha256-...'` token in `staticwebapp.config.json`, and run it again until it matches.
-3. Whitespace counts. The ThemeToggle and LeadPhoto scripts are hashed byte for byte, so a Prettier reflow of the `.astro` file changes the hash.
-4. A fifth inline script needs its own extractor in `csp-hash.mjs`. Without one the check passes and production blocks the script. Update docs/security.md, the `check:csp` line in docs/local-dev.md and the count at the top of this section.
+3. Whitespace counts. The ThemeToggle, LeadPhoto and TitleScreen scripts are hashed byte for byte, so a Prettier reflow of the `.astro` file changes the hash. Run Prettier first, then take the hash.
+4. A sixth inline script needs its own extractor in `csp-hash.mjs`. Without one the check passes and production blocks the script. Update docs/security.md, the `check:csp` line in docs/local-dev.md and the count at the top of this section.
 5. Never add `'unsafe-inline'` to `script-src`. A new host goes in the narrowest directive, with no wildcards.
 6. The dev server and `npm run preview` don't send the SWA headers, so CSP problems show only in production or a PR preview. Dark mode broke this way once (`51e5884`).
 

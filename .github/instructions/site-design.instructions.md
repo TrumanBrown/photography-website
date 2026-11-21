@@ -13,6 +13,13 @@ classes. Words follow [site-copy.instructions.md](./site-copy.instructions.md).
 Admin (`src/pages/admin/`, `src/lib/admin*.ts`) is a private tool and keeps its plain Tailwind
 look. Everything below is about the public pages.
 
+The title screen at `/` ([TitleScreen.astro](../../src/components/TitleScreen.astro),
+`src/lib/title/`) is the one public screen with its own look, picked after four rounds of mocks
+(2026-11-20): his name in Jersey 25 pixel type, rounded glass keys tinted from the photo under
+them, a cursor on a spring, a pixel eagle, and the photo moving against the pointer. Its rules
+are in the front-door skill. Don't copy any of it onto other pages, and don't pull it back toward
+ink and paper either. The front door under it, and every page after it, follow the rules below.
+
 ## Color
 
 - UI chrome uses the tokens in [global.css](../../src/styles/global.css), never Tailwind's
@@ -64,9 +71,10 @@ look. Everything below is about the public pages.
 ## Motion
 
 - Things move only in answer to the visitor. The lead photo is the one thing that changes on its
-  own, and it has a pause. The other exception is the video of his tank on the aquarium page,
-  which plays muted by itself because he picked a moving hero there (2026-10-25). It has the
-  player's pause, stops off screen and waits for play with reduced motion.
+  own, and it has a pause. The other exceptions are the video of his tank on the aquarium page,
+  which plays muted by itself because he picked a moving hero there (2026-10-25), and the title
+  screen's eagle, which crosses now and then (2026-11-20). Each has a pause, and with reduced
+  motion the video waits for play and the eagle never flies.
 - UI transitions run 150 to 320ms on `var(--ease)`, animate `transform` and `opacity` only, and
   list their properties (never `transition: all`). Each one needs a
   `prefers-reduced-motion: reduce` version that settles instantly.

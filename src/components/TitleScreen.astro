@@ -1,0 +1,976 @@
+---
+/**
+ * The title screen at `/` (src/lib/title/title.ts): the tarn photo from the
+ * Cascades, his name in pixel letters in its sky with the summit rising
+ * between the words, and glass keys over the water. The front door that was
+ * here before sits under it (index.astro); Work opens its Weekdays side.
+ *
+ * Its own look, unlike the rest of the site (site-design.instructions.md):
+ * colours from the photo, Jersey pixel type, glass. Truman picked it from the
+ * welcome mocks on 2026-11-20.
+ */
+import { DIR, SIZES } from "@/lib/title/frame";
+import tarn from "@/lib/title/tarn.json";
+
+interface Props {
+  photos: number;
+  trips: number;
+  places: number;
+  thingsLine: string;
+  role: string;
+  resume: string;
+  linkedin: string;
+  github: string;
+  /** The photo's session, for the "i": its place, month, size and the photo's number. */
+  info: { label: string; when: string; count: number; href: string } | null;
+}
+
+const {
+  photos,
+  trips,
+  places,
+  thingsLine,
+  role,
+  resume,
+  linkedin,
+  github,
+  info,
+} = Astro.props;
+const fmt = (n: number) => n.toLocaleString("en-US");
+const srcset = (layer: string, kind: "land" | "tall") =>
+  Object.keys(SIZES[kind])
+    .map((w) => `${DIR}${layer}-${kind}-${w}.webp ${w}w`)
+    .join(", ");
+const tallSizes = SIZES.tall["1080"];
+const photoLine = `${fmt(photos)} photos from ${fmt(trips)} trips, ${fmt(places)} places`;
+---
+
+<section id="title-screen" class="title wait" aria-label="Truman Brown">
+  <div class="t-world">
+    {
+      /* The photo and the land above the name get their sources from the
+        script just below, which skips them when the page opens on
+        #weekdays (the resume's link), so that visit never downloads them,
+        or the pixel fonts. It runs before the first layout (an inline
+        script waits for the stylesheets) and sets title-ready and title-on,
+        which decide what shows. title.ts sets the sources if the title
+        screen is shown later. */
+    }
+    <picture>
+      <source
+        media="(max-aspect-ratio: 4/5)"
+        sizes="max(103vw, 87vh)"
+        data-srcset={srcset("photo", "tall")}
+        width={tallSizes[0]}
+        height={tallSizes[1]}
+      />
+      <img
+        class="t-photo"
+        data-src={`${DIR}photo-land-1920.webp`}
+        data-srcset={srcset("photo", "land")}
+        sizes="max(103vw, 156vh)"
+        width="1920"
+        height="1280"
+        alt={tarn.alt}
+        fetchpriority="high"
+        decoding="sync"
+      />
+    </picture>
+    <noscript>
+      <img
+        class="t-photo t-photo-still"
+        src={`${DIR}photo-land-1920.webp`}
+        srcset={srcset("photo", "land")}
+        sizes="max(103vw, 156vh)"
+        width="1920"
+        height="1280"
+        alt={tarn.alt}
+      />
+    </noscript>
+    <img class="t-sky" alt="" aria-hidden="true" decoding="async" />
+    <div class="t-plane">
+      <h1 class="t-name">Truman Brown</h1>
+    </div>
+    <picture>
+      <source
+        media="(max-aspect-ratio: 4/5)"
+        sizes="max(103vw, 87vh)"
+        data-srcset={srcset("front", "tall")}
+      />
+      <img
+        class="t-front"
+        data-src={`${DIR}front-land-1920.webp`}
+        data-srcset={srcset("front", "land")}
+        sizes="max(103vw, 156vh)"
+        width="1920"
+        height="640"
+        alt=""
+        decoding="sync"
+      />
+    </picture>
+    <script is:inline>
+      (function () {
+        var root = document.documentElement;
+        root.classList.add("title-ready");
+        if (location.hash === "#weekdays") return;
+        root.classList.add("title-on");
+        var els = document.querySelectorAll("#title-screen [data-srcset]");
+        for (var i = 0; i < els.length; i++) {
+          var el = els[i];
+          el.srcset = el.getAttribute("data-srcset");
+          if (el.hasAttribute("data-src")) el.src = el.getAttribute("data-src");
+        }
+      })();
+    </script>
+    <canvas class="t-plate" aria-hidden="true"></canvas>
+    <img class="t-him" alt="" aria-hidden="true" decoding="async" />
+    <canvas class="t-bird" aria-hidden="true"></canvas>
+  </div>
+
+  <div class="t-ui">
+    <nav class="t-menu" aria-label="Where to go">
+      <div class="t-keys">
+        <a
+          class="t-key t-glass"
+          href="/photographs/"
+          data-key="photographs"
+          data-track="title:photographs"
+        >
+          <span class="t-label">Photographs</span>
+          <span class="t-line">{photoLine}</span>
+        </a>
+        <a
+          class="t-key t-glass"
+          href="/hobbies/"
+          data-key="things"
+          data-track="title:things-to-try"
+        >
+          <span class="t-label">Things to try</span>
+          <span class="t-line">{thingsLine}</span>
+        </a>
+        <a
+          class="t-key t-glass"
+          href="/#weekdays"
+          data-key="work"
+          data-track="title:work"
+        >
+          <span class="t-label">Work</span>
+          <span class="t-line">{role}</span>
+        </a>
+      </div>
+      <div class="t-smalls">
+        <a
+          class="t-small t-glass"
+          href={resume}
+          target="_blank"
+          rel="noopener"
+          data-key="resume"
+          data-track="title:resume-pdf">Resume (PDF)</a
+        >
+        <button
+          type="button"
+          class="t-small t-glass"
+          data-key="write"
+          data-contact-open
+          data-track="title:write-to-me">Write to me</button
+        >
+        {
+          /* LinkedIn's "in" bug (brand.linkedin.com, inbug) and GitHub's
+            Invertocat (brand.github.com), flat on a glass backing, which both
+            sets of brand rules allow. */
+        }
+        <a
+          class="t-small t-glass t-icon"
+          href={linkedin}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="LinkedIn"
+          aria-label="LinkedIn (opens in a new tab)"
+          data-key="linkedin"
+          data-track="title:linkedin"
+          ><svg viewBox="0 0 48 48" aria-hidden="true" focusable="false"
+            ><path
+              fill="currentColor"
+              fill-rule="evenodd"
+              d="m44.4 0h-40.9c-1.9 0-3.5 1.5-3.5 3.5v41.1c0 1.9 1.6 3.4 3.5 3.4h40.9c1.9 0 3.5-1.5 3.6-3.5v-41c0-2-1.6-3.5-3.6-3.5zm-30.2 40.9h-7.1v-22.9h7.1v22.9zm-3.5-26c-2.3 0-4.1-1.8-4.1-4.1s1.8-4.1 4.1-4.1 4.1 1.8 4.1 4.1c0 2.2-1.8 4.1-4.1 4.1zm30.2 26h-7.1v-11.1c0-2.7 0-6.1-3.7-6.1s-4.3 2.9-4.3 5.9v11.3h-7.1v-22.9h6.8v3.1h0.1c1-1.8 3.3-3.7 6.7-3.7 7.2 0 8.5 4.7 8.5 10.9v12.6z"
+            ></path></svg
+          ></a
+        >
+        <a
+          class="t-small t-glass t-icon"
+          href={github}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="GitHub"
+          aria-label="GitHub (opens in a new tab)"
+          data-key="github"
+          data-track="title:github"
+          ><svg viewBox="0 0 98 96" aria-hidden="true" focusable="false"
+            ><path
+              fill="currentColor"
+              d="M41.4395 69.3848C28.8066 67.8535 19.9062 58.7617 19.9062 46.9902C19.9062 42.2051 21.6289 37.0371 24.5 33.5918C23.2559 30.4336 23.4473 23.7344 24.8828 20.959C28.7109 20.4805 33.8789 22.4902 36.9414 25.2656C40.5781 24.1172 44.4062 23.543 49.0957 23.543C53.7852 23.543 57.6133 24.1172 61.0586 25.1699C64.0254 22.4902 69.2891 20.4805 73.1172 20.959C74.457 23.543 74.6484 30.2422 73.4043 33.4961C76.4668 37.1328 78.0937 42.0137 78.0937 46.9902C78.0937 58.7617 69.1934 67.6621 56.3691 69.2891C59.623 71.3945 61.8242 75.9883 61.8242 81.252L61.8242 91.2051C61.8242 94.0762 64.2168 95.7031 67.0879 94.5547C84.4102 87.9512 98 70.6289 98 49.1914C98 22.1074 75.9883 0 48.9043 0C21.8203 0 0 22.1074 0 49.1914C0 70.4375 13.4941 88.0469 31.6777 94.6504C34.2617 95.6074 36.75 93.8848 36.75 91.3008L36.75 83.6445C35.4102 84.2188 33.6875 84.6016 32.1562 84.6016C25.8398 84.6016 22.1074 81.1563 19.4277 74.7441C18.375 72.1602 17.2266 70.6289 15.0254 70.3418C13.877 70.2461 13.4941 69.7676 13.4941 69.1934C13.4941 68.0449 15.4082 67.1836 17.3223 67.1836C20.0977 67.1836 22.4902 68.9063 24.9785 72.4473C26.8926 75.2227 28.9023 76.4668 31.2949 76.4668C33.6875 76.4668 35.2187 75.6055 37.4199 73.4043C39.0469 71.7773 40.291 70.3418 41.4395 69.3848Z"
+            ></path></svg
+          ></a
+        >
+      </div>
+      <span class="t-frame" aria-hidden="true"></span>
+      <span class="t-cursor" aria-hidden="true"
+        ><svg viewBox="0 0 6 10"
+          ><path d="M0 0h2v2h2v2h2v2h-2v2h-2v2h-2z"></path></svg
+        ></span
+      >
+    </nav>
+
+    <div class="t-chips">
+      <button class="t-chip t-glass t-tilt" type="button" hidden>
+        <svg viewBox="0 0 16 16" aria-hidden="true"
+          ><rect
+            x="4.5"
+            y="1.5"
+            width="7"
+            height="13"
+            rx="1.6"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.4"
+            transform="rotate(-14 8 8)"></rect></svg
+        >Tilt
+      </button>
+      <button class="t-chip t-glass t-pause" type="button" hidden>Pause</button>
+      {
+        info && (
+          <>
+            <button
+              class="t-chip t-glass t-info"
+              type="button"
+              aria-label="About this photo"
+              aria-expanded="false"
+              aria-controls="title-info"
+              popovertarget="title-info"
+            >
+              <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                <circle cx="8" cy="3.7" r="1.55" fill="currentColor" />
+                <rect
+                  x="6.8"
+                  y="6.4"
+                  width="2.4"
+                  height="7.2"
+                  rx="1.2"
+                  fill="currentColor"
+                />
+              </svg>
+            </button>
+            <div
+              class="t-info-card t-glass"
+              id="title-info"
+              popover="manual"
+              role="dialog"
+              aria-label="About this photo"
+            >
+              <p class="t-ic-place">{info.label}</p>
+              <p class="t-ic-meta">
+                {info.when} · {info.count} photographs
+              </p>
+              <a class="t-ic-go" href={info.href} data-track="title:photo">
+                Open this photo <span aria-hidden="true">→</span>
+              </a>
+            </div>
+          </>
+        )
+      }
+    </div>
+  </div>
+</section>
+
+<noscript>
+  <style>
+    /* Without script: the plain photo, the name over it and the keys as links. */
+    #title-screen.wait .t-plane,
+    #title-screen.wait .t-ui {
+      visibility: visible;
+      animation: none;
+    }
+    #title-screen .t-photo-still {
+      visibility: visible;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: 44% 24%;
+    }
+    #title-screen .t-name {
+      left: 50%;
+      top: 7vh;
+      font-size: clamp(48px, 10vw, 160px);
+      transform: translateX(-50%);
+    }
+    #title-screen .t-menu {
+      left: 24px;
+      right: 24px;
+      top: auto;
+      bottom: 24px;
+      width: auto;
+      max-width: 400px;
+    }
+    #title-screen .t-chips {
+      display: none;
+    }
+  </style>
+</noscript>
+
+<style is:global>
+  /* Jersey 15 and 25 (OFL), the pixel faces for the name and the keys, and
+     Libre Franklin's whole weight range for the keys' small lines (the site's
+     own declaration stops at 500; the file is the same, so nothing more
+     downloads). */
+  @font-face {
+    font-family: "Jersey 25";
+    src: url("/fonts/jersey-25.woff2") format("woff2");
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "Jersey 15";
+    src: url("/fonts/jersey-15.woff2") format("woff2");
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "Title Franklin";
+    src: url("/fonts/libre-franklin-latin.woff2") format("woff2");
+    font-weight: 100 900;
+    font-display: swap;
+    unicode-range:
+      U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+      U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191,
+      U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  }
+
+  /* The title screen covers the page until Work (or /#weekdays) asks for the
+     page under it. The inline script sets title-ready and title-on before the
+     first layout; without script, /#weekdays decides through :target. */
+  html:not(.title-ready):has(#weekdays:target) #title-screen,
+  html.title-ready:not(.title-on) #title-screen {
+    display: none;
+  }
+  html:not(.title-ready):not(:has(#weekdays:target)) #page-shell,
+  html:not(.title-ready):not(:has(#weekdays:target)) .skip-link,
+  html.title-on #page-shell,
+  html.title-on .skip-link {
+    display: none;
+  }
+  html:not(.title-ready):not(:has(#weekdays:target)),
+  html.title-on {
+    overflow: hidden;
+  }
+
+  #title-screen {
+    /* Taken from the photo: its sky, the haze on the horizon, the shaded near
+       peak, the dark forest, and snow. */
+    --sky: #7fade2;
+    --haze: #bdd1dd;
+    --slate: #122a5b;
+    --snow: #f5f8fc;
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    /* A spring with a little overshoot, for presses and the keys settling. */
+    --spring: linear(
+      0,
+      0.007,
+      0.029 2.2%,
+      0.118 4.7%,
+      0.625 14.4%,
+      0.826 19%,
+      0.902,
+      0.962,
+      1.008 26.1%,
+      1.041 28.7%,
+      1.064 32.1%,
+      1.07 36%,
+      1.061 40.5%,
+      1.015 53.4%,
+      0.999 61.6%,
+      0.995 71.2%,
+      1
+    );
+    --lx: 50%;
+    --ly: 30%;
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    overflow: hidden;
+    background: var(--sky);
+    color: var(--snow);
+    font-family: "Title Franklin", ui-sans-serif, system-ui, sans-serif;
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  html.dark #title-screen {
+    background: #0c1424;
+  }
+
+  /* ---------- The scene ---------- */
+
+  #title-screen .t-world {
+    position: absolute;
+    inset: 0;
+  }
+  #title-screen .t-photo,
+  #title-screen .t-front,
+  #title-screen .t-sky,
+  #title-screen .t-him {
+    position: absolute;
+    left: 0;
+    top: 0;
+    max-width: none;
+    display: block;
+    pointer-events: none;
+  }
+  #title-screen .t-sky,
+  #title-screen .t-him {
+    will-change: transform;
+  }
+  #title-screen .t-plate,
+  #title-screen .t-bird {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+  #title-screen .t-plate {
+    opacity: 0;
+  }
+  #title-screen.gl .t-plate {
+    opacity: 1;
+  }
+  /* The photo and the front layer show once the script has placed them, so
+     neither paints at its natural size first and jumps. Then the moving
+     layers take over in one frame: the sky for the photo, the WebGL land and
+     him for the front layer. At rest the two sets match pixel for pixel. */
+  #title-screen .t-photo,
+  #title-screen .t-front,
+  #title-screen .t-sky,
+  #title-screen .t-him {
+    visibility: hidden;
+  }
+  #title-screen.placed .t-photo,
+  #title-screen.placed.painted .t-front {
+    visibility: visible;
+  }
+  #title-screen.placed.gl .t-photo,
+  #title-screen.placed.gl .t-front {
+    visibility: hidden;
+  }
+  #title-screen.placed.gl .t-sky,
+  #title-screen.placed.gl .t-him {
+    visibility: visible;
+  }
+  /* Wider than about 2.9:1 the photo and its carried-on edges show together. */
+  #title-screen.placed.wide:not(.painted) .t-photo {
+    visibility: hidden;
+  }
+  #title-screen .t-plane {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    will-change: transform;
+  }
+
+  /* Dark: the same photo after sunset. Every layer gets the same grade so
+     they still match: darker, cooler, a little more contrast. */
+  html.dark #title-screen .t-photo,
+  html.dark #title-screen .t-front,
+  html.dark #title-screen .t-sky,
+  html.dark #title-screen .t-him,
+  html.dark #title-screen .t-plate,
+  html.dark #title-screen .t-bird {
+    filter: brightness(0.5) saturate(0.85) contrast(1.12) hue-rotate(6deg);
+  }
+
+  /* The name and the controls wait until the summit is over the name, then
+     the entrance plays from its first frame. If the script never gets there,
+     they show anyway after a few seconds. */
+  #title-screen.wait .t-plane,
+  #title-screen.wait .t-ui {
+    visibility: hidden;
+    animation: t-failsafe 0s linear 4s forwards;
+  }
+  @keyframes t-failsafe {
+    to {
+      visibility: visible;
+    }
+  }
+
+  /* ---------- The name: white pixel letters with a slate outline ---------- */
+
+  #title-screen .t-name {
+    position: absolute;
+    left: 0;
+    top: 0;
+    margin: 0;
+    --fp: 4px; /* one font pixel; set from the size */
+    font:
+      400 160px/0.88 "Jersey 25",
+      ui-sans-serif,
+      sans-serif;
+    letter-spacing: 0;
+    white-space: nowrap;
+    color: var(--snow);
+    text-shadow:
+      calc(-1 * var(--fp)) 0 0 var(--slate),
+      var(--fp) 0 0 var(--slate),
+      0 calc(-1 * var(--fp)) 0 var(--slate),
+      0 var(--fp) 0 var(--slate),
+      calc(-1 * var(--fp)) calc(-1 * var(--fp)) 0 var(--slate),
+      var(--fp) calc(-1 * var(--fp)) 0 var(--slate),
+      calc(-1 * var(--fp)) var(--fp) 0 var(--slate),
+      var(--fp) var(--fp) 0 var(--slate),
+      calc(2 * var(--fp)) calc(2 * var(--fp)) 0 rgb(18 42 91 / 0.55);
+    pointer-events: none;
+  }
+  html.dark #title-screen .t-name {
+    --slate: #0b1a3a;
+  }
+
+  /* ---------- Glass ---------- */
+  /* Blur and saturate what's behind, tint it from the photo (glass.ts sets
+     --g-a per key so white words keep their contrast), a rim brightest toward
+     the light, and a soft sheen that follows the pointer or the tilt. In
+     Chrome and Edge, --g-lens adds the bend at the edges. */
+  #title-screen .t-glass {
+    --g-r: 16px;
+    --g-blur: 14px;
+    --g-sat: 1.7;
+    --g-tint: 14 23 44;
+    --g-a: 0.26;
+    --g-rim: 0.55;
+    position: relative;
+    isolation: isolate;
+    border-radius: var(--g-r);
+    background: rgb(var(--g-tint) / var(--g-a));
+    -webkit-backdrop-filter: blur(var(--g-blur)) saturate(var(--g-sat));
+    backdrop-filter: var(--g-lens, blur(0px)) blur(var(--g-blur))
+      saturate(var(--g-sat));
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.28),
+      inset 0 0 0 1px rgb(255 255 255 / 0.07),
+      0 1px 2px rgb(4 12 28 / 0.14),
+      0 14px 34px -16px rgb(4 12 28 / 0.6);
+  }
+  #title-screen .t-glass::before,
+  #title-screen .t-glass::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1; /* above the glass, under its words */
+    border-radius: inherit;
+    pointer-events: none;
+  }
+  /* The rim: a 1px ring lit from the light's side. */
+  #title-screen .t-glass::before {
+    padding: 1px;
+    background: radial-gradient(
+      140% 140% at var(--lx) var(--ly),
+      rgb(255 255 255 / var(--g-rim)),
+      rgb(255 255 255 / 0.06) 52%,
+      rgb(255 255 255 / 0.2)
+    );
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask-composite: exclude;
+  }
+  /* The sheen. */
+  #title-screen .t-glass::after {
+    background: radial-gradient(
+      70% 120% at var(--lx) var(--ly),
+      rgb(255 255 255 / 0.16),
+      rgb(255 255 255 / 0) 62%
+    );
+  }
+  html.dark #title-screen .t-key,
+  html.dark #title-screen .t-small,
+  html.dark #title-screen .t-info-card {
+    --g-tint: 8 14 30;
+  }
+
+  /* ---------- The controls ---------- */
+
+  #title-screen .t-ui {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    pointer-events: none;
+  }
+  #title-screen .t-ui > * {
+    pointer-events: auto;
+  }
+  #title-screen .t-ui :focus-visible {
+    outline: 2px solid var(--snow);
+    outline-offset: 3px;
+    box-shadow: 0 0 0 5px rgb(4 12 28 / 0.55);
+  }
+
+  #title-screen .t-menu {
+    --k: 1;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: calc(400px * var(--k));
+    display: grid;
+    gap: calc(8px * var(--k));
+  }
+  #title-screen .t-keys {
+    display: grid;
+    gap: calc(8px * var(--k));
+  }
+  #title-screen .t-smalls {
+    display: flex;
+    gap: calc(8px * var(--k));
+    margin-top: calc(8px * var(--k));
+  }
+  #title-screen .t-key {
+    --g-r: 10px;
+    --g-blur: 12px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+    height: calc(72px * var(--k));
+    padding: 0 calc(20px * var(--k)) 2px calc(22px * var(--k));
+    color: var(--snow);
+    text-decoration: none;
+    cursor: pointer;
+    transition:
+      transform 70ms var(--ease-out),
+      background-color 120ms linear;
+  }
+  #title-screen .t-label {
+    font:
+      400 calc(30px * var(--k)) / 1 "Jersey 15",
+      ui-sans-serif,
+      sans-serif;
+    transition: transform 260ms var(--spring);
+    text-shadow: 0 1px 0 rgb(4 12 28 / 0.35);
+  }
+  #title-screen .t-line {
+    font:
+      500 calc(13px * var(--k)) / 1.25 "Title Franklin",
+      sans-serif;
+    color: rgb(245 248 252 / 0.86);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: transform 260ms var(--spring);
+  }
+  /* The selected key: its glass clears a little, and its words step right
+     for the cursor. */
+  #title-screen .t-key.is-sel {
+    --g-a: 0.08 !important;
+    --g-rim: 0.85;
+  }
+  #title-screen .t-key.is-sel .t-label,
+  #title-screen .t-key.is-sel .t-line {
+    transform: translateX(calc(18px * var(--k)));
+  }
+  #title-screen .t-key.is-down {
+    transform: translateY(2px) scale(0.985);
+  }
+
+  /* The small keys: Resume (PDF), Write to me, LinkedIn and GitHub. */
+  #title-screen .t-small {
+    --g-r: 10px;
+    --g-blur: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: calc(48px * var(--k));
+    padding: 0 calc(16px * var(--k));
+    border: 0;
+    color: var(--snow);
+    font:
+      400 calc(22px * var(--k)) / 1 "Jersey 15",
+      ui-sans-serif,
+      sans-serif;
+    text-decoration: none;
+    cursor: pointer;
+    transition: transform 70ms var(--ease-out);
+  }
+  #title-screen .t-small.t-icon {
+    width: calc(48px * var(--k));
+    padding: 0;
+  }
+  #title-screen .t-small.t-icon svg {
+    width: calc(20px * var(--k));
+    height: calc(20px * var(--k));
+  }
+  #title-screen .t-small.is-sel {
+    --g-a: 0.08 !important;
+    --g-rim: 0.85;
+  }
+  #title-screen .t-small.is-down {
+    transform: translateY(2px) scale(0.97);
+  }
+  /* The frame and the cursor show focus on the keys instead of a ring. */
+  #title-screen .t-key:focus-visible,
+  #title-screen .t-small:focus-visible {
+    outline: none;
+    box-shadow: none;
+  }
+
+  /* The frame (springs between keys) and the pixel cursor. */
+  #title-screen .t-frame {
+    position: absolute;
+    left: 0;
+    top: 0;
+    border: 2px solid var(--snow);
+    border-radius: 13px;
+    box-shadow:
+      0 0 0 1px rgb(4 12 28 / 0.25),
+      0 0 18px rgb(245 248 252 / 0.25);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 120ms linear;
+  }
+  #title-screen .t-cursor {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 12px;
+    height: 20px;
+    color: var(--snow);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 120ms linear;
+    filter: drop-shadow(1px 1px 0 rgb(18 42 91 / 0.6));
+  }
+  #title-screen .t-menu.has-sel .t-frame,
+  #title-screen .t-menu.has-sel .t-cursor {
+    opacity: 1;
+  }
+  #title-screen .t-cursor svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    fill: currentColor;
+    shape-rendering: crispEdges;
+  }
+  #title-screen .t-cursor.bob svg {
+    animation: t-bob 560ms steps(2, jump-none) 3;
+  }
+  @keyframes t-bob {
+    0%,
+    100% {
+      transform: translateX(0);
+    }
+    50% {
+      transform: translateX(3px);
+    }
+  }
+
+  /* Pause, Tilt and the "i" sit bottom right. */
+  #title-screen .t-chips {
+    position: absolute;
+    right: 24px;
+    bottom: 24px;
+    display: flex;
+    gap: 8px;
+  }
+  #title-screen .t-chip {
+    position: relative;
+    z-index: 20;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 32px;
+    padding: 0 12px;
+    border: 0;
+    color: var(--snow);
+    font:
+      500 13px/1 "Title Franklin",
+      system-ui,
+      sans-serif;
+    cursor: pointer;
+    --g-r: 999px;
+    --g-blur: 10px;
+  }
+  #title-screen .t-chip[hidden] {
+    display: none;
+  }
+  #title-screen .t-chip svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  /* ---------- About this photo: the "i" and its card ---------- */
+  #title-screen .t-info {
+    width: auto;
+    aspect-ratio: 1;
+    padding: 0;
+    justify-content: center;
+  }
+  #title-screen .t-info.is-open {
+    --g-rim: 0.9;
+  }
+  #title-screen .t-info:focus-visible {
+    outline: 2px solid var(--snow);
+    outline-offset: 2px;
+  }
+  #title-screen .t-info-card {
+    --g-r: 18px;
+    --g-blur: 22px;
+    --g-a: 0.56;
+    position: fixed;
+    inset: auto;
+    margin: 0;
+    width: max-content;
+    max-width: min(300px, calc(100vw - 24px));
+    padding: 14px 16px 12px;
+    border: 0;
+    color: var(--snow);
+    overflow: visible;
+    font-family: "Title Franklin", ui-sans-serif, system-ui, sans-serif;
+    text-shadow: 0 1px 2px rgb(4 12 28 / 0.3);
+  }
+  #title-screen .t-info-card[hidden] {
+    display: none;
+  }
+  #title-screen .t-info-card p {
+    margin: 0;
+  }
+  #title-screen .t-ic-place {
+    font:
+      600 16px/1.25 "Title Franklin",
+      ui-sans-serif,
+      sans-serif;
+    letter-spacing: -0.005em;
+  }
+  #title-screen .t-ic-meta {
+    margin-top: 3px;
+    font:
+      400 13px/1.3 "Title Franklin",
+      ui-sans-serif,
+      sans-serif;
+    font-variant-numeric: tabular-nums;
+    opacity: 0.82;
+  }
+  #title-screen .t-ic-go {
+    display: inline-block;
+    margin: 10px -6px 0;
+    padding: 6px;
+    border-radius: 8px;
+    color: var(--snow);
+    font:
+      600 14px/1.2 "Title Franklin",
+      ui-sans-serif,
+      sans-serif;
+    text-decoration: none;
+  }
+  #title-screen .t-ic-go span {
+    display: inline-block;
+    transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  #title-screen .t-ic-go:hover {
+    text-decoration: underline 1px;
+    text-underline-offset: 3px;
+  }
+  #title-screen .t-ic-go:hover span,
+  #title-screen .t-ic-go:focus-visible span {
+    transform: translateX(3px);
+  }
+  #title-screen .t-ic-go:focus-visible {
+    outline: 2px solid var(--snow);
+    outline-offset: 0;
+    box-shadow: none;
+  }
+
+  /* ---------- Phone ---------- */
+  #title-screen.phone .t-menu {
+    left: 16px;
+    right: 16px;
+    width: auto;
+  }
+  #title-screen.phone .t-key {
+    height: 64px;
+    padding: 0 16px 2px 18px;
+    --g-blur: 20px;
+  }
+  #title-screen.phone .t-key .t-label {
+    font-size: 27px;
+  }
+  #title-screen.phone .t-small {
+    --g-blur: 18px;
+    height: 44px;
+    font-size: 20px;
+    padding: 0 12px;
+    white-space: nowrap;
+  }
+  /* A 375 px phone: Resume (PDF) and Write to me stay on one line each. */
+  @media (max-width: 389px) {
+    #title-screen.phone .t-small:not(.t-icon) {
+      font-size: 18px;
+      padding: 0 9px;
+    }
+  }
+  #title-screen.phone .t-small.t-icon {
+    width: 44px;
+  }
+  #title-screen.phone .t-smalls {
+    margin-top: 0;
+  }
+  #title-screen.phone .t-chips {
+    right: 16px;
+    bottom: auto;
+    top: 16px;
+  }
+  #title-screen.phone .t-info svg {
+    width: 16px;
+    height: 16px;
+  }
+  #title-screen.phone .t-ic-go {
+    padding: 12px 6px;
+    margin-bottom: -6px;
+  }
+
+  /* ---------- Opening a door: the pressed glass grows over the screen ---------- */
+  .title-sheet {
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    pointer-events: none;
+    background: rgb(14 23 44 / 0.2);
+    -webkit-backdrop-filter: blur(24px) saturate(1.6);
+    backdrop-filter: blur(24px) saturate(1.6);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.35),
+      0 20px 50px -20px rgb(4 12 28 / 0.6);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    #title-screen .t-glass::after {
+      display: none;
+    }
+    #title-screen .t-key,
+    #title-screen .t-label,
+    #title-screen .t-line,
+    #title-screen .t-small,
+    #title-screen .t-ic-go span {
+      transition: none;
+    }
+    #title-screen .t-cursor.bob svg {
+      animation: none;
+    }
+  }
+</style>
+
+<script>
+  import { initTitle } from "@/lib/title/title";
+
+  initTitle();
+</script>

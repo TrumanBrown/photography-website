@@ -43,6 +43,9 @@ export const WEEKDAYS =
 export const SUMMARY =
   "Product manager with 3+ years at Microsoft, owning migration and virtual machine features for Azure Local, its hybrid cloud platform. Scaled migration to 885 customers (57 Fortune 500 or Global 500) running 300,000+ cores.";
 
+/** The line under Work on the title screen, the job in one line. */
+export const ROLE = "Product manager on Azure Local at Microsoft";
+
 export const RESUME_PDF = "/Truman-Brown-Resume.pdf";
 
 export const LINKS = [

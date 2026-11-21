@@ -107,6 +107,8 @@ const ogImageAbsolute = previewImage
   </head>
   <body class="min-h-screen">
     <a class="skip-link" href="#main">Skip to content</a>
+    {/* Anything a page lays over its shell (the title screen at /). */}
+    <slot name="before" />
     {
       section === "home" ? (
         <div id="page-shell" class="archive-shell home-shell">

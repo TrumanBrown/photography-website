@@ -29,7 +29,7 @@ Where the patterns came from: Cult UI (rolling number, direction-aware tabs, the
 
 ## Rules
 
-- **Only in answer to the visitor.** The lead photo is the one thing that changes by itself, and it has a pause.
+- **Only in answer to the visitor.** The lead photo is the one thing that changes by itself, and it has a pause. The title screen at `/` is its own case, approved in the welcome mocks (design-mocks, rounds 2 to 4): the photo moves against the pointer or the tilt, and the eagle crosses now and then. Pause stops the eagle, and under reduced motion neither moves. Its parts live in `src/lib/title/` (front-door skill). Don't carry them onto other pages.
 - **150 to 320 ms on `var(--ease)`, `transform` and `opacity` only, properties listed.** The stamp, the developing postcard and the lead crossfade run longer on purpose; don't cite them as precedent.
 - **Never morph one photograph into a different one** across a page change; the cover and the banner are almost always different photos (2026-10-16).
 - **Nothing covers the animal**, and feedback sits by the thing it's about, never in the middle of the screen: "not in middle of screen, but subtly and noticeably by the score" (2026-10-14). A small stamp in the corner of a large photo is fine, as Narrow nature's price is (2026-10-25); a stamp across the subject isn't, as the first-find stamp was (2026-10-15).

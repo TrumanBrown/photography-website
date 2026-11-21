@@ -49,6 +49,14 @@ const CLICKS: Record<string, string> = {
   "rail:everest-photo": "the Everest photo",
   "rail:resume-pdf": "Resume (PDF) in the rail",
   "rail:write-to-me": "Write to me in the rail",
+  "title:photographs": "Photographs on the title screen",
+  "title:things-to-try": "Things to try on the title screen",
+  "title:work": "Work on the title screen",
+  "title:resume-pdf": "Resume (PDF) on the title screen",
+  "title:write-to-me": "Write to me on the title screen",
+  "title:linkedin": "LinkedIn on the title screen",
+  "title:github": "GitHub on the title screen",
+  "title:photo": "the title screen's photo in its session",
 };
 
 const PROJECT_PARTS: Record<string, string> = {

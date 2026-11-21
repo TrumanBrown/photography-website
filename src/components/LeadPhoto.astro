@@ -7,9 +7,14 @@ interface Props {
   items: LeadItem[];
   /** Seconds between photographs. */
   interval?: number;
+  /**
+   * Load the first photograph only once it shows: on the front door, where it
+   * sits under the title screen, so it never competes with the title's photo.
+   */
+  lazy?: boolean;
 }
 
-const { items, interval = 6 } = Astro.props;
+const { items, interval = 6, lazy = false } = Astro.props;
 
 /* Resolve optimised URLs at build time. The rotation swaps `src` on a pair of
    stacked <img> elements, so only the frames actually shown get downloaded —
@@ -52,7 +57,8 @@ const first = resolved[0];
           width="1600"
           height="1067"
           decoding="async"
-          fetchpriority="high"
+          loading={lazy ? "lazy" : undefined}
+          fetchpriority={lazy ? undefined : "high"}
         />
         <img
           id="lead-b"

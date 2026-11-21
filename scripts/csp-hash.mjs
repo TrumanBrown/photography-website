@@ -43,11 +43,21 @@ if (leadMatches.length !== 1) {
   throw new Error(`Expected one inline script in LeadPhoto.astro; found ${leadMatches.length}.`);
 }
 
+// The title screen at / gives its photo a source while the parser is still
+// working, unless the page opened on #weekdays (the resume's link), so that
+// visit never downloads it.
+const titleSource = read('src/components/TitleScreen.astro');
+const titleMatches = [...titleSource.matchAll(/<script\s+is:inline>([\s\S]*?)<\/script>/g)];
+if (titleMatches.length !== 1) {
+  throw new Error(`Expected one inline script in TitleScreen.astro; found ${titleMatches.length}.`);
+}
+
 const expected = [
   cspToken(themeMatch[1].trim()),
   cspToken(toggleMatches[0][1]),
   cspToken(leadMatches[0][1]),
   cspToken(landingMatch[1].trim()),
+  cspToken(titleMatches[0][1]),
 ];
 const config = JSON.parse(read('staticwebapp.config.json'));
 const policy = config.globalHeaders?.['Content-Security-Policy'];

@@ -314,7 +314,11 @@
     "contact-message",
   ) as HTMLTextAreaElement;
   const pageField = document.getElementById("contact-page") as HTMLInputElement;
-  const pageShell = document.getElementById("page-shell");
+  // The page, and the title screen laid over it at / (TitleScreen.astro).
+  const pageShells = ["page-shell", "title-screen"].flatMap((id) => {
+    const el = document.getElementById(id);
+    return el ? [el] : [];
+  });
 
   let isOpen = false;
   let posting: Posting | null = null;
@@ -339,7 +343,7 @@
     previousBodyOverflow = document.body.style.overflow;
     pageField.value = window.location.pathname + window.location.hash;
     drawer.removeAttribute("inert");
-    pageShell?.setAttribute("inert", "");
+    for (const shell of pageShells) shell.setAttribute("inert", "");
     drawer.classList.add("on");
     backdrop.classList.add("on");
     document.body.style.overflow = "hidden";
@@ -355,7 +359,7 @@
     drawer.classList.remove("on");
     backdrop.classList.remove("on");
     document.body.style.overflow = previousBodyOverflow;
-    pageShell?.removeAttribute("inert");
+    for (const shell of pageShells) shell.removeAttribute("inert");
     drawer.setAttribute("inert", "");
     opener?.focus();
   }

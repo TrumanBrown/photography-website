@@ -1,0 +1,14 @@
+{
+  "box": [25, 26],
+  "frames": 8,
+  "anchor": [13.54, 13.1],
+  "length": 11,
+  "hz": 1.713,
+  "cycle": [0, 1, 2, 3, 4, 5, 6],
+  "level": 0,
+  "glide": 7,
+  "bob": [0.274, 0.104, -0.31, -0.55, -0.124, 0.244, 0.362],
+  "pixel": true,
+  "src": "/title/eagle-v1/pixel.webp",
+  "credit": "Bald eagle frames from \u201cBald Eagle (Haliaeetus leucocephalus) in USA\u201d, US Fish and Wildlife Service, public domain, via Wikimedia Commons"
+}

@@ -64,6 +64,27 @@ Before this, `/` opened straight onto the archive. Someone arriving from a resum
 - **Things to try has a header instead of the rail.** Going there from any page with the rail, the rail steps out to the left and the header drops in from the top, and the page rises 8px into place. Coming back, the header lifts away and the rail steps in. These changes used to be a plain page load. Under reduced motion, or in a browser without cross-document view transitions, every one of these is a plain page load.
 - **"Write to me" replaced the round mail button.** It's a word in the footer, the rails and the Weekdays side, and the drawer is ink and paper now: a light heading, inputs with a 1px rule under them, one ink button, and plain text for "Message sent. Thank you!". Its line puts my work first: "About my work or projects, a print, or a photo you'd like to use." Every message is also emailed to me ([azure.md](azure.md#contact-form-email)). Closed, the drawer is `inert` and hidden, so it never takes keyboard focus.
 
+### A title screen over the front door (November 2026)
+
+The ink-and-paper look suits the photos and the hobbies, but I wanted a clean welcome page in front of them after seeing a Minecraft-style personal site: one full-screen world, the person standing in it, and big menu buttons. Four rounds of mocks (`mocks/welcome/`, the design-mocks skill) ended on C, the title screen, over a photo of me above a tarn in the Cascades. It now covers `/` ([TitleScreen.astro](../src/components/TitleScreen.astro), [src/lib/title/](../src/lib/title/)), and the front door above is unchanged under it.
+
+- **The photo** is photo 4 of Cascades, Washington, August 2025: me on a ridge above a still tarn, under a sharp peak. It fills the screen at any size. A phone gets a taller crop around the summit, and a window wider than the photo (a 32:9 monitor) gets the whole photo in the middle with its own edges carried on softly beside it, so the mountains are never lost to zooming in.
+- **My name** is in Jersey 25, a pixel font (SIL Open Font License, self-hosted beside its license in `public/fonts/`), white with a navy outline, sized and placed so the summit rises into the gap between Truman and Brown. If a tree would cross a letter, the name steps down a size.
+- **The photo moves a little against the pointer**, like an iPhone wallpaper: the near ridge moves more than the far peaks, each pixel by its own depth, drawn with WebGL. On a phone a finger does the same, and Tilt turns on the phone's motion sensor (an iPhone asks first).
+- **The keys are glass**, tinted from the part of the photo under each one, with a cursor on a spring that follows the selected key. Nothing is selected until the pointer or the keyboard picks something. Photographs and Things to try carry the same counts as everywhere else, and Work says my job in one line. Under them are Resume (PDF), Write to me, and LinkedIn's and GitHub's own marks.
+- **Work opens the Weekdays side** at `/#weekdays` on the same page: the key's glass grows over the screen in 320ms, the resume is put in place under it, and the glass fades. Back shrinks it into the key again. Photographs and Things to try grow the same glass and then use the site's plain page change. Write to me opens the drawer. Every About me link and the resume's own links still go to `/#weekdays`, which never shows the title screen.
+- **A bald eagle crosses now and then**, flap-gliding in a slow wave, behind the trees and in front of the far peaks. Its wingbeats are cut from public-domain US Fish and Wildlife Service footage and redrawn on the name's pixel grid, with the head set by hand so it reads at that size. Pause stops it.
+- **The "i"** in the corner says where the photo is from and opens it in its session (`#photo-4`), worked out at build time from the session's own order.
+- **Keyboard, screen readers, reduced motion.** Tab or the arrow keys move between keys and Enter opens. It's a labelled section of ordinary links, and the eagle is decorative. With reduced motion nothing moves and the doors are plain page loads. Without script it's a still photo with the name and the keys as links. Clicks are counted under `title:` names in the Analytics tab.
+
+How it stays fast:
+
+- An inline script (CSP-hashed) runs before the first paint. On `/#weekdays` it stops there, so the resume path downloads none of the title screen's photos or fonts. On `/` it hands the photo its address. Lighthouse on a phone over slow 4G: the resume path scores 94 to 97 against 97 to 99 before, and downloads less (about 360 KB against 430 KB). The title path scores 83, with the photo painting at about 4.0s, against 96 and 2.7s for the old front door. The gap is the full-screen photo itself. On a desktop the title path scores 97.
+- The first paint is one WebP sized to the screen: about 230 KB on a phone, 370 to 560 KB on a laptop or desktop. The moving layers, the WebGL plate and the glass's bent edges load after it in idle time, and stop while the title screen is hidden.
+- `src/lib/title/` imports nothing from the rest of `src/lib`, so its script arrives as one file instead of a chain of them.
+
+How the layers were made: a local script kept with the mocks (`scripts-local/prep-welcome-r4.py`) split the photo into the sky, the land, me and the near trees, and measured how near each part is with Depth Anything V2 Small, run on my machine. Nothing is generated: every pixel is the photo's own, moved, unmixed from the sky or blurred. The layers are committed in `public/title/tarn-v1/` and served from `/title/` with a year's immutable caching, so a rebuild doesn't need the script. A new photo gets a new folder (`tarn-v2`) rather than new files under the old name. The eagle's frames came from `scripts-local/prep-welcome-bird.py`.
+
 ### Faster first photograph
 
 Only the first visible homepage cover and first session-gallery photograph use eager loading and `fetchpriority="high"`; every other image remains lazy. The document also preconnects to the configured Blob origin. This prioritizes the likely LCP image without flooding the network with competing high-priority requests.
@@ -149,7 +170,7 @@ A later review took five ideas from a reel about AI-built interfaces looking gen
 - The year-grouped archive and session filter remain simpler than tags or faceted search at the current scale.
 - The masonry-style CSS columns keep mixed photo orientations visually natural.
 - Hobbies remain route-local; their heavier code does not affect photography pages.
-- No design system, component library, map SDK, comments, accounts or favorites were added. The one web font, Libre Franklin, is self-hosted from `public/fonts/`, and the cloud services added since July (the caption model, the contact email and the Logic App timers) are listed in [azure.md](azure.md).
+- No design system, component library, map SDK, comments, accounts or favorites were added. The site's font, Libre Franklin, is self-hosted from `public/fonts/`, with Jersey 25 and 15 beside it for the title screen's pixel type only, and the cloud services added since July (the caption model, the contact email and the Logic App timers) are listed in [azure.md](azure.md).
 - Full-resolution downloads remain available in PhotoSwipe.
 
 ## Ranked roadmap
@@ -178,4 +199,4 @@ npm test
 npm run build
 ```
 
-Then inspect `/` (both the Weekends and the Weekdays side, `/#weekdays`), `/photographs/`, one short session, one long session, `/hobbies`, each Hobbies route, `/admin`, and a missing route at 1440×900, 768×1024, and 390×844. Check keyboard focus, horizontal overflow, console/page errors, and the first image's `loading`/`fetchpriority` attributes. Open a session's lightbox on a photo with a long caption at 1440×900 and at 390×664 (a phone with its browser bars showing): the caption sits under the photograph and never touches it.
+Then inspect `/` (the title screen, then both the Weekends and the Weekdays side, `/#weekdays`), `/photographs/`, one short session, one long session, `/hobbies`, each Hobbies route, `/admin`, and a missing route at 1440×900, 768×1024, and 390×844. Check keyboard focus, horizontal overflow, console/page errors, and the first image's `loading`/`fetchpriority` attributes. Open a session's lightbox on a photo with a long caption at 1440×900 and at 390×664 (a phone with its browser bars showing): the caption sits under the photograph and never touches it.
