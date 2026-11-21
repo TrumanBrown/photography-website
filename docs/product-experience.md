@@ -79,7 +79,7 @@ The ink-and-paper look suits the photos and the hobbies, but I wanted a clean we
 
 How it stays fast:
 
-- An inline script (CSP-hashed) runs before the first paint. On `/#weekdays` it stops there, so the resume path downloads none of the title screen's photos or fonts. On `/` it hands the photo its address. Lighthouse on a phone over slow 4G: the resume path scores 94 to 97 against 97 to 99 before, and downloads less (about 360 KB against 430 KB). The title path scores 83, with the photo painting at about 4.0s, against 96 and 2.7s for the old front door. The gap is the full-screen photo itself. On a desktop the title path scores 97.
+- An inline script (CSP-hashed) runs before the first paint. On `/#weekdays` it stops there, so the resume path downloads none of the title screen's photos or fonts. On `/` it hands the photo its address. The pixel fonts apply only once the script has shown the screen, since a page arriving over a slow network can be styled before the script runs. Lighthouse on a phone over slow 4G: the resume path scores 94 to 97 against 97 to 99 before, and downloads less (about 360 KB against 430 KB). The title path scores 83, with the photo painting at about 4.0s, against 96 and 2.7s for the old front door. The gap is the full-screen photo itself. On a desktop the title path scores 97.
 - The first paint is one WebP sized to the screen: about 230 KB on a phone, 370 to 560 KB on a laptop or desktop. The moving layers, the WebGL plate and the glass's bent edges load after it in idle time, and stop while the title screen is hidden.
 - `src/lib/title/` imports nothing from the rest of `src/lib`, so its script arrives as one file instead of a chain of them.
 

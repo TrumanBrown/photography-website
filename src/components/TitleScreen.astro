@@ -302,7 +302,12 @@ const photoLine = `${fmt(photos)} photos from ${fmt(trips)} trips, ${fmt(places)
       left: 50%;
       top: 7vh;
       font-size: clamp(48px, 10vw, 160px);
+      font-family: "Jersey 25", ui-sans-serif, sans-serif;
       transform: translateX(-50%);
+    }
+    #title-screen .t-label,
+    #title-screen .t-small {
+      font-family: "Jersey 15", ui-sans-serif, sans-serif;
     }
     #title-screen .t-menu {
       left: 24px;
@@ -360,6 +365,18 @@ const photoLine = `${fmt(photos)} photos from ${fmt(trips)} trips, ${fmt(places)
   html:not(.title-ready):not(:has(#weekdays:target)),
   html.title-on {
     overflow: hidden;
+  }
+
+  /* The pixel faces apply only once the inline script has shown the screen.
+     The name is parsed before that script, and a page still arriving over the
+     network can be styled in between, which fetched Jersey 25 on /#weekdays.
+     Without script, the noscript style above sets them. */
+  html.title-on #title-screen .t-name {
+    font-family: "Jersey 25", ui-sans-serif, sans-serif;
+  }
+  html.title-on #title-screen .t-label,
+  html.title-on #title-screen .t-small {
+    font-family: "Jersey 15", ui-sans-serif, sans-serif;
   }
 
   #title-screen {
@@ -512,8 +529,7 @@ const photoLine = `${fmt(photos)} photos from ${fmt(trips)} trips, ${fmt(places)
     margin: 0;
     --fp: 4px; /* one font pixel; set from the size */
     font:
-      400 160px/0.88 "Jersey 25",
-      ui-sans-serif,
+      400 160px/0.88 ui-sans-serif,
       sans-serif;
     letter-spacing: 0;
     white-space: nowrap;
@@ -653,8 +669,7 @@ const photoLine = `${fmt(photos)} photos from ${fmt(trips)} trips, ${fmt(places)
   }
   #title-screen .t-label {
     font:
-      400 calc(30px * var(--k)) / 1 "Jersey 15",
-      ui-sans-serif,
+      400 calc(30px * var(--k)) / 1 ui-sans-serif,
       sans-serif;
     transition: transform 260ms var(--spring);
     text-shadow: 0 1px 0 rgb(4 12 28 / 0.35);
@@ -695,8 +710,7 @@ const photoLine = `${fmt(photos)} photos from ${fmt(trips)} trips, ${fmt(places)
     border: 0;
     color: var(--snow);
     font:
-      400 calc(22px * var(--k)) / 1 "Jersey 15",
-      ui-sans-serif,
+      400 calc(22px * var(--k)) / 1 ui-sans-serif,
       sans-serif;
     text-decoration: none;
     cursor: pointer;
