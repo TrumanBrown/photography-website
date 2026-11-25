@@ -469,10 +469,10 @@ Like the other islands, the loop pauses offscreen and when the tab is hidden, an
 ## Reference implementation: Narrow nature (daily puzzle)
 
 A daily puzzle that asks you to read a community rather than a single organism. Six species were
-all recorded at one real place in one month; they are revealed most-widely-recorded first, so the
-opening line narrows almost nothing and the last one is often local enough to name the valley. The
-visitor drops a pin on a world map, picks a month, and scores on distance, month accuracy, and how
-few species they needed.
+all recorded at one real place in one month. They're revealed the most widespread first: the
+opening line gets you to the right part of the world, each one after it is more local, and the last
+one is often local enough to name the valley. The visitor drops a pin on a world map, picks a
+month, and scores on distance, month accuracy, and how few species they needed.
 
 This is the inverse of a "what is this organism" quiz. One species gives you a range; an assemblage
 gives you a point, which is how field ecologists actually read a habitat (indicator species).
@@ -534,9 +534,10 @@ with the rules and uses one set of words throughout:
   numbered steps in the largest body text on the page. They use the same words as the controls
   ("show the next one", "tap the map", "Lock it in") and say that there's only one guess.
 - **The six species are the board.** Six squares, three to a row at every width, sit under a
-  "Most common → Rarest" rule. A shown species gets its photo, name, Latin name and worldwide
-  sighting count. The next square is the button and says what it costs ("−600 points"), and the
-  rest wait with their number. The photos are up to 360px across, so on a laptop the map sits below
+  "Widespread → Local" rule. A shown species gets its photo, name, Latin name and how far from the
+  place half its sightings are ("Half its sightings within 3,300 km of the spot", `reachLine`), so
+  the numbers shrink across the row and show how much each one narrows. The next square is the
+  button and says what it costs ("−600 points"), and the rest wait with their number. The photos are up to 360px across, so on a laptop the map sits below
   them. That's more than iNaturalist's 500px medium size holds on a sharp screen, so each photo
   also offers the 1024px large size (`photoSrcset`) and the browser picks whichever the screen
   needs. Preloads ask for the same size, so a reveal is still instant.
@@ -728,8 +729,8 @@ The puzzle is aimed at people who know the species, so the builder is strict abo
   observations. A single record is too often a vagrant, an escape, or a misidentification.
 - **Animals are preferred over plants.** A birder can picture a kookaburra and reason about where it
   lives; "Parry's Townsend-daisy" is a dead end for all but a handful of botanists. Animals sort
-  ahead of plants inside every abundance band, a round allows at most two botanical clues, and the
-  final band is reserved for animals entirely, because that last line is the one that gives the
+  ahead of plants inside every band, a round allows at most two botanical clues, and plants only go
+  in the three widest bands (500 km and up), because the last lines are the ones that give the
   place away.
 - **Species are labelled native, introduced or endemic for that place**, from iNaturalist's own
   establishment means. The Laughing Kookaburra on the Cradle Mountain list, for one, is introduced
@@ -762,11 +763,35 @@ The puzzle is aimed at people who know the species, so the builder is strict abo
   finds an acceptable licence, because the best-known species often have an all-rights-reserved lead
   image. The photographer and licence travel with the photo and are rendered under it on the
   board, since CC BY and CC BY-NC require attribution.
-- **Clue order uses worldwide observation counts**, which measure how often a species is _recorded_,
-  not how widespread it is. A well-studied European species out-records an equally widespread African
-  one. The UI says this plainly rather than implying a range map.
-- **A round is rejected** if its opening clue has fewer than 120,000 worldwide observations, because
-  without a cosmopolitan opener the puzzle starts half-solved.
+- **Clue order uses reach, not record counts.** A species' reach is the distance from the place
+  that holds half of its research-grade records worldwide. The builder counts every candidate's
+  records inside 17 rings around the place, 25 to 6,400 km and about √2 apart, with one
+  `species_counts` call per ring, and reads the halfway point between rings on a log scale
+  (`reachFrom`). Each of the six comes from its own band of reach: 1,500 km and up, 900, 500, 250,
+  100, and under 100. The card rounds the reach up to two figures, so "half within" stays true.
+  iNaturalist's records are heaviest in the US, Europe and South Africa, so a reach measures where a
+  species gets recorded, not its range: from the Serengeti, a lion reaches about 2,000 km and a
+  zebra about 2,300, because so many of their records come from South Africa.
+- **The opener belongs to this part of the world.** Inside a band, species with at least 80% of
+  their records within 4,500 km of the place go first, then animals, then ones the set hasn't used
+  yet, then ones with a common name, then the best known. Until November 2026 the order came from
+  worldwide record counts, and the opener had to have 120,000 of them so the puzzle wouldn't start
+  half-solved. A count says how often a species is recorded, not where, so Hokkaido opened on
+  Mallard, Common merganser, Reed bunting and Pine grosbeak, four birds that rule out nothing, and
+  people had no chance before the fifth. The 4,500 km test keeps them out: from Olympic National
+  Park 58% of Mallard records are that close, against 99% of American robins. At 3,200 km the
+  robin failed too, since Olympic sits in a corner of the continent, and the Mallard came back as
+  the opener. When nothing in a band passes, the band takes the species with most of its records
+  nearby, never the most recorded.
+- **A band with nothing in it** takes the nearest fit from what's left, measured on a log scale
+  from a target inside the band, so the steps stay as even as the place allows. Iceland in June has
+  nothing under 900 km but plants and one dolphin, and plants only go in the wide bands, so its
+  ladder runs Eurasian blackbird 2,586, then a whelk, a puffin and a goose at 1,670 to 1,830, the
+  great skua at 1,096 and the white-beaked dolphin at 265 km. A round never drops out over a short
+  band, since dropping a daily round moves everyone's today. The build notes any round whose first
+  species reaches under 900 km, since that one would start close to solved. None does yet, but
+  remote islands narrow in one jump: Haleakala opens on the convergent lady beetle, a North American
+  beetle brought to Hawaii, and its second line, at 191 km, already points at Hawaii.
 
 **Rebuilding the puzzles.**
 
@@ -778,12 +803,17 @@ npm run build:day-list -- --facts [--extra]  # refresh the facts and links only,
 ```
 
 A full build takes around an hour per set: the script throttles to one request a second, and it
-tries up to eight candidates per abundance band so a species without a usable photo costs a request
-rather than a whole round. Failed calls retry with a widening pause, because a build is well over a
-thousand requests and a dropped socket is a matter of when rather than if. It refuses to write a set
-with fewer than ten rounds. Rebuilding the daily set changes the rounds people are partway through,
-so do it near midnight. `--retag` keeps every round's species and only relabels native, introduced
-and endemic, so it's safe to run any time (about ten minutes for both sets). `--facts` does the same
+tries up to eight candidates per band so a species without a usable photo costs a request rather
+than a whole round. Measuring reach costs 20 requests a place (the place, its species, their
+worldwide counts and the 17 rings), and those counts are cached in `.cache/day-list/` for a week,
+so a rebuild to retune the bands only pays for photos and labels. Failed calls retry with a
+widening pause, because a build is well over a thousand requests and a dropped socket is a matter
+of when rather than if. It refuses to write a set with fewer than ten rounds. Rebuilding the daily
+set changes the rounds people are partway through, so do it near midnight. A daily place marked
+`hold: true` is skipped: the four the old 120,000-record rule left out (Sinharaja, Kinabalu,
+Crocker Range, Komodo) would build now, and a new daily round moves everyone's today, so they join
+in a rebuild that ships close to midnight. `--retag` keeps every round's species and only relabels
+native, introduced and endemic, so it's safe to run any time (about ten minutes for both sets). `--facts` does the same
 for the facts and their links, from `day-list-facts.json`. After a full build, write a fact for each
 species the build lists as missing, then run `--facts`.
 

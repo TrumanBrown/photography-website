@@ -1,6 +1,16 @@
 {
   "about": "Narrow nature's facts for the full list, one per species by iNaturalist taxon id. Each is one sentence of 12 to 25 words, written from that species' Wikipedia article and checked against it (November 2026). scripts/build-day-list.mjs copies them into day-list.json and day-list-extra.json. An empty fact says why there isn't one. A wiki link here replaces the one iNaturalist gives.",
   "facts": {
+    "39": {
+      "name": "Red-crowned Crane",
+      "fact": "China shortlisted it for national animal, but the decision was put off over its scientific name, Grus japonensis, which means Japanese crane.",
+      "wiki": "https://en.wikipedia.org/wiki/Red-crowned_crane"
+    },
+    "53": {
+      "name": "Gray Crowned-Crane",
+      "fact": "Along with the black crowned crane, it's the only crane that can roost in trees, thanks to a long hind toe that grips branches.",
+      "wiki": "https://en.wikipedia.org/wiki/Grey_crowned_crane"
+    },
     "95": {
       "name": "White-bellied Korhaan",
       "fact": "Young birds stay with their parents much longer than those of other bustards in the region, so it's usually seen in pairs or families."
@@ -17,6 +27,11 @@
       "name": "Ring-necked Pheasant",
       "fact": "It's South Dakota's state bird, one of only two US state birds that aren't native to the United States."
     },
+    "1406": {
+      "name": "Gambel's Quail",
+      "fact": "Often confused with the California quail, the male gives itself away with a black patch on the lower breast that California quail lack.",
+      "wiki": "https://en.wikipedia.org/wiki/Gambel's_quail"
+    },
     "1409": {
       "name": "California Quail",
       "fact": "Its curving crest is made of six feathers that droop forward, black in males and brown in females."
@@ -24,6 +39,16 @@
     "1428": {
       "name": "Helmeted Guineafowl",
       "fact": "Early European colonists in North America confused the native wild turkey with this African bird."
+    },
+    "1626": {
+      "name": "Hoatzin",
+      "fact": "Chicks escape predators by dropping into the water and swimming away, then climb back to the nest with the two claws on each wing.",
+      "wiki": "https://en.wikipedia.org/wiki/Hoatzin"
+    },
+    "1986": {
+      "name": "Greater Roadrunner",
+      "fact": "Early in the morning it sunbathes, back to the sun and feathers ruffled to bare its black skin, sometimes for two or three hours.",
+      "wiki": "https://en.wikipedia.org/wiki/Greater_roadrunner"
     },
     "2090": {
       "name": "Plain Chachalaca",
@@ -49,9 +74,24 @@
       "name": "Rose-crowned Fruit Dove",
       "fact": "Its pinkish-red crown has a yellow border, set off by a grey head and breast and an orange belly."
     },
+    "2927": {
+      "name": "Oriental Turtle-Dove",
+      "fact": "The Ainu traditionally hear its call as a saying: 'turtle dove ploughs, grandmother draws water, wife cooks, little master eats'.",
+      "wiki": "https://en.wikipedia.org/wiki/Oriental_turtle_dove"
+    },
     "3033": {
       "name": "Stock Dove",
       "fact": "A hole-nester in old trees, it's also been found nesting in rabbit burrows, ruins, cliff cracks and nest boxes."
+    },
+    "3048": {
+      "name": "Common Wood-Pigeon",
+      "fact": "In the UK and Ireland its cooing is remembered as 'take two cows, Teddy', though the call starts and ends partway through the phrase.",
+      "wiki": "https://en.wikipedia.org/wiki/Common_wood_pigeon"
+    },
+    "3460": {
+      "name": "White-winged Dove",
+      "fact": "North America's only game bird that's also a migratory pollinator, it leans heavily on saguaro nectar and fruit where the cactus grows.",
+      "wiki": "https://en.wikipedia.org/wiki/White-winged_dove"
     },
     "3652": {
       "name": "Namaqua Dove",
@@ -64,6 +104,11 @@
     "3770": {
       "name": "Green Ibis",
       "fact": "It's found today from Costa Rica to northern Argentina, but fossils show it once lived as far north as Kansas."
+    },
+    "3786": {
+      "name": "Blue-footed Booby",
+      "fact": "When researchers dulled a male's blue feet with makeup after the first egg, his mate laid a smaller second one.",
+      "wiki": "https://en.wikipedia.org/wiki/Blue-footed_booby"
     },
     "3838": {
       "name": "Little Stint",
@@ -105,6 +150,11 @@
       "name": "Brown Pelican",
       "fact": "Theodore Roosevelt set aside Florida's Pelican Island in 1903, the first National Wildlife Refuge, to protect brown pelicans from hunters."
     },
+    "4333": {
+      "name": "Dalmatian Pelican",
+      "fact": "The 'crispus' in its name is Latin for curly, after the shaggy crest that sets it apart from the smooth-headed great white pelican.",
+      "wiki": "https://en.wikipedia.org/wiki/Dalmatian_pelican"
+    },
     "4366": {
       "name": "Slaty-backed Gull",
       "fact": "Its wings show a 'string of pearls', large white crescents on the flight feathers that join a broad white trailing edge."
@@ -120,6 +170,11 @@
     "4415": {
       "name": "Pigeon Guillemot",
       "fact": "Its legs, feet and even the inside of its mouth are red, and a dark wedge breaks up its wing patch."
+    },
+    "4504": {
+      "name": "Atlantic Puffin",
+      "fact": "Colonies in Iceland hold 60% of the world's Atlantic puffins, and in their burrows they growl a bit like a chainsaw being revved up.",
+      "wiki": "https://en.wikipedia.org/wiki/Atlantic_puffin"
     },
     "4569": {
       "name": "Large-billed Tern",
@@ -157,6 +212,11 @@
       "name": "Semipalmated Plover",
       "fact": "Its partly webbed feet give it its name, and it fakes a broken wing to lure intruders away from its ground nest."
     },
+    "4850": {
+      "name": "Magellanic Oystercatcher",
+      "fact": "Disturbed near its nest, it may move off and sit on an imaginary one, false-brooding to draw attention away from its eggs and chicks.",
+      "wiki": "https://en.wikipedia.org/wiki/Magellanic_oystercatcher"
+    },
     "4943": {
       "name": "Little Egret",
       "fact": "Hunted out of northwestern Europe for hat plumes in the 1800s, it's now breeding again in Britain, Ireland, France and the Netherlands."
@@ -177,10 +237,20 @@
       "name": "Indian Pond-Heron",
       "fact": "It's been seen picking up bread crumbs and dropping them on the water to bait fish."
     },
+    "4999": {
+      "name": "Yellow-crowned Night Heron",
+      "fact": "Hunting crayfish, it stands at the burrow facing the sun, so its shadow doesn't fall across the entrance and warn its prey.",
+      "wiki": "https://en.wikipedia.org/wiki/Yellow-crowned_night_heron"
+    },
     "5020": {
       "name": "Green Heron",
       "fact": "Listen for a loud, sudden kyow, and look for a chestnut neck often pulled in tight against the body.",
       "wiki": "https://en.wikipedia.org/wiki/Green_heron"
+    },
+    "5049": {
+      "name": "Bare-throated Tiger-Heron",
+      "fact": "Its bare throat is greenish-yellow to orange at every age, and males give a booming call, especially at sunset.",
+      "wiki": "https://en.wikipedia.org/wiki/Bare-throated_tiger_heron"
     },
     "5106": {
       "name": "Eurasian Sparrowhawk",
@@ -190,9 +260,24 @@
       "name": "Montagu's Harrier",
       "fact": "In flight it usually looks slimmer than a hen harrier, with longer, narrower wings and almost tern-like wingbeats."
     },
+    "5173": {
+      "name": "Western Marsh Harrier",
+      "fact": "Males often pair with two females and occasionally three, and most pair bonds last just a single breeding season.",
+      "wiki": "https://en.wikipedia.org/wiki/Western_marsh_harrier"
+    },
+    "5212": {
+      "name": "Red-tailed Hawk",
+      "fact": "TV shows often use its rasping scream as a generic raptor sound, even when the bird on screen isn't a red-tailed hawk.",
+      "wiki": "https://en.wikipedia.org/wiki/Red-tailed_hawk"
+    },
     "5349": {
       "name": "Snail Kite",
       "fact": "When invasive apple snails five times the native size reached the Everglades, the kites there quickly evolved to be 12% bigger."
+    },
+    "5479": {
+      "name": "Southern Yellow-billed Hornbill",
+      "fact": "Walled into her nest with her own droppings, the female sheds every flight feather at once while the male feeds her through a slit.",
+      "wiki": "https://en.wikipedia.org/wiki/Southern_yellow-billed_hornbill"
     },
     "5947": {
       "name": "Violet-capped Woodnymph",
@@ -201,6 +286,11 @@
     "5987": {
       "name": "Violet Sabrewing",
       "fact": "The largest hummingbird in Mexico and Central America, it chases other hummingbirds off sugar-water feeders."
+    },
+    "6316": {
+      "name": "Costa's Hummingbird",
+      "fact": "The male's purple throat feathers flare back behind his head, and he angles his courtship dives to the sun to show them off.",
+      "wiki": "https://en.wikipedia.org/wiki/Costa's_hummingbird"
     },
     "6317": {
       "name": "Anna's Hummingbird",
@@ -218,6 +308,11 @@
       "name": "Green-winged Teal",
       "fact": "One of the smallest dabbling ducks, it gave its name to the blue-green color teal."
     },
+    "6947": {
+      "name": "Yellow-billed Teal",
+      "fact": "Drakes stretch up high after mating and swim around and alongside the female, a routine unique among its relatives.",
+      "wiki": "https://en.wikipedia.org/wiki/Yellow-billed_teal"
+    },
     "6994": {
       "name": "Barrow's Goldeneye",
       "fact": "Males wear a white crescent on a purple-glossed head, while male common goldeneyes show a round white patch and green gloss."
@@ -225,6 +320,11 @@
     "7004": {
       "name": "Common Merganser",
       "fact": "Groups often fish together by forming a semicircle and driving fish into shallow water, where they're easier to catch."
+    },
+    "7007": {
+      "name": "Pink-footed Goose",
+      "fact": "Its most important breeding site, Þjórsárver in Iceland, wasn't found until 1951, when Peter Scott and his team went looking.",
+      "wiki": "https://en.wikipedia.org/wiki/Pink-footed_goose"
     },
     "7044": {
       "name": "Ring-necked Duck",
@@ -238,6 +338,16 @@
       "name": "Canada Goose",
       "fact": "A common park bird, it's often called a pest for its droppings, noise, aggression and habit of stalking and begging for food."
     },
+    "7104": {
+      "name": "Hawaiian Goose",
+      "fact": "Its toes are less webbed than a typical goose's, an adaptation for walking on the cooled lava of its volcanic home.",
+      "wiki": "https://en.wikipedia.org/wiki/Nene_(bird)"
+    },
+    "7117": {
+      "name": "Upland Goose",
+      "fact": "Darwin noted in On the Origin of Species that the webbing between its toes seemed 'rudimentary in function, though not in structure'.",
+      "wiki": "https://en.wikipedia.org/wiki/Upland_goose"
+    },
     "7576": {
       "name": "Bewick's Wren",
       "fact": "Once found east to Pennsylvania and Maryland, it's now extremely rare east of the Mississippi River."
@@ -250,13 +360,32 @@
       "name": "Black-hooded Oriole",
       "fact": "Spending much of its time up in the tree canopy, it feeds on insects and fruit, especially figs."
     },
+    "8038": {
+      "name": "Pied Crow",
+      "fact": "The Maasai name for it, ol-korrok, comes from the sound of its harsh karh-karh-karh call.",
+      "wiki": "https://en.wikipedia.org/wiki/Pied_crow"
+    },
     "8088": {
       "name": "Eurasian Jay",
       "fact": "Eurasian jays were the main planters of European oaks before commercial planting, with one bird able to spread over a thousand acorns a year."
     },
+    "8162": {
+      "name": "Northern Fantail",
+      "fact": "French ornithologist Louis Vieillot named it rufiventris, Modern Latin for 'red-bellied', from a specimen he wrongly believed came from Australia."
+    },
+    "8234": {
+      "name": "Steller's Jay",
+      "fact": "A noted mimic, it often imitates the calls of red-tailed hawks and ospreys, sending other birds fleeing for cover.",
+      "wiki": "https://en.wikipedia.org/wiki/Steller's_jay"
+    },
     "8257": {
       "name": "Grey-headed Bushshrike",
       "fact": "Nicknamed the ghostbird, it's a big bushshrike with a massive bill and a mournful hooting call, usually found in denser savannah vegetation."
+    },
+    "8335": {
+      "name": "Canada Jay",
+      "fact": "Each summer it glues thousands of bits of food into bark and lichen with sticky saliva, then finds them by memory, sometimes months later.",
+      "wiki": "https://en.wikipedia.org/wiki/Canada_jay"
     },
     "8514": {
       "name": "Gray Shrikethrush",
@@ -266,9 +395,24 @@
       "name": "Australian Magpie",
       "fact": "Australian magpies can recognise at least 100 different people and may be less likely to swoop the ones they've befriended."
     },
+    "9083": {
+      "name": "Northern Cardinal",
+      "fact": "Defending his territory, a male may mistake his reflection in a shiny surface for an invading rival and fight it relentlessly.",
+      "wiki": "https://en.wikipedia.org/wiki/Northern_cardinal"
+    },
+    "9100": {
+      "name": "Song Sparrow",
+      "fact": "Its fear of hawks and owls seems to be instinctive, but a song sparrow has to learn to be afraid of cats.",
+      "wiki": "https://en.wikipedia.org/wiki/Song_sparrow"
+    },
     "9135": {
       "name": "Chipping Sparrow",
       "fact": "Before house sparrows were brought to North America, it lived in cities in large numbers, filling much the same niche they do now."
+    },
+    "9176": {
+      "name": "White-crowned Sparrow",
+      "fact": "During migration it can stay half-awake for up to two weeks, a trick studied for keeping shift workers and truck drivers alert.",
+      "wiki": "https://en.wikipedia.org/wiki/White-crowned_sparrow"
     },
     "9183": {
       "name": "Rufous-collared Sparrow",
@@ -278,10 +422,25 @@
       "name": "Reed Bunting",
       "fact": "Males have a black head and throat set off by a white neck collar, while females are much duller with streaked brown heads."
     },
+    "9236": {
+      "name": "European Serin",
+      "fact": "Serinus, its Latin name, comes from serin, the French word for a canary, which may be a corruption of citrinus, Latin for lemon-colored.",
+      "wiki": "https://en.wikipedia.org/wiki/European_serin"
+    },
+    "9607": {
+      "name": "Great-tailed Grackle",
+      "fact": "The Aztecs brought it to Tenochtitlan around 1500, probably for its iridescent feathers, and that's the earliest documented bird introduction in the Americas.",
+      "wiki": "https://en.wikipedia.org/wiki/Great-tailed_grackle"
+    },
     "9612": {
       "name": "Brown-capped Rosy-Finch",
       "fact": "Its bill is yellow in winter and black in summer, and it breeds on mountain peaks in the central Rockies.",
       "wiki": "https://en.wikipedia.org/wiki/Brown-capped_rosy_finch"
+    },
+    "9744": {
+      "name": "Red-winged Blackbird",
+      "fact": "When researchers dyed males' red shoulder patches black, 64% lost their territories, compared with just 8% of the control birds.",
+      "wiki": "https://en.wikipedia.org/wiki/Red-winged_blackbird"
     },
     "9771": {
       "name": "Pine Grosbeak",
@@ -299,6 +458,11 @@
       "name": "Common Chaffinch",
       "fact": "After farmers thresh their crops, it sometimes spends weeks picking grain out of the discarded chaff, which likely gave it its name."
     },
+    "10094": {
+      "name": "Dark-eyed Junco",
+      "fact": "A flock of these juncos is sometimes called a blizzard, which suits a bird whose scientific name means 'winter junco'.",
+      "wiki": "https://en.wikipedia.org/wiki/Dark-eyed_junco"
+    },
     "10288": {
       "name": "Blue-black Grassquit",
       "fact": "Males are mostly black with a dark blue sheen and a white underwing patch that usually only shows in flight."
@@ -314,6 +478,16 @@
     "11901": {
       "name": "Barn Swallow",
       "fact": "The most widespread swallow in the world, it turns up on every continent, with strays reported even in Antarctica."
+    },
+    "12038": {
+      "name": "Red-backed Shrike",
+      "fact": "Frogs, lizards, small birds and large insects end up impaled on thorns or barbed wire in its larder, hence the nickname butcher bird.",
+      "wiki": "https://en.wikipedia.org/wiki/Red-backed_shrike"
+    },
+    "12065": {
+      "name": "Superb Fairywren",
+      "fact": "Males pluck yellow petals and show them to females, sometimes in other territories and even outside the breeding season.",
+      "wiki": "https://en.wikipedia.org/wiki/Superb_fairywren"
     },
     "12133": {
       "name": "Southern Emuwren",
@@ -331,6 +505,15 @@
       "name": "American Robin",
       "fact": "With an estimated 370 million birds, it's the most abundant landbird in North America, ahead of red-winged blackbirds and starlings."
     },
+    "12751": {
+      "name": "Austral Thrush",
+      "fact": "An accomplished mimic, it's known to imitate the songs of at least 12 other species, including songbirds and raptors.",
+      "wiki": "https://en.wikipedia.org/wiki/Austral_thrush"
+    },
+    "12792": {
+      "name": "White-browed Robin-Chat",
+      "fact": "Usually sung at dawn and dusk, its song starts quietly and grows louder, with phrases like 'don't-you-do-it' sometimes repeated over ten times."
+    },
     "12810": {
       "name": "Large Niltava",
       "fact": "It lives in subtropical and tropical mountain forests from Nepal and Bhutan across to China, Vietnam, Malaysia and Indonesia."
@@ -342,6 +525,11 @@
     "12926": {
       "name": "Collared Bush-Robin",
       "fact": "Males of this Taiwan mountain endemic have a slate-black head, a white eyebrow and a rufous collar across the breast and back."
+    },
+    "13094": {
+      "name": "European Robin",
+      "fact": "Territorial fights cause up to 10% of adult robin deaths in some areas, and robins have even been recorded attacking their own reflection.",
+      "wiki": "https://en.wikipedia.org/wiki/European_robin"
     },
     "13631": {
       "name": "Black-crested Titmouse",
@@ -379,6 +567,15 @@
       "name": "Light-vented Bulbul",
       "fact": "A familiar bird of towns and urban parks, it may be Shanghai's third most common bird after tree sparrows and spotted doves."
     },
+    "14939": {
+      "name": "Superb Starling",
+      "fact": "Check the eyes: pale creamy white on this one, red on the look-alike Hildebrandt's starling, which also lacks the white breast band.",
+      "wiki": "https://en.wikipedia.org/wiki/Superb_starling"
+    },
+    "15071": {
+      "name": "Bare-cheeked Babbler",
+      "fact": "Especially common in Etosha, it lives in noisy family groups of 6 to 12 birds that mob predators together."
+    },
     "15560": {
       "name": "Red-billed Leiothrix",
       "fact": "Cagebird keepers call it the Pekin robin or Japanese nightingale, though it's neither a robin nor a nightingale and isn't native to Japan."
@@ -391,9 +588,19 @@
       "name": "White-throated Spadebill",
       "fact": "Only about 9 to 11 centimetres long, it has a large head with a bold face pattern, a stubby tail and a wide, flat bill."
     },
+    "16447": {
+      "name": "Vermilion Flycatcher",
+      "fact": "A favorite with birders, it's rarely kept in aviaries because captive males tend to lose their vermilion red, likely a matter of diet.",
+      "wiki": "https://en.wikipedia.org/wiki/Vermilion_flycatcher"
+    },
     "16462": {
       "name": "Tropical Royal Flycatcher",
       "fact": "Royal by name thanks to a striking, colorful crest, it rarely displays it except in courtship, after mating, while preening or when handled."
+    },
+    "16787": {
+      "name": "Tropical Kingbird",
+      "fact": "The melancholicus in its name means melancholic, or bad-tempered, and it aggressively defends its territory even against frigatebirds, toucans and hawks.",
+      "wiki": "https://en.wikipedia.org/wiki/Tropical_kingbird"
     },
     "16793": {
       "name": "Fork-tailed Flycatcher",
@@ -410,6 +617,10 @@
     "17383": {
       "name": "Yucatan Vireo",
       "fact": "In Belize it sings an evenly paced warble written as 'cheer up sweet' or 'cheer up why not sweet'."
+    },
+    "17534": {
+      "name": "Bonin White-eye",
+      "fact": "Offered tinned peaches, it wouldn't touch them until it saw introduced warbling white-eyes eating them."
     },
     "17638": {
       "name": "American Three-toed Woodpecker",
@@ -435,9 +646,24 @@
       "name": "Rose-ringed Parakeet",
       "fact": "Escaped pets have colonised cities in northern and western Europe, coping with low winter temperatures far from their tropical native range."
     },
+    "18921": {
+      "name": "Crimson Rosella",
+      "fact": "In the breeding season, females often raid other rosellas' nests and destroy the eggs, the most common reason an egg fails to hatch.",
+      "wiki": "https://en.wikipedia.org/wiki/Crimson_rosella"
+    },
+    "19050": {
+      "name": "Brown-headed Parrot",
+      "fact": "The cryptoxanthus in its scientific name comes from Greek words for 'hidden yellow', after the bright yellow feathers under its wings.",
+      "wiki": "https://en.wikipedia.org/wiki/Brown-headed_parrot"
+    },
     "19975": {
       "name": "Burrowing Owl",
       "fact": "Despite the name, it rarely digs its own burrow, moving instead into old ones dug by prairie dogs, ground squirrels, badgers or foxes."
+    },
+    "20044": {
+      "name": "Great Horned Owl",
+      "fact": "A poor sense of smell lets it routinely attack skunks with impunity, and its nests often reek of skunk.",
+      "wiki": "https://en.wikipedia.org/wiki/Great_horned_owl"
     },
     "20526": {
       "name": "Common Ostrich",
@@ -447,9 +673,38 @@
       "name": "Common Hoopoe",
       "fact": "Its feathered crown can be raised or lowered at will, and the name hoopoe imitates the bird's call."
     },
+    "23366": {
+      "name": "Angolan Reed Frog",
+      "fact": "Extremely abundant, it readily colonizes newly created water bodies and even turns up in towns and gardens."
+    },
     "24495": {
       "name": "European Fire-Bellied Toad",
       "fact": "When threatened it lifts its arms, sometimes flipping over, to flash its black-mottled red belly and warn predators it's toxic."
+    },
+    "26068": {
+      "name": "Saltwater Crocodile",
+      "fact": "Its broad body had early observers taking it for an alligator, which is why northern Australia's Alligator Rivers carry the wrong reptile's name.",
+      "wiki": "https://en.wikipedia.org/wiki/Saltwater_crocodile"
+    },
+    "26079": {
+      "name": "Freshwater Crocodile",
+      "fact": "A slender snout sets it apart from the saltwater crocodile, and it can live where its bigger relative can't, like above Kakadu's escarpment.",
+      "wiki": "https://en.wikipedia.org/wiki/Freshwater_crocodile"
+    },
+    "26159": {
+      "name": "American Alligator",
+      "fact": "When water starts to freeze, it pokes its snout through the surface to breathe above the ice and can stay that way for days.",
+      "wiki": "https://en.wikipedia.org/wiki/American_alligator"
+    },
+    "26747": {
+      "name": "Northwestern Salamander",
+      "fact": "Gilled adults get more common with altitude, so lowland adults almost all live on land while most at very high elevations keep their gills.",
+      "wiki": "https://en.wikipedia.org/wiki/Northwestern_salamander"
+    },
+    "27125": {
+      "name": "Blue Ridge Two-lined Salamander",
+      "fact": "Bright yellow to orange, it has two black lines along its back that usually break into dots around the middle of its long tail.",
+      "wiki": "https://en.wikipedia.org/wiki/Blue_Ridge_two-lined_salamander"
     },
     "27136": {
       "name": "Shenandoah Salamander",
@@ -462,6 +717,11 @@
     "27411": {
       "name": "Pygmy Salamander",
       "fact": "Just 35 to 44 millimetres long, it's among the smallest salamanders in the world and has no free-living larval stage."
+    },
+    "27413": {
+      "name": "Seal Salamander",
+      "fact": "The monticola in its scientific name is Latin for 'mountaineer' or 'highlander', after the high elevations where it's commonly found.",
+      "wiki": "https://en.wikipedia.org/wiki/Seal_salamander"
     },
     "27705": {
       "name": "Danube Crested Newt",
@@ -479,6 +739,19 @@
       "name": "Brown spotted pitviper",
       "fact": "Grayish or olive brown with big black-edged brown blotches, it ranges from northeastern India to Taiwan and has been introduced to Okinawa."
     },
+    "31127": {
+      "name": "Namib Rock Agama",
+      "fact": "Orange-and-blue males court the dappled, checkered females by running in circles around them while bobbing their heads."
+    },
+    "31132": {
+      "name": "Mwanza Flat-headed Rock Agama",
+      "fact": "Males wear Spider-Man colors, a red or violet head and shoulders on a dark blue body, which has made the lizard a fashionable pet.",
+      "wiki": "https://en.wikipedia.org/wiki/Mwanza_flat-headed_rock_agama"
+    },
+    "31150": {
+      "name": "Southern Rock Agama",
+      "fact": "Approached by a predator, a breeding male presses flat against the rock and swaps his bright blue head for duller camouflage colors."
+    },
     "31192": {
       "name": "Orange-winged Flying Lizard",
       "fact": "Gliding from tree to tree on black-spotted wings, the male also has a throat flap often twice as long as its head."
@@ -495,9 +768,33 @@
       "name": "Malayan Crested Lizard",
       "fact": "Known as the giant forest dragon or great anglehead lizard, it lives in Thailand, Myanmar, Vietnam, Malaysia and Indonesia."
     },
+    "33004": {
+      "name": "Panther Chameleon",
+      "fact": "Its color depends on where it lives, with panther chameleons from Nosy Be typically blue and those from Maroantsetra mostly red.",
+      "wiki": "https://en.wikipedia.org/wiki/Panther_chameleon"
+    },
+    "33016": {
+      "name": "Carpet Chameleon",
+      "fact": "Fast-maturing and short-lived, it can breed about three months after hatching but rarely if ever lives past three years.",
+      "wiki": "https://en.wikipedia.org/wiki/Carpet_chameleon"
+    },
+    "33118": {
+      "name": "Brown Basilisk",
+      "fact": "Smaller ones can sprint about 10 to 20 meters across water without sinking, opening flaps on their hind feet for extra surface area.",
+      "wiki": "https://en.wikipedia.org/wiki/Brown_basilisk"
+    },
+    "34042": {
+      "name": "Striped Day Gecko",
+      "fact": "More colorful than the females, males are green with red splotches on the head and lower back and a dark band down each side."
+    },
     "34050": {
       "name": "Gold Dust Day Gecko",
       "fact": "Gold speckles on the neck and upper back mark it out, and since 1999 one has been GEICO's talking mascot."
+    },
+    "35347": {
+      "name": "Marine Iguana",
+      "fact": "During El Niño food shortages, it can shrink by up to a fifth of its length, then grow back when the algae return.",
+      "wiki": "https://en.wikipedia.org/wiki/Marine_iguana"
     },
     "35519": {
       "name": "Large Psammodromus",
@@ -511,13 +808,36 @@
       "name": "Zebra-tailed Lizard",
       "fact": "In the hottest part of the day, it may stand on two legs, then switch to the other two in a kind of dance."
     },
+    "36094": {
+      "name": "Common Side-blotched Lizard",
+      "fact": "In its rock-paper-scissors mating game, yellow-throated males mimic females to sneak matings from the harems of big orange-throated males.",
+      "wiki": "https://en.wikipedia.org/wiki/Common_side-blotched_lizard"
+    },
+    "36142": {
+      "name": "Eastern Fence Lizard",
+      "fact": "It twitches to throw off attacking fire ants before fleeing, and in some regions it has evolved longer legs to escape them.",
+      "wiki": "https://en.wikipedia.org/wiki/Eastern_fence_lizard"
+    },
     "36189": {
       "name": "Crevice Spiny Lizard",
       "fact": "Shy and nervous, it flees up a rock face or into a crevice when approached, and females bear up to 11 young in midsummer."
     },
+    "36204": {
+      "name": "Western Fence Lizard",
+      "fact": "Ticks carrying Lyme disease that feed on it come away clean, because a protein in its blood kills the bacterium in their gut.",
+      "wiki": "https://en.wikipedia.org/wiki/Western_fence_lizard"
+    },
+    "36217": {
+      "name": "Canyon Lizard",
+      "fact": "It lives on the rock faces of canyon walls, sheltering in crevices, and its gray, tan or reddish-brown back matches the rock."
+    },
     "36514": {
       "name": "Green Anole",
       "fact": "Its ancestors crossed the sea from Cuba to the southern United States, a rare case of an island lizard colonizing a mainland."
+    },
+    "39122": {
+      "name": "Austral Smooth-throated lizard",
+      "fact": "One of the world's southernmost lizards, it lives on Patagonia's windswept steppe and gives birth to live young, usually three to five."
     },
     "39484": {
       "name": "Desert Night Lizard",
@@ -527,9 +847,29 @@
       "name": "Green Sea Turtle",
       "fact": "The green in its name comes from the fat under its shell, colored by a seagrass diet, while the shell itself is olive to black."
     },
+    "39824": {
+      "name": "Florida Red-bellied Cooter",
+      "fact": "Known for sometimes laying its eggs in alligator nest mounds, it has a red-tinged belly and two toothlike cusps on its upper beak.",
+      "wiki": "https://en.wikipedia.org/wiki/Florida_red-bellied_cooter"
+    },
+    "40232": {
+      "name": "Tasmanian Devil",
+      "fact": "Tasmania's early explorers heard its far-carrying screeches at night before they ever saw one, and nicknamed it 'Beelzebub's pup'.",
+      "wiki": "https://en.wikipedia.org/wiki/Tasmanian_devil"
+    },
     "40579": {
       "name": "Common Thick-thumbed Bat",
       "fact": "Look for thick white or pink pads at the base of its thumbs, and by day it roosts in dead bamboo stalks or banana leaves."
+    },
+    "40872": {
+      "name": "Bonin Flying-fox",
+      "fact": "One of the northernmost flying foxes, it spends winter days in colonies of up to 100, packed into a ball to keep warm.",
+      "wiki": "https://en.wikipedia.org/wiki/Bonin_flying_fox"
+    },
+    "41505": {
+      "name": "White-beaked Dolphin",
+      "fact": "With up to 92 vertebrae, it has more than any other oceanic dolphin, and it often rides the bow waves of fast boats.",
+      "wiki": "https://en.wikipedia.org/wiki/White-beaked_dolphin"
     },
     "41550": {
       "name": "Common Minke Whale",
@@ -543,17 +883,47 @@
       "name": "Humpback Whale",
       "fact": "Its flippers are each about a third of its body length, and it usually uses bubbles to catch krill and small fish."
     },
+    "41638": {
+      "name": "American Black Bear",
+      "fact": "In experiments, black bears learned to tell colors apart faster than chimpanzees and just as fast as domestic dogs.",
+      "wiki": "https://en.wikipedia.org/wiki/American_black_bear"
+    },
     "41702": {
       "name": "Harp Seal",
       "fact": "Pups wear a white coat for their first two to three weeks, and the black harp pattern doesn't show until they near maturity."
+    },
+    "41720": {
+      "name": "Bearded Seal",
+      "fact": "In the breeding season males sing a long, warbling trill that ends in a moan and can be heard over 30 km away underwater.",
+      "wiki": "https://en.wikipedia.org/wiki/Bearded_seal"
     },
     "41752": {
       "name": "Long-nosed Fur Seal",
       "fact": "It dives deeper and longer than any other fur seal, with males reaching about 380 meters for around 15 minutes."
     },
+    "41766": {
+      "name": "Walrus",
+      "fact": "An air sac under its throat works like a flotation bubble, letting it bob upright in the water and sleep.",
+      "wiki": "https://en.wikipedia.org/wiki/Walrus"
+    },
     "41921": {
       "name": "Banded Mongoose",
       "fact": "With nowhere to hide from predators like African wild dogs, a group lies piled together with heads facing out and up."
+    },
+    "41955": {
+      "name": "Cheetah",
+      "fact": "Cheetahs vary so little genetically that skin grafts swapped between unrelated animals are accepted and heal, as if they shared the same genes.",
+      "wiki": "https://en.wikipedia.org/wiki/Cheetah"
+    },
+    "41964": {
+      "name": "Lion",
+      "fact": "In Ngorongoro Crater, lions live largely on kills stolen from hyenas, but in Botswana's Chobe National Park the hyenas do the stealing.",
+      "wiki": "https://en.wikipedia.org/wiki/Lion"
+    },
+    "42051": {
+      "name": "Coyote",
+      "fact": "Coyotes sometimes team up with American badgers to dig out rodents, and some have been seen resting their heads on their badger partners.",
+      "wiki": "https://en.wikipedia.org/wiki/Coyote"
     },
     "42076": {
       "name": "Gray Fox",
@@ -567,6 +937,56 @@
       "name": "Common Warthog",
       "fact": "It kneels on calloused pads on its wrists to graze, and those pads start forming before it's even born."
     },
+    "42149": {
+      "name": "Common Hippopotamus",
+      "fact": "For an animal that spends most of the day in water, it may not swim at all, walking or bouncing along the bottom instead.",
+      "wiki": "https://en.wikipedia.org/wiki/Hippopotamus"
+    },
+    "42220": {
+      "name": "Mule Deer",
+      "fact": "Named for its big, mule-like ears, it's often seen stotting, with all four feet coming down together.",
+      "wiki": "https://en.wikipedia.org/wiki/Mule_deer"
+    },
+    "42223": {
+      "name": "White-tailed Deer",
+      "fact": "Bambi is a roe deer in the original novel, but Disney's 1942 film made him a white-tailed deer.",
+      "wiki": "https://en.wikipedia.org/wiki/White-tailed_deer"
+    },
+    "42240": {
+      "name": "Guanaco",
+      "fact": "A teaspoon of guanaco blood holds about 68 million red blood cells, four times a human's, which helps the animal survive at high altitude.",
+      "wiki": "https://en.wikipedia.org/wiki/Guanaco"
+    },
+    "42278": {
+      "name": "Impala",
+      "fact": "Seemingly the only hoofed mammal that grooms itself and others, it combs ticks from a partner's head and neck with its lower front teeth.",
+      "wiki": "https://en.wikipedia.org/wiki/Impala"
+    },
+    "42283": {
+      "name": "Springbok",
+      "fact": "During droughts, millions of migrating springbok once formed herds hundreds of kilometers long that could take several days to pass a town.",
+      "wiki": "https://en.wikipedia.org/wiki/Springbok"
+    },
+    "42308": {
+      "name": "Gemsbok",
+      "fact": "New Mexico released 93 gemsbok between 1969 and 1977, and about 3,000 now live in the desert around the White Sands Missile Range.",
+      "wiki": "https://en.wikipedia.org/wiki/Gemsbok"
+    },
+    "42329": {
+      "name": "Lechwe",
+      "fact": "Coated in a water-repellent substance, its legs let it run fast through the knee-deep water it uses for protection from predators.",
+      "wiki": "https://en.wikipedia.org/wiki/Lechwe"
+    },
+    "42390": {
+      "name": "Thinhorn Sheep",
+      "fact": "Denali National Park and Preserve was created in 1917 to protect these sheep from overhunting, and they're still often seen there.",
+      "wiki": "https://en.wikipedia.org/wiki/Dall_sheep"
+    },
+    "42405": {
+      "name": "African Buffalo",
+      "fact": "Herds decide where to eat or drink by 'voting', with females standing up before dusk to point in a particular direction.",
+      "wiki": "https://en.wikipedia.org/wiki/African_buffalo"
+    },
     "42970": {
       "name": "Rufous-bellied Pademelon",
       "fact": "It's been reported standing upright to yank up clumps of grass and throw them against its chest, possibly as a signal."
@@ -574,6 +994,21 @@
     "42983": {
       "name": "Koala",
       "fact": "Its eucalyptus diet is low in nutrition and toxic enough to deter most other mammals, and it sleeps up to twenty hours a day."
+    },
+    "43009": {
+      "name": "Bare-nosed Wombat",
+      "fact": "Besides leaving cube-shaped dung, it digs burrows up to 20 meters long that echidnas, wallabies, birds and even koalas also use.",
+      "wiki": "https://en.wikipedia.org/wiki/Common_wombat"
+    },
+    "43048": {
+      "name": "Northern White-breasted Hedgehog",
+      "fact": "Size follows climate in this hedgehog: it grows larger in southern Europe than in the north, and smaller where summers are wetter.",
+      "wiki": "https://en.wikipedia.org/wiki/Northern_white-breasted_hedgehog"
+    },
+    "43086": {
+      "name": "Rock Hyrax",
+      "fact": "Perfumers steep its hyraceum, a sticky mass of dung and urine used in South African folk medicine, in alcohol to make a natural musk.",
+      "wiki": "https://en.wikipedia.org/wiki/Rock_hyrax"
     },
     "43128": {
       "name": "Brown Hare",
@@ -583,13 +1018,62 @@
       "name": "American Pika",
       "fact": "Active by day, it stores plants in 'haypiles' to last the winter and calls out to warn of approaching predators."
     },
+    "43197": {
+      "name": "Collared Pika",
+      "fact": "It spends much of the summer stacking plants into haypiles for winter, but some have been seen eating dead birds for fat and protein.",
+      "wiki": "https://en.wikipedia.org/wiki/Collared_pika"
+    },
+    "43335": {
+      "name": "Plains Zebra",
+      "fact": "The largest wild zebra herd outside Africa roams San Simeon, California, descended from animals left behind when Hearst Castle's private zoo closed.",
+      "wiki": "https://en.wikipedia.org/wiki/Plains_zebra"
+    },
+    "43410": {
+      "name": "Black-faced Spider Monkey",
+      "fact": "Almost thumbless, with a gripping tail up to a meter long, it moves through the trees with an agility only Asia's gibbons can match.",
+      "wiki": "https://en.wikipedia.org/wiki/Peruvian_spider_monkey"
+    },
+    "43426": {
+      "name": "Black-capped Squirrel Monkey",
+      "fact": "Females run its big troops and push the males out to the edges, unlike the common squirrel monkey, whose troops are male-dominated.",
+      "wiki": "https://en.wikipedia.org/wiki/Black-capped_squirrel_monkey"
+    },
+    "43436": {
+      "name": "Mantled Howler Monkey",
+      "fact": "Disturb one and it'll often show its irritation by urinating or defecating on you, with good aim from high in the trees.",
+      "wiki": "https://en.wikipedia.org/wiki/Mantled_howler"
+    },
     "43613": {
       "name": "Common Brown Lemur",
       "fact": "Mostly active by day, it may carry on into the night, especially under a full moon or in the dry season."
     },
+    "43617": {
+      "name": "Ring-tailed Lemur",
+      "fact": "Rival males hold stink fights, soaking their tails in scent from glands on their arms and waving them at each other.",
+      "wiki": "https://en.wikipedia.org/wiki/Ring-tailed_lemur"
+    },
+    "43694": {
+      "name": "African Savanna Elephant",
+      "fact": "A lower-ranking elephant greets its superior by putting the tip of its trunk into the other's mouth.",
+      "wiki": "https://en.wikipedia.org/wiki/African_bush_elephant"
+    },
+    "43712": {
+      "name": "Central American Agouti",
+      "fact": "Agoutis placed fourth for sense of smell in an analysis of 240 species, beating dogs, which came out only average.",
+      "wiki": "https://en.wikipedia.org/wiki/Central_American_agouti"
+    },
+    "46087": {
+      "name": "Hoary Marmot",
+      "fact": "Whistler, British Columbia, once called London Mountain, was renamed after this marmot, nicknamed 'the whistler' for its high-pitched alarm call."
+    },
     "46093": {
       "name": "Olympic Marmot",
       "fact": "Found only on Washington's Olympic Peninsula, this cat-sized marmot became the state's official endemic mammal in 2009."
+    },
+    "46259": {
+      "name": "Douglas's Squirrel",
+      "fact": "Native Americans of the Kings River called it the 'Pillillooeet', copying the sound of its alarm call.",
+      "wiki": "https://en.wikipedia.org/wiki/Douglas_squirrel"
     },
     "47067": {
       "name": "Brown-throated Three-toed Sloth",
@@ -603,6 +1087,10 @@
     "47602": {
       "name": "common dandelion",
       "fact": "Each yellow flower head turns into a round 'clock' or 'blowball' of silver-tufted fruit that scatters on the wind."
+    },
+    "47776": {
+      "name": "Pacific Banana Slug",
+      "fact": "Though it tends to avoid slime trails, even its own, it can find its way back to the same spot after long periods away."
     },
     "47914": {
       "name": "Pandorus Sphinx",
@@ -628,9 +1116,17 @@
       "name": "Red Admiral",
       "fact": "Unusually calm, it often lets people get very close and will even land on them to use as a perch."
     },
+    "49348": {
+      "name": "White-lined Sphinx",
+      "fact": "Some Native Americans skewered and roasted its caterpillars, which have almost as much fat as hamburger meat but nearly a third less saturated fat."
+    },
     "49540": {
       "name": "Spinybacked Orbweaver",
       "fact": "Females carry six spine-like points on the abdomen, and it keeps an unusual 19-hour wake-sleep cycle."
+    },
+    "49699": {
+      "name": "Ochre Sea Star",
+      "fact": "Remove it from a stretch of shore and California mussels take over almost completely, which is why it's called a keystone species."
     },
     "49761": {
       "name": "White Peacock",
@@ -652,6 +1148,10 @@
       "name": "Seven-spotted Lady Beetle",
       "fact": "Short of aphids, it survives on pollen, nectar, thrips and whitefly, but it can't reproduce in the meantime."
     },
+    "51736": {
+      "name": "small balsam",
+      "fact": "Ripe seed pods explode when touched and fling the seeds widely, which is why it's also called small-flowered touch-me-not."
+    },
     "51875": {
       "name": "Red Clover",
       "fact": "A pale crescent marks the outer half of each leaflet, and its dark pink flowers are mostly visited by bumblebees."
@@ -668,10 +1168,19 @@
       "name": "Houndfish",
       "fact": "Feared by fishermen, it can leap from the water when frightened or drawn to lights and stab people with its beak."
     },
+    "52490": {
+      "name": "Tapered Drone Fly",
+      "fact": "Check the feet: on the front and middle legs they're entirely yellow, and males have a triangular abdomen, females a squarish one."
+    },
     "52555": {
       "name": "Chameleon Wrasse",
       "fact": "",
       "why": "No Wikipedia article of its own, and the Halichoeres article has nothing that holds for every wrasse in it."
+    },
+    "52564": {
+      "name": "Aggregating Anemone",
+      "fact": "Rival clone colonies fight with special stinging tentacles, and a scout polyp that comes home badly stung may be attacked by its own clonemates.",
+      "wiki": "https://en.wikipedia.org/wiki/Aggregating_anemone"
     },
     "52592": {
       "name": "Speckled Wood",
@@ -717,6 +1226,11 @@
       "name": "Marsh Pennywort",
       "fact": "Smelling faintly of carrot, it has round, shield-shaped leaves whose stalks attach in the middle of the underside."
     },
+    "57333": {
+      "name": "Mexican Hogfish",
+      "fact": "Starting life as a female, it later becomes a male, and large males sport a pronounced hump between the eyes.",
+      "wiki": "https://en.wikipedia.org/wiki/Mexican_hogfish"
+    },
     "57516": {
       "name": "Buff-tailed Bumble Bee",
       "fact": "Used for greenhouse pollination, it's escaped and become invasive in places like Japan, Chile, Argentina and Tasmania."
@@ -733,9 +1247,18 @@
       "name": "Ruddy Bowfin",
       "fact": "Breaking the surface to gulp air, it can survive low-oxygen water that would kill most other fish."
     },
+    "59202": {
+      "name": "Yellow-legged Gull",
+      "fact": "When Italy's 2020 lockdown cut off their food scraps, Rome's yellow-legged gulls turned to hunting prey as large as rats and rock doves.",
+      "wiki": "https://en.wikipedia.org/wiki/Yellow-legged_gull"
+    },
     "59399": {
       "name": "Pelican's-foot",
       "fact": "The flared lip of its adult shell has three or four points like a pelican's webbed foot, and empty shells sometimes wash ashore."
+    },
+    "60551": {
+      "name": "Eastern Tiger Swallowtail",
+      "fact": "John White drew one on Sir Walter Raleigh's 1587 expedition to Virginia, the first known drawing of a North American butterfly."
     },
     "60607": {
       "name": "Red-spotted Admiral",
@@ -745,6 +1268,10 @@
       "name": "Eastern Pondhawk",
       "fact": "Males start out bright green like the females, then shift to blue and finally a powdery bluish-gray over their adult lives."
     },
+    "61523": {
+      "name": "Roman Snail",
+      "fact": "Eaten by the ancient Romans and prized in French cooking as escargot, it's hard to farm and rarely raised commercially."
+    },
     "61608": {
       "name": "Sand Hammertail",
       "fact": "A robber fly that hunts tiger beetles, including the hairy-necked tiger beetle and the northeastern beach tiger beetle."
@@ -752,6 +1279,10 @@
     "61781": {
       "name": "Large Skipper",
       "fact": "Its caterpillar curls a leaf up with silk for a shelter, then hibernates half-grown and carries on feeding in spring."
+    },
+    "61918": {
+      "name": "Magpie Moth",
+      "fact": "Research on this moth, which comes in many different forms, is what first revealed sex-linked traits."
     },
     "62426": {
       "name": "Ringlet",
@@ -773,9 +1304,28 @@
       "name": "Giant Leopard Moth",
       "fact": "Mating pairs stay coupled for more than 24 hours, the male walking them between sun and shade while the female folds her legs."
     },
+    "64968": {
+      "name": "American Toad",
+      "fact": "Fish have reportedly died after eating just one of its toxic tadpoles, but most fish quickly learn to leave them alone.",
+      "wiki": "https://en.wikipedia.org/wiki/American_toad"
+    },
     "64970": {
       "name": "Western Toad",
       "fact": "Pick up an adult and it'll often struggle and call out with a sound like a peeping chick."
+    },
+    "66007": {
+      "name": "Mink Frog",
+      "fact": "Named for its scent, said to resemble a mink's, it smells more like rotting onions to anyone who's never sniffed a mink."
+    },
+    "66278": {
+      "name": "Strawberry Poison Dart Frog",
+      "fact": "Mothers carry each tadpole to its own pool of water, often in a bromeliad, then feed it unfertilized eggs that pass on their toxins.",
+      "wiki": "https://en.wikipedia.org/wiki/Strawberry_poison_dart_frog"
+    },
+    "66331": {
+      "name": "Iberian Green Frog",
+      "fact": "The Sahara frog of North Africa is its closest living relative, and the two may have split when the Mediterranean dried up.",
+      "wiki": "https://en.wikipedia.org/wiki/Perez's_frog"
     },
     "67560": {
       "name": "California Sister",
@@ -784,6 +1334,11 @@
     "68062": {
       "name": "Gray Wall Jumping Spider",
       "fact": "It builds no web, stalking flies on walls instead, and it can take crane flies at least twice its own size."
+    },
+    "68137": {
+      "name": "Vervet Monkey",
+      "fact": "Leopards, martial eagles, rock pythons and baboons each get their own alarm call, which infants learn by observation alone.",
+      "wiki": "https://en.wikipedia.org/wiki/Vervet_monkey"
     },
     "68273": {
       "name": "Pacific Fritillary",
@@ -797,6 +1352,10 @@
       "name": "China Rockfish",
       "fact": "Living up to 79 years, it rarely strays more than 10 meters from its crevice, sometimes shared with a giant Pacific octopus."
     },
+    "69893": {
+      "name": "Inflated Beetle",
+      "fact": "Its inflated wing covers, black with dense white spots, are fused down the middle, so this beetle can't fly."
+    },
     "70071": {
       "name": "Leafy Spurge Hawkmoth",
       "fact": "Its black caterpillars, dotted white and coral red, eat leafy spurge, so the moth is used to help control that weed."
@@ -805,13 +1364,32 @@
       "name": "Pine Hawkmoth",
       "fact": "Females lay their eggs in twos and threes along pine or spruce needles, which the caterpillars then eat."
     },
+    "70647": {
+      "name": "Eastern Tree Frog",
+      "fact": "Inside the Chernobyl exclusion zone, these tree frogs are much darker on the back, perhaps because the disaster's radiation favored dark skin."
+    },
     "72486": {
       "name": "Egyptian Goose",
       "fact": "A regular in ancient Egyptian art, it's been introduced to Europe and the United States as an ornamental bird."
     },
+    "72504": {
+      "name": "Eastern Spot-billed Duck",
+      "fact": "Since the early 1900s its range in Japan and the Russian Far East has spread over 500 kilometers north, possibly because of global warming.",
+      "wiki": "https://en.wikipedia.org/wiki/Eastern_spot-billed_duck"
+    },
+    "72541": {
+      "name": "Puna Thistletail",
+      "fact": "Males and females both sing a quick run of spluttering high notes that speeds up and grows louder, then fades at the end.",
+      "wiki": "https://en.wikipedia.org/wiki/Puna_thistletail"
+    },
     "72936": {
       "name": "Blue Duck",
       "fact": "The male's high-pitched whistle gave it the Māori name whio, and it's pictured on the back of New Zealand's $10 note."
+    },
+    "72981": {
+      "name": "Dolphin Gull",
+      "fact": "It raids seabird nests left empty when people scare the parents off, and keeping humans away has been found to help nesting cormorants.",
+      "wiki": "https://en.wikipedia.org/wiki/Dolphin_gull"
     },
     "72994": {
       "name": "Crested Duck",
@@ -820,6 +1398,15 @@
     "73691": {
       "name": "Sonoran Spotted Whiptail",
       "fact": "This whiptail is parthenogenic, reproducing without fertilization, and lives in Arizona, New Mexico and Mexico."
+    },
+    "73921": {
+      "name": "Andalusian wall lizard",
+      "fact": "Swiss botanist Henri Vaucher is honored in its scientific name, and it lives from sea level up to 3,100 meters."
+    },
+    "74832": {
+      "name": "Olive Baboon",
+      "fact": "In Eritrea, olive baboons use water holes dug by elephants, while the elephants use baboons in the treetops as an early warning system.",
+      "wiki": "https://en.wikipedia.org/wiki/Olive_baboon"
     },
     "81543": {
       "name": "Florida Ivory Millipede",
@@ -894,6 +1481,10 @@
       "name": "Jade Hunter",
       "fact": "A tiny to medium-sized black and yellow dragonfly, it lives on streams, rivers and lakes from north of Brisbane to Victoria."
     },
+    "97152": {
+      "name": "Wrought Iron Butterflyfish",
+      "fact": "Unusually black for a butterflyfish, it sometimes gathers in huge numbers to graze in a tight, rippling 'wrought-iron ball'."
+    },
     "100397": {
       "name": "Black-winged Dragonlet",
       "fact": "Found across North, Central and South America, this skimmer was rated least concern in 2016, with no immediate threat to its survival."
@@ -901,6 +1492,11 @@
     "101053": {
       "name": "Banded Killifish",
       "fact": "Females show thin, crisp black bars while males have fainter, closer-set silvery ones, so the bands tell the sexes apart."
+    },
+    "104548": {
+      "name": "Frosted Whiteface",
+      "fact": "Like every whiteface, it gets the 'whiteface' in its name from the distinctive pale frons at the front of its head.",
+      "wiki": "https://en.wikipedia.org/wiki/Leucorrhinia"
     },
     "107655": {
       "name": "Boreal Snaketail",
@@ -922,9 +1518,22 @@
       "name": "Southern Grass Skink",
       "fact": "It gives birth to live young nourished through a complex placenta, and when food runs short females will eat their offspring."
     },
+    "111712": {
+      "name": "Brown Amur Goby",
+      "fact": "Guarding eggs under a rock for up to two weeks without feeding, a worn-out male may end up eating them."
+    },
     "114871": {
       "name": "Canary Red Admiral",
       "fact": "Look for it on Madeira and the Canary Islands except Lanzarote, where its caterpillars feed on nettles."
+    },
+    "114956": {
+      "name": "Otway Black Snail",
+      "fact": "A carnivore, it grips other snails, slugs and earthworms with rows of sharp, backward-pointing teeth, but it won't eat its own kind."
+    },
+    "116461": {
+      "name": "Brown Anole",
+      "fact": "In the US it has pushed the native green anole up into the treetops, and it sometimes eats green anole hatchlings too.",
+      "wiki": "https://en.wikipedia.org/wiki/Brown_anole"
     },
     "116703": {
       "name": "Ladder Grasshopper",
@@ -962,6 +1571,10 @@
     "118559": {
       "name": "Red Milkweed Beetle",
       "fact": "When startled it makes a shrill noise, but it purrs when interacting with another beetle."
+    },
+    "118851": {
+      "name": "Brown Shrimp",
+      "fact": "Its numbers at Lytham in Lancashire tracked the yearly sunspot count so closely from 1965 to 1975 that sunspots can help predict the catch."
     },
     "119211": {
       "name": "Koppie Foam Grasshopper",
@@ -1004,6 +1617,10 @@
       "name": "Lesser Stag Beetle",
       "fact": "Adults can't eat solid food, so they get by drinking tree sap and the juice of fallen fruit."
     },
+    "125555": {
+      "name": "Common Mapwing",
+      "fact": "Its domed eggs have a toothed lid like a cogwheel, which the caterpillar lifts to climb out, leaving the shell uneaten."
+    },
     "125815": {
       "name": "Pearly Heath",
       "fact": "Easy to recognize by the broad white band under its hindwing, it usually sits in sunny spots with its wings closed."
@@ -1020,6 +1637,14 @@
     "130166": {
       "name": "smooth ground beetle",
       "fact": "A beetle of the north and of mountains, it's widespread across Central and Northern Europe up to the Arctic Circle."
+    },
+    "130213": {
+      "name": "Common Whelk",
+      "fact": "Look on the beach for its washed-up egg cases, which people call sea wash balls."
+    },
+    "130222": {
+      "name": "Black-tailed Bumble Bee",
+      "fact": "Northern bees wear a red band on the abdomen that's earned them the nickname 'red butts', while southern bees are black there instead."
     },
     "130451": {
       "name": "Juno Silverspot",
@@ -1038,6 +1663,10 @@
       "name": "Mottled Grasshopper",
       "fact": "Found from the British Isles east to Siberia and south to Morocco, it lives from sea level up to about 2,500 meters."
     },
+    "132892": {
+      "name": "Egyptian Bird Grasshopper",
+      "fact": "One of Europe's largest grasshoppers, it's easy to identify by its eyes, which have vertical black and white stripes."
+    },
     "143853": {
       "name": "Black-billed Magpie",
       "fact": "Once tied to bison herds, it now lands on the backs of cattle to pick off ticks and insects."
@@ -1049,6 +1678,16 @@
     "144455": {
       "name": "Great Egret",
       "fact": "It nests in tree colonies close to water, and lately it's been spreading into more northern parts of Europe."
+    },
+    "144456": {
+      "name": "Pied Heron",
+      "fact": "Without the adult's crest and dark head, young birds can pass for small white-necked herons and were once classified as a separate species.",
+      "wiki": "https://en.wikipedia.org/wiki/Pied_heron"
+    },
+    "144472": {
+      "name": "Black-bellied Bustard",
+      "fact": "A courting male pulls his head onto his back with a wheezy whistle, then slowly raises it with a popping 'quock' and soft gurgling.",
+      "wiki": "https://en.wikipedia.org/wiki/Black-bellied_bustard"
     },
     "144510": {
       "name": "Black-headed Gull",
@@ -1070,9 +1709,18 @@
       "name": "Boreal Chickadee",
       "fact": "Pairs stay together year round and may mate for life, stashing winter food in caches spread across different trees."
     },
+    "144910": {
+      "name": "Brown-eared Bulbul",
+      "fact": "One author described its song as 'one of the most unattractive noises made by any bird'.",
+      "wiki": "https://en.wikipedia.org/wiki/Brown-eared_bulbul"
+    },
     "145081": {
       "name": "Abyssinian Thrush",
       "fact": "Its bill is orange where the African thrush's is yellow, and birds tend to get darker the higher up you go."
+    },
+    "145157": {
+      "name": "Southern Double-collared Sunbird",
+      "fact": "The male looks a lot like the greater double-collared sunbird but is smaller, with a narrower red chest band and a shorter bill."
     },
     "145240": {
       "name": "Blackpoll Warbler",
@@ -1082,6 +1730,15 @@
       "name": "Pine Siskin",
       "fact": "Heavily streaked and drab, though about one bird in a hundred is a green morph that looks more like a Eurasian siskin."
     },
+    "145332": {
+      "name": "Rufous-tailed Weaver",
+      "fact": "Tanzania is the only country where it breeds, though wandering birds sometimes turn up in Kenya.",
+      "wiki": "https://en.wikipedia.org/wiki/Rufous-tailed_weaver"
+    },
+    "145642": {
+      "name": "Pale Grass Blue",
+      "fact": "After the Fukushima Daiichi nuclear disaster, Japanese studies found more abnormalities in pale grass blues exposed to the radiation."
+    },
     "147931": {
       "name": "Ocola Skipper",
       "fact": "Its caterpillars feed on rice and sugarcane, and strays turn up as far north as southern Ontario and New York."
@@ -1089,6 +1746,10 @@
     "148672": {
       "name": "Cross-barred White",
       "fact": "Look for it in disturbed spots like forest clearings, roadsides, cattle pastures and wasteland, from the southern United States to Paraguay."
+    },
+    "149448": {
+      "name": "Common Brown",
+      "fact": "Climate change has it emerging ten days earlier in the year than it did 65 years ago."
     },
     "153976": {
       "name": "Black-edged Bark Scorpion",
@@ -1110,9 +1771,33 @@
       "name": "Common Streaky-Skipper",
       "fact": "Caterpillars feed on mallows, and in Texas several generations of adults fly from March to September."
     },
+    "179994": {
+      "name": "Uinta Ground Squirrel",
+      "fact": "Only active for a few months each year, adults head back underground to hibernate between late July and mid-August.",
+      "wiki": "https://en.wikipedia.org/wiki/Uinta_ground_squirrel"
+    },
+    "179998": {
+      "name": "Columbian Ground Squirrel",
+      "fact": "Nicknamed 'seven sleepers' for their long hibernation, they greet each other by touching mouths and noses, which looks a lot like kissing.",
+      "wiki": "https://en.wikipedia.org/wiki/Columbian_ground_squirrel"
+    },
+    "180001": {
+      "name": "Arctic Ground Squirrel",
+      "fact": "In hibernation its core body temperature drops below freezing, colder than any other hibernating mammal, and its heart beats about once a minute."
+    },
+    "180009": {
+      "name": "Cascade Golden-mantled Ground Squirrel",
+      "fact": "The Columbia River walls it off from its closest relative, and that isolation likely explains how the two became separate species.",
+      "wiki": "https://en.wikipedia.org/wiki/Cascade_golden-mantled_ground_squirrel"
+    },
     "181044": {
       "name": "Mountain Bumble Bee",
       "fact": "It nests underground in abandoned small-mammal burrows, and its colonies are small, often with fewer than 50 workers."
+    },
+    "196626": {
+      "name": "Ecuadorian Hermit Crab",
+      "fact": "After nine hours with one food, it prefers foods that smell different for the next six, like a person bored with the same meal.",
+      "wiki": "https://en.wikipedia.org/wiki/Ecuadorian_hermit_crab"
     },
     "197809": {
       "name": "Cliff Chipmunk",
@@ -1122,17 +1807,47 @@
       "name": "House Finch",
       "fact": "Sold illegally in New York City as 'Hollywood finches,' birds released in the 1940s went on to settle across the eastern United States."
     },
+    "201031": {
+      "name": "Marabou Stork",
+      "fact": "Marabous living off garbage dumps will swallow virtually anything, and they've been seen eating shoes and pieces of metal.",
+      "wiki": "https://en.wikipedia.org/wiki/Marabou_stork"
+    },
     "201282": {
       "name": "Eurasian Moorhen",
       "fact": "The 'moor' in its name is the old word for marsh, so don't expect to find it out on moorland."
+    },
+    "203153": {
+      "name": "Great Tit",
+      "fact": "Great tits are the first songbirds recorded preying on bats, killing hibernating pipistrelles in winter when other food is scarce and eating their brains.",
+      "wiki": "https://en.wikipedia.org/wiki/Great_tit"
     },
     "203759": {
       "name": "Baltic Macoma",
       "fact": "Buried in mud, it feeds through two narrow siphons and can live in water only a tenth as salty as the sea."
     },
+    "204113": {
+      "name": "Red Deer",
+      "fact": "A rutting stag may guard as many as 20 hinds and rarely eats while he does, losing up to a fifth of his weight.",
+      "wiki": "https://en.wikipedia.org/wiki/Red_deer"
+    },
+    "204114": {
+      "name": "Wapiti",
+      "fact": "The name wapiti comes from a Shawnee and Cree word for 'white rump', the pale patch it fluffs up to signal alarm.",
+      "wiki": "https://en.wikipedia.org/wiki/Elk"
+    },
+    "204472": {
+      "name": "Common Buzzard",
+      "fact": "Described as 'sluggish and not very bold', a resident buzzard can spend more than half its day just sitting on a perch.",
+      "wiki": "https://en.wikipedia.org/wiki/Common_buzzard"
+    },
     "205176": {
       "name": "Green Grocer",
       "fact": "Nymphs spend years underground sipping sap from roots, then adults live about six weeks and males call at up to 120 decibels."
+    },
+    "208700": {
+      "name": "American Bison",
+      "fact": "From 1980 to 1999, bison injured 79 people in Yellowstone, more than three times the 24 hurt by bears.",
+      "wiki": "https://en.wikipedia.org/wiki/American_bison"
     },
     "209233": {
       "name": "Domestic Horse",
@@ -1158,6 +1873,27 @@
       "name": "Flamed Tigersnail",
       "fact": "Its slime is usually orange or reddish, and these snails often burrow and hibernate together in groups over winter."
     },
+    "213884": {
+      "name": "Apatania zonella",
+      "fact": "",
+      "why": "Its Wikipedia article gives only its family and a one-line range, and the Apatania article is a list of species."
+    },
+    "214185": {
+      "name": "Button's Banana Slug",
+      "fact": "With no shell and a bright, banana-like color, it's protected by toxic slime that numbs the mouth of anything that eats it."
+    },
+    "215286": {
+      "name": "Alaskan Fritillary",
+      "fact": "Also called the mountain fritillary, it's found in North America and northern European Russia, and its caterpillars eat false bistort and alpine smartweed."
+    },
+    "219779": {
+      "name": "Anicia Checkerspot",
+      "fact": "Plant chemicals eaten as a caterpillar stay in its body, and its red, yellow and black bands warn predators that it tastes bad."
+    },
+    "219813": {
+      "name": "Eupithecia monticolens",
+      "fact": "This Hawaiian moth lives on six of the islands and nowhere else, and its caterpillars feed on plants such as Metrosideros and Pipturus."
+    },
     "219829": {
       "name": "Satyr Pug Moth",
       "fact": "Flowers of a wide range of plants feed its caterpillars, and it's found from Ireland to Tibet and in North America too."
@@ -1166,9 +1902,23 @@
       "name": "July Highflyer Moth",
       "fact": "The July highflyer lives in the Holarctic, the northern regions of both the Old World and the New World."
     },
+    "228083": {
+      "name": "Banff Springs Snail",
+      "fact": "Found in a few Banff hot springs and nowhere else, it can dwindle until the entire population fits in an ice cream cone.",
+      "wiki": "https://en.wikipedia.org/wiki/Banff_Springs_snail"
+    },
+    "228118": {
+      "name": "Arctic White",
+      "fact": "Males look mostly white from above but can be pale yellow underneath with dark green veins, while females can be white or yellow."
+    },
     "228259": {
       "name": "Hollow-spotted Plagodis Moth",
       "fact": "Summer moths are a paler yellow with fewer markings than the spring brood, and the caterpillars prefer birch."
+    },
+    "233598": {
+      "name": "Arctic Fox",
+      "fact": "A yearling female tagged on Svalbard crossed the polar ice to Greenland and on to Canada, covering 3,506 km in 76 days.",
+      "wiki": "https://en.wikipedia.org/wiki/Arctic_fox"
     },
     "245924": {
       "name": "Doxocopa linda",
@@ -1207,6 +1957,15 @@
     "320711": {
       "name": "Cory's Shearwater",
       "fact": "Silent at sea, it fills its breeding colonies with raucous cackling at night, visiting nests after dark to dodge big gulls."
+    },
+    "321995": {
+      "name": "Climbing Galaxias",
+      "fact": "Broad, downward-facing fins let it climb waterfalls and dam sluices, and young fish netted as whitebait can scramble up and out of buckets.",
+      "wiki": "https://en.wikipedia.org/wiki/Climbing_galaxias"
+    },
+    "324831": {
+      "name": "Smoky Wainscot",
+      "fact": "Hard to tell for certain from similar wainscots, it has buff forewings with a dark streak near the base and gray hindwings edged white."
     },
     "326296": {
       "name": "European Toad",
@@ -1254,6 +2013,14 @@
       "name": "Copper Chafer",
       "fact": "It lives on pollen until summer, then switches to fruit like apples, and the high-carb fruit lets it travel longer."
     },
+    "362610": {
+      "name": "Common Halfband",
+      "fact": "Often confused with Simosyrphus grandicornis, Australia's other most common hoverfly, it's told apart by its all-black thorax."
+    },
+    "363775": {
+      "name": "Banded Wedge Shell",
+      "fact": "Underwater video shows it's most active around low tide, when it 'leaps' and gets dragged around by the waves before burying itself again."
+    },
     "367948": {
       "name": "Arctic Blue",
       "fact": "Males are silvery or steely blue above, females almost entirely brown, and the higher up they live, the darker they tend to get."
@@ -1290,6 +2057,10 @@
       "name": "Stripey",
       "fact": "Juveniles are often seen in tide pools, and adults turn up around man-made spots like jetties and harbour walls."
     },
+    "424747": {
+      "name": "Stripe-tailed Scorpion",
+      "fact": "Brownish-tan stripes along its tail set it apart from the Arizona bark scorpion, and its venom isn't considered dangerous to people."
+    },
     "429297": {
       "name": "Spiny Orb-Weaver Spider",
       "fact": "Like other spiny-backed orb-weavers, females are several times larger than the males, which lack the prominent spines and bright colors.",
@@ -1311,6 +2082,10 @@
       "name": "Muslin Footman",
       "fact": "Its hairy caterpillars eat lichen and mosses, then pupate under rocks and flat stones in a loose cocoon with hairs woven in."
     },
+    "458935": {
+      "name": "Icelandic Scallop",
+      "fact": "Subfossil shells of this North Atlantic scallop turn up south of its present range, including in the British Isles."
+    },
     "464739": {
       "name": "Isogona snowi",
       "fact": "Snow's owlet flies year round in southern Texas and Mexico, and its caterpillars feed on Celtis pallida."
@@ -1322,6 +2097,11 @@
     "467422": {
       "name": "Lophyra flexuosa",
       "fact": "Called the leopard tiger beetle, it can fly and ranges from France and Spain across North Africa to Israel and Syria."
+    },
+    "467427": {
+      "name": "Scarabaeus cicatricosus",
+      "fact": "Like its relative the sacred scarab, it feeds only on dung, rolling a piece away from the pile and burying it to eat underground.",
+      "wiki": "https://en.wikipedia.org/wiki/Scarabaeus"
     },
     "469590": {
       "name": "Black-spotted Falsehorn",
@@ -1353,13 +2133,48 @@
       "name": "Striped Venus",
       "fact": "The surest way to tell it from the common venus clam is its siphons, fully joined here but separate and much shorter in the other."
     },
+    "486630": {
+      "name": "Eastern Buzzard",
+      "fact": "",
+      "wiki": "https://en.wikipedia.org/wiki/Eastern_buzzard",
+      "why": "Its Wikipedia article covers only its split from the common buzzard and where its four subspecies live."
+    },
     "487192": {
       "name": "Pretty Orbweaver",
       "fact": "Its diamond-shaped abdomen ranges from reddish-brown to bright green or yellow on top, with a jet-black block edged in white or yellow below."
     },
+    "491075": {
+      "name": "Pimelia muricata",
+      "fact": "Fused body plates help it hold on to water, but they also leave it unable to fly.",
+      "wiki": "https://en.wikipedia.org/wiki/Pimelia"
+    },
+    "500625": {
+      "name": "Amarygmus morio",
+      "fact": "Its wireworm-shaped larvae are shiny and mostly yellow-brown, and some have been collected from the trunk of a rotting mango tree.",
+      "wiki": "https://en.wikipedia.org/wiki/Amarygmus"
+    },
+    "503374": {
+      "name": "Eastern Black-tailed Rattlesnake",
+      "fact": "True to its name, its tail scales are entirely black, no matter what color the rest of the snake is.",
+      "wiki": "https://en.wikipedia.org/wiki/Black-tailed_rattlesnake"
+    },
+    "506118": {
+      "name": "California Scrub-Jay",
+      "fact": "It summons other jays to screech over a dead jay, and these noisy 'funerals' can last up to half an hour.",
+      "wiki": "https://en.wikipedia.org/wiki/California_scrub_jay"
+    },
     "508982": {
       "name": "Yellow-throated Honeyeater",
       "fact": "Endemic to Tasmania, it collects hair for its nest straight from live animals, including horses, dogs and people."
+    },
+    "510166": {
+      "name": "Blueberry Hermit Crab",
+      "fact": "Blue to purple with pale eyestalks, it chirps at a high pitch by rapidly beating the tip of its body inside its shell."
+    },
+    "512251": {
+      "name": "ʻIʻiwi",
+      "fact": "Its song has been likened to whistles, balls dropping into water, balloons rubbing together and the squeak of a rusty hinge.",
+      "wiki": "https://en.wikipedia.org/wiki/ʻIʻiwi"
     },
     "516126": {
       "name": "Culpeo",
@@ -1378,6 +2193,10 @@
       "name": "Chestnut-cheeked Starling",
       "fact": "It breeds in Japan, Sakhalin and the Kuril Islands, then heads south to spend winter in Taiwan, the Philippines and northern Borneo."
     },
+    "567360": {
+      "name": "Yellow-banded Pinktoe Tarantula",
+      "fact": "Often mistaken for Avicularia juruensis, it has brighter yellow leg rings, and an antifungal peptide in its venom was named juruin after the mix-up."
+    },
     "568268": {
       "name": "Phimenes curvatus",
       "fact": "A potter wasp, it belongs to a group found across the Indomalayan and Australasian regions.",
@@ -1387,13 +2206,43 @@
       "name": "Cape Protea Chafer",
       "fact": "Also called the brunia beetle, this flower scarab is found only in South Africa's Cape Floristic Region."
     },
+    "618828": {
+      "name": "Solor Jawfish",
+      "fact": "",
+      "why": "It has no Wikipedia article, and the Opistognathus article gives only the oceans the jawfish live in and a list of species."
+    },
+    "619598": {
+      "name": "Japanese Angelfish",
+      "fact": "Females turn into males when they reach 12.7 cm long, and the switch takes 20 to 39 days to finish.",
+      "wiki": "https://en.wikipedia.org/wiki/Japanese_angelfish"
+    },
     "694796": {
       "name": "Mayan Moth",
       "fact": "This moth's known range is southern Africa, where it's been found in South Africa and Zimbabwe."
     },
+    "740644": {
+      "name": "Ezo Spring Cicada",
+      "fact": "",
+      "why": "There's no English Wikipedia article for it or its genus, Yezoterpnosia."
+    },
     "742930": {
       "name": "Bay Nettle",
       "fact": "It eats the comb jellies that hurt Chesapeake Bay fisheries, and their impact fades once bay nettles reach high numbers each summer."
+    },
+    "748473": {
+      "name": "Coriomeris hirticornis",
+      "fact": "",
+      "why": "It has no English Wikipedia article, and the genus article gives only its family and a species count."
+    },
+    "750900": {
+      "name": "greater-streaked shieldbug",
+      "fact": "",
+      "why": "It has no English Wikipedia article, and the genus article only lists its species."
+    },
+    "782146": {
+      "name": "Nyctelia confusa",
+      "fact": "",
+      "why": "No Wikipedia article for it or for Nyctelia, and the Nycteliini article says only that the tribe has about 12 genera in the Neotropics."
     },
     "790501": {
       "name": "Eleodes pilosa",
@@ -1407,6 +2256,10 @@
     "792926": {
       "name": "Bearded Woodpecker",
       "fact": "One of Africa's largest woodpeckers, it drums loudly on branches and ends each drum-roll with four taps."
+    },
+    "797597": {
+      "name": "Peters's Rock Agama",
+      "fact": "By eating Florida's invasive brown anoles, it may leave mosquitoes fewer to feed on and send them after people, a 2024 study suggests."
     },
     "797638": {
       "name": "Taiwan Japalure",
@@ -1422,13 +2275,49 @@
       "fact": "",
       "why": "No Wikipedia article, and the Pachyiulus article is a list of species."
     },
+    "893613": {
+      "name": "Pome Looper",
+      "fact": "",
+      "why": "Its Wikipedia article gives only its family, who named it, its island range and a note that adults come to light."
+    },
+    "904339": {
+      "name": "Redleg Orbweaver",
+      "fact": "Strong enough to snag the occasional bird or bat, its web is spun from yellow silk that shines like gold in sunlight."
+    },
+    "922180": {
+      "name": "Vineyard Snail",
+      "fact": "Its scientific name comes from Vindobona, the Celtic settlement now known as Vienna, the capital of Austria."
+    },
+    "937415": {
+      "name": "Eastern Short-eared Rock Wallaby",
+      "fact": "Once lumped in with the Kimberley's short-eared rock-wallaby, it's smaller and darker, with brighter limbs and bolder stripes on its head and flanks."
+    },
+    "963673": {
+      "name": "Camponotus hemichlaena",
+      "fact": "Carpenter ants like this one don't eat wood, and despite the name, only a few kinds even nest in it.",
+      "wiki": "https://en.wikipedia.org/wiki/Carpenter_ant"
+    },
+    "966787": {
+      "name": "grass snake",
+      "fact": "It can rear up and flatten its head and neck like a cobra, a trick that may date from when cobras lived in Europe.",
+      "wiki": "https://en.wikipedia.org/wiki/Grass_snake"
+    },
     "980262": {
       "name": "Warbling White-eye",
       "fact": "In Japan it's called mejiro, meaning \"white eye,\" and it shows up often in Japanese art and was once kept as a cage bird."
     },
+    "1021509": {
+      "name": "Gray Buckeye",
+      "fact": "Its wing eyespots distract predators just like the common buckeye's, and until 2018 it was counted as part of that species."
+    },
     "1081329": {
       "name": "Zabulon Skipper",
       "fact": "Males are mostly orange and perch all day looking for females, which are dark brown with large glassy spots."
+    },
+    "1090483": {
+      "name": "Carabus gehinii",
+      "fact": "Hunting snails at night, Carabus beetles like this one either crush the shell or push their heads inside to eat.",
+      "wiki": "https://en.wikipedia.org/wiki/Carabus"
     },
     "1095846": {
       "name": "White beggarticks",
@@ -1442,9 +2331,23 @@
       "name": "Side-striped Jackal",
       "fact": "Less of a hunter than other jackals, one was recorded slipping into a duck pen to eat the ducks' feed and ignoring the birds."
     },
+    "1225676": {
+      "name": "Wahlberg’s Striped Skink",
+      "fact": "The Wahlberg in its name was Johan August Wahlberg, a Swedish naturalist, and this skink gives birth to live young."
+    },
     "1242736": {
       "name": "Purple Olive Snail",
       "fact": "Native Californians have made beads from its shell for at least 9,000 years, and such beads have been found as far inland as Idaho."
+    },
+    "1289591": {
+      "name": "Imperial Shag",
+      "fact": "It nests in colonies often shared with rockhopper penguins and black-browed albatrosses, cementing seaweed and grass together with mud and droppings.",
+      "wiki": "https://en.wikipedia.org/wiki/Imperial_shag"
+    },
+    "1289600": {
+      "name": "Magellanic Cormorant",
+      "fact": "Feeding close to shore along kelp beds, it typically dives only about 5 meters, leaving deeper water further out to the imperial shag.",
+      "wiki": "https://en.wikipedia.org/wiki/Rock_shag"
     },
     "1289601": {
       "name": "Neotropic Cormorant",
@@ -1453,6 +2356,19 @@
     "1321829": {
       "name": "Marbled Skipper",
       "fact": "Its darker hindwings carry two rows of almost white spots, and it has just one generation a year, flying from May to July."
+    },
+    "1430934": {
+      "name": "Damara Dik-dik",
+      "fact": "Dik-diks are named for their call, a trumpet-like 'zik-zik' they give while zigzagging away from danger to a nearby thicket.",
+      "wiki": "https://en.wikipedia.org/wiki/Kirk's_dik-dik"
+    },
+    "1432781": {
+      "name": "Chimango Caracara",
+      "fact": "The commonest raptor through much of Chile and Argentina, it often follows farmers as they plow, sometimes more than 100 birds at once."
+    },
+    "1439800": {
+      "name": "Pacific Creolefish",
+      "fact": "Unlike most groupers, it schools in the water column and picks plankton one at a time, but it still hides in crevices from danger."
     },
     "1453431": {
       "name": "Red-necked Wallaby",
@@ -1488,15 +2404,54 @@
       "fact": "This is a widespread bumblebee of Europe, found in the continent's mountainous regions.",
       "wiki": ""
     },
+    "1510571": {
+      "name": "Southern Giraffe",
+      "fact": "Also called the two-horned giraffe, it has rounded or blotched spots, some with star-like points, running all the way down to its hooves.",
+      "wiki": "https://en.wikipedia.org/wiki/Southern_giraffe"
+    },
+    "1510574": {
+      "name": "Maasai Giraffe",
+      "fact": "Tanzania's national animal, it has jagged, leaf-like blotches that run all the way from its hooves to its head.",
+      "wiki": "https://en.wikipedia.org/wiki/Masai_giraffe"
+    },
+    "1551487": {
+      "name": "Flying Crab",
+      "fact": "It feeds on crustaceans, especially young Crangon shrimp, as well as molluscs and fish, and can host the parasitic barnacle Sacculina."
+    },
+    "1585912": {
+      "name": "Cape Robin-Chat",
+      "fact": "Its harsh, three-syllable alarm call is behind local names like 'Jan frederik', which fits the rhythm if you run the last syllables together.",
+      "wiki": "https://en.wikipedia.org/wiki/Cape_robin-chat"
+    },
     "1607274": {
       "name": "Casbia tetramera",
       "fact": "",
       "why": "No Wikipedia article, and the Casbia article is a list of species."
     },
+    "1630133": {
+      "name": "Rainbow Skink",
+      "fact": "Three yellow-orange stripes run from its head to an electric blue tail, though in adults they can fade until they're hard to see.",
+      "wiki": "https://en.wikipedia.org/wiki/Trachylepis_margaritifera"
+    },
     "1638386": {
       "name": "Northern Cloudywing",
       "fact": "Both sexes have dark brown wings all over except for small, clear triangular spots, and caterpillars pupate rolled up in a leaf.",
       "wiki": "https://en.wikipedia.org/wiki/Thorybes_pylades"
+    },
+    "1673443": {
+      "name": "Desert Spiny Lizard",
+      "fact": "A frequent tree climber, it favors cottonwoods, yuccas, Joshua trees and ironwood, and is often seen doing territorial push-ups."
+    },
+    "1696537": {
+      "name": "Wisent",
+      "fact": "When poachers killed the last free-living wisent in 1927, Europe's heaviest wild land animal was down to 48, all in zoos.",
+      "wiki": "https://en.wikipedia.org/wiki/European_bison"
+    },
+    "1720554": {
+      "name": "Masked Bunting",
+      "fact": "",
+      "wiki": "https://en.wikipedia.org/wiki/Masked_bunting",
+      "why": "Its Wikipedia article gives only its range and how its classification has changed."
     }
   }
 }

@@ -10,6 +10,7 @@ import {
   placeVerdict,
   readDaily,
   readExtra,
+  reachLine,
   scoreGuess,
   shareText,
   tidyFact,
@@ -41,6 +42,35 @@ describe("the two puzzle sets", () => {
   it("hold enough extra places for a week of ten a day", () => {
     expect(new Set(extra.map((r) => r.placeId)).size).toBeGreaterThanOrEqual(
       EXTRA_PER_DAY * 6,
+    );
+  });
+
+  // Ordered by worldwide record count, the first four were Mallards and
+  // House Sparrows that ruled nothing out (2026-11-24).
+  it("run from the most widespread species to the most local", () => {
+    const unordered = daily.filter((round) =>
+      round.clues.some(
+        (c, i) =>
+          typeof c.reach !== "number" ||
+          (i > 0 && c.reach > (round.clues[i - 1].reach ?? 0)),
+      ),
+    );
+    expect(unordered.map((r) => r.name)).toEqual([]);
+  });
+});
+
+describe("reachLine", () => {
+  it("rounds up to two figures, so half its sightings really are within it", () => {
+    expect(reachLine({ reach: 3229, global: 1 })).toBe(
+      "Half its sightings within 3,300 km of the spot",
+    );
+    expect(reachLine({ reach: 747, global: 1 })).toContain("within 750 km");
+    expect(reachLine({ reach: 25, global: 1 })).toContain("within 25 km");
+  });
+
+  it("falls back to the worldwide count for a species with no reach", () => {
+    expect(reachLine({ reach: null, global: 971861 })).toBe(
+      "971,861 sightings worldwide",
     );
   });
 });

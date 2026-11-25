@@ -3,9 +3,11 @@
  * single organism.
  *
  * Six species were all recorded at one real place in one month. They arrive one
- * at a time, most widely recorded first, so the first one could be almost
- * anywhere and the last one is nearly the answer. You pin the place on a world
- * map and choose the month, once. Every species you ask for lowers the most you
+ * at a time, the one whose sightings spread widest around the place first, so
+ * the first one gets you to the right part of the world and the last one is
+ * nearly the answer. Each says how far from the place half its sightings are,
+ * so the board shows how much it narrows. You pin the place on a world map and
+ * choose the month, once. Every species you ask for lowers the most you
  * can score, and the board shows both that ceiling ("Up to 5,400 points") and
  * what the next species costs, so the trade is visible before you make it.
  *
@@ -62,6 +64,13 @@ interface Clue {
   global: number;
   /** Observations at this place in this month. */
   local: number;
+  /**
+   * Km from the place holding half its research-grade records worldwide. The
+   * six run from the widest to the most local. Null for a species that filled
+   * a round with nothing better left, and missing from a set built before
+   * November 2026; either way the card shows `global` instead.
+   */
+  reach?: number | null;
   /** Standing at this place, by majority of the place's flagged records. */
   standing: "native" | "introduced" | "endemic";
   fact: string;
@@ -161,6 +170,22 @@ const DATE_SHORT = new Intl.DateTimeFormat("en-US", {
 const count = (value: number): string => value.toLocaleString("en-US");
 const clamp = (v: number, lo: number, hi: number) =>
   Math.min(hi, Math.max(lo, v));
+
+/**
+ * A reach rounded up to two figures, so "half within" stays true: 3,229 km
+ * reads 3,300 and 747 reads 750.
+ */
+export function reachKm(km: number): number {
+  const step = 10 ** Math.max(0, Math.floor(Math.log10(km)) - 1);
+  return Math.ceil(km / step) * step;
+}
+
+/** The line under a species name on the board. */
+export function reachLine(clue: Pick<Clue, "reach" | "global">): string {
+  return clue.reach
+    ? `Half its sightings within ${count(reachKm(clue.reach))} km of the spot`
+    : `${count(clue.global)} sightings worldwide`;
+}
 
 function todayNumber(): number {
   const now = new Date();
@@ -1086,7 +1111,7 @@ export function initDayList(root: HTMLElement): void {
           <figcaption class="dl-slot__body">
             <span class="dl-slot__name">${escapeHtml(speciesName(clue.name))}</span>
             <span class="dl-slot__sci">${escapeHtml(clue.sci)}</span>
-            <span class="dl-slot__count">${count(clue.global)} sightings worldwide</span>
+            <span class="dl-slot__count">${reachLine(clue)}</span>
           </figcaption>
         </figure>`;
       const img = li.querySelector("img");
@@ -1199,8 +1224,8 @@ export function initDayList(root: HTMLElement): void {
     const clue = round.clues[lines - 1];
     if (announce) {
       announce.textContent =
-        `Species ${lines} of ${round.clues.length}: ${speciesName(clue.name)}, ` +
-        `${count(clue.global)} sightings worldwide. ` +
+        `Species ${lines} of ${round.clues.length}: ${speciesName(clue.name)}. ` +
+        `${reachLine(clue)}. ` +
         `Up to ${count(bestPossible(lines))} points now.`;
     }
     // The button that was pressed has been replaced, so keyboard focus

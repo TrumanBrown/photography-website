@@ -6,8 +6,8 @@
  *
  * The game asks you to read a *community* rather than a single organism: six
  * species that were all recorded at one real place in one month, revealed from
- * the most widely recorded in the world to the most local, so each line narrows
- * the map further.
+ * the one that ranges widest around the place to the most local, so each line
+ * narrows the map further.
  *
  * Accuracy rules, because this is aimed at people who know the species:
  *
@@ -29,9 +29,11 @@
  *  - Photos are openly licensed only, and the licence and photographer travel
  *    with the photo so the UI can credit them. CC BY and CC BY-NC both require
  *    attribution.
- *  - Clue ordering uses worldwide iNaturalist observation counts. That is a
- *    measure of how often a species is *recorded*, not how widespread it is,
- *    and the UI says so rather than implying range.
+ *  - Clue ordering uses each species' reach: the distance from the place
+ *    that holds half of its research-grade records worldwide (see reachOf).
+ *    Worldwide record counts used to order them, but a count measures how
+ *    often a species is recorded, not where, so the first four lines were
+ *    Mallards and House Sparrows that ruled out nothing (2026-11-24).
  *
  * Two sets come out of this. PLACES is the daily rotation, one list a day for
  * everyone. EXTRA_PLACES feeds "More lists", up to ten a day per player. They
@@ -44,7 +46,7 @@
  *   npm run build:day-list -- --facts [--extra] refresh the facts and their
  *                                               links only, same species
  */
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -231,10 +233,38 @@ const PLACES = [
   { id: 13078, month: 6, label: "Hokkaido", region: "Japan" },
   { id: 34090, month: 5, label: "Yakushima", region: "Kagoshima, Japan" },
   { id: 186468, month: 4, label: "The Ogasawara Islands", region: "Japan" },
-  { id: 150778, month: 2, label: "Sinharaja Forest", region: "Sri Lanka" },
-  { id: 131079, month: 3, label: "Kinabalu Park", region: "Sabah, Borneo" },
-  { id: 69564, month: 6, label: "Crocker Range", region: "Sabah, Borneo" },
-  { id: 131063, month: 7, label: "Komodo National Park", region: "Indonesia" },
+  // Held out: the old rule that the opener needed 120,000 records worldwide
+  // skipped these four, so the live rotation has never had them. Adding a
+  // daily round moves everyone's "today" (todayNumber() % ROUNDS.length), so
+  // drop `hold` only in a rebuild that ships close to midnight.
+  {
+    id: 150778,
+    month: 2,
+    label: "Sinharaja Forest",
+    region: "Sri Lanka",
+    hold: true,
+  },
+  {
+    id: 131079,
+    month: 3,
+    label: "Kinabalu Park",
+    region: "Sabah, Borneo",
+    hold: true,
+  },
+  {
+    id: 69564,
+    month: 6,
+    label: "Crocker Range",
+    region: "Sabah, Borneo",
+    hold: true,
+  },
+  {
+    id: 131063,
+    month: 7,
+    label: "Komodo National Park",
+    region: "Indonesia",
+    hold: true,
+  },
 
   // Australia and the Pacific
   {
@@ -776,17 +806,170 @@ async function standings(placeId, ids) {
 }
 
 /**
- * Six clues stepping from "recorded almost everywhere" down to "this is the
- * spot", one from each logarithmic band of worldwide observation count.
+ * Rings around the place, in km, about √2 apart. Each is one species_counts
+ * call that counts every candidate at once.
+ */
+const RINGS = [
+  25, 35, 50, 70, 100, 140, 200, 280, 400, 560, 800, 1100, 1600, 2200, 3200,
+  4500, 6400,
+];
+/**
+ * A species with at least 80% of its records within 4,500 km of the place
+ * belongs to this part of the world. Mallards don't anywhere: from Olympic
+ * National Park 58% are within 4,500 km, against 99% of American Robins.
+ * 3,200 km was too tight for a place in a corner of its continent, where it
+ * left out the robin and let the Mallard back in as the opener.
+ */
+const NEAR_KM = 4500;
+const NEAR_SHARE = 0.8;
+
+/** Counts are cached so retuning the bands doesn't cost another hour. */
+const CACHE_DIR = join(root, ".cache/day-list");
+const CACHE_DAYS = 7;
+
+/** Research-grade counts for these taxa, by id, with any extra filter. */
+async function countsFor(ids, extra = {}) {
+  const data = await api("observations/species_counts", {
+    taxon_id: ids.join(","),
+    quality_grade: "research",
+    per_page: "500",
+    ...extra,
+  });
+  await sleep(THROTTLE);
+  const counts = {};
+  for (const row of data.results || []) counts[row.taxon.id] = row.count;
+  return counts;
+}
+
+/**
+ * The radius around the place that holds half of a species' research-grade
+ * records worldwide, read between rings on a log scale. Infinity when fewer
+ * than half are within the widest ring.
+ */
+function reachFrom(shares, rings = RINGS) {
+  for (let i = 0; i < rings.length; i++) {
+    if (shares[i] < 0.5) continue;
+    if (i === 0) return rings[0];
+    const [s0, s1] = [shares[i - 1], shares[i]];
+    const t = (0.5 - s0) / (s1 - s0);
+    const [l0, l1] = [Math.log(rings[i - 1]), Math.log(rings[i])];
+    return Math.exp(l0 + t * (l1 - l0));
+  }
+  return Infinity;
+}
+
+/**
+ * The place and the species recorded there that month, each with its reach
+ * and its share of records within NEAR_KM, from the cache when it's fresh.
+ */
+async function survey(entry) {
+  const file = join(CACHE_DIR, `${entry.id}-${entry.month}.json`);
+  if (existsSync(file)) {
+    const cached = JSON.parse(readFileSync(file, "utf8"));
+    const age = (Date.now() - Date.parse(cached.fetched)) / 86_400_000;
+    if (age < CACHE_DAYS && cached.rings.join() === RINGS.join()) {
+      return measure(cached);
+    }
+  }
+
+  const data = await api(`places/${entry.id}`);
+  await sleep(THROTTLE);
+  const place = (data.results || [])[0];
+  if (!place) throw new Error(`place ${entry.id} not found`);
+  const [lat, lng] = String(place.location || "")
+    .split(",")
+    .map(Number);
+  const box = bboxOf(place);
+  const centre =
+    Number.isFinite(lat) && Number.isFinite(lng)
+      ? { lat, lng }
+      : box && { lat: (box.s + box.n) / 2, lng: (box.w + box.e) / 2 };
+  if (!centre) throw new Error("no centre or bounding box");
+
+  const listed = await api("observations/species_counts", {
+    place_id: String(entry.id),
+    month: String(entry.month),
+    quality_grade: "research",
+    per_page: "200",
+    locale: "en",
+  });
+  await sleep(THROTTLE);
+  const candidates = (listed.results || [])
+    .filter((r) => r.taxon.rank === "species" && r.taxon.observations_count > 0)
+    .map((r) => ({
+      id: r.taxon.id,
+      local: r.count,
+      global: r.taxon.observations_count,
+      name: r.taxon.preferred_common_name || r.taxon.name,
+      common: Boolean(r.taxon.preferred_common_name),
+      sci: r.taxon.name,
+      group: r.taxon.iconic_taxon_name || "",
+    }))
+    // Two or more local records: a single record is often a vagrant,
+    // an escape, or a misidentification, none of which belong in a puzzle
+    // that claims to describe a place.
+    .filter((s) => s.local >= 2);
+
+  const ids = candidates.map((c) => c.id);
+  const world = ids.length ? await countsFor(ids) : {};
+  const rings = [];
+  for (const radius of RINGS) {
+    rings.push(
+      ids.length
+        ? await countsFor(ids, {
+            lat: String(centre.lat),
+            lng: String(centre.lng),
+            radius: String(radius),
+          })
+        : {},
+    );
+  }
+
+  const fresh = {
+    fetched: new Date().toISOString(),
+    rings: RINGS,
+    place: {
+      display_name: place.display_name,
+      bounding_box_geojson: place.bounding_box_geojson,
+    },
+    centre,
+    candidates,
+    world,
+    counts: rings,
+  };
+  mkdirSync(CACHE_DIR, { recursive: true });
+  writeFileSync(file, JSON.stringify(fresh));
+  return measure(fresh);
+}
+
+function measure(surveyed) {
+  const near = RINGS.indexOf(NEAR_KM);
+  const candidates = surveyed.candidates.map((c) => {
+    const total = surveyed.world[c.id] || 0;
+    const shares = surveyed.counts.map((ring) =>
+      total ? Math.min(1, (ring[c.id] || 0) / total) : 0,
+    );
+    return { ...c, reach: reachFrom(shares), near: shares[near] };
+  });
+  return { place: surveyed.place, candidates };
+}
+
+/**
+ * Six clues stepping from "this part of the world" down to "this is the
+ * spot", one from each band of reach in km. The opener used to be a species
+ * recorded nearly everywhere, and with four of those in a row nobody had a
+ * chance (2026-11-24).
  */
 const BANDS = [
-  [150000, Infinity],
-  [55000, 150000],
-  [16000, 55000],
-  [4500, 16000],
-  [1100, 4500],
-  [0, 1100],
+  [1500, 6400],
+  [900, 1500],
+  [500, 900],
+  [250, 500],
+  [100, 250],
+  [0, 100],
 ];
+/** What an empty band is refilled towards, km. */
+const BAND_AIM = [2200, 1150, 670, 350, 160, 50];
 
 /** Up to this many candidates are tried per band before giving up on it. */
 const TRIES_PER_BAND = 8;
@@ -801,11 +984,31 @@ const TRIES_PER_BAND = 8;
 const BOTANICAL = new Set(["Plantae", "Fungi", "Chromista", "Protozoa"]);
 const MAX_BOTANICAL_PER_ROUND = 2;
 
-/** Animals sort ahead of plants inside a band, so they are tried first. */
-function animalFirst(a, b) {
+/**
+ * Species already on the board in an earlier round of this set. Every round
+ * opening on American Robin would get old fast, so a band takes one it hasn't
+ * used when it has the choice.
+ */
+const onBoard = new Set();
+
+/**
+ * Inside a band: species that belong to this part of the world first, then
+ * animals, then ones this set hasn't used, then ones with a common name, then
+ * the best known. When none belong, the one with most of its records nearby,
+ * not the most recorded, which would be a Mallard.
+ */
+function preferred(a, b) {
+  const an = a.near >= NEAR_SHARE;
+  const bn = b.near >= NEAR_SHARE;
+  if (an !== bn) return an ? -1 : 1;
   const ab = BOTANICAL.has(a.group) ? 1 : 0;
   const bb = BOTANICAL.has(b.group) ? 1 : 0;
   if (ab !== bb) return ab - bb;
+  if (!an && a.near !== b.near) return b.near - a.near;
+  const au = onBoard.has(a.id);
+  const bu = onBoard.has(b.id);
+  if (au !== bu) return au ? 1 : -1;
+  if (a.common !== b.common) return a.common ? -1 : 1;
   return b.global - a.global;
 }
 
@@ -836,6 +1039,7 @@ async function enrich(clue) {
     group: clue.group,
     global: clue.global,
     local: clue.local,
+    reach: Number.isFinite(clue.reach) ? Math.round(clue.reach) : null,
     standing: "native",
     ...factFor(clue.id, taxon),
     rank: taxon.conservation_status
@@ -849,64 +1053,80 @@ async function enrich(clue) {
 }
 
 /**
- * Walks each abundance band, enriching candidates until one sticks. Doing the
+ * Walks each band of reach, enriching candidates until one sticks. Doing the
  * enrichment inside the pick (rather than picking first and enriching after)
  * means a species with no usable photo costs a request, not a whole round.
  */
 async function buildClues(list) {
-  const sorted = list.slice().sort((a, b) => b.global - a.global);
+  const pool = list.filter((s) => Number.isFinite(s.reach));
   const used = new Set();
   const picked = [];
+  const empty = [];
   let botanical = 0;
 
-  for (let band = 0; band < BANDS.length; band++) {
-    const [lo, hi] = BANDS[band];
-    // The last band is the line that gives the place away, so it has to be an
-    // animal: somebody can reason from a honeyeater, not from a sedge.
-    const giveaway = band === BANDS.length - 1;
-    const inBand = sorted
-      .filter((s) => s.global >= lo && s.global < hi && !used.has(s.id))
-      .sort(animalFirst)
-      .filter((s) => {
-        if (!BOTANICAL.has(s.group)) return true;
-        return !giveaway && botanical < MAX_BOTANICAL_PER_ROUND;
-      });
+  // Plants only in the wide bands (500 km and up), so the last lines, the
+  // ones that give the place away, are animals: somebody can reason from a
+  // honeyeater, not from a sedge.
+  const allowed = (s, band) =>
+    !used.has(s.id) &&
+    (!BOTANICAL.has(s.group) ||
+      (band <= 2 && botanical < MAX_BOTANICAL_PER_ROUND));
 
-    for (const candidate of inBand.slice(0, TRIES_PER_BAND)) {
+  async function take(candidates) {
+    for (const candidate of candidates.slice(0, TRIES_PER_BAND)) {
       const clue = await enrich(candidate);
-      if (clue) {
-        used.add(candidate.id);
-        picked.push(clue);
-        if (BOTANICAL.has(candidate.group)) botanical += 1;
-        break;
-      }
-    }
-  }
-
-  // Backfill from the most local end if a band came up empty, still animals first.
-  const backfill = sorted
-    .slice()
-    .reverse()
-    .sort((a, b) => {
-      const ab = BOTANICAL.has(a.group) ? 1 : 0;
-      const bb = BOTANICAL.has(b.group) ? 1 : 0;
-      if (ab !== bb) return ab - bb;
-      return a.global - b.global;
-    });
-  for (const candidate of backfill) {
-    if (picked.length >= 6) break;
-    if (used.has(candidate.id)) continue;
-    if (BOTANICAL.has(candidate.group) && botanical >= MAX_BOTANICAL_PER_ROUND)
-      continue;
-    const clue = await enrich(candidate);
-    if (clue) {
+      if (!clue) continue;
       used.add(candidate.id);
       picked.push(clue);
       if (BOTANICAL.has(candidate.group)) botanical += 1;
+      return true;
     }
+    return false;
   }
 
-  picked.sort((a, b) => b.global - a.global);
+  for (let band = 0; band < BANDS.length; band++) {
+    const [lo, hi] = BANDS[band];
+    const inBand = pool
+      .filter((s) => s.reach >= lo && s.reach < hi && allowed(s, band))
+      .sort(preferred);
+    if (!(await take(inBand))) empty.push(band);
+  }
+
+  // An empty band takes the nearest fit from what's left, so the steps stay
+  // as even as the place allows. Iceland in June has nothing under 900 km but
+  // plants and one dolphin, so its middle bands take a whelk, a puffin and a
+  // goose that reach 1,670 to 1,830 km.
+  for (const band of empty) {
+    const aim = Math.log(BAND_AIM[band]);
+    const off = (s) => Math.abs(Math.log(s.reach) - aim);
+    const nearest = pool
+      .filter((s) => allowed(s, band))
+      .sort((a, b) => {
+        const an = a.near >= NEAR_SHARE ? 0 : 1;
+        const bn = b.near >= NEAR_SHARE ? 0 : 1;
+        if (an !== bn) return an - bn;
+        const ab = BOTANICAL.has(a.group) ? 1 : 0;
+        const bb = BOTANICAL.has(b.group) ? 1 : 0;
+        if (ab !== bb) return ab - bb;
+        return off(a) - off(b) || b.global - a.global;
+      });
+    await take(nearest);
+  }
+
+  // Last resort, so a place never drops out of the rotation: anything left,
+  // animals first, most local first.
+  const byReach = (a, b) => (a === b ? 0 : a - b);
+  const rest = list.slice().sort((a, b) => {
+    const ab = BOTANICAL.has(a.group) ? 1 : 0;
+    const bb = BOTANICAL.has(b.group) ? 1 : 0;
+    return ab - bb || byReach(a.reach, b.reach);
+  });
+  while (picked.length < 6) {
+    if (!(await take(rest.filter((s) => allowed(s, 0))))) break;
+  }
+
+  const widest = (c) => c.reach ?? Infinity;
+  picked.sort((a, b) => byReach(widest(b), widest(a)) || b.global - a.global);
   return picked.length === 6 ? picked : null;
 }
 
@@ -972,23 +1192,23 @@ if (FACTS) {
 
 const rounds = [];
 const problems = [];
+const notes = [];
 
 for (const entry of EXTRA ? EXTRA_PLACES : PLACES) {
-  let place;
+  if (entry.hold) {
+    notes.push(`${entry.label}: held out of the rotation`);
+    continue;
+  }
+
+  let surveyed;
   try {
-    const data = await api(`places/${entry.id}`);
-    place = (data.results || [])[0];
+    surveyed = await survey(entry);
   } catch (error) {
-    problems.push(`${entry.label}: place lookup failed (${error.message})`);
+    problems.push(`${entry.label}: survey failed (${error.message})`);
     await sleep(THROTTLE);
     continue;
   }
-  await sleep(THROTTLE);
-
-  if (!place) {
-    problems.push(`${entry.label}: place ${entry.id} not found`);
-    continue;
-  }
+  const { place, candidates } = surveyed;
 
   const bbox = bboxOf(place);
   if (!bbox) {
@@ -996,58 +1216,31 @@ for (const entry of EXTRA ? EXTRA_PLACES : PLACES) {
     continue;
   }
 
-  // Candidate species actually recorded there that month.
-  let candidates = [];
-  try {
-    const data = await api("observations/species_counts", {
-      place_id: String(entry.id),
-      month: String(entry.month),
-      quality_grade: "research",
-      per_page: "200",
-      locale: "en",
-    });
-    candidates = (data.results || [])
-      .filter(
-        (r) => r.taxon.rank === "species" && r.taxon.observations_count > 0,
-      )
-      .map((r) => ({
-        id: r.taxon.id,
-        local: r.count,
-        global: r.taxon.observations_count,
-        name: r.taxon.preferred_common_name || r.taxon.name,
-        sci: r.taxon.name,
-        group: r.taxon.iconic_taxon_name || "",
-      }))
-      // Two or more local records: a single record is often a vagrant,
-      // an escape, or a misidentification, none of which belong in a puzzle
-      // that claims to describe a place.
-      .filter((s) => s.local >= 2);
-  } catch (error) {
-    problems.push(`${entry.label}: species_counts failed (${error.message})`);
-    await sleep(THROTTLE);
-    continue;
-  }
-  await sleep(THROTTLE);
-
   const enriched = await buildClues(candidates);
-  if (enriched && enriched[0].global < 120000) {
-    // Without a genuinely cosmopolitan opener the puzzle starts half-solved.
-    problems.push(
-      `${entry.label}: opening clue only ${enriched[0].global} records, too local to open with`,
-    );
-    continue;
-  }
   if (!enriched) {
     problems.push(
       `${entry.label}: could not assemble 6 clues from ${candidates.length} species in month ${entry.month}`,
     );
     continue;
   }
+  // An island of endemics can start close to solved. Worth knowing, not a
+  // reason to drop the place: dropping a daily round moves everyone's today.
+  if ((enriched[0].reach ?? Infinity) < BANDS[1][0]) {
+    notes.push(
+      `${entry.label}: opens narrow, the first species reaches ${enriched[0].reach} km`,
+    );
+  }
+  if (BOTANICAL.has(enriched[5].group)) {
+    notes.push(
+      `${entry.label}: the last species is a ${enriched[5].group} one`,
+    );
+  }
   const labels = await standings(
     entry.id,
     enriched.map((c) => c.id),
   );
   for (const clue of enriched) clue.standing = labels.get(clue.id) || "native";
+  for (const clue of enriched) onBoard.add(clue.id);
 
   rounds.push({
     placeId: entry.id,
@@ -1062,12 +1255,17 @@ for (const entry of EXTRA ? EXTRA_PLACES : PLACES) {
   const summary = enriched
     .map(
       (c) =>
-        `${Math.round(c.global / 1000)}k${c.standing === "native" ? "" : c.standing[0]}`,
+        `${c.reach ?? "far"}${c.standing === "native" ? "" : c.standing[0]}`,
     )
     .join(" > ");
   console.log(
-    `${entry.label.slice(0, 30).padEnd(31)}m${String(entry.month).padStart(2)}  ${summary}`,
+    `${entry.label.slice(0, 30).padEnd(31)}m${String(entry.month).padStart(2)}  ${summary} km`,
   );
+}
+
+if (notes.length) {
+  console.log("\nNotes:");
+  for (const n of notes) console.log(`  - ${n}`);
 }
 
 if (problems.length) {

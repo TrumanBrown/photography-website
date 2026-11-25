@@ -3,7 +3,7 @@
  * Day list - a daily puzzle built on real iNaturalist records.
  *
  * Six species were all recorded at one place in one month. The board shows
- * them one at a time, most widely recorded first, so each one narrows the map
+ * them one at a time, the most widespread first, so each one narrows the map
  * further. The visitor drops a pin, picks a month and locks it in once. Every
  * extra species lowers the most they can score, and the board shows that
  * number before they ask (the "Reveal next clue -750" idea from Originle).
@@ -20,8 +20,8 @@ interface Props {
 const { heading = "Today's list" } = Astro.props;
 
 const STEPS = [
-  "You start with one species. It's the most common of the six, so it could be almost anywhere.",
-  "If you're stuck, show the next one. Each is rarer than the last and narrows things down, but it costs you points.",
+  "You start with one species. It's the most widespread of the six, so it only gets you to the right part of the world.",
+  "If you're stuck, show the next one. Each is more local than the last and narrows things down, but it costs you points.",
   "Whenever you have a hunch, tap the map where you think they were seen and pick a month.",
   "Lock it in. You only get one guess, and a pin anywhere inside the place counts as spot on.",
 ];
@@ -82,12 +82,12 @@ const MONTHS = [
     </div>
 
     <div class="dl-axis" aria-hidden="true">
-      <span>Most common</span><i></i><span>Rarest</span>
+      <span>Widespread</span><i></i><span>Local</span>
     </div>
     <ol
       class="dl-tray"
       role="list"
-      aria-label="The six species, most common first"
+      aria-label="The six species, most widespread first"
       data-daylist-clues
     >
     </ol>
@@ -174,13 +174,13 @@ const MONTHS = [
 
   <p class="dl-foot">
     Every species on a list was logged at that place in that month, and every
-    place has a published boundary. Sighting counts show
-    how often something gets logged worldwide, which follows where people go
-    looking as much as where the animal lives. The full list flags introduced
-    and endemic species, because a kookaburra in Tasmania is a very different
-    clue once you know it was put there. Data from iNaturalist, terrain and
-    borders from Natural Earth. Photo credits are tucked away below, since a
-    photographer's name can give the place away.
+    place has a published boundary. The distance under each species is how far
+    from the place half its sightings were logged, and sightings follow where
+    people go looking as much as where the animal lives. The full list flags
+    introduced and endemic species, because a kookaburra in Tasmania is a very
+    different clue once you know it was put there. Data from iNaturalist,
+    terrain and borders from Natural Earth. Photo credits are tucked away
+    below, since a photographer's name can give the place away.
   </p>
 
   <details class="dl-credits" data-daylist-credits>
