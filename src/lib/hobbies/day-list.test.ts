@@ -2,18 +2,18 @@ import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
 import {
   EXTRA_PER_DAY,
-  STAMP_CLEAR,
   bestPossible,
+  coords,
+  entryFraction,
   photoCredits,
-  photoSrcset,
   pickExtra,
-  placeVerdict,
   readDaily,
   readExtra,
   reachLine,
   scoreGuess,
   shareText,
   tidyFact,
+  verdictFor,
   type Round,
 } from "./day-list";
 import puzzles from "./day-list.json";
@@ -56,6 +56,21 @@ describe("the two puzzle sets", () => {
       ),
     );
     expect(unordered.map((r) => r.name)).toEqual([]);
+  });
+
+  // The page reads every photo's pixels for its ring colour, so each loads
+  // with CORS, and static.inaturalist.org sends no CORS header: a photo from
+  // there wouldn't load at all.
+  it("take every photo from iNaturalist's open-data bucket", () => {
+    const elsewhere = [...daily, ...extra].flatMap((round) =>
+      round.clues
+        .map((c) => c.photo)
+        .filter(
+          (src) =>
+            !src.startsWith("https://inaturalist-open-data.s3.amazonaws.com/"),
+        ),
+    );
+    expect(elsewhere).toEqual([]);
   });
 });
 
@@ -192,65 +207,40 @@ describe("shareText", () => {
   });
 });
 
-describe("placeVerdict", () => {
-  // The map, the stamp's tilted footprint for the longest verdict ("Wrong
-  // side of the planet", with its distance), and the controls, as measured
-  // on the page at 390x844 and 1440x900.
-  const screens = {
-    phone: {
-      size: { width: 390, height: 193 },
-      stamp: { w: 179, h: 56 },
-      controls: { zoomLeft: 354, footer: 36 },
-    },
-    desktop: {
-      size: { width: 778, height: 388 },
-      stamp: { w: 227, h: 65 },
-      controls: { zoomLeft: 739, footer: 39 },
-    },
-  };
-  const near = (r: Round) => ({
-    lat: Math.min(85, r.bbox.n + 1.5),
-    lon: Math.min(180, r.bbox.e + 2),
+describe("verdictFor", () => {
+  it("names the same bands as the share squares", () => {
+    expect([0, 1, 399, 400, 1499, 1500, 4999, 5000].map(verdictFor)).toEqual([
+      "Spot on",
+      "Near enough",
+      "Near enough",
+      "Right part of the world",
+      "Right part of the world",
+      "Not quite",
+      "Not quite",
+      "Wrong side of the planet",
+    ]);
   });
-  // A guess in each quarter of the world, and one just off the place.
-  const guesses = (r: Round) => [
-    { lat: 45, lon: -100 },
-    { lat: 50, lon: 30 },
-    { lat: -15, lon: -55 },
-    { lat: -25, lon: 135 },
-    near(r),
-  ];
+});
 
-  it.each(Object.entries(screens))(
-    "keeps the stamp off the pin, the line and the place on a %s",
-    (_, screen) => {
-      const covered: string[] = [];
-      for (const round of [...daily, ...extra]) {
-        for (const pin of guesses(round)) {
-          const b = round.bbox;
-          const frame = {
-            w: Math.min(b.w, pin.lon),
-            e: Math.max(b.e, pin.lon),
-            s: Math.min(b.s, pin.lat),
-            n: Math.max(b.n, pin.lat),
-          };
-          // The map's labels are 11px, about 6.5px a letter.
-          const labels = { name: round.name.length * 6.5, km: 52 };
-          const { clear } = placeVerdict({
-            bbox: b,
-            pin,
-            frame,
-            labels,
-            ...screen,
-          });
-          if (clear < STAMP_CLEAR) {
-            covered.push(`${round.name} from ${pin.lat},${pin.lon}: ${clear}`);
-          }
-        }
-      }
-      expect(covered).toEqual([]);
-    },
-  );
+describe("coords", () => {
+  it("labels a spot the way the hobby scene's finder box does", () => {
+    expect(coords({ lat: 43.45, lon: 142.62 })).toBe("43.5° N · 142.6° E");
+    expect(coords({ lat: -33.9, lon: -70.04 })).toBe("33.9° S · 70.0° W");
+  });
+});
+
+describe("entryFraction", () => {
+  const box = { w: 10, e: 20, s: 40, n: 50 };
+  const middle = { lat: 45, lon: 15 };
+
+  it("stops the line where it meets the boundary", () => {
+    expect(entryFraction({ lat: 45, lon: 0 }, middle, box)).toBeCloseTo(2 / 3);
+    expect(entryFraction({ lat: 65, lon: 15 }, middle, box)).toBeCloseTo(0.75);
+  });
+
+  it("draws no line from a pin inside the place", () => {
+    expect(entryFraction({ lat: 42, lon: 12 }, middle, box)).toBe(0);
+  });
 });
 
 describe("photoCredits", () => {
@@ -271,28 +261,6 @@ describe("photoCredits", () => {
     const html = photoCredits([{ ...clues[0], by: "<b>A&B</b>" }], 1);
     expect(html).toContain("&lt;b&gt;A&amp;B&lt;/b&gt;");
     expect(html).not.toContain("<b>");
-  });
-});
-
-describe("photoSrcset", () => {
-  it("offers iNaturalist's large size beside medium", () => {
-    expect(photoSrcset("https://x/photos/1/medium.jpeg")).toBe(
-      "https://x/photos/1/medium.jpeg 375w, https://x/photos/1/large.jpeg 768w",
-    );
-    expect(photoSrcset("https://x/photos/2/medium.")).toContain(
-      "/photos/2/large. 768w",
-    );
-  });
-
-  it("leaves a photo that isn't the medium size alone", () => {
-    expect(photoSrcset("https://x/photos/3/square.jpg")).toBe("");
-  });
-
-  it("covers every photo in both puzzle sets", () => {
-    const photos = [...daily, ...extra].flatMap((r) =>
-      r.clues.map((c) => c.photo),
-    );
-    expect(photos.filter((p) => !photoSrcset(p))).toEqual([]);
   });
 });
 

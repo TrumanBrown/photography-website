@@ -17,10 +17,9 @@
  * Everything is drawn on the map's own canvas at the pin's place on the
  * globe, so a ring stays put while the map zooms or pans under it. The poses
  * are pure functions of time; createPinMotion is the thin driver, and the map
- * only keeps redrawing while one of them is still moving.
- *
- * dealFrames is the board's half: a species you pay to see slides into its
- * square from the square the next one sits in.
+ * only keeps redrawing while one of them is still moving. Its `frame()` hands
+ * the same poses to a map that draws the pin its own way, as Narrow nature's
+ * pixel map does.
  */
 import { prefersReducedMotion } from "../motion";
 import type { LonLat, Point } from "./day-list-map";
@@ -145,33 +144,6 @@ export function pressPose(ms: number): PinPose {
   return { ...REST, sx: s, sy: s, weight: 1 + 0.45 * depth };
 }
 
-/** How long a species takes to be dealt into its square, ms. */
-export const DEAL_MS = 230;
-
-/**
- * A clue dealt into its square from the side the next one sits on: `dx`,
- * `dy` px away, turned `turn` degrees, sliding in and settling square.
- */
-export function dealFrames(dx: number, dy: number, turn: number): Keyframe[] {
-  const at = (k: number, r: number) =>
-    `translate(${(dx * k).toFixed(2)}px, ${(dy * k).toFixed(2)}px) rotate(${r.toFixed(2)}deg)`;
-  return [
-    {
-      offset: 0,
-      opacity: 0,
-      transform: at(1, turn),
-      easing: "cubic-bezier(0.2, 0, 0, 1)",
-    },
-    { offset: 0.3, opacity: 1 },
-    {
-      offset: 0.78,
-      transform: at(-0.06, -turn * 0.15),
-      easing: "cubic-bezier(0.4, 0, 0.2, 1)",
-    },
-    { offset: 1, opacity: 1, transform: at(0, 0) },
-  ];
-}
-
 /** The pin as the map has always drawn it, in a pose. */
 export function drawPin(
   ctx: CanvasRenderingContext2D,
@@ -218,6 +190,18 @@ interface Lifting {
   from: PinPose;
 }
 
+/** Everything about the pin at one moment, for a map that draws it its own way. */
+export interface PinFrame {
+  /** The rings landings left, spreading at their spots. */
+  rings: { at: LonLat; r: number; alpha: number }[];
+  /** Old pins lifting out where they stood. */
+  lifting: { at: LonLat; pose: PinPose }[];
+  /** The pin's pose at `pin`, or null with no pin down. */
+  pin: PinPose | null;
+  /** True while anything is still moving, so the map draws another frame. */
+  busy: boolean;
+}
+
 export interface PinMotion {
   /** A tap put the pin at `at`; `was` is where it stood, if anywhere. */
   drop(at: LonLat, was: LonLat | null): void;
@@ -229,6 +213,8 @@ export interface PinMotion {
   press(inMs: number): void;
   /** A new round: nothing left in the air. */
   clear(): void;
+  /** Where everything is now, for `pin` standing where it is. */
+  frame(pin: LonLat | null): PinFrame;
   /**
    * Draw the rings, any old pin lifting out, and the pin itself at `pin`.
    * True while anything is still moving, so the map draws another frame.
@@ -256,6 +242,39 @@ export function createPinMotion(
       falling = null;
     }
     return pressPose(t - pressAt);
+  }
+
+  function frame(pin: LonLat | null): PinFrame {
+    const t = now();
+    const out: PinFrame = { rings: [], lifting: [], pin: null, busy: false };
+
+    for (let i = rings.length - 1; i >= 0; i--) {
+      const ms = t - rings[i].t0;
+      if (ms >= RING_MS) {
+        rings.splice(i, 1);
+        continue;
+      }
+      out.busy = true;
+      const r = ringPose(ms);
+      if (r) out.rings.push({ at: rings[i].at, ...r });
+    }
+
+    for (let i = lifting.length - 1; i >= 0; i--) {
+      const l = lifting[i];
+      const p = liftPose(l.from, t - l.t0);
+      if (!p) {
+        lifting.splice(i, 1);
+        continue;
+      }
+      out.busy = true;
+      out.lifting.push({ at: l.at, pose: p });
+    }
+
+    if (pin) {
+      out.pin = pose(t);
+      if (falling || t - pressAt < PRESS_MS) out.busy = true;
+    }
+    return out;
   }
 
   return {
@@ -294,20 +313,11 @@ export function createPinMotion(
       lifting.length = 0;
       rings.length = 0;
     },
+    frame,
     draw(ctx, project, ink, pin) {
-      const t = now();
-      let busy = false;
-
-      for (let i = rings.length - 1; i >= 0; i--) {
-        const ms = t - rings[i].t0;
-        if (ms >= RING_MS) {
-          rings.splice(i, 1);
-          continue;
-        }
-        busy = true;
-        const r = ringPose(ms);
-        if (!r) continue;
-        const p = project(rings[i].at.lon, rings[i].at.lat);
+      const f = frame(pin);
+      for (const r of f.rings) {
+        const p = project(r.at.lon, r.at.lat);
         ctx.save();
         ctx.globalAlpha = r.alpha;
         ctx.strokeStyle = ink;
@@ -317,24 +327,11 @@ export function createPinMotion(
         ctx.stroke();
         ctx.restore();
       }
-
-      for (let i = lifting.length - 1; i >= 0; i--) {
-        const l = lifting[i];
-        const p = liftPose(l.from, t - l.t0);
-        if (!p) {
-          lifting.splice(i, 1);
-          continue;
-        }
-        busy = true;
-        drawPin(ctx, project(l.at.lon, l.at.lat), p, ink);
+      for (const l of f.lifting) {
+        drawPin(ctx, project(l.at.lon, l.at.lat), l.pose, ink);
       }
-
-      if (pin) {
-        const p = pose(t);
-        if (falling || t - pressAt < PRESS_MS) busy = true;
-        drawPin(ctx, project(pin.lon, pin.lat), p, ink);
-      }
-      return busy;
+      if (pin && f.pin) drawPin(ctx, project(pin.lon, pin.lat), f.pin, ink);
+      return f.busy;
     },
   };
 }

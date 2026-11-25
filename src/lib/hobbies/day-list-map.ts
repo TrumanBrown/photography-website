@@ -11,14 +11,18 @@
  * Ways to zoom: pinch, Ctrl or Cmd + scroll (a trackpad pinch arrives as
  * Ctrl + scroll), double-click or double-tap, the + and - buttons, and the
  * + / - / 0 keys. A plain scroll wheel keeps scrolling the page, and the map
- * says how to zoom instead of trapping it. On touch, one finger scrolls the
- * page at world view (touch-action: pan-y) and pans once you're zoomed in
- * (touch-action: none), the same deal as the herp map.
+ * says how to zoom instead of trapping it, unless `wheelZoom` says there's no
+ * page to scroll. On touch, one finger scrolls the page at world view
+ * (touch-action: pan-y) and pans once you're zoomed in (touch-action: none),
+ * the same deal as the herp map.
  *
  * Country and state borders are vector lines from ./day-list-borders, drawn
  * over the terrain at whatever detail the zoom needs.
  *
- * The game draws its pin, line and boundary on top through `drawOverlay`.
+ * The game draws on top through `drawOverlay`. A game with a look of its own
+ * can give the map its own colours (`colours`), draw it coarser for pixel art
+ * (`pixelScale`), and keep the world its own shape on a very wide canvas
+ * (`maxAspect`), where the sea runs on past the world's edges.
  */
 import { LAND } from "../geo";
 import { prefersReducedMotion } from "../motion";
@@ -45,18 +49,24 @@ export interface View {
   cu: number;
   cv: number;
 }
-export interface Palette {
-  key: string;
-  ink: string;
-  ink2: string;
-  paper: string;
-  /** Open water, exactly the colour the tiles give it. */
+/** The colours the map draws in, for one theme. */
+export interface MapColours {
+  /** Relief tile grey (0-255) to RGBA, 256 entries of four, as buildLut makes. */
+  lut: Uint8ClampedArray;
+  /** Open water, exactly the colour the lut gives grey 0. */
   water: string;
   /** Land for the coarse coastline drawn before the tiles arrive. */
   land: string;
+  /** Country and state borders. */
+  ink: string;
   grid: string;
   coast: string;
-  lut: Uint8ClampedArray;
+}
+
+export interface Palette extends MapColours {
+  key: string;
+  ink2: string;
+  paper: string;
   /** Light ink on a dark page. */
   dark: boolean;
 }
@@ -83,27 +93,51 @@ const RELIEF = relief as {
 const clamp = (v: number, lo: number, hi: number) =>
   Math.min(hi, Math.max(lo, v));
 
-/** Keep zoom in range and the view inside the world. */
-export function clampView(view: View, maxZoom = MAX_ZOOM): View {
+/**
+ * The world's width in CSS pixels at zoom 1 on a `width` by `height` canvas.
+ * It fills the canvas, stretched a little if it must, unless the canvas is
+ * wider than `maxAspect` to 1: then the world keeps that shape, centred, and
+ * the sea runs on either side of it.
+ */
+export function worldBase(
+  width: number,
+  height: number,
+  maxAspect = Infinity,
+): number {
+  return Math.min(width, maxAspect * height);
+}
+
+/**
+ * Keep zoom in range and the view inside the world. `across` is the canvas's
+ * width over the world's at zoom 1 (worldBase); while the world is narrower
+ * than the canvas it stays in the middle.
+ */
+export function clampView(view: View, maxZoom = MAX_ZOOM, across = 1): View {
   const k = clamp(view.k, 1, maxZoom);
-  const half = 0.5 / k;
+  const halfU = (0.5 * across) / k;
+  const halfV = 0.5 / k;
   return {
     k,
-    cu: clamp(view.cu, half, 1 - half),
-    cv: clamp(view.cv, half, 1 - half),
+    cu: halfU >= 0.5 ? 0.5 : clamp(view.cu, halfU, 1 - halfU),
+    cv: clamp(view.cv, halfV, 1 - halfV),
   };
 }
 
-/** Where a point lands on a `width` by `height` map showing `view`. */
+/**
+ * Where a point lands on a `width` by `height` map showing `view`, with the
+ * world `worldW` pixels across at zoom 1 (the whole width unless worldBase
+ * says otherwise).
+ */
 export function projectAt(
   view: View,
   width: number,
   height: number,
   lon: number,
   lat: number,
+  worldW = width,
 ): Point {
   return {
-    x: ((lon + 180) / 360 - view.cu) * width * view.k + width / 2,
+    x: ((lon + 180) / 360 - view.cu) * worldW * view.k + width / 2,
     y: ((90 - lat) / 180 - view.cv) * height * view.k + height / 2,
   };
 }
@@ -118,8 +152,8 @@ export interface Inset {
 /**
  * The view that shows `box` with `pad` CSS pixels to spare on every side, and
  * `inset` more where something sits over the map (the buttons on the right,
- * the verdict stamp), no closer than `maxZoom`. The map is 2:1 like the world,
- * so one zoom fits both directions.
+ * the panels along the top and the bottom), no closer than `maxZoom`.
+ * `worldW` is the world's width at zoom 1, as for projectAt.
  */
 export function fitView(
   box: Box,
@@ -128,6 +162,7 @@ export function fitView(
   pad: number,
   maxZoom = FIT_MAX_ZOOM,
   inset: Inset = {},
+  worldW = width,
 ): View {
   const { top = 0, right = 0, bottom = 0 } = inset;
   const u0 = (box.w + 180) / 360;
@@ -136,14 +171,21 @@ export function fitView(
   const v1 = (90 - box.s) / 180;
   const roomX = Math.max(0.1, 1 - (2 * pad + right) / width);
   const roomY = Math.max(0.1, 1 - (2 * pad + top + bottom) / height);
-  const span = Math.max((u1 - u0) / roomX, (v1 - v0) / roomY, 1 / maxZoom);
+  // 1 / zoom: the share of the world's height the view shows, and of its
+  // width when the world fills the canvas.
+  const span = Math.max(
+    ((u1 - u0) * worldW) / (roomX * width),
+    (v1 - v0) / roomY,
+    1 / maxZoom,
+  );
   // Shift the centre by half of each inset, so the box sits in the room
-  // that's left of the buttons and clear of the stamp.
-  const shiftU = (right / 2 / width) * span;
+  // that's left of the buttons and clear of the panels.
+  const shiftU = (right / 2 / worldW) * span;
   const shiftV = ((top - bottom) / 2 / height) * span;
   return clampView(
     { k: 1 / span, cu: (u0 + u1) / 2 + shiftU, cv: (v0 + v1) / 2 - shiftV },
     maxZoom,
+    width / worldW,
   );
 }
 
@@ -153,18 +195,24 @@ export const answerPad = (width: number): number => (width < 480 ? 28 : 44);
 /**
  * How the reveal frames the answer: room on every side, plus the width of the
  * zoom buttons on the right so the place never lands under them, plus any
- * `room` asked for, such as a band for the verdict stamp.
+ * `room` asked for, such as the panels over the map.
  */
 export function answerView(
   box: Box,
   width: number,
   height: number,
   room: Inset = {},
+  worldW = width,
 ): View {
-  return fitView(box, width, height, answerPad(width), FIT_MAX_ZOOM, {
-    right: 40,
-    ...room,
-  });
+  return fitView(
+    box,
+    width,
+    height,
+    answerPad(width),
+    FIT_MAX_ZOOM,
+    { right: 40, ...room },
+    worldW,
+  );
 }
 
 /** The coarsest tile level with enough pixels for `need` device pixels across. */
@@ -278,6 +326,27 @@ export interface WorldMapOptions {
   onView?: (map: WorldMap) => void;
   /** A plain scroll over the map, which scrolls the page rather than zooming. */
   onWheelHint?: () => void;
+  /** A plain scroll zooms too, for a map that fills a page with no scroll. */
+  wheelZoom?: boolean;
+  /**
+   * The map's colours in the dark theme or the light one, in place of the
+   * page's tokens. Asked again whenever the theme changes.
+   */
+  colours?: (dark: boolean) => MapColours;
+  /**
+   * Canvas pixels per CSS pixel, asked on every resize. Under 1 draws a
+   * coarser map to show with `image-rendering: pixelated` (a quarter makes
+   * each map pixel 4 CSS pixels). Left out, it's the screen's own, up to 2.
+   */
+  pixelScale?: () => number;
+  /** The widest the world is drawn, width over height (see worldBase). */
+  maxAspect?: number;
+  /**
+   * How much of the canvas's width is on screen, centred, when the canvas
+   * runs past both sides of the screen. The view keeps that part inside the
+   * world rather than the whole canvas, and `fit` frames a box in it.
+   */
+  shownWidth?: () => number;
 }
 
 export interface WorldMap {
@@ -327,6 +396,9 @@ export function createWorldMap(options: WorldMapOptions): WorldMap | null {
 
   let width = 0;
   let height = 0;
+  // The world's width at zoom 1 (worldBase): all of `width` unless the canvas
+  // is wider than options.maxAspect allows.
+  let baseW = 0;
   let dpr = 1;
   let view: View = { k: 1, cu: 0.5, cv: 0.5 };
   let frame = 0;
@@ -339,17 +411,29 @@ export function createWorldMap(options: WorldMapOptions): WorldMap | null {
   let scratch: CanvasRenderingContext2D | null = null;
 
   function readPalette(): Palette {
-    const css = getComputedStyle(document.documentElement);
+    const root = document.documentElement;
+    const css = getComputedStyle(root);
     const v = (name: string, fallback: string) =>
       css.getPropertyValue(name).trim() || fallback;
     const paper = v("--paper", "#fbfaf8");
     const ink = v("--ink", "#16150f");
+    const ink2 = v("--ink-2", "#706c63");
+    if (options.colours) {
+      const dark = root.classList.contains("dark");
+      return {
+        ...options.colours(dark),
+        key: `own|${dark}`,
+        ink2,
+        paper,
+        dark,
+      };
+    }
     const sea = v("--stack-1", "#d8d2c4");
     const tones = mapTones(paper, ink, sea);
     return {
       key: `${paper}|${ink}|${sea}`,
       ink,
-      ink2: v("--ink-2", "#706c63"),
+      ink2,
       paper,
       water: hexOf(tones.water),
       land: hexOf(mix(tones.shadow, tones.light, 0.75)),
@@ -362,10 +446,17 @@ export function createWorldMap(options: WorldMapOptions): WorldMap | null {
     };
   }
 
+  /** The part of the canvas on screen, CSS px across (options.shownWidth). */
+  const shown = () =>
+    Math.min(width, Math.max(1, options.shownWidth?.() ?? width));
+  /** The shown width over the world's, for clampView. */
+  const across = () => (baseW ? shown() / baseW : 1);
+  const clampHere = (next: View) => clampView(next, MAX_ZOOM, across());
+
   const project = (lon: number, lat: number): Point =>
-    projectAt(view, width, height, lon, lat);
+    projectAt(view, width, height, lon, lat, baseW);
   const unproject = (x: number, y: number): LonLat => ({
-    lon: ((x - width / 2) / (width * view.k) + view.cu) * 360 - 180,
+    lon: ((x - width / 2) / (baseW * view.k) + view.cu) * 360 - 180,
     lat: 90 - ((y - height / 2) / (height * view.k) + view.cv) * 180,
   });
 
@@ -445,16 +536,18 @@ export function createWorldMap(options: WorldMapOptions): WorldMap | null {
   function drawLevel(level: number, fetch: boolean): boolean {
     const lv = RELIEF.levels[level];
     const T = RELIEF.tile;
-    const half = 0.5 / view.k;
-    const tx0 = Math.max(0, Math.floor(((view.cu - half) * lv.w) / T));
+    const worldW = baseW * view.k;
+    const halfU = width / 2 / worldW;
+    const halfV = 0.5 / view.k;
+    const tx0 = Math.max(0, Math.floor(((view.cu - halfU) * lv.w) / T));
     const tx1 = Math.min(
       lv.cols - 1,
-      Math.floor(((view.cu + half) * lv.w) / T),
+      Math.floor(((view.cu + halfU) * lv.w) / T),
     );
-    const ty0 = Math.max(0, Math.floor(((view.cv - half) * lv.h) / T));
+    const ty0 = Math.max(0, Math.floor(((view.cv - halfV) * lv.h) / T));
     const ty1 = Math.min(
       lv.rows - 1,
-      Math.floor(((view.cv + half) * lv.h) / T),
+      Math.floor(((view.cv + halfV) * lv.h) / T),
     );
     let complete = true;
     for (let ty = ty0; ty <= ty1; ty++) {
@@ -462,9 +555,9 @@ export function createWorldMap(options: WorldMapOptions): WorldMap | null {
         // Snap edges to device pixels, overlapping by a hair, so no seams.
         const tw = Math.min(T, lv.w - tx * T);
         const th = Math.min(T, lv.h - ty * T);
-        const x0 = ((tx * T) / lv.w - view.cu) * width * view.k + width / 2;
+        const x0 = ((tx * T) / lv.w - view.cu) * worldW + width / 2;
         const y0 = ((ty * T) / lv.h - view.cv) * height * view.k + height / 2;
-        const x1 = x0 + (tw / lv.w) * width * view.k;
+        const x1 = x0 + (tw / lv.w) * worldW;
         const y1 = y0 + (th / lv.h) * height * view.k;
         const sx0 = Math.floor(x0 * dpr) / dpr;
         const sy0 = Math.floor(y0 * dpr) / dpr;
@@ -528,7 +621,7 @@ export function createWorldMap(options: WorldMapOptions): WorldMap | null {
   }
 
   function drawGraticule(): void {
-    const pxPerDeg = (width * view.k) / 360;
+    const pxPerDeg = (baseW * view.k) / 360;
     const step = graticuleStep(pxPerDeg);
     const west = unproject(0, 0).lon;
     const east = unproject(width, 0).lon;
@@ -564,7 +657,7 @@ export function createWorldMap(options: WorldMapOptions): WorldMap | null {
     ctx!.fillStyle = palette.water;
     ctx!.fillRect(0, 0, width, height);
 
-    const target = levelFor(width * view.k * dpr, widths);
+    const target = levelFor(baseW * view.k * dpr, widths);
     // The coarsest level loads first and sits under everything, so a zoom
     // never shows a blank; finer levels sharpen it as they arrive. The level
     // under the target loads too: a quarter as many tiles, so after a big
@@ -577,7 +670,14 @@ export function createWorldMap(options: WorldMapOptions): WorldMap | null {
     drawGraticule();
     borders.draw(
       ctx!,
-      { width, height, k: view.k, cu: view.cu, cv: view.cv },
+      {
+        width,
+        height,
+        k: view.k,
+        cu: view.cu,
+        cv: view.cv,
+        worldW: baseW * view.k,
+      },
       { ink: palette.ink, dark: palette.dark },
     );
     options.drawOverlay?.(ctx!, map);
@@ -592,7 +692,7 @@ export function createWorldMap(options: WorldMapOptions): WorldMap | null {
   /* ----------------------------------------------------------- the view */
 
   function setView(next: View): void {
-    view = clampView(next);
+    view = clampHere(next);
     surface.classList.toggle("is-zoomed", view.k > 1.001);
     // One finger scrolls the page until there's something to pan.
     surface.style.touchAction = view.k > 1.001 ? "none" : "pan-y";
@@ -615,7 +715,7 @@ export function createWorldMap(options: WorldMapOptions): WorldMap | null {
    */
   function animateTo(to: View, ms: number): Promise<void> {
     stopAnimation();
-    const target = clampView(to);
+    const target = clampHere(to);
     if (ms <= 0 || prefersReducedMotion()) {
       setView(target);
       return Promise.resolve();
@@ -646,25 +746,25 @@ export function createWorldMap(options: WorldMapOptions): WorldMap | null {
   }
 
   function zoomAt(k: number, at: Point): void {
-    const u = (at.x - width / 2) / (width * view.k) + view.cu;
+    const u = (at.x - width / 2) / (baseW * view.k) + view.cu;
     const v = (at.y - height / 2) / (height * view.k) + view.cv;
     const next = clamp(k, 1, MAX_ZOOM);
     setView({
       k: next,
-      cu: u - (at.x - width / 2) / (width * next),
+      cu: u - (at.x - width / 2) / (baseW * next),
       cv: v - (at.y - height / 2) / (height * next),
     });
   }
 
   function zoomBy(factor: number, at?: Point): void {
     const p = at ?? { x: width / 2, y: height / 2 };
-    const u = (p.x - width / 2) / (width * view.k) + view.cu;
+    const u = (p.x - width / 2) / (baseW * view.k) + view.cu;
     const v = (p.y - height / 2) / (height * view.k) + view.cv;
     const k = clamp(view.k * factor, 1, MAX_ZOOM);
     void animateTo(
       {
         k,
-        cu: u - (p.x - width / 2) / (width * k),
+        cu: u - (p.x - width / 2) / (baseW * k),
         cv: v - (p.y - height / 2) / (height * k),
       },
       260,
@@ -723,7 +823,7 @@ export function createWorldMap(options: WorldMapOptions): WorldMap | null {
       if (pinch.d > 0) {
         zoomAt(view.k * (now.d / pinch.d), now.mid);
         // Two fingers also pan, by however far their midpoint moved.
-        const du = (now.mid.x - pinch.mid.x) / (width * view.k);
+        const du = (now.mid.x - pinch.mid.x) / (baseW * view.k);
         const dv = (now.mid.y - pinch.mid.y) / (height * view.k);
         setView({ ...view, cu: view.cu - du, cv: view.cv - dv });
       }
@@ -738,7 +838,7 @@ export function createWorldMap(options: WorldMapOptions): WorldMap | null {
       surface.classList.add("is-panning");
       setView({
         ...view,
-        cu: view.cu - (p.x - prev.x) / (width * view.k),
+        cu: view.cu - (p.x - prev.x) / (baseW * view.k),
         cv: view.cv - (p.y - prev.y) / (height * view.k),
       });
     }
@@ -782,7 +882,7 @@ export function createWorldMap(options: WorldMapOptions): WorldMap | null {
   surface.addEventListener(
     "wheel",
     (e) => {
-      if (!e.ctrlKey && !e.metaKey) {
+      if (!e.ctrlKey && !e.metaKey && !options.wheelZoom) {
         // Only when the mouse was just moved onto the map. A page scroll with
         // the mouse resting still slides the map under it, and that's not
         // somebody trying to zoom.
@@ -838,17 +938,23 @@ export function createWorldMap(options: WorldMapOptions): WorldMap | null {
   function resize(): void {
     const rect = canvas.getBoundingClientRect();
     if (!rect.width) return;
-    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const scale = options.pixelScale?.() ?? window.devicePixelRatio;
+    dpr = Math.min(scale || 1, 2);
     width = rect.width;
     height = rect.height;
-    canvas.width = Math.round(width * dpr);
-    canvas.height = Math.round(height * dpr);
+    baseW = worldBase(width, height, options.maxAspect);
+    canvas.width = Math.max(1, Math.round(width * dpr));
+    canvas.height = Math.max(1, Math.round(height * dpr));
     setView(view);
     render();
   }
 
   if (typeof ResizeObserver !== "undefined") {
-    new ResizeObserver(resize).observe(surface);
+    const watch = new ResizeObserver(resize);
+    watch.observe(surface);
+    // The canvas can be sized apart from its surface (running past a phone's
+    // edges, say), so it's watched too.
+    if (canvas !== surface) watch.observe(canvas);
   } else {
     window.addEventListener("resize", resize);
   }
@@ -875,7 +981,7 @@ export function createWorldMap(options: WorldMapOptions): WorldMap | null {
       return view;
     },
     get worldWidth() {
-      return width * view.k;
+      return baseW * view.k;
     },
     get palette() {
       return palette;
@@ -888,7 +994,7 @@ export function createWorldMap(options: WorldMapOptions): WorldMap | null {
       stopAnimation();
       setView({
         ...view,
-        cu: view.cu + dx / (width * view.k),
+        cu: view.cu + dx / (baseW * view.k),
         cv: view.cv + dy / (height * view.k),
       });
     },
@@ -896,7 +1002,13 @@ export function createWorldMap(options: WorldMapOptions): WorldMap | null {
       animateTo({ k: 1, cu: 0.5, cv: 0.5 }, animate ? 420 : 0),
     fit: (box, { animate = true, ms = 650, room } = {}) =>
       animateTo(
-        answerView(box, width || 600, height || 300, room),
+        answerView(
+          box,
+          width ? shown() : 600,
+          height || 300,
+          room,
+          baseW || width || 600,
+        ),
         animate ? ms : 0,
       ),
     show(at) {
@@ -917,13 +1029,13 @@ export function createWorldMap(options: WorldMapOptions): WorldMap | null {
       if (!dx && !dy) return;
       setView({
         ...view,
-        cu: view.cu + dx / (width * view.k),
+        cu: view.cu + dx / (baseW * view.k),
         cv: view.cv + dy / (height * view.k),
       });
     },
     kmPerPx() {
       const lat = unproject(width / 2, height / 2).lat;
-      return (40075 * Math.cos((lat * Math.PI) / 180)) / (width * view.k);
+      return (40075 * Math.cos((lat * Math.PI) / 180)) / (baseW * view.k);
     },
   };
 

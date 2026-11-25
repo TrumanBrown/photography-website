@@ -13,13 +13,18 @@ classes. Words follow [site-copy.instructions.md](./site-copy.instructions.md).
 Admin (`src/pages/admin/`, `src/lib/admin*.ts`) is a private tool and keeps its plain Tailwind
 look. Everything below is about the public pages.
 
-The title screen at `/` ([TitleScreen.astro](../../src/components/TitleScreen.astro),
-`src/lib/title/`) is the one public screen with its own look, picked after four rounds of mocks
-(2026-11-20): his name in Jersey 25 pixel type, rounded glass keys tinted from the photo under
-them, a cursor on a spring, a pixel eagle, and the photo moving against the pointer. It ignores the
-theme: the photo always shows at its own colours, in light and dark (2026-11-21). Its rules
-are in the front-door skill. Don't copy any of it onto other pages, and don't pull it back toward
-ink and paper either. The front door under it, and every page after it, follow the rules below.
+Two public screens have their own look. The title screen at `/`
+([TitleScreen.astro](../../src/components/TitleScreen.astro), `src/lib/title/`) was picked after
+four rounds of mocks (2026-11-20): his name in Jersey 25 pixel type, rounded glass keys tinted from
+the photo under them, a cursor on a spring, a pixel eagle, and the photo moving against the
+pointer. It ignores the theme: the photo always shows at its own colours, in light and dark
+(2026-11-21). Its rules are in the front-door skill. Narrow nature at `/hobbies/narrow-nature/`
+([DayList.astro](../../src/components/hobbies/DayList.astro)) was picked after two rounds
+(2026-11-24): a full-screen pixel world map in its own day and night palettes, Jersey type, solid
+navy panels with hard drops, keys that press, and rings in colours taken from the species' photos,
+with no site header or footer. Its rules are in the narrow-nature skill. Don't copy either look
+onto other pages, and don't pull them back toward ink and paper. The front door under the title
+screen, and every other page, follow the rules below.
 
 ## Color
 

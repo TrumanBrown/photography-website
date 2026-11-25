@@ -1,15 +1,15 @@
 /**
- * Day list - a daily puzzle that asks you to read a community rather than a
- * single organism.
+ * Narrow nature (Day list in the code) - a daily puzzle that asks you to read
+ * a community rather than a single organism.
  *
  * Six species were all recorded at one real place in one month. They arrive one
  * at a time, the one whose sightings spread widest around the place first, so
  * the first one gets you to the right part of the world and the last one is
- * nearly the answer. Each says how far from the place half its sightings are,
- * so the board shows how much it narrows. You pin the place on a world map and
- * choose the month, once. Every species you ask for lowers the most you
- * can score, and the board shows both that ceiling ("Up to 5,400 points") and
- * what the next species costs, so the trade is visible before you make it.
+ * nearly the answer. Each draws a ring round the pin of how far from the place
+ * half its sightings are, so the map shows how much it narrows. You pin the
+ * place and choose the month, once. Every species you ask for lowers the most
+ * you can score, and the board shows both that ceiling ("Up to 5,400 points")
+ * and what the next species costs, so the trade is visible before you make it.
  *
  * Two modes share the board. Today's list is the same round for everyone,
  * picked by date from day-list.json. More lists deals up to ten a day per
@@ -17,40 +17,63 @@
  * can never spoil a future daily one. Both modes remember a round in progress,
  * so reloading can't reset how many species you've seen.
  *
+ * It plays as one full-screen pixel world (mock D, 2026-11-24): the map at a
+ * quarter of its resolution in a day or a night palette (./day-list-pixel),
+ * the rings in colours picked from each species' photo (./day-list-tints), a
+ * hand of six cards, and on Lock it in the bullseye slides to the place and a
+ * red finder box closes in on it before the verdict drops in.
+ *
  * Puzzle data is built at release time by scripts/build-day-list.mjs. Photos
- * come from the iNaturalist CDNs already allow-listed in the site's CSP, so the
+ * come from the iNaturalist CDN already allow-listed in the site's CSP, so the
  * island makes no runtime API calls. The map (zoom, terrain, gestures) is
  * ./day-list-map.
  *
  * Mounted by src/components/hobbies/DayList.astro via [data-daylist] hooks.
  */
-import { canvasFont, canvasFontReady } from "../canvas-font";
-import {
-  STAMP_TOUCH_MS,
-  initUnderlineTabs,
-  prefersReducedMotion,
-  rollTo,
-  stamp,
-} from "../motion";
-import {
-  DEAL_MS,
-  PRESS_DOWN_MS,
-  createPinMotion,
-  dealFrames,
-} from "./pin-drop";
+import { covered, whenUncovered } from "../covered";
+import { initUnderlineTabs, prefersReducedMotion } from "../motion";
+import { PRESS_DOWN_MS, createPinMotion } from "./pin-drop";
 import {
   MAX_ZOOM,
-  answerPad,
   answerView,
   createWorldMap,
-  projectAt,
-  scaleBar,
+  graticuleStep,
   type Box,
   type Inset,
   type LonLat,
-  type Point,
   type WorldMap,
 } from "./day-list-map";
+import {
+  ENCODED,
+  PALETTES,
+  PIN,
+  PIN_PRESS,
+  PIN_SQUASH,
+  circle,
+  computeGeo,
+  destination,
+  disc,
+  drawToken,
+  line,
+  outlined,
+  px,
+  rasterRing,
+  recolour,
+  shade,
+  sprite,
+  type Frame,
+  type Geo,
+  type Grid,
+} from "./day-list-pixel";
+import {
+  assignTints,
+  photoHues,
+  punch,
+  ringFor,
+  type Peak,
+  type RGB,
+  type Tint,
+} from "./day-list-tints";
 import puzzles from "./day-list.json";
 import { speciesName } from "../species-name";
 import { siteConfig } from "../../../site.config";
@@ -143,19 +166,8 @@ const EXTRA_KEY = "day-list-extra-v1";
 /** Extra lists a browser can start in a day. The pool is finite, so pace it. */
 export const EXTRA_PER_DAY = 10;
 
-/**
- * After "Lock it in" the answer lands in one beat: the map glides to frame the
- * pin and the place, the line runs from one to the other while the distance
- * counts up beside it, the boundary strokes in as the total lands, then the
- * species still hidden fill in one after another.
- */
-const CAMERA_MS = 650;
-const LINE_MS = 600;
-const BOX_MS = 300;
-const FILL_STAGGER_MS = 70;
-
 const MAP_LABEL =
-  "World map. Tap where you think the six species were seen. Arrow keys move the pin, plus and minus zoom.";
+  "World map. Each species draws a ring round your pin, as far as half its sightings are from the spot. Tap where you think the six were seen. Arrow keys move the pin, plus and minus zoom.";
 
 // The page is in English, so dates and numbers are too.
 const DATE_LONG = new Intl.DateTimeFormat("en-US", {
@@ -167,7 +179,8 @@ const DATE_SHORT = new Intl.DateTimeFormat("en-US", {
   month: "long",
   day: "numeric",
 });
-const count = (value: number): string => value.toLocaleString("en-US");
+const count = (value: number): string =>
+  Math.round(value).toLocaleString("en-US");
 const clamp = (v: number, lo: number, hi: number) =>
   Math.min(hi, Math.max(lo, v));
 
@@ -180,11 +193,32 @@ export function reachKm(km: number): number {
   return Math.ceil(km / step) * step;
 }
 
-/** The line under a species name on the board. */
+/** The line under a species name, read out for each card. */
 export function reachLine(clue: Pick<Clue, "reach" | "global">): string {
   return clue.reach
     ? `Half its sightings within ${count(reachKm(clue.reach))} km of the spot`
     : `${count(clue.global)} sightings worldwide`;
+}
+
+/** What the banner says for a guess `km` from the place. */
+export function verdictFor(km: number): string {
+  return km === 0
+    ? "Spot on"
+    : km < 400
+      ? "Near enough"
+      : km < 1500
+        ? "Right part of the world"
+        : km < 5000
+          ? "Not quite"
+          : "Wrong side of the planet";
+}
+
+const degrees = (v: number, pos: string, neg: string) =>
+  `${Math.abs(v).toFixed(1)}° ${v >= 0 ? pos : neg}`;
+
+/** "43.4° N · 142.5° E", the way the hobby scene's finder box labels a spot. */
+export function coords(at: LonLat): string {
+  return `${degrees(at.lat, "N", "S")} · ${degrees(at.lon, "E", "W")}`;
 }
 
 function todayNumber(): number {
@@ -350,306 +384,26 @@ export function scoreGuess(
   };
 }
 
-/* ------------------------------------------------- the verdict stamp */
-
-/** How far the verdict stamp keeps from the answer, px. */
-export const STAMP_CLEAR = 6;
-/** How far the place name reaches above the place's box, px. */
-const LABEL_H = 18;
-/** How far the pin's cross reaches from its middle, px. */
-const PIN_R = 12;
-
-export interface Rect {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
-
-export type Corner = "tl" | "tr" | "bl" | "br";
-const CORNERS: Corner[] = ["tl", "tr", "bl", "br"];
-
-/** What the answer draws on the map, in map pixels. */
-export interface AnswerMarks {
-  /** The pin, the boundary and the labels. */
-  rects: Rect[];
-  /** The dashed line, once for each copy of the world it's drawn in. */
-  lines: [Point, Point][];
-}
-
-type Project = (lon: number, lat: number) => Point;
-
-/** The place's boundary on the map, never smaller than a few pixels. */
-function boundaryRect(bbox: Box, at: Project): Rect {
-  const tl = at(bbox.w, bbox.n);
-  const br = at(bbox.e, bbox.s);
-  return {
-    x: tl.x - 1,
-    y: tl.y - 1,
-    w: Math.max(6, br.x - tl.x) + 2,
-    h: Math.max(6, br.y - tl.y) + 2,
-  };
-}
+type Scored = ReturnType<typeof scoreGuess>;
 
 /**
- * The line runs to the nearest edge of the place, the point the distance is
- * measured to, the short way round: a pin in Hawaii reaches Japan off one side
- * of the map and back in at the other, so it's drawn once more a world over.
+ * Where the straight line from a pin to a place's middle crosses into its
+ * boundary, as a share of the way (0 when the pin is already inside). The
+ * line the bullseye leaves behind stops there, since the distance is
+ * measured to the boundary.
  */
-function answerLine(
-  pin: LonLat,
-  bbox: Box,
-  at: Project,
-  worldWidth: number,
-): { from: Point; to: Point; shifts: number[] } {
-  const edge = nearestPoint(pin, bbox);
-  let toLon = edge.lon;
-  if (toLon - pin.lon > 180) toLon -= 360;
-  else if (pin.lon - toLon > 180) toLon += 360;
-  const shifts = [0];
-  if (toLon < -180) shifts.push(worldWidth);
-  if (toLon > 180) shifts.push(-worldWidth);
-  return { from: at(pin.lon, pin.lat), to: at(toLon, edge.lat), shifts };
-}
-
-/** The place name sits above its box, to the right unless that runs off. */
-function nameSpot(box: Rect, nameW: number, mapW: number): Point {
-  let x = box.x + box.w + 5;
-  if (x + nameW > mapW - 4) x = box.x - 5 - nameW;
-  return { x: clamp(x, 4, mapW - 4 - nameW), y: Math.max(13, box.y - 5) };
-}
-
-/** The distance sits on the middle of the line, kept on the map. */
-function kmSpot(
-  middle: Point,
-  textW: number,
-  size: { width: number; height: number },
-): Point {
-  return {
-    x: clamp(middle.x - textW / 2, 4, size.width - 4 - textW),
-    y: clamp(middle.y - 8, 13, size.height - 6),
-  };
-}
-
-/** An 11px label drawn from its baseline at `at`, with its paper rim. */
-function labelRect(at: Point, textW: number): Rect {
-  return { x: at.x - 2, y: at.y - 11, w: textW + 4, h: 15 };
-}
-
-/**
- * Everything the answer puts on the map in a view, through `at`, so the stamp
- * can be kept off it before the camera gets there: the pin's cross, the line,
- * the boundary, the name, and the distance once the line can carry it.
- * `labels` are the two labels' widths.
- */
-export function answerMarks(
-  bbox: Box,
-  pin: LonLat,
-  at: Project,
-  size: { width: number; height: number; worldWidth: number },
-  labels: { name: number; km: number },
-): AnswerMarks {
-  const p = at(pin.lon, pin.lat);
-  const box = boundaryRect(bbox, at);
-  const rects: Rect[] = [
-    { x: p.x - PIN_R, y: p.y - PIN_R, w: 2 * PIN_R, h: 2 * PIN_R },
-    box,
-    labelRect(nameSpot(box, labels.name, size.width), labels.name),
-  ];
-  const lines: [Point, Point][] = [];
-  const { from, to, shifts } = answerLine(pin, bbox, at, size.worldWidth);
-  const length = Math.hypot(to.x - from.x, to.y - from.y);
-  if (length > 8) {
-    for (const shift of shifts) {
-      lines.push([
-        { x: from.x + shift, y: from.y },
-        { x: to.x + shift, y: to.y },
-      ]);
-    }
-    if (length > 110) {
-      const middle = { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 };
-      rects.push(labelRect(kmSpot(middle, labels.km, size), labels.km));
-    }
-  }
-  return { rects, lines };
-}
-
-/**
- * The four places the verdict stamp can sit, one tucked into each corner of
- * the map, clear of the zoom buttons at the top right (whose left edge is
- * `zoomLeft`) and of the strip `footer` tall along the bottom, where the scale
- * bar and "Whole world" sit. `stamp` is the stamp's footprint once tilted.
- */
-export function stampSpots(
-  size: { width: number; height: number },
-  stamp: { w: number; h: number },
-  edge: number,
-  controls: { zoomLeft: number; footer: number },
-): Record<Corner, Rect> {
-  const { w, h } = stamp;
-  const right = Math.min(size.width - edge, controls.zoomLeft - edge) - w;
-  const bottom = size.height - controls.footer - edge - h;
-  return {
-    tl: { x: edge, y: edge, w, h },
-    tr: { x: right, y: edge, w, h },
-    bl: { x: edge, y: bottom, w, h },
-    br: { x: size.width - edge - w, y: bottom, w, h },
-  };
-}
-
-function rectGap(a: Rect, b: Rect): number {
-  const dx = Math.max(0, b.x - (a.x + a.w), a.x - (b.x + b.w));
-  const dy = Math.max(0, b.y - (a.y + a.h), a.y - (b.y + b.h));
-  return Math.hypot(dx, dy);
-}
-
-function pointGap(p: Point, a: Point, b: Point): number {
-  const dx = b.x - a.x;
-  const dy = b.y - a.y;
-  const t = clamp(
-    ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy || 1),
+export function entryFraction(pin: LonLat, to: LonLat, box: Box): number {
+  const axis = (a: number, q: number, lo: number, hi: number) =>
+    a < lo ? (lo - a) / (q - a) : a > hi ? (hi - a) / (q - a) : 0;
+  return clamp(
+    Math.max(
+      0,
+      axis(pin.lon, to.lon, box.w, box.e),
+      axis(pin.lat, to.lat, box.s, box.n),
+    ),
     0,
     1,
   );
-  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
-}
-
-/** How far a line segment stays from a box, 0 if it crosses it. */
-function segmentGap(r: Rect, a: Point, b: Point): number {
-  // Clip the segment to the box (Liang-Barsky): any part left means it crosses.
-  const dx = b.x - a.x;
-  const dy = b.y - a.y;
-  const p = [-dx, dx, -dy, dy];
-  const q = [a.x - r.x, r.x + r.w - a.x, a.y - r.y, r.y + r.h - a.y];
-  let t0 = 0;
-  let t1 = 1;
-  let crosses = true;
-  for (let i = 0; i < 4 && crosses; i++) {
-    if (p[i] === 0) crosses = q[i] >= 0;
-    else if (p[i] < 0) t0 = Math.max(t0, q[i] / p[i]);
-    else t1 = Math.min(t1, q[i] / p[i]);
-    if (t0 > t1) crosses = false;
-  }
-  if (crosses) return 0;
-  const corners = [
-    { x: r.x, y: r.y },
-    { x: r.x + r.w, y: r.y },
-    { x: r.x, y: r.y + r.h },
-    { x: r.x + r.w, y: r.y + r.h },
-  ];
-  return Math.min(
-    rectGap(r, { ...a, w: 0, h: 0 }),
-    rectGap(r, { ...b, w: 0, h: 0 }),
-    ...corners.map((c) => pointGap(c, a, b)),
-  );
-}
-
-/** How far a stamp at `spot` stays from everything in `marks`, px. */
-function clearance(spot: Rect, marks: AnswerMarks): number {
-  let clear = Infinity;
-  for (const r of marks.rects) clear = Math.min(clear, rectGap(spot, r));
-  for (const [a, b] of marks.lines) {
-    clear = Math.min(clear, segmentGap(spot, a, b));
-  }
-  return clear;
-}
-
-/**
- * The corner farthest from everything the answer draws, and how far that is
- * in pixels. 0 means a stamp there would cover something.
- */
-export function stampCorner(
-  spots: Record<Corner, Rect>,
-  marks: AnswerMarks,
-): { corner: Corner; clear: number } {
-  let best: { corner: Corner; clear: number } = { corner: "tl", clear: -1 };
-  for (const corner of CORNERS) {
-    const clear = clearance(spots[corner], marks);
-    if (clear > best.clear) best = { corner, clear };
-  }
-  return best;
-}
-
-/**
- * Where the verdict stamp goes once the answer is framed: the corner farthest
- * from the pin, the line and the place. A phone's map is short enough that
- * sometimes no corner is clear. Then the framing leaves a band for the stamp
- * along the top or the bottom (`room`, passed on to answerView), and when the
- * answer spans so much of the world that the map can't move, the stamp slides
- * along the top or bottom edge to the clearest spot.
- */
-export function placeVerdict(input: {
-  bbox: Box;
-  pin: LonLat;
-  /** What the camera frames: the pin and the place together. */
-  frame: Box;
-  size: { width: number; height: number };
-  /** The stamp's footprint once tilted. */
-  stamp: { w: number; h: number };
-  controls: { zoomLeft: number; footer: number };
-  labels: { name: number; km: number };
-}): { room: Inset; corner: Corner; spot: Rect; clear: number } {
-  const { width, height } = input.size;
-  const { stamp, controls } = input;
-  const edge = width < 480 ? 6 : 10;
-  const corners = stampSpots(input.size, stamp, edge, controls);
-  const pad = answerPad(width);
-  const rooms: Inset[] = [
-    {},
-    {
-      top: Math.max(
-        0,
-        edge + stamp.h + STAMP_CLEAR + Math.max(LABEL_H, PIN_R) - pad,
-      ),
-    },
-    {
-      bottom: Math.max(
-        0,
-        controls.footer + edge + stamp.h + STAMP_CLEAR + PIN_R - pad,
-      ),
-    },
-  ];
-  const framings = rooms.map((room) => {
-    const view = answerView(input.frame, width, height, room);
-    const marks = answerMarks(
-      input.bbox,
-      input.pin,
-      (lon, lat) => projectAt(view, width, height, lon, lat),
-      { width, height, worldWidth: width * view.k },
-      input.labels,
-    );
-    return { room, marks };
-  });
-
-  type Pick = { room: Inset; corner: Corner; spot: Rect; clear: number };
-  let best: Pick | null = null;
-  const consider = (pick: Pick) => {
-    if (!best || pick.clear > best.clear) best = pick;
-    return pick.clear >= STAMP_CLEAR;
-  };
-  for (const { room, marks } of framings) {
-    const { corner, clear } = stampCorner(corners, marks);
-    if (consider({ room, corner, spot: corners[corner], clear })) return best!;
-  }
-  // Along the top, left of the zoom buttons, and along the bottom.
-  const steps = 12;
-  for (const { room, marks } of framings) {
-    for (const [left, right] of [
-      [corners.tl, corners.tr],
-      [corners.bl, corners.br],
-    ]) {
-      for (let i = 0; i <= steps; i++) {
-        const spot = { ...left, x: left.x + ((right.x - left.x) * i) / steps };
-        const top = spot.y === corners.tl.y;
-        const side = spot.x + spot.w / 2 < width / 2 ? "l" : "r";
-        const corner = `${top ? "t" : "b"}${side}` as Corner;
-        if (consider({ room, corner, spot, clear: clearance(spot, marks) })) {
-          return best!;
-        }
-      }
-    }
-  }
-  return best!;
 }
 
 /** Where to send people from the share text. */
@@ -763,13 +517,6 @@ export function tidyFact(fact: string, sci: string): string {
   return tidy;
 }
 
-function formatPin(pin: LonLat): string {
-  return (
-    `${Math.abs(pin.lat).toFixed(1)}\u00b0${pin.lat >= 0 ? "N" : "S"}, ` +
-    `${Math.abs(pin.lon).toFixed(1)}\u00b0${pin.lon >= 0 ? "E" : "W"}`
-  );
-}
-
 function escapeHtml(value: string): string {
   return String(value).replace(
     /[&<>"']/g,
@@ -797,124 +544,1450 @@ export function photoCredits(clues: Round["clues"], shown: number): string {
     .join("");
 }
 
-/**
- * The squares are up to 360px across, more than iNaturalist's medium size
- * holds on a sharp screen, so the browser can swap in large. The widths given
- * are each size's short side for a 4:3 photo, since the square crops to it.
- */
-const PHOTO_SIZES =
-  "(min-width: 1152px) 360px, (min-width: 640px) calc((100vw - 72px) / 3), calc((100vw - 48px) / 3)";
+/* ------------------------------------------------------------- motion */
 
-export function photoSrcset(photo: string): string {
-  if (!photo.includes("/medium.")) return "";
-  return `${photo} 375w, ${photo.replace("/medium.", "/large.")} 768w`;
-}
-
-/** Fetch a photo at the size its square will ask for, so it shows at once. */
-function preloadPhoto(photo: string): void {
-  const image = new Image();
-  image.decoding = "async";
-  const srcset = photoSrcset(photo);
-  if (srcset) {
-    image.sizes = PHOTO_SIZES;
-    image.srcset = srcset;
-  }
-  image.src = photo;
-}
-
-const isMac = () =>
-  /Mac|iPhone|iPad/.test(
-    (navigator as Navigator & { userAgentData?: { platform?: string } })
-      .userAgentData?.platform ?? navigator.userAgent,
+const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+const easeOut = (t: number) => 1 - Math.pow(1 - clamp(t, 0, 1), 3);
+const easeInOut = (t: number) => {
+  const k = clamp(t, 0, 1);
+  return k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+};
+const easeOutBack = (t: number, s = 1.4) =>
+  1 + (s + 1) * Math.pow(t - 1, 3) + s * Math.pow(t - 1, 2);
+const now = () => performance.now();
+const reduced = () => prefersReducedMotion();
+/** A duration, or none under reduced motion. */
+const dur = (n: number) => (reduced() ? 0 : n);
+const wait = (n: number): Promise<void> =>
+  new Promise((r) => setTimeout(r, reduced() ? 0 : n));
+const frames2 = (): Promise<void> =>
+  new Promise((r) =>
+    requestAnimationFrame(() => requestAnimationFrame(() => r())),
   );
+
+/** Tween over `ms`, calling `step` with an eased 0 to 1. */
+function tween(
+  ms: number,
+  step: (t: number) => void,
+  ease: (t: number) => number = easeOut,
+): Promise<void> {
+  if (reduced() || ms <= 0) {
+    step(1);
+    return Promise.resolve();
+  }
+  const t0 = now();
+  return new Promise((resolve) => {
+    const frame = (t: number) => {
+      const k = Math.min(1, (t - t0) / ms);
+      step(ease(k));
+      if (k < 1) requestAnimationFrame(frame);
+      else resolve();
+    };
+    requestAnimationFrame(frame);
+  });
+}
+
+/** Two significant figures, for a ring's tag as it rolls. */
+const twoFigures = (km: number) => {
+  if (km < 10) return Math.round(km);
+  const step = 10 ** Math.max(0, Math.floor(Math.log10(km)) - 1);
+  return Math.round(km / step) * step;
+};
+
+/* ------------------------------------------------------------- the photos */
+
+interface PhotoEntry {
+  img: HTMLImageElement;
+  ready: Promise<HTMLImageElement>;
+}
+
+/** A photo read small: a 64 px copy, its strong colours, its token pixels. */
+interface PhotoInfo {
+  small: HTMLCanvasElement | null;
+  hues: Peak[];
+  tokens: Map<number, Uint8ClampedArray>;
+}
+
+const photos = new Map<string, PhotoEntry>();
+const infos = new Map<string, Promise<PhotoInfo>>();
+
+/**
+ * Every copy of a clue photo loads with CORS, the cards' too, so the copy a
+ * canvas reads to pick the ring's colour is never a cached one without the
+ * header (iNaturalist's bucket varies on Origin).
+ */
+function photo(src: string): PhotoEntry {
+  const known = photos.get(src);
+  if (known) return known;
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.decoding = "async";
+  img.src = src;
+  const ready = img.decode().then(
+    () => img,
+    () => img,
+  );
+  const entry = { img, ready };
+  photos.set(src, entry);
+  return entry;
+}
+
+/** The photo, or after 350 ms whatever it has, so a slow one never holds a turn. */
+function photoSoon(src: string): Promise<HTMLImageElement> {
+  const e = photo(src);
+  return Promise.race([
+    e.ready,
+    new Promise<HTMLImageElement>((r) => setTimeout(() => r(e.img), 350)),
+  ]);
+}
+
+/** A square middle crop of `img`, `n` pixels across. */
+function shrink(img: CanvasImageSource, n: number): HTMLCanvasElement {
+  const c = document.createElement("canvas");
+  c.width = n;
+  c.height = n;
+  const x = c.getContext("2d", { willReadFrequently: true });
+  if (!x) return c;
+  x.imageSmoothingEnabled = true;
+  x.imageSmoothingQuality = "high";
+  const iw =
+    (img as HTMLImageElement).naturalWidth || (img as HTMLCanvasElement).width;
+  const ih =
+    (img as HTMLImageElement).naturalHeight ||
+    (img as HTMLCanvasElement).height;
+  const s = Math.min(iw, ih);
+  x.drawImage(img, (iw - s) / 2, (ih - s) / 2, s, s, 0, 0, n, n);
+  return c;
+}
+
+const NO_INFO = (): PhotoInfo => ({ small: null, hues: [], tokens: new Map() });
+
+function photoInfo(src: string): Promise<PhotoInfo> {
+  let known = infos.get(src);
+  if (!known) {
+    known = photo(src).ready.then((img) => {
+      if (!img.naturalWidth) return NO_INFO();
+      try {
+        const small = shrink(img, 64);
+        const data = small
+          .getContext("2d", { willReadFrequently: true })!
+          .getImageData(0, 0, 64, 64).data;
+        return { small, hues: photoHues(data, 64), tokens: new Map() };
+      } catch {
+        // A canvas that can't be read: the slot's colour in the set will do.
+        return NO_INFO();
+      }
+    });
+    infos.set(src, known);
+  }
+  return known;
+}
+
+/** A photo as `n` x `n` punched-up pixels, for a token on its ring. */
+function tokenPixels(
+  info: PhotoInfo | null | undefined,
+  n: number,
+): Uint8ClampedArray | null {
+  if (!info?.small) return null;
+  let pix = info.tokens.get(n);
+  if (!pix) {
+    try {
+      const c = shrink(info.small, n);
+      pix = punch(
+        c
+          .getContext("2d", { willReadFrequently: true })!
+          .getImageData(0, 0, n, n).data,
+      );
+    } catch {
+      return null;
+    }
+    info.tokens.set(n, pix);
+  }
+  return pix;
+}
+
+/* ---------------------------------------------------------- the game */
+
+/** One per species: its reach in km and where its ring's motion stands. */
+interface RingState {
+  km: number | null;
+  shown: boolean;
+  /** The tightening: from `from` km at `t0`, over `d` ms. */
+  t0: number;
+  d: number;
+  from: number;
+  /** Its photo is on its way from the card. */
+  flying: boolean;
+  /** When the photo landed on the ring (0 not yet). */
+  landed: number;
+}
+
+/** The answer as it plays: the slide, the line, the boundary, the finder. */
+interface Answer {
+  pin: LonLat;
+  to: LonLat;
+  /** How far along the line from the pin the boundary is. */
+  frac: number;
+  t0: number;
+  d: number;
+  /** Each wider ring follows this far behind the last. */
+  lag: number;
+  settle: number;
+  march: number;
+  boxT: number;
+  findT: number;
+  lockT: number;
+  /** The finder's box in CSS pixels, once it's drawn. */
+  finder: Rect | null;
+}
+
+interface Rect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** Where a ring's token and tag went on the last frame. */
+interface Lay {
+  i: number;
+  tok: { x: number; y: number } | null;
+  centre: { x: number; y: number };
+  rpx: number;
+  css: { x: number; y: number } | null;
+  cssCentre: { x: number; y: number };
+  cssR: number;
+}
+
+/** A ring as one frame draws it. */
+interface Item {
+  i: number;
+  g: RingState;
+  km: number;
+  labelKm: number;
+  col: RGB;
+  rank: number;
+  c: LonLat;
+  rpx: number;
+}
+
+/** A frame's pixels, their palette, and frame pixels to a CSS pixel. */
+interface MapFrame extends Frame {
+  s: number;
+}
+
+/** The camera's move to the answer. */
+const CAMERA_MS = 820;
+/** Each species' bearing round its ring, for its token. */
+const BEARINGS = [-48, 30, -120, 120, -10, 70];
+/** Under this radius, in map pixels, a ring shows as a dot. */
+const DOT = 2.5;
+/** The world keeps its own shape on a screen wider than this. */
+const MAX_ASPECT = 2;
+/** Laptops and up; under this the phone layout. */
+const PHONE_BELOW = 760;
+
+const meets = (a: Rect, b: Rect) =>
+  a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+const snapTo = (v: number, u: number) => Math.round(v / u) * u;
 
 export function initDayList(root: HTMLElement): void {
   const q = <T extends Element>(selector: string) =>
     root.querySelector<T>(selector);
   const canvas = q<HTMLCanvasElement>("[data-daylist-map]");
   const surface = q<HTMLElement>("[data-daylist-mapwrap]");
+  const labels = q<HTMLElement>("[data-daylist-labels]");
+  const ui = q<HTMLElement>(".dl-ui");
   const tray = q<HTMLElement>("[data-daylist-clues]");
-  const lockBtn = q<HTMLButtonElement>("[data-daylist-lock]");
+  const hand = q<HTMLElement>("[data-daylist-hand]");
   const guessPanel = q<HTMLElement>("[data-daylist-guess]");
+  const lockBtn = q<HTMLButtonElement>("[data-daylist-lock]");
+  const lockHint = q<HTMLElement>("[data-daylist-hint]");
   const resultSlot = q<HTMLElement>("[data-daylist-result]");
-  const monthInputs = Array.from(
-    root.querySelectorAll<HTMLInputElement>("[data-daylist-month]"),
+  const worthEl = q<HTMLElement>("[data-daylist-worth]");
+  const stakes = q<HTMLElement>("[data-daylist-stakes]");
+  const stakesUp = q<HTMLElement>("[data-daylist-stakes-up]");
+  const readout = q<HTMLElement>("[data-daylist-reach-readout]");
+  const reachEl = q<HTMLElement>("[data-daylist-reach]");
+  const titlePanel = q<HTMLElement>(".dl-title");
+  const zoomBox = q<HTMLElement>(".dl-zoom");
+  const monthBox = q<HTMLElement>("[data-daylist-months]");
+  const monthKeys = Array.from(
+    root.querySelectorAll<HTMLButtonElement>("[data-daylist-month]"),
   );
   if (
     !canvas ||
     !surface ||
+    !labels ||
+    !ui ||
     !tray ||
-    !lockBtn ||
+    !hand ||
     !guessPanel ||
+    !lockBtn ||
+    !lockHint ||
     !resultSlot ||
-    monthInputs.length !== MONTHS.length
+    !worthEl ||
+    !stakes ||
+    !stakesUp ||
+    !readout ||
+    !reachEl ||
+    !titlePanel ||
+    !zoomBox ||
+    !monthBox ||
+    monthKeys.length !== MONTHS.length
   )
     return;
 
-  const readout = q<HTMLElement>("[data-daylist-readout]");
-  const worthEl = q<HTMLElement>("[data-daylist-worth]");
   const announce = q<HTMLElement>("[data-daylist-announce]");
-  const rollSlot = q<HTMLElement>("[data-daylist-roll]");
   const metaEl = q<HTMLElement>("[data-daylist-meta]");
-  const titleEl = q<HTMLElement>("[data-daylist-title]");
-  const board = q<HTMLElement>("[data-daylist-board]");
-  const playArea = q<HTMLElement>("[data-daylist-play]");
+  const boardTitle = q<HTMLElement>("[data-daylist-title]");
   const modes = q<HTMLElement>("[data-daylist-modes]");
   const zoomInBtn = q<HTMLButtonElement>('[data-daylist-zoom="in"]');
   const zoomOutBtn = q<HTMLButtonElement>('[data-daylist-zoom="out"]');
   const viewBtn = q<HTMLButtonElement>("[data-daylist-view]");
-  const scaleEl = q<HTMLElement>("[data-daylist-scale]");
-  const wheelHint = q<HTMLElement>("[data-daylist-wheelhint]");
+  const howKey = q<HTMLButtonElement>("[data-daylist-how]");
+  const howPanel = q<HTMLElement>("[data-daylist-howpanel]");
+  const howRing = q<HTMLCanvasElement>("[data-daylist-howring]");
+  const howClose = q<HTMLButtonElement>("[data-daylist-how-close]");
+  const sheet = q<HTMLDialogElement>("[data-daylist-sheet]");
+  const sheetClose = q<HTMLButtonElement>("[data-daylist-sheet-close]");
+  const rollSlot = q<HTMLElement>("[data-daylist-roll]");
   const credits = q<HTMLDetailsElement>("[data-daylist-credits]");
   const creditList = q<HTMLElement>("[data-daylist-credit-list]");
 
   const day = todayNumber();
   const daily = ROUNDS[day % ROUNDS.length];
+  const isDark = () => document.documentElement.classList.contains("dark");
+  const coarse = window.matchMedia("(pointer: coarse)");
 
   let mode: Mode = "daily";
   let round = daily;
   let lines = 1;
-  // Slots showing a species. It matches `lines` except while the answer is
-  // landing, when the species still hidden wait for the boundary.
-  let shown = 1;
   let pin: LonLat | null = null;
   let month: number | null = null;
   let done = false;
-  // How much of the answer the map shows, 0 to 1: the line from the pin, then
-  // the boundary. Both stay at 1 unless the reveal is playing.
-  let lineT = 1;
-  let boxT = 1;
-  // Bumped whenever a round loads, so a reveal still playing for the last
+  let result: Scored | null = null;
+  // Bumped whenever a round loads, so anything still playing for the last
   // round stops touching the board.
   let generation = 0;
   // True from "Lock it in" until the answer has landed on the map.
   let revealing = false;
-  // The verdict stamped on the map once the answer is down.
-  let verdictStamp: HTMLElement | null = null;
-  // Room the answer's framing keeps clear for that stamp, when a corner alone
-  // can't keep it off the answer.
+  // Room the answer's framing keeps clear of the panels over the map.
   let answerRoom: Inset = {};
   let extraPool: Round[] | null = null;
   let extra = readExtra(readStore(EXTRA_KEY), day);
   // The pin dropping in, its rings, and the press on Lock it in.
   const pins = createPinMotion();
 
+  let phone = false;
+  let rings: RingState[] = [];
+  let tints: Tint[] | null = null;
+  let pinfo: (PhotoInfo | null)[] = [];
+  // The hand is dealt: the photos are in, or have had their chance.
+  let ready = false;
+  /** The species whose card the mouse is on, its ring drawn thicker. */
+  let hot: number | null = null;
+  /** Where the bullseye is, and where it wants to be. */
+  let centre: LonLat | null = null;
+  let pointerAt: LonLat | null = null;
+  let restAt: LonLat | null = null;
+  let lastFrame = 0;
+  /** The first ring opening out past its size and back as a list starts. */
+  let breath: { t0: number; d: number } | null = null;
+  let ans: Answer | null = null;
+  let answerShown = false;
+  let lay: (Lay | undefined)[] = [];
+  /**
+   * The part of the map's canvas on screen, in its CSS pixels: all of it,
+   * except on a phone after the answer, when it runs past both sides.
+   */
+  let vis: { x0: number; y0: number; x1: number; y1: number } | null = null;
+  /** The map's height while playing on a phone, which the answer never goes under. */
+  let playH = 0;
+  /** A token's photo in map pixels, odd so it has a middle; the mock's 9 read as a blob of colour. */
+  const TOK = 11;
+
+  const tintOf = (i: number): Tint => tints?.[i] ?? ringFor(i);
+
   /* ---------------------------------------------------------------- map */
 
+  // The draw pass reads its frame back every time, so the canvas keeps its
+  // pixels where the CPU can reach them.
+  canvas.getContext("2d", { willReadFrequently: true });
   const map = createWorldMap({
     canvas,
     surface,
     onTap: (at) => placePin(at, "tap"),
-    focusPoint: () => pin,
-    drawOverlay: drawGame,
+    focusPoint: () => pin ?? centre ?? null,
+    drawOverlay: draw,
     onView: syncMapControls,
-    onWheelHint: showWheelHint,
+    wheelZoom: true,
+    colours: () => ENCODED,
+    pixelScale: () => (phone ? 0.5 : 0.25),
+    maxAspect: MAX_ASPECT,
+    shownWidth: () => (vis ? vis.x1 - vis.x0 : Infinity),
   });
   if (!map) return;
-  // The answer's labels are Libre Franklin; draw again once it's in.
-  void canvasFontReady().then(() => map.redraw());
+  const m: WorldMap = map;
 
-  /** The pin and the place together, which the reveal frames. */
+  const visNow = () => vis ?? { x0: 0, y0: 0, x1: m.width, y1: m.height };
+
+  let frame: MapFrame | null = null;
+  let classes: Uint8Array | null = null;
+  let geo: Geo | null = null;
+
+  /** Recolour the map's frame into the palette, then draw the game on it. */
+  function draw(ctx: CanvasRenderingContext2D, wm: WorldMap): void {
+    const c = ctx.canvas;
+    const W = c.width;
+    const H = c.height;
+    if (!W || !H || !wm.width) return;
+    const P = isDark() ? PALETTES.night : PALETTES.day;
+    const img = ctx.getImageData(0, 0, W, H);
+    if (!classes || classes.length !== W * H) classes = new Uint8Array(W * H);
+    const s = W / wm.width;
+    const f: MapFrame = { d: img.data, W, H, P, s };
+    recolour(f, classes, wm.project(0, -90).y * s, gridFor(wm, W, H, s));
+    frame = f;
+    const busy = drawGame(wm);
+    ctx.putImageData(img, 0, 0);
+    frame = null;
+    if (busy) wm.redraw();
+  }
+
+  let grid: Grid | null = null;
+  /**
+   * The frame's columns and rows the graticule runs along, as far apart as
+   * the map's own (graticuleStep), and on past the world's edges into the
+   * sea on a wide screen.
+   */
+  function gridFor(wm: WorldMap, W: number, H: number, s: number): Grid {
+    const cols =
+      grid?.cols.length === W ? grid.cols.fill(0) : new Uint8Array(W);
+    const rows =
+      grid?.rows.length === H ? grid.rows.fill(0) : new Uint8Array(H);
+    const step = graticuleStep(wm.worldWidth / 360);
+    const nw = wm.unproject(0, 0);
+    const se = wm.unproject(wm.width, wm.height);
+    for (
+      let lon = Math.ceil(nw.lon / step) * step;
+      lon <= se.lon;
+      lon += step
+    ) {
+      if (Math.abs(lon) % 360 === 180) continue;
+      const x = Math.floor((Math.round(wm.project(lon, 0).x) + 0.5) * s);
+      if (x >= 0 && x < W) cols[x] = 1;
+    }
+    for (
+      let lat = Math.ceil(se.lat / step) * step;
+      lat <= nw.lat;
+      lat += step
+    ) {
+      if (Math.abs(lat) >= 90) continue;
+      const y = Math.floor((Math.round(wm.project(0, lat).y) + 0.5) * s);
+      if (y >= 0 && y < H) rows[y] = 1;
+    }
+    grid = { cols, rows };
+    return grid;
+  }
+
+  /** A place on the frame, in whole frame pixels. */
+  const at = (lon: number, lat: number) => {
+    const p = m.project(lon, lat);
+    return { x: Math.floor(p.x * frame!.s), y: Math.floor(p.y * frame!.s) };
+  };
+  /** A place on the frame, in fractional frame pixels, through the frame's geo. */
+  const fx = (lon: number) => (lon - geo!.lon[0]) / geo!.dlon;
+  const fy = (lat: number) => (lat - geo!.lat[0]) / geo!.dlat;
+  /**
+   * A world narrower than the canvas, with sea either side: a ring is drawn
+   * once round its own middle, carrying on past the world's edge into the
+   * sea, never again a world away (rasterRing's `once`).
+   */
+  let once = false;
+  const narrowWorld = () => m.worldWidth / m.view.k < m.width - 1;
+  /** Its copy a world over, when that's the one on the frame. */
+  function fxIn(lon: number): number {
+    let x = fx(lon);
+    if (once) return x;
+    const world = 360 / geo!.dlon;
+    if (x < -0.5 && x + world <= geo!.W) x += world;
+    else if (x > geo!.W - 0.5 && x - world >= 0) x -= world;
+    return x;
+  }
+  /** A point on a ring, on the same copy of the world as the ring's middle. */
+  function fxNear(lon: number, middle: number): number {
+    let l = lon;
+    while (l - middle > 180) l -= 360;
+    while (middle - l > 180) l += 360;
+    return fxIn(l);
+  }
+  /** A ring's radius in frame pixels, north to south. */
+  const ringPx = (km: number) => km / 111.2 / Math.abs(geo!.dlat);
+
+  /* --------------------------------------------- the rings, frame by frame */
+
+  /** A ring's radius now: it tightens from `from` and snaps a touch past. */
+  function kmAt(g: RingState, t: number): number {
+    const km = g.km ?? 0;
+    if (!g.d || t >= g.t0 + g.d) return km;
+    if (t <= g.t0) return g.from;
+    return g.from + (km - g.from) * easeOutBack((t - g.t0) / g.d, 1.25);
+  }
+  /** The figure on it, which rolls down without the snap. */
+  function labelAt(g: RingState, t: number): number {
+    const km = g.km ?? 0;
+    if (!g.d || t >= g.t0 + g.d) return km;
+    if (t <= g.t0) return g.from;
+    return g.from + (km - g.from) * easeOut((t - g.t0) / g.d);
+  }
+  function breathAt(t: number): number | null {
+    if (!breath) return null;
+    const p = (t - breath.t0) / breath.d;
+    if (p >= 1) {
+      breath = null;
+      return null;
+    }
+    if (p <= 0) return 0.4;
+    if (p < 0.42) return lerp(0.4, 1.14, easeOut(p / 0.42));
+    return lerp(1.14, 1, easeInOut((p - 0.42) / 0.58));
+  }
+  function newestShown(): number | null {
+    let k: number | null = null;
+    rings.forEach((g, i) => {
+      if (g.shown && g.km) k = i;
+    });
+    return k;
+  }
+  function lensTarget(wm: WorldMap): LonLat {
+    if (pin) return pin;
+    if (pointerAt) return pointerAt;
+    if (restAt) return restAt;
+    return wm.unproject(wm.width / 2, wm.height / 2);
+  }
+  /** During the answer each ring slides from the pin to the place, the wider ones a beat behind. */
+  function slideCentre(rank: number, t: number): LonLat {
+    const a = ans!;
+    const p = a.d ? easeInOut((t - a.t0 - rank * a.lag) / a.d) : 1;
+    return {
+      lon: lerp(a.pin.lon, a.to.lon, p),
+      lat: lerp(a.pin.lat, a.to.lat, p),
+    };
+  }
+  const slidingUntil = () => (ans ? ans.t0 + ans.d + 5 * ans.lag : 0);
+
+  function drawGame(wm: WorldMap): boolean {
+    const f = frame!;
+    const P = f.P;
+    const t = now();
+    let busy = false;
+    geo = computeGeo(geo, f.W, f.H, f.s, wm.unproject);
+    once = narrowWorld();
+
+    // The bullseye follows its target on a quick spring, so the lens trails
+    // the mouse by a hair and a moved pin draws its rings across.
+    const want = lensTarget(wm);
+    const dt = lastFrame ? Math.min(50, Math.max(0, t - lastFrame)) : 16;
+    lastFrame = t;
+    if (!centre || reduced()) centre = { ...want };
+    else {
+      const k = 1 - Math.exp(-dt / (pin ? 70 : 30));
+      centre = {
+        lon: lerp(centre.lon, want.lon, k),
+        lat: lerp(centre.lat, want.lat, k),
+      };
+      const gap = Math.hypot(
+        (want.lon - centre.lon) / geo.dlon,
+        (want.lat - centre.lat) / geo.dlat,
+      );
+      if (gap < 0.2) centre = { ...want };
+      else busy = true;
+    }
+
+    const items: Item[] = [];
+    const newest = newestShown();
+    rings.forEach((g, i) => {
+      if (!g.shown || !g.km || !ready) return;
+      let km = kmAt(g, t);
+      if (g.d && t < g.t0 + g.d) busy = true;
+      if (i === 0) {
+        const b = breathAt(t);
+        if (b !== null) {
+          km *= b;
+          busy = true;
+        }
+      }
+      if (ans && ans.settle && t < ans.settle + 700) {
+        const p = (t - ans.settle) / 700;
+        km *=
+          1 + 0.06 * Math.exp(-3.5 * p) * Math.sin(p * Math.PI * 3 + i * 0.7);
+        busy = true;
+      }
+      items.push({
+        i,
+        g,
+        km,
+        labelKm: labelAt(g, t),
+        col: tintOf(i).rgb,
+        rank: 0,
+        c: centre!,
+        rpx: 0,
+      });
+    });
+    const bySize = [...items].sort((a, b) => b.km - a.km);
+    bySize.forEach((it, rank) => (it.rank = bySize.length - 1 - rank));
+    for (const it of items) {
+      it.c = ans ? slideCentre(it.rank, t) : centre!;
+      it.rpx = ringPx(it.km);
+    }
+    if (ans && t < slidingUntil()) busy = true;
+
+    // The rings, widest first so the tight ones sit on top.
+    for (const it of bySize) {
+      if (it.rpx < DOT) continue;
+      const thick = (it.i === newest && !ans) || hot === it.i ? 2 : 1;
+      let tintK = 0;
+      if (it.i === newest && !ans && !done && it.rpx >= 3) {
+        const full = isDark() ? 0.16 : 0.1;
+        tintK = full * clamp((t - it.g.t0) / 220, 0, 1);
+        if (tintK < full) busy = true;
+      }
+      rasterRing(f, geo, it.c, it.km, thick, it.col, tintK, once);
+    }
+    // Rings too small to see at this zoom: a pixel dot for the tightest.
+    const dots = items.filter((it) => it.rpx < DOT);
+    let dotAt: { x: number; y: number } | null = null;
+    const nw = items.find((it) => it.i === newest);
+    if (!dots.length && nw && phone && wm.view.k < 1.5 && nw.rpx < 13) {
+      dotAt = { x: Math.round(fxIn(nw.c.lon)), y: Math.round(fy(nw.c.lat)) };
+    }
+    if (dots.length) {
+      const tight = dots.reduce((a, b) => (b.km < a.km ? b : a));
+      const x = Math.round(fxIn(tight.c.lon));
+      const y = Math.round(fy(tight.c.lat));
+      outlined(
+        f,
+        [
+          [x, y],
+          [x + 1, y],
+          [x, y + 1],
+          [x + 1, y + 1],
+        ],
+        tight.col,
+      );
+      dotAt = { x, y };
+    }
+
+    if (ans) busy = drawAnswerUnder(t) || busy;
+    busy = placeTokens(items, t) || busy;
+    if (ans) drawFinder();
+    if (drawPin()) busy = true;
+
+    // With no pin and no mouse on the map, a small cross marks the lens's middle.
+    if (!pin && !done && !pointerAt) {
+      const x = Math.round(fxIn(centre!.lon));
+      const y = Math.round(fy(centre!.lat));
+      const arms: [number, number][] = [];
+      for (const k of [2, 3])
+        arms.push([x + k, y], [x - k, y], [x, y + k], [x, y - k]);
+      outlined(f, arms, P.ring);
+    }
+
+    placeDom(items, newest, dotAt);
+    return busy;
+  }
+
+  /* ------------------------------------------------------------ the pin */
+
+  /** The pin in its pose from the pin motion, as a sprite of whole pixels. */
+  function drawPin(): boolean {
+    const f = frame!;
+    const P = f.P;
+    const key = { o: P.ink, a: P.pin, h: P.pinHi, d: P.pinLo };
+    const pf = pins.frame(pin);
+    const u = f.s;
+    for (const r of pf.rings) {
+      const p = at(r.at.lon, r.at.lat);
+      const rr = Math.max(2, Math.round(r.r * u * 1.3));
+      circle(f, p.x, p.y, rr, r.alpha > 0.3 ? P.ring : P.dots, r.alpha < 0.42);
+    }
+    for (const l of pf.lifting) {
+      if (l.pose.alpha < 0.3) continue;
+      const p = at(l.at.lon, l.at.lat);
+      sprite(
+        f,
+        PIN,
+        3,
+        7,
+        p.x + Math.round(l.pose.x * u),
+        p.y + Math.round(l.pose.y * u),
+        { o: P.ink, a: P.pinLo, h: P.pin, d: P.pinLo },
+      );
+    }
+    if (pin && pf.pin) {
+      const p = at(pin.lon, pin.lat);
+      const pose = pf.pin;
+      shade(f, p.x - 1, p.y + 1, 0.55);
+      shade(f, p.x, p.y + 1, 0.55);
+      shade(f, p.x + 1, p.y + 1, 0.55);
+      const x = p.x + Math.round(pose.x * u);
+      const y = p.y + Math.round(pose.y * u);
+      if (pose.alpha < 0.15) {
+        // Still too high and faint to show.
+      } else if (pose.sx > 1.05 && pose.sy < 0.95) {
+        sprite(f, PIN_SQUASH, 4, 5, x, y, key);
+      } else if (pose.sx < 0.94) {
+        sprite(f, PIN_PRESS, 3, 6, x, y, key);
+      } else {
+        sprite(f, PIN, 3, 7, x, y, key);
+      }
+    }
+    return pf.busy;
+  }
+
+  /* ---------------------------------------- tokens and tags on the rings */
+
+  const blockCache = { v: -1, rects: [] as Rect[] };
+  let blockVersion = 0;
+  /** The panels over the map, in the map's CSS pixels, which tokens keep clear of. */
+  function blockers(): Rect[] {
+    if (blockCache.v === blockVersion) return blockCache.rects;
+    const r = canvas!.getBoundingClientRect();
+    const els = phone
+      ? [readout, zoomBox]
+      : [
+          titlePanel,
+          stakes,
+          readout,
+          zoomBox,
+          hand,
+          guessPanel,
+          resultSlot,
+          ui!.querySelector(":scope > .dl-banner"),
+          howPanel,
+        ];
+    const rects: Rect[] = [];
+    for (const el of els) {
+      if (!(el instanceof HTMLElement) || el.hidden || !el.isConnected)
+        continue;
+      const b = el.getBoundingClientRect();
+      if (!b.width || !b.height) continue;
+      const style = getComputedStyle(el);
+      if (style.visibility === "hidden" || Number(style.opacity) < 0.1)
+        continue;
+      rects.push({
+        x: b.left - r.left - 8,
+        y: b.top - r.top - 8,
+        w: b.width + 16,
+        h: b.height + 16,
+      });
+    }
+    blockCache.v = blockVersion;
+    blockCache.rects = rects;
+    return rects;
+  }
+
+  /** Put each ring's token on its ring where it clears everything, and draw it. */
+  function placeTokens(items: Item[], t: number): boolean {
+    const f = frame!;
+    const s = f.s;
+    const u = 1 / s;
+    const full = TOK + 4;
+    const half = full / 2;
+    const blocks = blockers().map((b) => ({
+      x: b.x * s,
+      y: b.y * s,
+      w: b.w * s,
+      h: b.h * s,
+    }));
+    if (pin) {
+      const p = at(pin.lon, pin.lat);
+      blocks.push({ x: p.x - 4, y: p.y - 8, w: 9, h: 10 });
+    }
+    const placed: { x: number; y: number }[] = [];
+    lay = [];
+    let busy = false;
+    const newestFirst = [...items].sort((a, b) => b.i - a.i);
+    const V = visNow();
+    for (const it of newestFirst) {
+      const e: Lay = {
+        i: it.i,
+        tok: null,
+        centre: { x: fxIn(it.c.lon), y: fy(it.c.lat) },
+        rpx: it.rpx,
+        css: null,
+        cssCentre: { x: 0, y: 0 },
+        cssR: 0,
+      };
+      lay[it.i] = e;
+      if (it.rpx < full * 0.7) continue;
+      const base = BEARINGS[it.i % BEARINGS.length];
+      for (let step = 0; step < 31; step++) {
+        const off =
+          step === 0 ? 0 : Math.ceil(step / 2) * 12 * (step % 2 ? 1 : -1);
+        const qd = destination(it.c.lat, it.c.lon, base + off, it.km);
+        const p = {
+          x: Math.round(fxNear(qd.lon, it.c.lon)),
+          y: Math.round(fy(qd.lat)),
+        };
+        const me = { x: p.x - half, y: p.y - half, w: full, h: full };
+        const inside =
+          me.x >= V.x0 * s + 1 &&
+          me.y >= V.y0 * s + 1 &&
+          me.x + me.w <= V.x1 * s - 1 &&
+          me.y + me.h <= V.y1 * s - 1;
+        if (!inside || blocks.some((b) => meets(me, b))) continue;
+        if (
+          !placed.every(
+            (o) => Math.abs(o.x - p.x) > full || Math.abs(o.y - p.y) > full,
+          )
+        ) {
+          continue;
+        }
+        e.tok = p;
+        placed.push(p);
+        break;
+      }
+    }
+    for (const it of newestFirst) {
+      const e = lay[it.i]!;
+      const g = it.g;
+      if (!e.tok || g.flying) continue;
+      if (!g.landed || t < g.landed) continue;
+      const since = t - g.landed;
+      const grow = since >= 0 && since < 90 ? 1 : 0;
+      if (since < 320) busy = true;
+      drawToken(
+        f,
+        e.tok.x,
+        e.tok.y,
+        TOK,
+        tintOf(it.i).rgb,
+        tokenPixels(pinfo[it.i], TOK),
+        grow,
+      );
+      // It lands with a ring of pixels thrown off round it.
+      if (since > 40 && since < 300) {
+        const k = (since - 40) / 260;
+        circle(
+          f,
+          e.tok.x,
+          e.tok.y,
+          Math.round(half + 1 + k * 4),
+          k < 0.6 ? f.P.ring : tintOf(it.i).rgb,
+          k > 0.35,
+        );
+      }
+    }
+    // Token and centre, in CSS pixels, for the flight and the tags.
+    for (const e of lay) {
+      if (!e) continue;
+      e.css = e.tok ? { x: (e.tok.x + 0.5) * u, y: (e.tok.y + 0.5) * u } : null;
+      e.cssCentre = { x: (e.centre.x + 0.5) * u, y: (e.centre.y + 0.5) * u };
+      e.cssR = e.rpx * u;
+    }
+    return busy;
+  }
+
+  const labelEls: HTMLElement[] = [];
+  function labelEl(i: number): HTMLElement {
+    let el = labelEls[i];
+    if (!el || !el.isConnected) {
+      el = document.createElement("span");
+      el.className = "dl-rk dl-px15";
+      labels!.append(el);
+      labelEls[i] = el;
+    }
+    return el;
+  }
+  let hintEl: HTMLElement | null = null;
+  const widths = new Map<string, number>();
+  let measurer: CanvasRenderingContext2D | null = null;
+  function textW(text: string, font: string): number {
+    const key = `${font}|${text}`;
+    let w = widths.get(key);
+    if (w === undefined) {
+      measurer ??= document.createElement("canvas").getContext("2d");
+      if (!measurer) return text.length * 9;
+      measurer.font = font;
+      w = Math.ceil(measurer.measureText(text).width);
+      widths.set(key, w);
+    }
+    return w;
+  }
+
+  /** Each ring's km on its tag, the zoom hint, and the readout by the score. */
+  function placeDom(
+    items: Item[],
+    newest: number | null,
+    dotAt: { x: number; y: number } | null,
+  ): void {
+    const u = 1 / frame!.s;
+    const V = visNow();
+    const blocks = blockers().slice();
+    if (pin) {
+      const p = m.project(pin.lon, pin.lat);
+      blocks.push({ x: p.x - 16, y: p.y - 34, w: 32, h: 40 });
+    }
+    for (const e of lay) {
+      if (e?.css)
+        blocks.push({ x: e.css.x - 26, y: e.css.y - 26, w: 52, h: 52 });
+    }
+    const taken: Rect[] = [];
+    const fontPx = phone ? 15 : 18;
+    const font = `${fontPx}px "Jersey 15"`;
+    const showing = new Set<number>();
+    const fits = (b: Rect) =>
+      b.x >= V.x0 + 4 &&
+      b.y >= V.y0 + 4 &&
+      b.x + b.w <= V.x1 - 4 &&
+      b.y + b.h <= V.y1 - 4;
+    if (!done && ready) {
+      const newestFirst = [...items].sort((a, b) => b.i - a.i);
+      for (const it of newestFirst) {
+        const e = lay[it.i];
+        if (!e) continue;
+        const g = it.g;
+        // Before a ring's photo lands its figure already rolls where it will be.
+        if (!e.css && it.i !== newest) continue;
+        if (e.css && !g.flying && !(g.landed && now() >= g.landed)) continue;
+        if (!e.css && it.rpx < DOT) continue;
+        const text = `${count(twoFigures(it.labelKm))} km`;
+        const w = textW(text, font) + (phone ? 10 : 14);
+        const h = phone ? 20 : 24;
+        const tokR = (TOK + 4) * u * 0.5;
+        let spots: [number, number][];
+        if (e.css) {
+          const { x, y } = e.css;
+          spots = [
+            [x + tokR + 6, y - h / 2],
+            [x - tokR - 6 - w, y - h / 2],
+            [x - w / 2, y - tokR - 6 - h],
+            [x - w / 2, y + tokR + 6],
+          ];
+        } else {
+          const { x, y } = e.cssCentre;
+          const r = e.cssR;
+          spots = [
+            [x + r * 0.74 + 8, y - r * 0.74 - h],
+            [x - r * 0.74 - 8 - w, y - r * 0.74 - h],
+            [x + r * 0.74 + 8, y + r * 0.74],
+            [x - r * 0.74 - 8 - w, y + r * 0.74],
+          ];
+        }
+        const box = ([sx, sy]: [number, number]) => ({ x: sx, y: sy, w, h });
+        const free = (b: Rect) =>
+          !blocks.some((o) => meets(b, o)) && !taken.some((o) => meets(b, o));
+        let spot = spots.map(box).find((b) => fits(b) && free(b));
+        if (!spot && it.i === newest) {
+          spot = spots
+            .map(box)
+            .find((b) => fits(b) && !taken.some((o) => meets(b, o)));
+        }
+        if (!spot) continue;
+        taken.push(spot);
+        const el = labelEl(it.i);
+        el.hidden = false;
+        if (el.textContent !== text) el.textContent = text;
+        el.style.color = tintOf(it.i).hex;
+        el.classList.toggle("is-hot", hot === it.i);
+        el.style.transform = `translate(${snapTo(spot.x, u)}px, ${snapTo(spot.y, u)}px)`;
+        showing.add(it.i);
+      }
+    }
+    labelEls.forEach((el, i) => {
+      if (el && !showing.has(i)) el.hidden = true;
+    });
+
+    // Rings too small to see: a word on how to get in close.
+    if (dotAt && !done && ready) {
+      if (!hintEl) {
+        hintEl = document.createElement("span");
+        hintEl.className = "dl-rh dl-px15";
+        labels!.append(hintEl);
+      }
+      const words =
+        phone || coarse.matches ? "Pinch to zoom in" : "Scroll to zoom in";
+      if (hintEl.textContent !== words) hintEl.textContent = words;
+      const w = textW(words, font) + (phone ? 10 : 14);
+      const h = phone ? 20 : 24;
+      const x = (dotAt.x + 0.5) * u;
+      const y = (dotAt.y + 0.5) * u;
+      const spots = [
+        [x + 14, y + 8],
+        [x - 14 - w, y + 8],
+        [x + 14, y - 8 - h - 30],
+        [x - 14 - w, y - 8 - h - 30],
+      ].map(([sx, sy]) => ({ x: sx, y: sy, w, h }));
+      const spot =
+        spots.find(
+          (b) =>
+            fits(b) &&
+            !blocks.some((o) => meets(b, o)) &&
+            !taken.some((o) => meets(b, o)),
+        ) ??
+        spots.find(fits) ??
+        spots[0];
+      hintEl.hidden = false;
+      hintEl.style.transform = `translate(${snapTo(spot.x, u)}px, ${snapTo(spot.y, u)}px)`;
+    } else if (hintEl) hintEl.hidden = true;
+
+    // The readout by the score: the newest ring's figure, rolling with it.
+    const it = items.find((x) => x.i === newest);
+    if (it) {
+      const text = count(twoFigures(it.labelKm));
+      if (reachEl!.textContent !== text) reachEl!.textContent = text;
+      readout!.style.setProperty("--g-c", tintOf(it.i).hex);
+    } else if (ready && newest === null && reachEl!.textContent !== "?") {
+      reachEl!.textContent = "?";
+    }
+
+    if (ans && answerShown) placeAnswerLabels();
+  }
+
+  /* ------------------------------------------------------------ the answer */
+
+  /** The place's box on the frame, never smaller than 5 pixels. */
+  function boxPx() {
+    const b = round.bbox;
+    const a = at(b.w, b.n);
+    const z = at(b.e, b.s);
+    const grow = (lo: number, hi: number): [number, number] => {
+      const need = 5 - (hi - lo);
+      return need > 0
+        ? [lo - Math.ceil(need / 2), hi + Math.floor(need / 2)]
+        : [lo, hi];
+    };
+    const [x0, x1] = grow(a.x, z.x);
+    const [y0, y1] = grow(a.y, z.y);
+    return { x0, y0, x1, y1 };
+  }
+
+  /** The line the bullseye leaves behind it, and the boundary inking in. */
+  function drawAnswerUnder(t: number): boolean {
+    const f = frame!;
+    const a = ans!;
+    const P = f.P;
+    let busy = false;
+    const slideP = a.d ? easeInOut((t - a.t0) / a.d) : 1;
+    if (slideP < 1) busy = true;
+    if (a.frac > 0 && pin) {
+      const k = Math.min(slideP, a.frac);
+      const from = at(a.pin.lon, a.pin.lat);
+      const to = at(lerp(a.pin.lon, a.to.lon, k), lerp(a.pin.lat, a.to.lat, k));
+      const pts = line(from.x, from.y, to.x, to.y);
+      const phase = Math.floor(a.march / 90) % 4;
+      // The short way round leaves one side of the map and comes back in at
+      // the other, so the line is drawn a world over each way too.
+      const world = Math.round(360 / Math.abs(geo!.dlon));
+      for (const shift of once ? [0] : [0, world, -world]) {
+        for (let i = 0; i < pts.length; i++) {
+          if ((i + 4 - phase) % 4 < 2) {
+            px(f, pts[i][0] + shift, pts[i][1] + 1, P.ink);
+            px(f, pts[i][0] + shift, pts[i][1], P.line);
+          }
+        }
+      }
+    }
+    if (a.boxT > 0) {
+      const { x0, y0, x1, y1 } = boxPx();
+      const per: [number, number][] = [];
+      for (let x = x0; x <= x1; x++) per.push([x, y0]);
+      for (let y = y0 + 1; y <= y1; y++) per.push([x1, y]);
+      for (let x = x1 - 1; x >= x0; x--) per.push([x, y1]);
+      for (let y = y1 - 1; y > y0; y--) per.push([x0, y]);
+      const n = Math.round(per.length * Math.min(1, a.boxT));
+      // It inks in from the top middle, both ways round at once.
+      const mid = Math.floor((x1 - x0) / 2);
+      const shown: [number, number][] = [];
+      for (let k = 0; k < Math.ceil(n / 2); k++) {
+        shown.push(per[(mid + k) % per.length]);
+        shown.push(per[(mid - k + per.length * 2) % per.length]);
+      }
+      outlined(f, shown, P.bound);
+    }
+    return busy;
+  }
+
+  /** The red finder: four brackets close in, pulse as they lock, grow ticks. */
+  function drawFinder(): void {
+    const a = ans!;
+    if (!(a.findT > 0)) return;
+    const f = frame!;
+    const { x0, y0, x1, y1 } = boxPx();
+    const cx = (x0 + x1) / 2;
+    const cy = (y0 + y1) / 2;
+    const tw = Math.max(4, (x1 - x0) / 2 + 3);
+    const th = Math.max(4, (y1 - y0) / 2 + 3);
+    const start = Math.max(f.W, f.H) * 0.62;
+    const k = easeOutBack(a.findT, 1.1);
+    const pulse = Math.round(
+      Math.sin(Math.PI * a.lockT) * Math.max(1, Math.min(tw, th) * 0.18),
+    );
+    // The snap past the place is two pixels at most, so it never swallows it.
+    const hw = Math.round(Math.max(tw - 2, lerp(start, tw, k))) - pulse;
+    const hh = Math.round(Math.max(th - 2, lerp(start, th, k))) - pulse;
+    const arm = Math.round(clamp(Math.min(hw, hh) * 0.45, 2, 5));
+    const pts: [number, number][] = [];
+    for (const [sx, sy] of [
+      [-1, -1],
+      [1, -1],
+      [1, 1],
+      [-1, 1],
+    ]) {
+      const x = Math.round(cx + sx * hw);
+      const y = Math.round(cy + sy * hh);
+      for (let qd = 0; qd <= arm; qd++) {
+        pts.push([x - sx * qd, y]);
+        if (qd) pts.push([x, y - sy * qd]);
+      }
+    }
+    const tick =
+      a.lockT > 0.25
+        ? Math.round(
+            Math.min(3, Math.min(hw, hh) * 0.4) *
+              clamp((a.lockT - 0.25) / 0.6, 0, 1),
+          )
+        : 0;
+    for (let qd = 1; qd <= tick; qd++) {
+      pts.push([Math.round(cx), Math.round(cy - hh + qd)]);
+      pts.push([Math.round(cx), Math.round(cy + hh - qd)]);
+      pts.push([Math.round(cx - hw + qd), Math.round(cy)]);
+      pts.push([Math.round(cx + hw - qd), Math.round(cy)]);
+    }
+    outlined(f, pts, f.P.box);
+    const u = 1 / f.s;
+    a.finder = {
+      x: (cx - hw) * u,
+      y: (cy - hh) * u,
+      w: (2 * hw + 1) * u,
+      h: (2 * hh + 1) * u,
+    };
+  }
+
+  /** The place's name above the finder and its coordinates under it, clear of everything. */
+  function placeAnswerLabels(): void {
+    const fb = ans?.finder;
+    if (!fb) return;
+    const u = 1 / (frame?.s ?? 0.25);
+    const V = visNow();
+    const r = canvas!.getBoundingClientRect();
+    const blocks: Rect[] = [];
+    for (const el of [
+      ui!.querySelector(":scope > .dl-banner"),
+      resultSlot,
+      stakes,
+      zoomBox,
+    ]) {
+      if (!(el instanceof HTMLElement) || el.hidden || !el.offsetWidth)
+        continue;
+      const b = el.getBoundingClientRect();
+      blocks.push({
+        x: b.left - r.left - 6,
+        y: b.top - r.top - 6,
+        w: b.width + 12,
+        h: b.height + 12,
+      });
+    }
+    if (pin) {
+      const p = m.project(pin.lon, pin.lat);
+      blocks.push({ x: p.x - 16, y: p.y - 36, w: 32, h: 42 });
+    }
+    // The photo tokens on the rings round the place.
+    for (const e of lay) {
+      if (e?.css)
+        blocks.push({ x: e.css.x - 18, y: e.css.y - 18, w: 36, h: 36 });
+    }
+    const fits = (b: Rect) =>
+      b.x >= V.x0 + 4 &&
+      b.y >= V.y0 + 4 &&
+      b.x + b.w <= V.x1 - 4 &&
+      b.y + b.h <= V.y1 - 4;
+    const clampIn = (b: Rect): Rect => ({
+      ...b,
+      x: clamp(b.x, V.x0 + 4, V.x1 - 4 - b.w),
+      y: clamp(b.y, V.y0 + 4, V.y1 - 4 - b.h),
+    });
+    const pick = (cands: Rect[], also: Rect[]) =>
+      cands
+        .map(clampIn)
+        .find(
+          (b) =>
+            fits(b) &&
+            !blocks.some((o) => meets(b, o)) &&
+            !also.some((o) => meets(b, o)),
+        ) ?? clampIn(cands[0]);
+    const cx = fb.x + fb.w / 2;
+    const taken: Rect[] = [fb];
+    const coordsEl = labels!.querySelector<HTMLElement>(".dl-coords");
+    let cBox: Rect | null = null;
+    if (coordsEl && !coordsEl.hidden) {
+      const w = coordsEl.offsetWidth;
+      const h = coordsEl.offsetHeight;
+      cBox = pick(
+        [
+          { x: cx - w / 2, y: fb.y + fb.h + 8, w, h },
+          { x: cx - w / 2, y: fb.y - 8 - h, w, h },
+          { x: fb.x + fb.w + 10, y: fb.y + fb.h / 2 - h / 2, w, h },
+          { x: fb.x - 10 - w, y: fb.y + fb.h / 2 - h / 2, w, h },
+        ],
+        taken,
+      );
+      taken.push(cBox);
+      coordsEl.style.transform = `translate(${snapTo(cBox.x, u)}px, ${snapTo(cBox.y, u)}px)`;
+    }
+    const name = labels!.querySelector<HTMLElement>(".dl-place");
+    if (name && !name.hidden) {
+      const w = name.offsetWidth;
+      const h = name.offsetHeight;
+      const below =
+        cBox && cBox.y > fb.y ? cBox.y + cBox.h + 8 : fb.y + fb.h + 10;
+      const above = cBox && cBox.y < fb.y ? cBox.y - 10 - h : fb.y - 12 - h;
+      const b = pick(
+        [
+          { x: cx - w / 2, y: above, w, h },
+          { x: cx - w / 2, y: below, w, h },
+          { x: fb.x + fb.w + 12, y: fb.y - h / 2, w, h },
+          { x: fb.x - 12 - w, y: fb.y - h / 2, w, h },
+        ],
+        taken,
+      );
+      name.style.transform = `translate(${snapTo(b.x, u)}px, ${snapTo(b.y, u)}px)`;
+    }
+  }
+
+  /* ------------------------------------------------------------ the pin */
+
+  /** How close a tap can land to the pin and only shift it, CSS px. */
+  const NEAR_PX = 8;
+
+  /**
+   * Put the pin at `at`. A tap drops it in (or, right on top of the pin,
+   * just shifts it and rings); an arrow key slides it; the key press that
+   * places the first pin drops it like a tap.
+   */
+  function placePin(where: LonLat, how: "tap" | "key"): void {
+    if (done || revealing) return;
+    const was = pin;
+    pin = { lat: clamp(where.lat, -85, 85), lon: clamp(where.lon, -180, 180) };
+    if (!was) {
+      pins.drop(pin, null);
+    } else if (how === "key") {
+      pins.slide(pin);
+    } else {
+      const a = m.project(was.lon, was.lat);
+      const b = m.project(pin.lon, pin.lat);
+      if (Math.hypot(a.x - b.x, a.y - b.y) <= NEAR_PX) pins.tapNear(pin);
+      else pins.drop(pin, was);
+    }
+    surface!.classList.add("is-placed");
+    blockVersion++;
+    syncLock();
+    persist();
+    m.redraw();
+    if (announce && how === "tap")
+      announce.textContent = `Pin at ${coords(pin)}.`;
+  }
+
+  // Keyboard guessing: the pin starts in the middle of the lens and arrows
+  // nudge it, by less the further in you've zoomed. Once the answer is in,
+  // arrows pan the map instead, so the keyboard can look around it too.
+  surface.addEventListener("keydown", (event) => {
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+    if (done) {
+      const pan: Record<string, [number, number]> = {
+        ArrowUp: [0, -1],
+        ArrowDown: [0, 1],
+        ArrowLeft: [-1, 0],
+        ArrowRight: [1, 0],
+      };
+      const dir = pan[event.key];
+      if (!dir || m.view.k <= 1.001) return;
+      event.preventDefault();
+      const by = (event.shiftKey ? 0.5 : 0.15) * m.width;
+      m.panBy(dir[0] * by, dir[1] * by);
+      return;
+    }
+    const step = Math.max(0.01, (event.shiftKey ? 15 : 4) / m.view.k);
+    let next = pin;
+    if (!next) {
+      if (
+        !event.key.startsWith("Arrow") &&
+        event.key !== "Enter" &&
+        event.key !== " "
+      ) {
+        return;
+      }
+      next = centre ?? restAt ?? m.unproject(m.width / 2, m.height / 2);
+    } else if (event.key === "ArrowUp")
+      next = { ...next, lat: next.lat + step };
+    else if (event.key === "ArrowDown")
+      next = { ...next, lat: next.lat - step };
+    else if (event.key === "ArrowLeft")
+      next = { ...next, lon: next.lon - step };
+    else if (event.key === "ArrowRight")
+      next = { ...next, lon: next.lon + step };
+    else return;
+    event.preventDefault();
+    placePin(next, "key");
+    if (pin) {
+      m.show(pin);
+      if (announce) announce.textContent = `Pin at ${coords(pin)}.`;
+    }
+  });
+
+  // The lens: before a pin, the rings follow the mouse over the map.
+  const localOf = (e: PointerEvent) => {
+    const r = canvas.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  };
+  surface.addEventListener("pointermove", (e) => {
+    if (e.pointerType === "touch") return;
+    const p = localOf(e);
+    const where = m.unproject(p.x, p.y);
+    // Off the world's edge on a wide screen the lens waits at the edge.
+    pointerAt = {
+      lat: clamp(where.lat, -85, 85),
+      lon: clamp(where.lon, -180, 180),
+    };
+    if (!pin && !done) m.redraw();
+  });
+  surface.addEventListener("pointerleave", (e) => {
+    if (e.pointerType === "touch") return;
+    if (pointerAt) restAt = pointerAt;
+    pointerAt = null;
+    m.redraw();
+  });
+
+  /* ------------------------------------------------------------ layout */
+
+  function layout(): void {
+    const vw = document.documentElement.clientWidth || innerWidth;
+    const vh = root.clientHeight || innerHeight;
+    const wasPhone = phone;
+    phone = vw < PHONE_BELOW;
+    root.classList.toggle("is-phone", phone);
+    for (const el of [canvas!, labels!]) {
+      el.style.left = "";
+      el.style.width = "";
+      el.style.right = "";
+    }
+    surface!.style.marginTop = "";
+    vis = null;
+    root.style.removeProperty("--post-h");
+    if (phone && done) {
+      layoutAnswerPhone();
+      return;
+    }
+    let w: number;
+    let h: number;
+    if (phone) {
+      // As wide as the phone, with the hand and the keys under it all on one
+      // screen: the map takes what's left, between 2:1 and 1.6:1, and the
+      // cards get shorter on a short screen before the map goes under 2:1.
+      w = Math.floor(vw / 4) * 4;
+      const minH = Math.round(w / 2 / 4) * 4;
+      root.style.removeProperty("--card-h");
+      const rest = () =>
+        titlePanel!.offsetHeight +
+        hand!.offsetHeight +
+        guessPanel!.offsetHeight +
+        68;
+      let free = vh - rest();
+      if (free < minH) {
+        const cardH = clamp(152 - Math.ceil((minH - free) / 2), 112, 152);
+        root.style.setProperty("--card-h", `${cardH}px`);
+        free = vh - rest();
+      }
+      h = clamp(Math.floor(free / 4) * 4, minH, Math.round(w / 1.6 / 4) * 4);
+      playH = h;
+      surface!.style.left = "";
+      surface!.style.top = "";
+      surface!.style.marginLeft = `${Math.floor((vw - w) / 2)}px`;
+    } else {
+      // The whole screen; a screen taller than 1.6:1 gets a 1.6:1 map with
+      // sea under it, and one wider than 2:1 a 2:1 world with sea either side.
+      w = vw;
+      h = vw / vh < 1.6 ? vw / 1.6 : vh;
+      w = Math.ceil(w / 4) * 4;
+      h = Math.ceil(h / 4) * 4;
+      surface!.style.left = `${Math.floor((vw - w) / 2)}px`;
+      surface!.style.top = "0px";
+      surface!.style.marginLeft = "";
+    }
+    surface!.style.width = `${w}px`;
+    surface!.style.height = `${h}px`;
+    root.style.setProperty("--stakes-w", `${stakes!.offsetWidth}px`);
+    if (phone) {
+      // The zoom keys sit in the map's bottom right corner, the readout top left.
+      const top = surface!.offsetTop;
+      root.style.setProperty("--map-top", `${top + h - 34 - 4 - 10}px`);
+      root.style.setProperty("--read-top", `${top + 8}px`);
+    }
+    blockVersion++;
+    if (wasPhone !== phone && !done) void m.reset(false);
+    m.redraw();
+  }
+
+  /**
+   * A phone after the answer: the postcard docks at the foot of the screen
+   * and the map takes everything between it and the verdict. The map keeps
+   * its 1.6:1 shape, so a taller map runs wider than the phone and its sides
+   * go past the screen's edges; only the middle shows (`shownWidth`). An
+   * answer that spans more of the world than that middle can hold even at
+   * the widest zoom gets a shorter map, so the pin and the place both show.
+   */
+  function layoutAnswerPhone(): void {
+    const vw = document.documentElement.clientWidth || innerWidth;
+    const vh = root.clientHeight || innerHeight;
+    const w = Math.floor(vw / 4) * 4;
+    const shown = !resultSlot!.hidden;
+    if (!shown) {
+      resultSlot!.hidden = false;
+      resultSlot!.style.visibility = "hidden";
+    }
+    const postH = resultSlot!.offsetHeight;
+    if (!shown) {
+      resultSlot!.hidden = true;
+      resultSlot!.style.visibility = "";
+    }
+    root.style.setProperty("--post-h", `${postH}px`);
+    surface!.style.marginTop = "";
+    const top = surface!.offsetTop;
+    const least = playH || Math.round(w / 1.6 / 4) * 4;
+    const avail = Math.floor((vh - top - postH - 30) / 4) * 4;
+    let h = Math.max(least, avail);
+    const b = answerBox();
+    const across = (b.e - b.w) / 360;
+    // The pin and the place at the widest zoom, inside the padding and the
+    // zoom keys' strip (room() on a phone).
+    const spare = w - 2 * 28 - 52;
+    if (across > 0 && h * 1.6 * across > spare) {
+      h = Math.max(least, Math.floor(spare / across / 1.6 / 4) * 4);
+    }
+    const cw = Math.max(w, Math.round((h * 1.6) / 4) * 4);
+    const left = Math.round((w - cw) / 2 / 2) * 2;
+    surface!.style.width = `${w}px`;
+    surface!.style.height = `${h}px`;
+    surface!.style.marginLeft = `${Math.floor((vw - w) / 2)}px`;
+    for (const el of [canvas!, labels!]) {
+      el.style.left = `${left}px`;
+      el.style.width = `${cw}px`;
+      el.style.right = "auto";
+    }
+    vis = { x0: -left, y0: 0, x1: -left + w, y1: h };
+    // A shorter map sits in the middle of the space it was given.
+    const drop = Math.max(0, Math.floor((avail - h) / 2 / 4) * 4);
+    if (drop) {
+      const base = parseFloat(getComputedStyle(surface!).marginTop) || 0;
+      surface!.style.marginTop = `${base + drop}px`;
+    }
+    root.style.setProperty("--map-top", `${top + drop + h - 34 - 4 - 10}px`);
+    blockVersion++;
+    m.redraw();
+  }
+
+  /** The pin and the place together, which the answer frames. */
   function answerBox(): Box {
     const b = round.bbox;
     if (!pin) return b;
@@ -926,92 +1999,39 @@ export function initDayList(root: HTMLElement): void {
     };
   }
 
-  function drawGame(ctx: CanvasRenderingContext2D, m: WorldMap): void {
-    const { ink, ink2, paper } = m.palette;
-    const at = m.project;
-    const box = boundaryRect(round.bbox, at);
-    let middle: Point | null = null;
-    let lineLength = 0;
-
-    // The line leaves from the rim of the pin rather than its middle.
-    if (done && pin && lineT > 0) {
-      const { from, to, shifts } = answerLine(
-        pin,
-        round.bbox,
-        at,
-        m.worldWidth,
-      );
-      const length = Math.hypot(to.x - from.x, to.y - from.y);
-      if (length > 8) {
-        const ux = (to.x - from.x) / length;
-        const uy = (to.y - from.y) / length;
-        const reach = 7 + (length - 7) * lineT;
-        const a = { x: from.x + ux * 7, y: from.y + uy * 7 };
-        const b = { x: from.x + ux * reach, y: from.y + uy * reach };
-        ctx.strokeStyle = ink2;
-        ctx.lineWidth = 1.4;
-        ctx.setLineDash([4, 4]);
-        ctx.beginPath();
-        for (const shift of shifts) {
-          ctx.moveTo(a.x + shift, a.y);
-          ctx.lineTo(b.x + shift, b.y);
-        }
-        ctx.stroke();
-        ctx.setLineDash([]);
-        middle = { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 };
-        lineLength = length;
-      }
-    }
-
-    // Show the real boundary, not just a dot, so the scoring is legible. While
-    // the reveal plays it strokes in from its top-left corner.
-    if (done && boxT > 0) {
-      const perimeter = 2 * (box.w + box.h);
-      ctx.strokeStyle = ink;
-      ctx.lineWidth = 1.6;
-      if (boxT < 1) ctx.setLineDash([perimeter * boxT, perimeter]);
-      ctx.strokeRect(box.x, box.y, box.w, box.h);
-      ctx.setLineDash([]);
-    }
-
-    // The rings taps left, any old pin lifting out, then the pin in its pose.
-    // While one of them moves, the map draws another frame.
-    if (pins.draw(ctx, m.project, ink, pin)) m.redraw();
-
-    if (!done || boxT < 1) return;
-
-    // Labels sit on a rim of paper so they read over coastlines and relief.
-    ctx.font = canvasFont(11);
-    ctx.textAlign = "left";
-    ctx.lineJoin = "round";
-    ctx.lineWidth = 3;
-    const label = (text: string, x: number, y: number) => {
-      ctx.strokeStyle = paper;
-      ctx.strokeText(text, x, y);
-      ctx.fillStyle = ink;
-      ctx.fillText(text, x, y);
+  /** What sits over the map once the answer is up, as room for the camera to keep clear. */
+  function room(): Inset {
+    if (phone) return { top: 12, bottom: 12, right: 52 };
+    const r = surface!.getBoundingClientRect();
+    const s = stakes!.getBoundingClientRect();
+    const z = zoomBox!.getBoundingClientRect();
+    const p = resultSlot!.getBoundingClientRect();
+    // The zoom keys sit under the score, or by the postcard on a wide screen.
+    const zoomUp = z.top < r.top + r.height / 2;
+    const top = Math.max(124, s.bottom + 24, zoomUp ? z.bottom + 20 : 0);
+    const postTop = p.height ? p.top : innerHeight - 280;
+    const bottomEdge = Math.min(postTop, zoomUp ? Infinity : z.top) - 24;
+    return {
+      top: top - r.top,
+      bottom: Math.max(0, r.bottom - bottomEdge),
+      right: 64,
     };
-
-    const nameW = ctx.measureText(round.name).width;
-    const { x: nx, y: ny } = nameSpot(box, nameW, m.width);
-    label(round.name, nx, ny);
-
-    // How far, written on the line itself once it's long enough to carry it.
-    if (pin && middle && lineLength > 110) {
-      const km = distanceToPlace(pin, round.bbox);
-      const text = `${count(Math.round(km))} km`;
-      const tw = ctx.measureText(text).width;
-      const { x: lx, y: ly } = kmSpot(middle, tw, m);
-      const clear =
-        Math.abs(ly - ny) > 16 || lx + tw < nx - 8 || lx > nx + nameW + 8;
-      if (km > 0 && clear) label(text, lx, ly);
-    }
   }
 
-  function isFramed(m: WorldMap): boolean {
+  /* -------------------------------------------------------- map controls */
+
+  function isFramed(wm: WorldMap): boolean {
     if (!done || !pin) return false;
-    const want = answerView(answerBox(), m.width, m.height, answerRoom);
-    const v = m.view;
+    const baseW = wm.worldWidth / wm.view.k;
+    const v0 = visNow();
+    const want = answerView(
+      answerBox(),
+      v0.x1 - v0.x0,
+      wm.height,
+      answerRoom,
+      baseW,
+    );
+    const v = wm.view;
     return (
       Math.abs(Math.log(v.k / want.k)) < 0.08 &&
       Math.abs(v.cu - want.cu) < 0.05 / v.k &&
@@ -1019,17 +2039,17 @@ export function initDayList(root: HTMLElement): void {
     );
   }
 
-  function syncMapControls(m: WorldMap): void {
-    const k = m.view.k;
+  function syncMapControls(wm: WorldMap): void {
+    const k = wm.view.k;
     if (zoomInBtn) zoomInBtn.disabled = k >= MAX_ZOOM - 0.01;
     if (zoomOutBtn) zoomOutBtn.disabled = k <= 1.001;
     if (viewBtn) {
       // Zoomed in: a way back out. After the answer, a way back to it. Not
       // while the answer is landing, when the view moves by itself.
-      const framed = isFramed(m);
+      const wasHidden = viewBtn.hidden;
       if (revealing) {
         viewBtn.hidden = true;
-      } else if (done && !framed) {
+      } else if (done && !isFramed(wm)) {
         viewBtn.hidden = false;
         viewBtn.textContent = "Back to your guess";
         viewBtn.dataset.action = "answer";
@@ -1040,127 +2060,613 @@ export function initDayList(root: HTMLElement): void {
       } else {
         viewBtn.hidden = true;
       }
-    }
-    if (scaleEl) {
-      const show = k > 1.5;
-      scaleEl.hidden = !show;
-      if (show) {
-        const { km, px } = scaleBar(m.kmPerPx());
-        const bar = scaleEl.querySelector<HTMLElement>("i");
-        const text = scaleEl.querySelector<HTMLElement>("span");
-        if (bar) bar.style.width = `${Math.round(px)}px`;
-        if (text) text.textContent = `${count(km)} km`;
-      }
+      if (wasHidden !== viewBtn.hidden) blockVersion++;
     }
   }
 
   zoomInBtn?.addEventListener("click", () => {
-    map.zoomBy(2, pin ? map.project(pin.lon, pin.lat) : undefined);
+    const p = pin ?? centre;
+    m.zoomBy(2, p ? m.project(p.lon, p.lat) : undefined);
   });
-  zoomOutBtn?.addEventListener("click", () => map.zoomBy(0.5));
+  zoomOutBtn?.addEventListener("click", () => m.zoomBy(0.5));
   viewBtn?.addEventListener("click", () => {
     if (viewBtn.dataset.action === "answer") {
-      void map.fit(answerBox(), { room: answerRoom });
-    } else void map.reset();
+      void m.fit(answerBox(), { room: answerRoom });
+    } else void m.reset();
   });
 
-  let hintTimer = 0;
-  function showWheelHint(): void {
-    if (!wheelHint) return;
-    wheelHint.textContent = isMac()
-      ? "Hold \u2318 and scroll to zoom"
-      : "Hold Ctrl and scroll to zoom";
-    wheelHint.classList.add("is-on");
-    window.clearTimeout(hintTimer);
-    hintTimer = window.setTimeout(
-      () => wheelHint.classList.remove("is-on"),
-      1200,
+  /* ------------------------------------------------------------ the hand */
+
+  function reachBit(clue: Clue): string {
+    const line = escapeHtml(reachLine(clue));
+    if (!clue.reach) {
+      return `<p class="dl-card-reach dl-px15"><span aria-hidden="true">${count(
+        clue.global,
+      )} <small>seen</small></span><span class="dl-sr">${line}</span></p>`;
+    }
+    const km = count(reachKm(clue.reach));
+    return `<p class="dl-card-reach dl-px15" title="${line}"><span aria-hidden="true"><small>within</small> ${km} <small>km</small></span><span class="dl-sr">${line}</span></p>`;
+  }
+
+  function cardFace(i: number): string {
+    const clue = round.clues[i];
+    return `<div class="dl-card-face">
+        <div class="dl-card-pic"><img src="${escapeHtml(
+          clue.photo,
+        )}" alt="" width="500" height="500" decoding="async" crossorigin="anonymous"></div>
+        <p class="dl-card-name"><span>${escapeHtml(speciesName(clue.name))}</span></p>
+        ${reachBit(clue)}
+      </div>
+      <span class="dl-card-n dl-px15" aria-hidden="true">${i + 1}</span>`;
+  }
+
+  /**
+   * One card per species. Shown ones carry the photo, the name and the
+   * reach; the next one is the key and says what it costs; the rest wait
+   * face down with their number.
+   */
+  function slot(i: number): void {
+    const li = tray!.children[i] as HTMLElement | undefined;
+    if (!li) return;
+    const pops = Array.from(li.querySelectorAll(":scope > .dl-pop"));
+    li.className = "dl-card";
+    li.dataset.i = String(i);
+    li.style.setProperty("--c", tintOf(i).hex);
+    if (i < lines || done) {
+      li.classList.add("is-shown");
+      li.innerHTML = cardFace(i);
+    } else if (i === lines) {
+      const cost = bestPossible(lines) - bestPossible(lines + 1);
+      li.classList.add("is-next");
+      li.innerHTML = `<button type="button" class="dl-key dl-key-next" data-daylist-more>
+          <span>Show the next one</span>
+          <span class="dl-price" aria-hidden="true">&minus;${count(cost)}</span>
+          <span class="dl-price-unit" aria-hidden="true">points</span>
+          <span class="dl-sr">, costs ${count(cost)} points</span>
+        </button>
+        <span class="dl-card-n dl-px15" aria-hidden="true">${i + 1}</span>`;
+    } else {
+      li.classList.add("is-back");
+      li.innerHTML = `<div class="dl-card-back"><span class="dl-card-q dl-px25" aria-hidden="true">?</span><span class="dl-sr">Species ${
+        i + 1
+      }, not shown yet</span></div><span class="dl-card-n dl-px15" aria-hidden="true">${i + 1}</span>`;
+    }
+    li.append(...pops);
+  }
+
+  /** The colours from the photos are in: every card, thumb and entry takes its own. */
+  function paintTints(): void {
+    Array.from(tray!.children).forEach((li, i) =>
+      (li as HTMLElement).style.setProperty("--c", tintOf(i).hex),
+    );
+    root
+      .querySelectorAll<HTMLElement>("[data-tint]")
+      .forEach((el) =>
+        el.style.setProperty("--c", tintOf(Number(el.dataset.tint)).hex),
+      );
+  }
+
+  /**
+   * Show a species: the key folds away into its card, and the photo comes up
+   * from big pixels to sharp in five steps.
+   */
+  async function turn(i: number): Promise<void> {
+    const li = tray!.children[i] as HTMLElement | undefined;
+    if (!li) return;
+    const old = li.querySelector<HTMLElement>(".dl-key-next, .dl-card-back");
+    const clue = round.clues[i];
+    const mine = generation;
+    const img = photoSoon(clue.photo);
+    if (reduced() || typeof li.animate !== "function") {
+      slot(i);
+      return;
+    }
+    const half = 70;
+    if (old) {
+      await old
+        .animate([{ transform: "scaleX(1)" }, { transform: "scaleX(0)" }], {
+          duration: half,
+          easing: "cubic-bezier(0.5, 0, 1, 1)",
+          fill: "forwards",
+        })
+        .finished.catch(() => {});
+    }
+    if (mine !== generation) return;
+    slot(i);
+    const face = li.querySelector<HTMLElement>(".dl-card-face");
+    const pic = li.querySelector<HTMLElement>(".dl-card-pic");
+    if (!face || !pic) return;
+    const cv = document.createElement("canvas");
+    pic.append(cv);
+    const loaded = await img;
+    if (mine !== generation) return;
+    const steps = [26, 14, 8, 4];
+    blocky(cv, loaded, pic, steps[0]);
+    face.animate(
+      [
+        { transform: "scaleX(0)" },
+        { transform: "scaleX(1.08)", offset: 0.7 },
+        { transform: "scaleX(1)" },
+      ],
+      { duration: half * 1.4, easing: "cubic-bezier(0, 0, 0.3, 1)" },
+    );
+    for (const b of steps.slice(1)) {
+      await wait(80);
+      if (mine !== generation) return;
+      blocky(cv, loaded, pic, b);
+    }
+    await wait(80);
+    if (mine !== generation) return;
+    cv.remove();
+  }
+
+  /** The photo as `block`-pixel squares, for the turn. */
+  function blocky(
+    cv: HTMLCanvasElement,
+    img: HTMLImageElement,
+    pic: HTMLElement,
+    block: number,
+  ): void {
+    const w = pic.clientWidth || 120;
+    const h = pic.clientHeight || 120;
+    const cols = Math.max(1, Math.round(w / block));
+    const rows = Math.max(1, Math.round(h / block));
+    cv.width = cols;
+    cv.height = rows;
+    const c = cv.getContext("2d");
+    if (!c) return;
+    if (!img.naturalWidth) {
+      c.fillStyle = "#122a5b";
+      c.fillRect(0, 0, cols, rows);
+      return;
+    }
+    const k = Math.max(w / img.naturalWidth, h / img.naturalHeight);
+    const sw = w / k;
+    const sh = h / k;
+    c.imageSmoothingEnabled = true;
+    c.imageSmoothingQuality = "high";
+    c.drawImage(
+      img,
+      (img.naturalWidth - sw) / 2,
+      (img.naturalHeight - sh) / 2,
+      sw,
+      sh,
+      0,
+      0,
+      cols,
+      rows,
     );
   }
 
-  /* -------------------------------------------------------- the species */
+  /** The points a species cost, rising off the corner of its card. */
+  function pop(li: Element | undefined, cost: number): void {
+    if (!li) return;
+    const el = document.createElement("span");
+    el.className = "dl-pop dl-px25";
+    el.setAttribute("aria-hidden", "true");
+    el.textContent = `\u2212${count(cost)}`;
+    li.append(el);
+    if (reduced() || typeof el.animate !== "function") {
+      setTimeout(() => el.remove(), 900);
+      return;
+    }
+    const side =
+      (Math.random() < 0.5 ? -1 : 1) * (4 + Math.round(Math.random() * 8));
+    const rise = phone
+      ? 18 + Math.round(Math.random() * 6)
+      : 34 + Math.round(Math.random() * 12);
+    const keys: Keyframe[] = [];
+    const N = 12;
+    for (let k = 0; k <= N; k++) {
+      const t = k / N;
+      const e = 1 - Math.pow(1 - t, 2.2);
+      const y = -Math.round((rise * e) / 3) * 3;
+      const x = Math.round((side * t) / 3) * 3;
+      const s = k === 0 ? 1.5 : k === 1 ? 1.15 : 1;
+      keys.push({
+        offset: t,
+        transform: `translate(${x}px, ${y}px) scale(${s})`,
+        opacity: t < 0.6 ? 1 : k === N ? 0 : t < 0.8 ? 0.7 : 0.35,
+        easing: "steps(1, end)",
+      });
+    }
+    const run = el.animate(keys, { duration: 820, fill: "forwards" });
+    run.onfinish = () => el.remove();
+    run.oncancel = () => el.remove();
+  }
 
-  tray.textContent = "";
-  const slots = Array.from({ length: 6 }, () => {
-    const li = document.createElement("li");
-    li.className = "dl-slot";
-    tray.append(li);
-    return li;
-  });
+  /** The big counter in whole steps, like an arcade score. */
+  const countRuns = new WeakMap<HTMLElement, number>();
+  function countTo(
+    el: HTMLElement,
+    to: number,
+    ms = 360,
+    from: number | null = null,
+  ): Promise<void> {
+    const start = from ?? Number(el.dataset.value ?? to);
+    el.dataset.value = String(to);
+    const id = (countRuns.get(el) ?? 0) + 1;
+    countRuns.set(el, id);
+    if (reduced() || start === to) {
+      el.textContent = count(to);
+      return Promise.resolve();
+    }
+    const steps = Math.max(6, Math.round(ms / 40));
+    return tween(
+      ms,
+      (k) => {
+        if (id !== countRuns.get(el)) return;
+        const v = start + (to - start) * k;
+        el.textContent = count(k >= 1 ? to : Math.round(v / 10) * 10);
+      },
+      (k) => Math.round(k * steps) / steps,
+    );
+  }
 
-  /**
-   * One square per species. Shown ones carry the photo and name; the next one
-   * is the button and says what it costs; the rest wait with their number.
-   * `fresh` plays the reveal for a species that has just come out, starting
-   * `delay` ms late so a row of them can fill in one after another.
-   */
-  function paintSlot(i: number, fresh = false, delay = 0): void {
-    const li = slots[i];
-    if (fresh && delay > 0) li.style.setProperty("--dl-delay", `${delay}ms`);
-    else li.style.removeProperty("--dl-delay");
-    if (i < shown) {
-      const clue = round.clues[i];
-      const srcset = photoSrcset(clue.photo);
-      li.className = fresh ? "dl-slot is-new" : "dl-slot";
-      li.innerHTML = `<figure class="dl-slot__fig">
-          <div class="dl-slot__pic"><img src="${escapeHtml(clue.photo)}"${
-            srcset
-              ? ` srcset="${escapeHtml(srcset)}" sizes="${PHOTO_SIZES}"`
-              : ""
-          } alt="" width="500" height="500" decoding="async"></div>
-          <figcaption class="dl-slot__body">
-            <span class="dl-slot__name">${escapeHtml(speciesName(clue.name))}</span>
-            <span class="dl-slot__sci">${escapeHtml(clue.sci)}</span>
-            <span class="dl-slot__count">${reachLine(clue)}</span>
-          </figcaption>
-        </figure>`;
-      const img = li.querySelector("img");
-      if (!img) return;
-      const show = () => img.classList.add("is-loaded");
-      if (img.complete && img.naturalWidth > 0) {
-        // Already cached: wait a frame on a fresh reveal so the fade runs.
-        if (fresh) requestAnimationFrame(() => requestAnimationFrame(show));
-        else show();
-      } else {
-        img.addEventListener("load", show, { once: true });
-        img.addEventListener("error", show, { once: true });
+  /* ----------------------------------------------------------- the flight */
+
+  /** Where a ring's token is on screen, or its middle when there's no room. */
+  function flightTarget(i: number) {
+    const r = canvas!.getBoundingClientRect();
+    const e = lay[i];
+    if (!e)
+      return { x: r.left + r.width / 2, y: r.top + r.height / 2, tok: false };
+    const p = e.css || e.cssCentre;
+    return {
+      x: r.left + clamp(p.x, 0, r.width),
+      y: r.top + clamp(p.y, 0, r.height),
+      tok: Boolean(e.css),
+    };
+  }
+
+  /** A photo as a token, `n` pixels across, square or round, drawn on `cv`. */
+  function paintFlyer(
+    cv: HTMLCanvasElement,
+    i: number,
+    n: number,
+    round_: boolean,
+  ): void {
+    const P = isDark() ? PALETTES.night : PALETTES.day;
+    const full = n + 4;
+    cv.width = full;
+    cv.height = full;
+    const c = cv.getContext("2d");
+    if (!c) return;
+    c.clearRect(0, 0, full, full);
+    const info = pinfo[i];
+    if (!round_) {
+      c.fillStyle = `rgb(${P.ink.join(",")})`;
+      c.fillRect(0, 0, full, full);
+      c.fillStyle = tintOf(i).hex;
+      c.fillRect(1, 1, full - 2, full - 2);
+      if (info?.small) {
+        c.imageSmoothingEnabled = true;
+        c.drawImage(info.small, 2, 2, n, n);
       }
       return;
     }
+    const img = c.createImageData(full, full);
+    const d = img.data;
+    const set = (x: number, y: number, rgb: RGB) => {
+      const o = (y * full + x) * 4;
+      d[o] = rgb[0];
+      d[o + 1] = rgb[1];
+      d[o + 2] = rgb[2];
+      d[o + 3] = 255;
+    };
+    const outer = disc(n + 2);
+    const inner = disc(n);
+    const pix = tokenPixels(info, n);
+    const col = tintOf(i).rgb;
+    const ins = (x: number, y: number) =>
+      x >= 0 && y >= 0 && x < n + 2 && y < n + 2 && outer[y][x];
+    for (let y = -1; y <= n + 2; y++) {
+      for (let x = -1; x <= n + 2; x++) {
+        if (ins(x, y)) {
+          const ix = x - 1;
+          const iy = y - 1;
+          if (pix && ix >= 0 && iy >= 0 && ix < n && iy < n && inner[iy][ix]) {
+            const o = (iy * n + ix) * 4;
+            set(x + 1, y + 1, [pix[o], pix[o + 1], pix[o + 2]]);
+          } else set(x + 1, y + 1, col);
+        } else if (
+          ins(x - 1, y) ||
+          ins(x + 1, y) ||
+          ins(x, y - 1) ||
+          ins(x, y + 1)
+        ) {
+          set(x + 1, y + 1, P.ink);
+        }
+      }
+    }
+    c.putImageData(img, 0, 0);
+  }
 
-    li.className = "dl-slot";
-    if (!done && i === lines) {
-      const cost = bestPossible(lines) - bestPossible(lines + 1);
-      li.innerHTML = `<button type="button" class="dl-slot__next" data-daylist-more>
-          <span class="dl-slot__cta">Show the next one</span>
-          <span class="dl-slot__cost">&minus;${count(cost)} points</span>
-        </button>`;
+  /**
+   * The photo flies from its card to its token on the ring, in whole map
+   * pixels: it shrinks a pixel at a time from the card's size to the
+   * token's, turns round on the way, and bends a different way each time.
+   */
+  function fly(i: number, mine: number): void {
+    const g = rings[i];
+    if (!g) return;
+    if (reduced() || !g.km) {
+      g.flying = false;
+      g.landed = now() - 5000;
+      m.redraw();
       return;
     }
-    li.innerHTML = `<span class="dl-slot__blank" aria-hidden="true">${
-      i + 1
-    }</span><span class="dl-sr">Species ${i + 1}, not shown yet</span>`;
+    const li = tray!.children[i];
+    const pic = li?.querySelector(".dl-card-pic") ?? li;
+    if (!pic) return;
+    const r = pic.getBoundingClientRect();
+    const unit = phone ? 2 : 4;
+    const start = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    const n0 = Math.max(TOK, Math.round(r.width / unit) - 4);
+    const el = document.createElement("canvas");
+    el.className = "dl-fly";
+    el.setAttribute("aria-hidden", "true");
+    root.append(el);
+    const t0 = now();
+    const D = 400;
+    // It arcs up like a throw, by a different amount each time.
+    const bend = 0.12 + Math.random() * 0.16;
+    let lastN = -1;
+    let lastRound: boolean | null = null;
+    const step = () => {
+      if (mine !== generation) {
+        el.remove();
+        return;
+      }
+      const p = clamp((now() - t0) / D, 0, 1);
+      const tgt = flightTarget(i);
+      const e = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+      const dx = tgt.x - start.x;
+      const dy = tgt.y - start.y;
+      const up = dx >= 0 ? 1 : -1;
+      const cx = start.x + dx / 2 + dy * bend * up;
+      const cy = start.y + dy / 2 - dx * bend * up;
+      const x =
+        (1 - e) * (1 - e) * start.x + 2 * (1 - e) * e * cx + e * e * tgt.x;
+      const y =
+        (1 - e) * (1 - e) * start.y + 2 * (1 - e) * e * cy + e * e * tgt.y;
+      const n = Math.round(lerp(n0, TOK, easeOut(clamp(p / 0.8, 0, 1))));
+      const roundNow = p > 0.22;
+      if (n !== lastN || roundNow !== lastRound) {
+        paintFlyer(el, i, n, roundNow);
+        lastN = n;
+        lastRound = roundNow;
+      }
+      const size = (n + 4) * unit;
+      const wr = canvas!.getBoundingClientRect();
+      const left = wr.left + snapTo(x - size / 2 - wr.left, unit);
+      const top = wr.top + snapTo(y - size / 2 - wr.top, unit);
+      el.style.width = `${size}px`;
+      el.style.height = `${size}px`;
+      el.style.transform = `translate(${left}px, ${top}px)`;
+      el.style.opacity = tgt.tok || p < 0.8 ? "1" : p < 0.9 ? "0.6" : "0.3";
+      if (p < 1) {
+        requestAnimationFrame(step);
+        return;
+      }
+      el.remove();
+      g.flying = false;
+      g.landed = now();
+      m.redraw();
+    };
+    requestAnimationFrame(step);
   }
 
-  function syncWorth(): void {
-    if (worthEl) rollTo(worthEl, bestPossible(lines));
-  }
+  /* ------------------------------------------------------------ how to play */
 
-  function paintCredits(): void {
-    if (creditList) creditList.innerHTML = photoCredits(round.clues, shown);
-  }
-
-  /** Fetch the next photo while the visitor thinks, so the reveal is instant. */
-  function preloadNext(): void {
-    const next = round.clues[lines];
-    if (!next || done) return;
-    const fetchPhoto = () => preloadPhoto(next.photo);
-    if (typeof window.requestIdleCallback === "function") {
-      window.requestIdleCallback(fetchPhoto, { timeout: 2000 });
-    } else {
-      setTimeout(fetchPhoto, 300);
+  let howLoop = 0;
+  function openHow(open: boolean): void {
+    if (!howPanel || !howKey) return;
+    if (howPanel.hidden === !open) return;
+    howPanel.hidden = !open;
+    howKey.setAttribute("aria-expanded", String(open));
+    cancelAnimationFrame(howLoop);
+    blockVersion++;
+    if (!open) return;
+    const r = titlePanel!.getBoundingClientRect();
+    howPanel.style.top = phone ? "" : `${Math.round(r.bottom + 18)}px`;
+    if (!reduced()) {
+      howPanel.animate(
+        [
+          { transform: "translateY(-12px) scale(0.92)", opacity: 0 },
+          {
+            transform: "translateY(-4px) scale(1.02)",
+            opacity: 1,
+            offset: 0.6,
+          },
+          { transform: "none", opacity: 1 },
+        ],
+        { duration: 180, easing: "steps(4, end)" },
+      );
     }
+    howPanel.querySelectorAll(".dl-how-art *").forEach((el) => {
+      for (const a of el.getAnimations()) a.currentTime = 0;
+    });
+    const t0 = now();
+    const tick = () => {
+      drawHowRing(reduced() ? 2400 * 0.9 : (now() - t0) % 2400);
+      if (!reduced() && !howPanel.hidden) howLoop = requestAnimationFrame(tick);
+    };
+    tick();
   }
+
+  /** The middle scene: a ring tightening round a pin, in the map's own pixels. */
+  function drawHowRing(t: number): void {
+    if (!howRing?.parentElement) return;
+    const box = howRing.parentElement;
+    const W = Math.max(16, Math.floor(box.clientWidth / 4));
+    const H = Math.max(12, Math.floor(box.clientHeight / 4));
+    if (howRing.width !== W || howRing.height !== H) {
+      howRing.width = W;
+      howRing.height = H;
+    }
+    howRing.style.width = `${W * 4}px`;
+    howRing.style.height = `${H * 4}px`;
+    const P = isDark() ? PALETTES.night : PALETTES.day;
+    const c = howRing.getContext("2d");
+    if (!c) return;
+    const img = c.createImageData(W, H);
+    const f: Frame = { d: img.data, W, H, P };
+    const cx = Math.floor(W / 2);
+    const cy = Math.floor(H / 2) + 2;
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const lx = (x - cx + 3) / (W * 0.36);
+        const ly = (y - cy + 1) / (H * 0.42);
+        const land = lx * lx + ly * ly < 1 && !(x < cx - W * 0.2 && y > cy + 2);
+        px(
+          f,
+          x,
+          y,
+          land ? P.land[1] : (x + y) % 2 === 0 && y % 6 === 0 ? P.dots : P.sea,
+        );
+      }
+    }
+    const ringAt = (r: number, col: RGB) => {
+      const ins = (x: number, y: number) =>
+        (x - cx) * (x - cx) + (y - cy) * (y - cy) <= r * r + r * 0.6;
+      const edge: [number, number][] = [];
+      for (let y = 0; y < H; y++) {
+        for (let x = 0; x < W; x++) {
+          if (
+            ins(x, y) &&
+            (!ins(x - 1, y) ||
+              !ins(x + 1, y) ||
+              !ins(x, y - 1) ||
+              !ins(x, y + 1))
+          ) {
+            edge.push([x, y]);
+          }
+        }
+      }
+      outlined(f, edge, col);
+    };
+    const big = Math.min(H / 2 - 1, 9);
+    const p = t / 2400;
+    ringAt(big, ringFor(0).rgb);
+    if (p > 0.2) {
+      const k = clamp((p - 0.2) / 0.3, 0, 1);
+      const r = Math.round(lerp(big, 4, easeOutBack(k, 1.6)));
+      ringAt(Math.max(2, r), ringFor(3).rgb);
+    }
+    sprite(f, PIN, 3, 7, cx, cy, {
+      o: P.ink,
+      a: P.pin,
+      h: P.pinHi,
+      d: P.pinLo,
+    });
+    c.putImageData(img, 0, 0);
+  }
+
+  howKey?.addEventListener("click", () => openHow(Boolean(howPanel?.hidden)));
+  howClose?.addEventListener("click", () => {
+    openHow(false);
+    howKey?.focus();
+  });
+  root.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && howPanel && !howPanel.hidden) {
+      openHow(false);
+      howKey?.focus();
+    }
+  });
+  document.addEventListener("pointerdown", (e) => {
+    const target = e.target as Node | null;
+    if (
+      howPanel &&
+      !howPanel.hidden &&
+      target &&
+      !howPanel.contains(target) &&
+      !howKey?.contains(target)
+    ) {
+      openHow(false);
+    }
+  });
+
+  /* ------------------------------------------------------- months, lock */
+
+  function syncMonths(): void {
+    monthKeys.forEach((b, j) => {
+      const on = month === j;
+      b.setAttribute("aria-checked", String(on));
+      b.tabIndex = on || (month === null && j === 0) ? 0 : -1;
+    });
+  }
+
+  function setMonth(j: number): void {
+    if (done || revealing) return;
+    month = j;
+    syncMonths();
+    syncLock();
+    persist();
+  }
+
+  monthBox.addEventListener("click", (e) => {
+    const b = (e.target as Element | null)?.closest<HTMLElement>(
+      "[data-daylist-month]",
+    );
+    if (b) setMonth(Number(b.dataset.daylistMonth));
+  });
+  monthBox.addEventListener("keydown", (e) => {
+    const b = (e.target as Element | null)?.closest<HTMLElement>(
+      "[data-daylist-month]",
+    );
+    if (!b) return;
+    const i = Number(b.dataset.daylistMonth);
+    const moves: Record<string, number> = {
+      ArrowRight: 1,
+      ArrowLeft: -1,
+      ArrowDown: 6,
+      ArrowUp: -6,
+      Home: -i,
+      End: 11 - i,
+    };
+    if (!(e.key in moves)) return;
+    e.preventDefault();
+    const j = (i + moves[e.key] + 12) % 12;
+    monthKeys[j].focus();
+    setMonth(j);
+  });
+
+  function syncLock(): void {
+    lockBtn!.disabled = done || revealing || !pin || month === null;
+    lockHint!.textContent = done
+      ? ""
+      : !pin && month === null
+        ? "Tap the map, pick a month"
+        : !pin
+          ? "Now tap the map"
+          : month === null
+            ? "Now pick a month"
+            : `Up to ${count(bestPossible(lines))} points`;
+  }
+
+  // A key sits down on its drop while it's held, and pops back up.
+  root.addEventListener("pointerdown", (e) => {
+    const k = (e.target as Element | null)?.closest<HTMLElement>(".dl-key");
+    if (!k || (k as HTMLButtonElement).disabled) return;
+    k.classList.add("is-down");
+    const up = () => {
+      setTimeout(() => k.classList.remove("is-down"), 40);
+      removeEventListener("pointerup", up);
+      removeEventListener("pointercancel", up);
+    };
+    addEventListener("pointerup", up);
+    addEventListener("pointercancel", up);
+  });
+  root.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const k = (e.target as Element | null)?.closest?.<HTMLElement>(".dl-key");
+    if (!k || (k as HTMLButtonElement).disabled) return;
+    k.classList.add("is-down");
+    setTimeout(() => k.classList.remove("is-down"), 110);
+  });
+
+  /* ------------------------------------------------------------ saving */
 
   function persist(): void {
     const progress: Progress = { lines, done };
@@ -1177,314 +2683,104 @@ export function initDayList(root: HTMLElement): void {
     }
   }
 
+  /* ---------------------------------------------------- showing the next */
+
+  /** A new ring: it tightens from the last one's size while its photo flies to it. */
+  function ringIn(k: number, mine: number): void {
+    const t = now();
+    const g = rings[k];
+    let prev: number | null = null;
+    for (let j = 0; j < k; j++) if (rings[j].shown && rings[j].km) prev = j;
+    g.shown = true;
+    const km = g.km ?? 0;
+    const fromKm = prev !== null ? kmAt(rings[prev], t) : km * 1.7;
+    g.from = fromKm > km * 1.02 ? fromKm : km * 1.3;
+    g.t0 = t + dur(90);
+    g.d = dur(460);
+    g.flying = !reduced();
+    g.landed = 0;
+    if (reduced()) g.landed = t - 5000;
+    else setTimeout(() => fly(k, mine), 110);
+    m.redraw();
+  }
+
   function reveal(fromKeyboard: boolean): void {
-    if (done || lines >= round.clues.length) return;
+    if (done || revealing || lines >= round.clues.length) return;
+    const mine = generation;
     const cost = bestPossible(lines) - bestPossible(lines + 1);
     lines += 1;
-    shown = lines;
-    paintSlot(lines - 1, true);
-    if (lines < round.clues.length) paintSlot(lines);
-    // The price lands on the species it bought: that's where the eye is, and
-    // the points total is usually down the page under the map. The species
-    // is dealt in from the square the next one sits in, and the stamp comes
-    // down so it touches as the card settles.
-    const host = slots[lines - 1];
-    const price = () => stamp(host, `\u2212${count(cost)}`, { unit: "points" });
-    const fig = host.querySelector<HTMLElement>(".dl-slot__fig");
-    if (fig && !prefersReducedMotion() && typeof fig.animate === "function") {
-      const here = host.getBoundingClientRect();
-      const from =
-        slots[lines]?.getBoundingClientRect() ??
-        new DOMRect(here.right, here.top, here.width, here.height);
-      let dx = from.left + from.width / 2 - (here.left + here.width / 2);
-      let dy = from.top + from.height / 2 - (here.top + here.height / 2);
-      const d = Math.hypot(dx, dy) || 1;
-      const reach = clamp(here.width * 0.1, 10, 18);
-      dx = (dx / d) * reach;
-      dy = (dy / d) * reach;
-      fig.animate(dealFrames(dx, dy, dx >= 0 ? 1.2 : -1.2), {
-        duration: DEAL_MS,
-        fill: "backwards",
-      });
-      const mine = generation;
-      window.setTimeout(
-        () => {
-          if (mine === generation) price();
-        },
-        Math.max(0, DEAL_MS - STAMP_TOUCH_MS),
-      );
-    } else {
-      price();
-    }
-    paintCredits();
-    syncWorth();
-    preloadNext();
+    const k = lines - 1;
+    ringIn(k, mine);
+    void turn(k);
+    if (lines < round.clues.length) slot(lines);
+    pop(tray!.children[k], cost);
+    void countTo(worthEl!, bestPossible(lines));
+    syncLock();
     persist();
-
-    const clue = round.clues[lines - 1];
+    paintCredits();
+    const clue = round.clues[k];
     if (announce) {
       announce.textContent =
         `Species ${lines} of ${round.clues.length}: ${speciesName(clue.name)}. ` +
-        `${reachLine(clue)}. ` +
-        `Up to ${count(bestPossible(lines))} points now.`;
+        `${reachLine(clue)}. Up to ${count(bestPossible(lines))} points now.`;
     }
-    // The button that was pressed has been replaced, so keyboard focus
-    // follows to the next one (or the map once all six are out).
-    if (fromKeyboard) {
-      const next = tray!.querySelector<HTMLElement>("[data-daylist-more]");
-      (next ?? surface!).focus();
+    // The key that was pressed is going, so focus follows to the next one
+    // (or the map once all six are out).
+    const focused = document.activeElement;
+    if (fromKeyboard || focused === document.body || tray!.contains(focused)) {
+      const next = tray!.children[lines]?.querySelector<HTMLElement>(
+        "[data-daylist-more]",
+      );
+      (next ?? surface!).focus({ preventScroll: true });
     }
   }
 
   tray.addEventListener("click", (event) => {
-    const target = event.target as Element | null;
-    if (!target?.closest("[data-daylist-more]")) return;
+    if (!(event.target as Element | null)?.closest("[data-daylist-more]"))
+      return;
     // A click fired by Enter or Space has no pointer, so detail is 0.
     reveal(event.detail === 0);
   });
-
-  /* ------------------------------------------------------------ guessing */
-
-  function describeGuess(): void {
-    if (!readout) return;
-    if (pin && month !== null) {
-      readout.textContent = `Pin at ${formatPin(pin)} in ${MONTHS[month]}.`;
-    } else if (pin) {
-      readout.textContent = `Pin at ${formatPin(pin)}. Now pick a month.`;
-    } else if (month !== null) {
-      readout.textContent = `${MONTHS[month]}. Now drop a pin on the map.`;
-    } else {
-      readout.textContent = "Drop a pin, then pick a month.";
-    }
-  }
-
-  function syncLock(): void {
-    lockBtn!.disabled = done || !pin || month === null;
-  }
-
-  /** How close a tap can land to the pin and only shift it, CSS px. */
-  const NEAR_PX = 8;
-
-  /**
-   * Put the pin at `at`. A tap drops it in (or, right on top of the pin,
-   * just shifts it and rings); an arrow key slides it; the key press that
-   * places the first pin drops it like a tap.
-   */
-  function placePin(at: LonLat, how: "tap" | "key"): void {
-    if (done) return;
-    const was = pin;
-    pin = { lat: clamp(at.lat, -85, 85), lon: clamp(at.lon, -180, 180) };
-    if (!was) {
-      pins.drop(pin, null);
-    } else if (how === "key") {
-      pins.slide(pin);
-    } else {
-      const a = map!.project(was.lon, was.lat);
-      const b = map!.project(pin.lon, pin.lat);
-      if (Math.hypot(a.x - b.x, a.y - b.y) <= NEAR_PX) pins.tapNear(pin);
-      else pins.drop(pin, was);
-    }
-    surface!.classList.add("is-placed");
-    describeGuess();
-    syncLock();
-    persist();
-    map!.redraw();
-  }
-
-  // Keyboard guessing: the pin starts in the middle of the view and arrows
-  // nudge it, by less the further in you've zoomed. Once the answer is in,
-  // arrows pan the map instead, so the keyboard can look around it too.
-  surface.addEventListener("keydown", (event) => {
-    if (event.altKey || event.ctrlKey || event.metaKey) return;
-    if (done) {
-      const pan: Record<string, [number, number]> = {
-        ArrowUp: [0, -1],
-        ArrowDown: [0, 1],
-        ArrowLeft: [-1, 0],
-        ArrowRight: [1, 0],
-      };
-      const dir = pan[event.key];
-      if (!dir || map.view.k <= 1.001) return;
-      event.preventDefault();
-      const by = (event.shiftKey ? 0.5 : 0.15) * map.width;
-      map.panBy(dir[0] * by, dir[1] * by);
-      return;
-    }
-    const step = Math.max(0.01, (event.shiftKey ? 15 : 4) / map.view.k);
-    let next = pin;
-    if (!next) {
-      if (!event.key.startsWith("Arrow") && event.key !== "Enter") return;
-      next = map.unproject(map.width / 2, map.height / 2);
-    } else if (event.key === "ArrowUp")
-      next = { ...next, lat: next.lat + step };
-    else if (event.key === "ArrowDown")
-      next = { ...next, lat: next.lat - step };
-    else if (event.key === "ArrowLeft")
-      next = { ...next, lon: next.lon - step };
-    else if (event.key === "ArrowRight")
-      next = { ...next, lon: next.lon + step };
-    else return;
-    event.preventDefault();
-    placePin(next, "key");
-    if (pin) map.show(pin);
+  // Holding Enter on Show the next one shouldn't spend all six.
+  root.addEventListener(
+    "keydown",
+    (e) => {
+      if (
+        e.repeat &&
+        e.key === "Enter" &&
+        (e.target as Element | null)?.closest?.("[data-daylist-more]")
+      ) {
+        e.preventDefault();
+      }
+    },
+    true,
+  );
+  // A card under the mouse thickens its ring.
+  tray.addEventListener("pointerover", (e) => {
+    if (e.pointerType === "touch" || done) return;
+    const li = (e.target as Element | null)?.closest?.<HTMLElement>(
+      ".dl-card.is-shown",
+    );
+    const i = li ? Number(li.dataset.i) : null;
+    if (i === hot) return;
+    hot = i;
+    m.redraw();
+  });
+  tray.addEventListener("pointerleave", (e) => {
+    if (e.pointerType === "touch" || hot === null) return;
+    hot = null;
+    m.redraw();
   });
 
-  monthInputs.forEach((input) => {
-    input.addEventListener("change", () => {
-      if (done || !input.checked) return;
-      month = Number(input.value);
-      describeGuess();
-      syncLock();
-      persist();
-    });
-  });
+  /* ------------------------------------------------------------ the answer */
 
-  /* -------------------------------------------------------------- result */
-
-  const STAMP_TILT = -6;
-  const STAMP_CLASS = "stamp-ink dl-verdict-stamp";
-
-  interface StampPlan {
-    corner: Corner;
-    spot: Rect;
-    room: Inset;
-    /** The stamp's own size before it's tilted. */
-    w: number;
-    h: number;
-  }
-
-  let labelCtx: CanvasRenderingContext2D | null = null;
-  function labelWidth(text: string): number {
-    labelCtx ??= document.createElement("canvas").getContext("2d");
-    if (!labelCtx) return text.length * 7;
-    labelCtx.font = canvasFont(11);
-    return labelCtx.measureText(text).width;
-  }
-
-  /** Measure the stamp and the map's controls, and pick the corner. */
-  function planStamp(verdict: string, unit: string): StampPlan | null {
-    const box = surface!.parentElement;
-    const width = map!.width;
-    const height = map!.height;
-    if (!box || !pin || !width || !height) return null;
-    // Measure the stamp as it will be, then take it away again.
-    const probe = stamp(box, verdict, {
-      unit,
-      className: STAMP_CLASS,
-      stay: true,
-      animate: false,
-      tilt: STAMP_TILT,
-    });
-    const w = probe.offsetWidth;
-    const h = probe.offsetHeight;
-    probe.remove();
-    const turn = (Math.abs(STAMP_TILT) * Math.PI) / 180;
-    const origin = canvas!.getBoundingClientRect();
-    const zoom = zoomInBtn?.parentElement?.getBoundingClientRect();
-    const zoomTop = zoom ? Math.max(0, zoom.top - origin.top) : 8;
-    const km = Math.round(distanceToPlace(pin, round.bbox));
-    const pick = placeVerdict({
-      bbox: round.bbox,
-      pin,
-      frame: answerBox(),
-      size: { width, height },
-      stamp: {
-        w: w * Math.cos(turn) + h * Math.sin(turn),
-        h: w * Math.sin(turn) + h * Math.cos(turn),
-      },
-      controls: {
-        zoomLeft: zoom ? zoom.left - origin.left : width,
-        footer: (zoomInBtn?.offsetHeight || 32) + zoomTop,
-      },
-      labels: {
-        name: labelWidth(round.name),
-        km: labelWidth(`${count(km)} km`),
-      },
-    });
-    return { ...pick, w, h };
-  }
-
-  /** Pin a stamp to its corner, so it stays there if the map resizes. */
-  function placeStamp(mark: HTMLElement, plan: StampPlan): void {
-    const host = mark.parentElement?.getBoundingClientRect();
-    if (!host) return;
-    const origin = canvas!.getBoundingClientRect();
-    const { spot, w, h, corner } = plan;
-    const left = origin.left - host.left + spot.x + (spot.w - w) / 2;
-    const top = origin.top - host.top + spot.y + (spot.h - h) / 2;
-    const s = mark.style;
-    s.left = corner[1] === "l" ? `${left}px` : "auto";
-    s.right = corner[1] === "r" ? `${host.width - left - w}px` : "auto";
-    s.top = corner[0] === "t" ? `${top}px` : "auto";
-    s.bottom = corner[0] === "b" ? `${host.height - top - h}px` : "auto";
-  }
+  const verdictLine = (r: Scored) =>
+    r.km === 0 ? "Inside the boundary" : `${count(r.km)} km off`;
 
   /** Share on a phone, where most plays are; copy everywhere else. */
   const sharesNatively = () =>
     typeof navigator.share === "function" &&
     window.matchMedia("(pointer: coarse)").matches;
-
-  /** Everything about the six, now that the answer is out. */
-  function renderFullList(): void {
-    if (!rollSlot) return;
-    const inMonth = MONTHS[round.month - 1];
-    const entries = round.clues
-      .map((clue) => {
-        const status = [STANDING_LABEL[clue.standing], clue.rank]
-          .filter(Boolean)
-          .map(escapeHtml)
-          .join(" &middot; ");
-        const fact = clue.fact ? tidyFact(clue.fact, clue.sci) : "";
-        const links = [
-          clue.wiki
-            ? `<a href="${escapeHtml(
-                clue.wiki,
-              )}" target="_blank" rel="noopener noreferrer">Wikipedia</a>`
-            : "",
-          `<a href="https://www.inaturalist.org/taxa/${clue.id}" target="_blank" rel="noopener noreferrer">iNaturalist</a>`,
-        ]
-          .filter(Boolean)
-          .join(" &middot; ");
-        return `<li class="dl-entry">
-          <p class="dl-entry__name">${escapeHtml(speciesName(clue.name))}</p>
-          <p class="dl-entry__sci"><i>${escapeHtml(clue.sci)}</i>${
-            status
-              ? ` &middot; <span class="dl-entry__status">${status}</span>`
-              : ""
-          }</p>
-          ${fact ? `<p class="dl-entry__fact">${escapeHtml(fact)}</p>` : ""}
-          <p class="dl-entry__meta">Seen here ${count(clue.local)} ${
-            clue.local === 1 ? "time" : "times"
-          } in ${inMonth} &middot; ${count(clue.global)} worldwide &middot; ${links}</p>
-        </li>`;
-      })
-      .join("");
-    rollSlot.innerHTML = `<section class="dl-roll" aria-labelledby="dl-roll-title">
-        <h3 id="dl-roll-title">The full list</h3>
-        <ol class="dl-entries" role="list">${entries}</ol>
-      </section>`;
-  }
-
-  /**
-   * Play the answer onto the map: the line for `lineMs`, then the boundary
-   * for BOX_MS, redrawing every frame. `landed` runs once both are down.
-   */
-  function playReveal(lineMs: number, mine: number, landed: () => void): void {
-    lineT = 0;
-    boxT = 0;
-    const start = performance.now();
-    const easeOut = (k: number) => 1 - Math.pow(1 - clamp(k, 0, 1), 3);
-    const step = (now: number) => {
-      if (mine !== generation) return;
-      const elapsed = now - start;
-      lineT = lineMs > 0 ? easeOut(elapsed / lineMs) : 1;
-      boxT = easeOut((elapsed - lineMs) / BOX_MS);
-      map!.redraw();
-      if (elapsed < lineMs + BOX_MS) requestAnimationFrame(step);
-      else landed();
-    };
-    requestAnimationFrame(step);
-  }
 
   function extraRow(): string {
     const played = extra.played.length;
@@ -1494,250 +2790,536 @@ export function initDayList(root: HTMLElement): void {
       : `${played} of ${EXTRA_PER_DAY} played today &middot; ${count(points)} points`;
   }
 
+  function buildPost(r: Scored): void {
+    const inMonth = MONTHS[round.month - 1];
+    const guessed = MONTHS[month ?? 0];
+    const thumbs = round.clues
+      .map((c, j) => {
+        const name = escapeHtml(speciesName(c.name));
+        return `<li class="${j < r.used ? "is-used" : "is-unused"}" data-tint="${j}" style="--c: ${
+          tintOf(j).hex
+        }"><img src="${escapeHtml(c.photo)}" alt="${name}" title="${name}" width="500" height="500" decoding="async" crossorigin="anonymous"><span class="dl-px25" aria-hidden="true">${
+          j + 1
+        }</span></li>`;
+      })
+      .join("");
+    const canNext = mode === "extra" && extra.played.length < EXTRA_PER_DAY;
+    const shareLabel = sharesNatively() ? "Share result" : "Copy result";
+    // The title panel and its tabs are away once the answer is up, so the
+    // postcard is the way on to the other list.
+    const actions =
+      mode === "daily"
+        ? `<button type="button" class="dl-key dl-key-amber" data-daylist-to-extra>Play more lists</button>
+           <button type="button" class="dl-key" data-daylist-copy>${shareLabel}</button>`
+        : `${
+            canNext
+              ? `<button type="button" class="dl-key dl-key-amber" data-daylist-next>Next list</button>`
+              : ""
+          }<button type="button" class="dl-key" data-daylist-to-daily>Today's list</button>`;
+    resultSlot!.innerHTML = `
+      <ol class="dl-post-thumbs" aria-label="The six species">${thumbs}</ol>
+      <div class="dl-post-where">
+        <h2 class="dl-px25" id="dl-post-place" tabindex="-1" data-daylist-place>${escapeHtml(
+          round.name,
+        )}</h2>
+        <p class="dl-px15">${escapeHtml(round.region)} <span aria-hidden="true">&middot;</span> ${inMonth}</p>
+        <p class="dl-post-used">${r.used} of ${round.clues.length} species used</p>
+      </div>
+      <dl class="dl-post-pts dl-px15">
+        <dt>${verdictLine(r)}</dt><dd>${count(r.placePoints)}</dd>
+        <dt>${r.off === 0 ? `${inMonth}, spot on` : `You said ${guessed}`}</dt><dd>${count(r.monthPoints)}</dd>
+        <dt class="dl-tot">Total</dt><dd class="dl-tot" data-daylist-score>${count(r.score)}</dd>
+      </dl>
+      <div class="dl-post-acts">
+        ${actions}
+        <a class="dl-key" href="https://www.inaturalist.org/places/${
+          round.placeId
+        }" target="_blank" rel="noopener noreferrer">See the place</a>
+        <button type="button" class="dl-key" data-daylist-list aria-haspopup="dialog">The full list</button>
+        <p class="dl-post-note dl-px15">${
+          mode === "daily" ? "A new list turns up tomorrow" : extraRow()
+        }</p>
+      </div>`;
+  }
+
+  function showPost(animate: boolean): void {
+    resultSlot!.hidden = false;
+    blockVersion++;
+    if (!animate || reduced()) return;
+    resultSlot!.animate(
+      [
+        { transform: "translateY(110%)" },
+        { transform: "translateY(-10px)", offset: 0.7 },
+        { transform: "translateY(0)" },
+      ],
+      { duration: 300, easing: "steps(7, end)" },
+    );
+    resultSlot!.querySelectorAll(".dl-post-thumbs li").forEach((li, j) => {
+      li.animate(
+        [
+          { transform: "translateY(-14px)", opacity: 0 },
+          { transform: "translateY(3px)", opacity: 1, offset: 0.7 },
+          { transform: "none", opacity: 1 },
+        ],
+        {
+          duration: 180,
+          delay: 200 + j * 55,
+          easing: "steps(3, end)",
+          fill: "backwards",
+        },
+      );
+    });
+  }
+
+  /** The coordinates under the finder, printed a character at a time in red. */
+  function showCoords(): void {
+    let el = labels!.querySelector<HTMLElement>(".dl-coords");
+    if (!el) {
+      el = document.createElement("span");
+      el.className = "dl-coords dl-px15";
+      labels!.append(el);
+    }
+    const b = round.bbox;
+    const text = coords({ lat: (b.s + b.n) / 2, lon: (b.w + b.e) / 2 });
+    el.dataset.text = text;
+    el.innerHTML = `<span class="dl-c-on"></span><span class="dl-c-off">${text}</span>`;
+    el.hidden = false;
+    answerShown = true;
+    m.redraw();
+  }
+  function typeCoords(k: number): void {
+    const el = labels!.querySelector<HTMLElement>(".dl-coords");
+    if (!el) return;
+    const text = el.dataset.text ?? "";
+    const n = Math.round(text.length * clamp(k, 0, 1));
+    (el.firstChild as HTMLElement).textContent = text.slice(0, n);
+    (el.lastChild as HTMLElement).textContent = text.slice(n);
+  }
+  function showName(animate: boolean): void {
+    let el = labels!.querySelector<HTMLElement>(".dl-place");
+    if (!el) {
+      el = document.createElement("span");
+      el.className = "dl-place dl-px15";
+      el.textContent = round.name;
+      labels!.append(el);
+    }
+    if (animate && !reduced()) {
+      el.animate(
+        [
+          { transform: "translateY(6px)", opacity: 0 },
+          { transform: "translateY(-2px)", opacity: 1, offset: 0.6 },
+          { transform: "none", opacity: 1 },
+        ],
+        { duration: 160, easing: "steps(3, end)", composite: "add" },
+      );
+    }
+  }
+
+  function showBanner(r: Scored, animate: boolean): void {
+    let el = ui!.querySelector<HTMLElement>(":scope > .dl-banner");
+    if (!el) {
+      el = document.createElement("div");
+      el.className = "dl-banner";
+      el.setAttribute("aria-hidden", "true");
+      ui!.append(el);
+    }
+    el.innerHTML = `<b class="dl-px25">${verdictFor(r.km)}</b><span class="dl-px15">${verdictLine(
+      r,
+    )}</span>`;
+    blockVersion++;
+    if (!animate || reduced()) return;
+    el.animate(
+      [
+        { transform: "translateY(-110%)" },
+        { transform: "translateY(-55%)", offset: 0.3 },
+        { transform: "translateY(12px)", offset: 0.62 },
+        { transform: "translateY(-3px)", offset: 0.82 },
+        { transform: "translateY(0)" },
+      ],
+      { duration: 320, easing: "steps(8, end)", fill: "backwards" },
+    );
+  }
+
+  /** The answer, as it stands once everything has landed. */
+  function settledAnswer(): Answer {
+    const pinAt = { ...pin! };
+    const b = round.bbox;
+    const place = { lat: (b.s + b.n) / 2, lon: (b.w + b.e) / 2 };
+    // The short way round: a pin in Hawaii reaches Japan off one side of the
+    // map and back in at the other. Not on a world with sea either side,
+    // where nothing comes back in: there it crosses the world, as the
+    // camera does.
+    let toLon = place.lon;
+    if (!narrowWorld()) {
+      if (toLon - pinAt.lon > 180) toLon -= 360;
+      else if (pinAt.lon - toLon > 180) toLon += 360;
+    }
+    const shift = toLon - place.lon;
+    const box = { w: b.w + shift, e: b.e + shift, s: b.s, n: b.n };
+    const to = { lon: toLon, lat: place.lat };
+    return {
+      pin: pinAt,
+      to,
+      frac: (result?.km ?? 0) > 0 ? entryFraction(pinAt, to, box) : 0,
+      t0: -1e9,
+      d: 0,
+      lag: 0,
+      settle: 0,
+      march: 0,
+      boxT: 1,
+      findT: 1,
+      lockT: 1,
+      finder: null,
+    };
+  }
+
   /**
-   * Score the guess and swap the guess panel for a receipt. `animate` is
-   * false when a finished round is restored, so nothing replays.
+   * Score the guess and play the answer onto the map. `animate` is false when
+   * a finished round is restored, so nothing replays and nothing is counted.
    */
   async function finish(animate: boolean): Promise<void> {
     if (!pin || month === null) return;
     const mine = generation;
     done = true;
-    const motion = animate && !prefersReducedMotion();
-    const { km, off, used, placePoints, monthPoints, score } = scoreGuess(
-      round,
-      { ...pin, month, lines },
-    );
-    if (mode === "extra") extra.scores[String(round.placeId)] = score;
+    const motion = animate && !reduced();
+    const r = scoreGuess(round, { ...pin, month, lines });
+    result = r;
+    if (mode === "extra") extra.scores[String(round.placeId)] = r.score;
     persist();
     // A round just played (not one restored) counts in /admin's Analytics tab.
     if (animate) {
       window.dispatchEvent(
-        new CustomEvent("tb:nn", { detail: { mode, score } }),
+        new CustomEvent("tb:nn", { detail: { mode, score: r.score } }),
       );
     }
-
-    const verdict =
-      km === 0
-        ? "Spot on"
-        : km < 400
-          ? "Near enough"
-          : km < 1500
-            ? "Right part of the world"
-            : km < 5000
-              ? "Not quite"
-              : "Wrong side of the planet";
-    const lineMs = km === 0 ? 0 : LINE_MS;
-    const kmShown = Math.round(km);
-    const distance =
-      km === 0
-        ? "Inside the boundary"
-        : `<span class="dl-num" data-daylist-km>${
-            motion ? "0" : count(kmShown)
-          }</span> km off`;
-    const unit = km === 0 ? "inside the boundary" : `${count(kmShown)} km off`;
-    const plan = planStamp(verdict, unit);
-    answerRoom = plan?.room ?? {};
-    // The verdict lands on the map as the boundary closes, and stays, in the
-    // corner the plan picked.
-    const stampVerdict = (slam: boolean) => {
-      verdictStamp?.remove();
-      const box = surface!.parentElement;
-      if (!box) return;
-      verdictStamp = stamp(box, verdict, {
-        unit,
-        className: STAMP_CLASS,
-        stay: true,
-        animate: slam,
-        tilt: STAMP_TILT,
-      });
-      if (plan) placeStamp(verdictStamp, plan);
-    };
-    const monthWhy =
-      off === 0
-        ? "Right month"
-        : `You picked ${MONTHS[month]}, ${off} ${off === 1 ? "month" : "months"} out`;
-
-    // The species still hidden stay numbered squares until the boundary is
-    // down, then fill in. Their photos start loading now.
-    for (let i = shown; i < round.clues.length; i++) paintSlot(i);
-    const fillIn = () => {
-      const from = shown;
-      shown = round.clues.length;
-      for (let i = from; i < round.clues.length; i++) {
-        paintSlot(i, animate, (i - from) * FILL_STAGGER_MS);
-      }
-      paintCredits();
-    };
-    if (motion) {
-      for (const clue of round.clues.slice(used)) preloadPhoto(clue.photo);
-    }
-
+    openHow(false);
+    hot = null;
+    buildPost(r);
+    root.classList.add("is-done");
     surface!.classList.add("is-done");
-    surface!.setAttribute(
-      "aria-label",
-      `World map showing your pin and ${round.name}.`,
-    );
-    syncLock();
-
-    const canNext = mode === "extra" && extra.played.length < EXTRA_PER_DAY;
-    const shareLabel = sharesNatively() ? "Share result" : "Copy result";
-    const actions =
-      mode === "daily"
-        ? `<button type="button" class="btn btn-ink" data-daylist-to-extra>Play more lists</button>
-           <button type="button" class="btn" data-daylist-copy>${shareLabel}</button>`
-        : canNext
-          ? `<button type="button" class="btn btn-ink" data-daylist-next>Next list</button>`
-          : "";
-    guessPanel!.hidden = true;
+    // The title panel, the hand and the guess slide away for the verdict,
+    // keys and all, and the hand keeps the cards it had as it goes.
+    titlePanel!.inert = true;
+    hand!.inert = true;
+    guessPanel!.inert = true;
     resultSlot!.hidden = false;
-    // While the answer lands, the verdict and the place are held back so the
-    // panel can't give away what the map is about to show.
-    resultSlot!.innerHTML = `
-      <div class="dl-result__head${motion ? " is-held" : ""}" data-daylist-head>
-        <p class="dl-verdict">${verdict}</p>
-        <h3 class="dl-place" tabindex="-1" data-daylist-place>${escapeHtml(round.name)}</h3>
-        <p class="dl-region">${escapeHtml(round.region)} &middot; ${
-          MONTHS[round.month - 1]
-        }</p>
-      </div>
-      <dl class="dl-receipt">
-        <div>
-          <dt>Place</dt>
-          <dd class="dl-receipt__pts">${count(placePoints)}</dd>
-          <dd class="dl-receipt__why">${distance}, with ${used} of ${round.clues.length} species showing</dd>
-        </div>
-        <div>
-          <dt>Month</dt>
-          <dd class="dl-receipt__pts">${count(monthPoints)}</dd>
-          <dd class="dl-receipt__why">${monthWhy}</dd>
-        </div>
-        <div class="dl-receipt__total">
-          <dt>Total</dt>
-          <dd class="dl-receipt__pts"><span class="dl-score" data-daylist-score>${
-            motion ? "0" : count(score)
-          }</span></dd>
-        </div>
-      </dl>
-      <div class="dl-actions">
-        ${actions}
-        <a class="btn" href="https://www.inaturalist.org/places/${
-          round.placeId
-        }" target="_blank" rel="noopener noreferrer">See the place</a>
-      </div>
-      <p class="dl-next">${
-        mode === "daily" ? "A new list turns up tomorrow" : extraRow()
-      }</p>`;
-
-    const copy = resultSlot!.querySelector<HTMLButtonElement>(
-      "[data-daylist-copy]",
-    );
-    copy?.addEventListener("click", async () => {
-      const text = shareText({
-        list: (day % ROUNDS.length) + 1,
-        date: new Date(),
-        km,
-        off,
-        used,
-        total: round.clues.length,
-        score,
-      });
-      if (sharesNatively()) {
-        try {
-          await navigator.share({ text });
-          return;
-        } catch (error) {
-          // Closing the share sheet is a choice, not a failure.
-          if ((error as DOMException)?.name === "AbortError") return;
-        }
-      }
-      let copied = false;
-      try {
-        await navigator.clipboard.writeText(text);
-        copied = true;
-      } catch {
-        copied = false;
-      }
-      copy.textContent = copied ? "Copied" : "Couldn't copy";
-      window.setTimeout(() => {
-        copy.textContent = shareLabel;
-      }, 1800);
-    });
-    resultSlot!
-      .querySelector("[data-daylist-to-extra]")
-      ?.addEventListener("click", () => void setMode("extra", true));
-    resultSlot!
-      .querySelector("[data-daylist-next]")
-      ?.addEventListener("click", () => startExtra(true));
-
+    resultSlot!.style.visibility = "hidden";
+    answerRoom = room();
+    resultSlot!.hidden = true;
+    resultSlot!.style.visibility = "";
+    paintCredits();
     renderFullList();
-
-    if (animate) {
-      // Screen readers hear the place first. The map is kept in view so the
-      // answer can be watched landing; on a phone the result sits under it.
-      resultSlot!
-        .querySelector<HTMLElement>("[data-daylist-place]")
-        ?.focus({ preventScroll: true });
-      surface!.scrollIntoView({
-        block: "nearest",
-        behavior: motion ? "smooth" : "auto",
-      });
+    syncLock();
+    blockVersion++;
+    if (phone) {
+      layoutAnswerPhone();
+      // Let the map take its new size before the camera moves.
+      await frames2();
+      if (mine !== generation) return;
     }
+
+    const landed = () => {
+      surface!.setAttribute(
+        "aria-label",
+        `World map showing your pin and ${round.name}. Arrow keys look around once zoomed in.`,
+      );
+      if (announce && animate) {
+        announce.textContent =
+          `${verdictFor(r.km)}. ${round.name}, ${round.region}, in ${MONTHS[round.month - 1]}. ` +
+          `${verdictLine(r)}. ${count(r.score)} points.`;
+      }
+    };
 
     if (!motion) {
-      lineT = 1;
-      boxT = 1;
-      fillIn();
-      await map!.fit(answerBox(), { animate: false, room: answerRoom });
-      stampVerdict(false);
+      // A round restored as the page loads: let the map take its size first.
+      if (!animate) await frames2();
+      if (mine !== generation) return;
+      await m.fit(answerBox(), { animate: false, room: answerRoom });
+      if (mine !== generation) return;
+      ans = settledAnswer();
+      showCoords();
+      typeCoords(1);
+      showName(false);
+      showBanner(r, false);
+      stakesUp!.textContent = "Your score";
+      worthEl!.dataset.value = String(r.score);
+      worthEl!.textContent = count(r.score);
+      showPost(false);
+      landed();
+      blockVersion++;
+      m.redraw();
+      syncMapControls(m);
+      if (animate) {
+        resultSlot!
+          .querySelector<HTMLElement>("[data-daylist-place]")
+          ?.focus({ preventScroll: true });
+      }
       return;
     }
 
-    // The numbers start straight away, so nothing sits at zero. The distance
-    // reaches its value as the line reaches the place, and the total as the
-    // boundary closes.
     revealing = true;
-    const kmEl = resultSlot!.querySelector<HTMLElement>("[data-daylist-km]");
-    if (kmEl) {
-      kmEl.dataset.value = "0";
-      rollTo(kmEl, kmShown, { ms: CAMERA_MS + lineMs });
-    }
-    const scoreEl = resultSlot!.querySelector<HTMLElement>(
-      "[data-daylist-score]",
-    );
-    if (scoreEl) {
-      scoreEl.dataset.value = "0";
-      rollTo(scoreEl, score, { ms: CAMERA_MS + lineMs + BOX_MS });
-    }
-
-    lineT = 0;
-    boxT = 0;
-    map!.redraw();
-    syncMapControls(map!);
-    // The pin presses into the map as the camera settles on it, and the line
-    // leaves as it comes back up.
-    pins.press(CAMERA_MS - PRESS_DOWN_MS);
-    await map!.fit(answerBox(), {
+    syncMapControls(m);
+    // The pin presses into the map as the camera settles on it, and the
+    // bullseye leaves as it comes back up.
+    pins.press(220 + CAMERA_MS - PRESS_DOWN_MS);
+    m.redraw();
+    await wait(220);
+    if (mine !== generation) return;
+    blockVersion++;
+    await m.fit(answerBox(), {
       animate: true,
       ms: CAMERA_MS,
       room: answerRoom,
     });
     if (mine !== generation) return;
 
-    playReveal(lineMs, mine, () => {
-      revealing = false;
-      fillIn();
-      stampVerdict(true);
-      resultSlot!
-        .querySelector("[data-daylist-head]")
-        ?.classList.remove("is-held");
-      map!.redraw();
-      syncMapControls(map!);
+    // The whole bullseye slides from the pin to the place's middle, the
+    // dotted line marching out behind it.
+    const a = settledAnswer();
+    const from = m.project(a.pin.lon, a.pin.lat);
+    const to = m.project(a.to.lon, a.to.lat);
+    const span = Math.hypot(to.x - from.x, to.y - from.y);
+    a.t0 = now();
+    a.d = clamp(420 + span * 0.8, 480, 980);
+    a.lag = 34;
+    a.boxT = 0;
+    a.findT = 0;
+    a.lockT = 0;
+    ans = a;
+    const t0 = now();
+    const slideFor = a.d + 5 * a.lag;
+    await new Promise<void>((resolve) => {
+      const step = () => {
+        if (mine !== generation) return resolve();
+        a.march = now() - t0;
+        m.redraw();
+        if (now() - t0 < slideFor) requestAnimationFrame(step);
+        else resolve();
+      };
+      requestAnimationFrame(step);
     });
+    if (mine !== generation) return;
+
+    // The rings settle round the place, the boundary inks in at their
+    // middle, and the finder closes in on it in whole pixels.
+    a.settle = now();
+    await Promise.all([
+      tween(
+        300,
+        (k) => {
+          a.boxT = k;
+          m.redraw();
+        },
+        (k) => Math.round(k * 12) / 12,
+      ),
+      tween(
+        620,
+        (k) => {
+          a.findT = k;
+          m.redraw();
+        },
+        (k) => k,
+      ),
+    ]);
+    if (mine !== generation) return;
+    // It locks on: one pulse, the ticks grow, the coordinates print.
+    showCoords();
+    await tween(
+      220,
+      (k) => {
+        a.lockT = k;
+        typeCoords(k);
+        m.redraw();
+      },
+      (k) => k,
+    );
+    if (mine !== generation) return;
+    typeCoords(1);
+
+    // Now the map has said where, its name goes up, and the verdict drops in.
+    showName(true);
+    showBanner(r, true);
+    blockVersion++;
+    m.redraw();
+    landed();
+    await wait(160);
+    if (mine !== generation) return;
+    stakesUp!.textContent = "Your score";
+    const ms = Math.min(1100, 300 + r.score / 8);
+    const counting = countTo(worthEl!, r.score, ms, 0);
+    worthEl!.animate(
+      [{ transform: "scale(1.12)" }, { transform: "scale(1)" }],
+      {
+        duration: 140,
+        easing: "steps(2, end)",
+      },
+    );
+    showPost(true);
+    const total = resultSlot!.querySelector<HTMLElement>(
+      "[data-daylist-score]",
+    );
+    if (total) void countTo(total, r.score, ms, 0);
+    revealing = false;
+    syncMapControls(m);
+    resultSlot!
+      .querySelector<HTMLElement>("[data-daylist-place]")
+      ?.focus({ preventScroll: true });
+    await counting;
+    if (mine !== generation) return;
+    blockVersion++;
+    m.redraw();
+    worthEl!.animate(
+      [{ transform: "translateY(-6px) scale(1.12)" }, { transform: "none" }],
+      { duration: 200, easing: "steps(3, end)" },
+    );
   }
 
   lockBtn.addEventListener("click", () => {
-    if (done || !pin || month === null) return;
+    if (done || revealing || !pin || month === null) return;
     void finish(true);
+  });
+
+  /* --------------------------------------------------------- the full list */
+
+  function paintCredits(): void {
+    if (creditList)
+      creditList.innerHTML = photoCredits(
+        round.clues,
+        done ? round.clues.length : lines,
+      );
+  }
+
+  /** Everything about the six, now that the answer is out. */
+  function renderFullList(): void {
+    if (!rollSlot) return;
+    const inMonth = MONTHS[round.month - 1];
+    rollSlot.innerHTML = round.clues
+      .map((clue, j) => {
+        const name = escapeHtml(speciesName(clue.name));
+        const status = [STANDING_LABEL[clue.standing], clue.rank]
+          .filter(Boolean)
+          .map(escapeHtml)
+          .join(" &middot; ");
+        const fact = clue.fact ? tidyFact(clue.fact, clue.sci) : "";
+        const links = [
+          clue.wiki
+            ? `<a href="${escapeHtml(clue.wiki)}" target="_blank" rel="noopener noreferrer">Wikipedia</a>`
+            : "",
+          `<a href="https://www.inaturalist.org/taxa/${clue.id}" target="_blank" rel="noopener noreferrer">iNaturalist</a>`,
+        ]
+          .filter(Boolean)
+          .join(" &middot; ");
+        return `<li class="dl-entry" data-tint="${j}" style="--c: ${tintOf(j).hex}">
+          <div class="dl-entry-pic"><img src="${escapeHtml(
+            clue.photo,
+          )}" alt="" width="500" height="500" loading="lazy" decoding="async" crossorigin="anonymous"><span class="dl-px25" aria-hidden="true">${
+            j + 1
+          }</span></div>
+          <p class="dl-entry-name">${name}</p>
+          <p class="dl-entry-sci"><i>${escapeHtml(clue.sci)}</i>${
+            status
+              ? ` &middot; <span class="dl-entry-status">${status}</span>`
+              : ""
+          }</p>
+          <p class="dl-entry-meta">Seen here ${count(clue.local)} ${
+            clue.local === 1 ? "time" : "times"
+          } in ${inMonth} &middot; ${count(clue.global)} worldwide &middot; ${links}</p>
+          ${fact ? `<p class="dl-entry-fact">${escapeHtml(fact)}</p>` : ""}
+        </li>`;
+      })
+      .join("");
+  }
+
+  let sheetOpener: HTMLElement | null = null;
+  function openSheet(opener: HTMLElement): void {
+    if (!sheet || sheet.open) return;
+    sheetOpener = opener;
+    if (credits) credits.open = false;
+    sheet.showModal();
+    const body = sheet.querySelector(".dl-sheet-body");
+    if (body) body.scrollTop = 0;
+    sheetClose?.focus();
+  }
+  function closeSheet(): void {
+    if (!sheet?.open) return;
+    sheet.close();
+  }
+  sheet?.addEventListener("close", () => {
+    sheetOpener?.focus({ preventScroll: true });
+    sheetOpener = null;
+  });
+  sheetClose?.addEventListener("click", closeSheet);
+  // A click on the backdrop, outside the sheet's own box, closes it too.
+  sheet?.addEventListener("click", (e) => {
+    if (e.target !== sheet) return;
+    const r = sheet.getBoundingClientRect();
+    const inside =
+      e.clientX >= r.left &&
+      e.clientX <= r.right &&
+      e.clientY >= r.top &&
+      e.clientY <= r.bottom;
+    if (!inside) closeSheet();
+  });
+
+  resultSlot.addEventListener("click", async (event) => {
+    const target = event.target as Element | null;
+    if (target?.closest("[data-daylist-to-extra]")) {
+      void setMode("extra", true);
+      return;
+    }
+    if (target?.closest("[data-daylist-to-daily]")) {
+      void setMode("daily", true);
+      return;
+    }
+    if (target?.closest("[data-daylist-next]")) {
+      const keyboard = event.detail === 0;
+      startExtra();
+      if (keyboard) {
+        setTimeout(
+          () =>
+            tray!.querySelector<HTMLElement>("[data-daylist-more]")?.focus(),
+          reduced() ? 0 : 300,
+        );
+      }
+      return;
+    }
+    const listKey = target?.closest<HTMLElement>("[data-daylist-list]");
+    if (listKey) {
+      openSheet(listKey);
+      return;
+    }
+    const copy = target?.closest<HTMLButtonElement>("[data-daylist-copy]");
+    if (!copy || !result) return;
+    const shareLabel = sharesNatively() ? "Share result" : "Copy result";
+    const text = shareText({
+      list: (day % ROUNDS.length) + 1,
+      date: new Date(),
+      km: result.km,
+      off: result.off,
+      used: result.used,
+      total: round.clues.length,
+      score: result.score,
+    });
+    if (sharesNatively()) {
+      try {
+        await navigator.share({ text });
+        return;
+      } catch (error) {
+        // Closing the share sheet is a choice, not a failure.
+        if ((error as DOMException)?.name === "AbortError") return;
+      }
+    }
+    let copied = false;
+    try {
+      await navigator.clipboard.writeText(text);
+      copied = true;
+    } catch {
+      copied = false;
+    }
+    copy.textContent = copied ? "Copied" : "Couldn't copy";
+    window.setTimeout(() => {
+      copy.textContent = shareLabel;
+    }, 1800);
   });
 
   /* ------------------------------------------------------------ rounds */
@@ -1748,59 +3330,139 @@ export function initDayList(root: HTMLElement): void {
       metaEl.textContent = DATE_LONG.format(new Date());
       return;
     }
-    const at = Math.max(1, extra.played.indexOf(round.placeId) + 1);
-    metaEl.textContent = `List ${at} of ${EXTRA_PER_DAY} today`;
+    const n = Math.max(1, extra.played.indexOf(round.placeId) + 1);
+    metaEl.textContent = `List ${n} of ${EXTRA_PER_DAY} today`;
   }
+
+  /** Resolves once the hobby scene that opened the page has gone. */
+  const uncovered = new Promise<void>((resolve) => {
+    if (covered()) whenUncovered(resolve);
+    else resolve();
+  });
 
   /** Put a round on the board, as far along as `progress` says. */
   function loadRound(next: Round, progress: Progress | null): void {
     generation++;
+    const mine = generation;
     revealing = false;
     pins.clear();
-    verdictStamp?.remove();
-    verdictStamp = null;
-    answerRoom = {};
     round = next;
     lines = clamp(progress?.lines ?? 1, 1, next.clues.length);
-    shown = lines;
     pin =
       progress && isNum(progress.lat) && isNum(progress.lon)
         ? { lat: progress.lat, lon: progress.lon }
         : null;
     month = progress && isNum(progress.month) ? progress.month : null;
     done = false;
-    lineT = 1;
-    boxT = 1;
+    result = null;
+    answerRoom = {};
+    ans = null;
+    answerShown = false;
+    tints = null;
+    pinfo = [];
+    ready = false;
+    hot = null;
+    breath = null;
+    restAt = null;
+    centre = null;
+    lay = [];
+    rings = round.clues.map((c, k) => ({
+      km: c.reach ? reachKm(c.reach) : null,
+      shown: k < lines,
+      t0: -1e9,
+      d: 0,
+      from: 0,
+      flying: false,
+      landed: k < lines ? 1 : 0,
+    }));
 
+    root.classList.remove("is-done");
     surface!.classList.remove("is-done");
+    titlePanel!.inert = false;
+    hand!.inert = false;
+    guessPanel!.inert = false;
     surface!.classList.toggle("is-placed", Boolean(pin));
     surface!.setAttribute("aria-label", MAP_LABEL);
-    monthInputs.forEach((input) => {
-      input.checked = month !== null && Number(input.value) === month;
-    });
-    guessPanel!.hidden = false;
     resultSlot!.hidden = true;
     resultSlot!.innerHTML = "";
+    ui!.querySelector(":scope > .dl-banner")?.remove();
+    labels!.innerHTML = "";
+    labelEls.length = 0;
+    hintEl = null;
+    if (sheet?.open) sheet.close();
     if (rollSlot) rollSlot.innerHTML = "";
-    // Left open, the footnote would show the next round's names as they come.
+    // Left open, the credits would show the next round's names as they come.
     if (credits) credits.open = false;
     if (announce) announce.textContent = "";
+    openHow(false);
+    for (const c of round.clues) photo(c.photo);
+    tray!.innerHTML = round.clues.map(() => "<li></li>").join("");
+    round.clues.forEach((_, j) => slot(j));
+    hand!.classList.add("is-waiting");
+    if (phone) layout();
     // A new round's ceiling is set, not counted down from the last one's.
-    if (worthEl) delete worthEl.dataset.value;
-    for (let i = 0; i < slots.length; i++) paintSlot(i);
-    paintCredits();
-    describeGuess();
+    worthEl!.dataset.value = String(bestPossible(lines));
+    worthEl!.textContent = count(bestPossible(lines));
+    stakesUp!.textContent = "Up to";
+    reachEl!.textContent = "?";
+    syncMonths();
     syncLock();
-    syncWorth();
     syncMeta();
-    void map!.reset(false);
+    paintCredits();
+    void m.reset(false);
+    blockVersion++;
+    m.redraw();
 
-    if (progress?.done && pin && month !== null) void finish(false);
-    else preloadNext();
+    const finished = Boolean(progress?.done && pin && month !== null);
+    // Colour comes from the photos, once they're in, then the hand is dealt
+    // and the first ring opens out round the lens.
+    const loaded = Promise.all(round.clues.map((c) => photoInfo(c.photo))).then(
+      (list) => {
+        if (mine !== generation) return;
+        pinfo = list;
+        tints = assignTints(list.map((x) => x.hues));
+        paintTints();
+        m.redraw();
+      },
+    );
+    const dealt = Promise.race([
+      loaded,
+      new Promise((r) => setTimeout(r, 600)),
+    ]);
+    void Promise.all([dealt, uncovered]).then(() => {
+      if (mine !== generation) return;
+      ready = true;
+      round.clues.forEach((_, j) => slot(j));
+      hand!.classList.remove("is-waiting");
+      if (!reduced() && !finished) {
+        Array.from(tray!.children).forEach((li, j) => {
+          li.animate(
+            [
+              { transform: "translateY(48px)", opacity: 0 },
+              { transform: "translateY(-8px)", opacity: 1, offset: 0.6 },
+              { transform: "translateY(2px)", opacity: 1, offset: 0.8 },
+              { transform: "none", opacity: 1 },
+            ],
+            {
+              duration: 240,
+              delay: j * 45,
+              easing: "steps(5, end)",
+              fill: "backwards",
+            },
+          );
+        });
+        breath = { t0: now() + 60, d: 1100 };
+        rings[0].landed = now() + 380;
+      }
+      blockVersion++;
+      m.redraw();
+    });
+
+    if (finished) void finish(false);
   }
 
   /** Deal the next extra list, if today's ten aren't used up. */
-  function startExtra(scroll: boolean): void {
+  function startExtra(): void {
     if (!extraPool?.length) return;
     if (extra.played.length >= EXTRA_PER_DAY) return;
     const id = pickExtra(
@@ -1817,12 +3479,6 @@ export function initDayList(root: HTMLElement): void {
     const next = extraPool.find((r) => r.placeId === id);
     if (!next) return;
     loadRound(next, extra.current);
-    if (scroll) {
-      board?.scrollIntoView({
-        block: "start",
-        behavior: prefersReducedMotion() ? "auto" : "smooth",
-      });
-    }
   }
 
   /** The tabs, the board's title and the URL say which list this is. */
@@ -1835,8 +3491,8 @@ export function initDayList(root: HTMLElement): void {
           String(option.dataset.value === next),
         ),
       );
-    if (titleEl) {
-      titleEl.textContent = next === "daily" ? "Today's list" : "More lists";
+    if (boardTitle) {
+      boardTitle.textContent = next === "daily" ? "Today's list" : "More lists";
     }
     if (fromUser) {
       const url = `${location.pathname}${location.search}${
@@ -1853,8 +3509,9 @@ export function initDayList(root: HTMLElement): void {
    */
   function setBusy(busy: boolean): void {
     tray!.inert = busy;
-    if (playArea) playArea.inert = busy;
-    board?.classList.toggle("is-loading", busy);
+    guessPanel!.inert = busy || done;
+    surface!.inert = busy;
+    root.classList.toggle("is-loading", busy);
   }
 
   // The mode asked for last. `mode` changes only once that mode's round is on
@@ -1903,19 +3560,12 @@ export function initDayList(root: HTMLElement): void {
     if (current && extra.current) {
       loadRound(current, extra.current);
     } else if (extra.played.length < EXTRA_PER_DAY) {
-      startExtra(false);
+      startExtra();
     } else {
       // Ten played but none to show, which only a cleared or edited store
       // can cause. Today's list is still there to play.
       await setMode("daily", false);
       if (metaEl) metaEl.textContent = "That's all ten more lists for today";
-      return;
-    }
-    if (fromUser) {
-      board?.scrollIntoView({
-        block: "start",
-        behavior: prefersReducedMotion() ? "auto" : "smooth",
-      });
     }
   }
 
@@ -1930,5 +3580,15 @@ export function initDayList(root: HTMLElement): void {
 
   /* ---------------------------------------------------------------- boot */
 
+  addEventListener("resize", () => {
+    layout();
+    if (done && pin && !revealing)
+      void m.fit(answerBox(), { animate: false, room: answerRoom });
+  });
+  layout();
   void setMode(location.hash === "#more-lists" ? "extra" : "daily", false);
+  document.fonts?.ready.then(() => {
+    widths.clear();
+    layout();
+  });
 }

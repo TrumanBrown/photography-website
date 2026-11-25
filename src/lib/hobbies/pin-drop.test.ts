@@ -14,7 +14,6 @@ import {
   RING_TO,
   SQUASH_MS,
   createPinMotion,
-  dealFrames,
   dropPose,
   liftPose,
   planDrop,
@@ -139,35 +138,6 @@ describe("pressPose", () => {
       const p = pressPose(ms);
       expect(Math.abs(p.sx - prev.sx)).toBeLessThan(0.02);
       prev = p;
-    }
-  });
-});
-
-describe("dealFrames", () => {
-  const frames = dealFrames(14, -6, 1.2);
-
-  it("slides in unseen from the next square and settles square", () => {
-    const offsets = frames.map((frame) => frame.offset as number);
-    expect(offsets[0]).toBe(0);
-    expect(offsets.at(-1)).toBe(1);
-    for (let i = 1; i < offsets.length; i++) {
-      expect(offsets[i]).toBeGreaterThan(offsets[i - 1]);
-    }
-    expect(frames[0].opacity).toBe(0);
-    expect(frames[0].transform).toBe(
-      "translate(14.00px, -6.00px) rotate(1.20deg)",
-    );
-    expect(frames.at(-1)!.opacity).toBe(1);
-    expect(frames.at(-1)!.transform).toBe(
-      "translate(0.00px, 0.00px) rotate(0.00deg)",
-    );
-  });
-
-  it("only animates transform and opacity", () => {
-    for (const frame of frames) {
-      for (const key of Object.keys(frame)) {
-        expect(["offset", "opacity", "transform", "easing"]).toContain(key);
-      }
     }
   });
 });
@@ -329,5 +299,28 @@ describe("createPinMotion", () => {
     const { ctx, circles } = recorder();
     expect(m.draw(ctx, project, "#000", null)).toBe(false);
     expect(circles).toHaveLength(0);
+  });
+
+  it("hands the same poses to a map that draws its own pin", () => {
+    const m = pins();
+    m.drop(at(0), null);
+    clock = 20;
+    m.drop(at(100), at(0));
+    clock = 300;
+    const f = m.frame(at(100));
+    expect(f.busy).toBe(true);
+    expect(f.rings.map((r) => r.at.lon).sort((a, b) => a - b)).toEqual([
+      0, 100,
+    ]);
+    expect(f.lifting).toHaveLength(0);
+    expect(f.pin).toBe(REST);
+    clock = 2000;
+    expect(m.frame(at(100))).toEqual({
+      rings: [],
+      lifting: [],
+      pin: REST,
+      busy: false,
+    });
+    expect(m.frame(null).pin).toBeNull();
   });
 });

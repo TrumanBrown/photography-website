@@ -102,8 +102,8 @@ A few interaction details come from React component libraries (Cult UI, Watermel
 | `playReveal()`: a find's photo arrives in the card, by lifting off the scene, under a hand lens or dropped like a print | [specimen-reveal.ts](../src/lib/hobbies/specimen-reveal.ts)  | The aquarium's fish jump, and a hand lens                     | The tide pooling and herping reveal cards, replacing the pixel reveal (Magic UI `pixel-image`) in November 2026 |
 | `.hike-print.developing`: the finished canvas comes up pale and soft under a dot grain, reaching full contrast in 1.7s     | [PixelHike.astro](../src/components/hobbies/PixelHike.astro) | Cult UI `dither-image`, Magic UI `pixel-image`                | The hiking postcard                                                                                   |
 | `makePostmark()`: a round postmark, a name round the top and the day in the middle, worn in places like a real one         | [postmark.ts](../src/lib/postmark.ts)                        | A post office's round date stamp                              | The hiking postcard's corner, and the envelope a message folds into once "Write to me" sends it       |
-| `stamp(host, text)`: a cost stamped in red ink on the thing it bought; it slams down, sits, then drifts down and fades     | `motion.ts`, `global.css`                                    | Games' floating score text (Krillion's point pops)            | Narrow nature, on each species you pay to see                                                         |
-| `stamp(host, text, { stay: true })`: the same slam in ink, staying put as the record of a result                           | `motion.ts`, `global.css`                                    | A rubber stamp                                                | Narrow nature's verdict, first finds in tide pooling and herping                                      |
+| `stamp(host, text)`: a cost stamped in red ink on the thing it bought; it slams down, sits, then drifts down and fades     | `motion.ts`, `global.css`                                    | Games' floating score text (Krillion's point pops)            | Hiking's "Full, 10 of 10" when the trail is full, in ink                                              |
+| `stamp(host, text, { stay: true })`: the same slam in ink, staying put as the record of a result                           | `motion.ts`, `global.css`                                    | A rubber stamp                                                | First finds in tide pooling and herping                                                               |
 | `journalHop()`: a first find's copy arcs into the journal's count and goes to ink, and the count rolls as it lands         | [journal-hop.ts](../src/lib/hobbies/journal-hop.ts)          | The aquarium's fish jump (`jumpArc`)                          | Tide pooling and herping, as the card closes on a first find                                          |
 
 `.utabs` groups pick one value, so they're `role="radiogroup"` with `<button role="radio" aria-checked>` options. The bar follows `aria-checked` however it changes, so an engine that restores state (undo, start over) only has to set the attribute. Everything above settles instantly under `prefers-reduced-motion`.
@@ -111,7 +111,7 @@ A few interaction details come from React component libraries (Cult UI, Watermel
 The other shared pieces:
 
 - `.u-label` (the archive's tracked caps label), `.btn` / `.btn-ink` (square, a rule for a border; ink for the one primary action), `.linkbtn` (a text button, 32px tall), `.range` (a slider: a 1px ink-2 line for the track and a square ink thumb on a 24px tall input, for hiking's route length and terrain points and the aquarium's tank size), and `.shead` / `.shead-blurb` / `.shead-link` (a light section heading with a plain count or link on the right). All in `global.css`.
-- [canvas-font.ts](../src/lib/canvas-font.ts): `canvasFont(size, 300 | 400)` and `canvasFontReady()`, for any text a canvas draws (the herp and fishing maps, the hiking editor and postcard, the postmark, Narrow nature's answer). See island convention 8.
+- [canvas-font.ts](../src/lib/canvas-font.ts): `canvasFont(size, 300 | 400)` and `canvasFontReady()`, for any text a canvas draws (the herp and fishing maps, the hiking editor and postcard, the postmark). See island convention 8.
 - [FieldJournal.astro](../src/components/hobbies/FieldJournal.astro) and [SpecimenCard.astro](../src/components/hobbies/SpecimenCard.astro): the journal row and the reveal card shared by tide pooling and herping, driven through `data-tp-*` / `data-hp-*` hooks. The card is a modal: focus moves to its button, Escape or the scrim closes it, and focus returns.
 - Every card, on `/hobbies/` and in the home page's band, ends with the hobby's verb and an arrow ("Guess where →", "Take the wheel →"), from `hobbyVerb()` in [src/lib/hobbies.ts](../src/lib/hobbies.ts), so it says it can be played. On `/hobbies/` the verb sits at the foot of the card, so the verbs line up along a row whatever the summary's length. The `summary` above it is also the page's meta description and link-preview text.
 - [species-name.js](../src/lib/species-name.js): `speciesName()` puts a common name in sentence case and keeps proper nouns ("Western red-backed salamander", "Prince Henry's laughingthrush", "New Zealand red admiral"). Every name from iNaturalist goes through it (the birding life list and its family headings, the observations grid, the herp map, Narrow nature), and the photo captions pipeline uses the same function, so there's one list of proper nouns. A proper noun it lowercases goes in its lists, with a case in `species-name.test.ts`. Names typed into the hobby data are already sentence case, and `species-facts.test.ts` checks them.
@@ -482,14 +482,21 @@ More lists deals up to ten more a day per browser, from a separate set of places
 
 **Files**
 
-- [src/components/hobbies/DayList.astro](../src/components/hobbies/DayList.astro), the markup:
-  the how-to-play steps, the board (mode tabs, species tray, map and its controls, guess panel), the
-  month radios, and the styles.
+- [src/components/hobbies/DayList.astro](../src/components/hobbies/DayList.astro), the markup and
+  styles: the title panel (rules line, How to play, mode tabs), the score and reach panels, the map,
+  the hand of six cards, the month keys and Lock it in, the postcard and the full list sheet.
 - [src/lib/hobbies/day-list.ts](../src/lib/hobbies/day-list.ts), the engine: both modes and their
-  saved state, the species tray and its reveal, the points ceiling, pin and keyboard guessing,
-  scoring, the reveal on the map, the result receipt, share string and the full list.
+  saved state, the cards and what a turn does, the points ceiling, the rings, pin and keyboard
+  guessing, scoring, the answer on the map, the postcard, share string and the full list.
+- [src/lib/hobbies/day-list-pixel.ts](../src/lib/hobbies/day-list-pixel.ts), the pixel world: the
+  day and night palettes, repainting the map's pixels in them, and drawing the rings, pin, tokens,
+  line and finder box into the same pixels.
+- [src/lib/hobbies/day-list-tints.ts](../src/lib/hobbies/day-list-tints.ts), the ring colours,
+  picked from each species' photo.
 - [src/lib/hobbies/day-list-map.ts](../src/lib/hobbies/day-list-map.ts), the map: zoom and pan,
   gestures, the terrain tiles and their palette, the graticule, and the camera moves the reveal uses.
+- [src/lib/hobbies/pin-drop.ts](../src/lib/hobbies/pin-drop.ts), how the pin drops, lifts and
+  presses in.
 - [src/lib/hobbies/day-list-borders.ts](../src/lib/hobbies/day-list-borders.ts), the country and
   state borders drawn over the map, from the files in `src/lib/hobbies/day-list-borders/`.
 - [src/lib/hobbies/day-list.json](../src/lib/hobbies/day-list.json), the daily set, and
@@ -514,103 +521,152 @@ address ([staticwebapp.config.json](../staticwebapp.config.json)), so old bookma
 code keeps the old name: the files, the `dayList` block, the `data-daylist-*` hooks and the
 saved-progress keys, so saved rounds carry over. The title and the share text say Narrow nature.
 `order: 0` puts it first in Things to try, since it's the one people come back to every day. The
-block is still opt-in per hobby, so it can be dropped onto any other hobby page by adding:
+game is switched on by this block in the hobby's JSON:
 
 ```json
 "dayList": { "heading": "Today's list" }
 ```
+
+A hobby with it gets the game in place of the usual hobby page: `[slug].astro` hands
+[BaseLayout.astro](../src/layouts/BaseLayout.astro) `section="game"`, which leaves out the site
+header, footer and skip link, and renders only `DayList` (with the hobby's title for its h1) inside
+the `data-toy` wrapper the analytics count plays by. The hobby's `intro`, facts line and gallery
+aren't shown there. The `summary` is still the page description and the card's line.
 
 Its card, on `/hobbies/` and in the home page's band, ends "Guess where →" (`hobbyVerb()` in
 [src/lib/hobbies.ts](../src/lib/hobbies.ts)).
 
 ### How the page reads
 
-People who tried the first version couldn't tell what the game was. It had three explanations with
-three different metaphors, and the cost of each extra species was never shown. The page now leads
-with the rules and uses one set of words throughout:
+The game takes the whole screen. People who tried the first version couldn't tell what the game was,
+so for a while the premise and four numbered steps were the biggest thing on the page. That fixed
+the confusion and left a wall of text, with nothing on the page that moved like a game (2026-11-24).
+Truman pointed at Krillion, which is almost all graphics, and picked mock D from two rounds of mocks
+(the design-mocks skill has both): a pixel world map, a ring for each species, and a red finder box
+for the answer.
 
-- **Premise, then steps.** The hobby `intro` is the premise in one line ("Six species were all seen
-  at the same place in the same month. Guess where and when."). Under it, "How to play" is four
-  numbered steps in the largest body text on the page. They use the same words as the controls
-  ("show the next one", "tap the map", "Lock it in") and say that there's only one guess.
-- **The six species are the board.** Six squares, three to a row at every width, sit under a
-  "Widespread → Local" rule. A shown species gets its photo, name, Latin name and how far from the
-  place half its sightings are ("Half its sightings within 3,300 km of the spot", `reachLine`), so
-  the numbers shrink across the row and show how much each one narrows. The next square is the
-  button and says what it costs ("−600 points"), and the rest wait with their number. The photos are up to 360px across, so on a laptop the map sits below
-  them. That's more than iNaturalist's 500px medium size holds on a sharp screen, so each photo
-  also offers the 1024px large size (`photoSrcset`) and the browser picks whichever the screen
-  needs. Preloads ask for the same size, so a reveal is still instant.
-- **Photo credits are a closed footnote.** A photographer's name can give the place away, so
-  credits aren't under the photos. They sit in a "Photo credits" `<details>` at the foot of the
-  page, which lists only the photos on the board (`photoCredits`) and closes again whenever a new
-  round loads. CC BY and CC BY-NC are still met, since the credit is on the same page as the photo.
-- **The stakes stay on screen.** The guess panel opens with "Up to 6,000 points", the most a perfect
-  guess can still score (`bestPossible`). It rolls down with each species you ask for (`rollTo`).
-  The panel is under the map, usually off screen when you ask, so the price is also stamped in red
-  on the corner of the species it bought (`stamp()` in [motion.ts](../src/lib/motion.ts)). It slams
-  down, sits for half a second, then drifts down toward the points and fades. The species itself is
-  dealt into its square: it slides in 10 to 18px from the square the next one sits in, turned a
-  degree, and settles square over 230ms (`dealFrames` in
-  [pin-drop.ts](../src/lib/hobbies/pin-drop.ts)). The stamp waits about 110ms (`DEAL_MS` less
-  `STAMP_TOUCH_MS`, the moment a stamp touches the paper) so it lands as the card settles. Each fast
-  press deals its own card and stamp. Under reduced motion the species appears in place and the
-  stamp comes with it, as before. Once the answer is down,
-  the verdict ("Spot on", "Not quite"...) is stamped in ink with the distance under it, and stays
-  there with the result. It goes in the map corner farthest from your pin, the line and the place
-  (`placeVerdict`), worked out before the camera moves and clear of the zoom buttons and the scale
-  bar. A phone's map is short enough that sometimes no corner is clear: then the framing leaves a
-  band for the stamp along the top or bottom, and when the answer spans so much of the world that
-  the map can't move, the stamp slides along an edge to the clearest spot.
-- **The result is a receipt.** "Lock it in" swaps the panel for the verdict, the place and where the
-  points came from: Place (distance, and how many species were showing), Month, Total. On the
-  daily list, "Copy result" copies it as text: "Narrow nature list 25, November 15", a square per
-  species (a book for each one read), one for the distance and one for the month, the numbers,
+- **One screen, three layers.** The world map fills the screen. Everything written over it sits on
+  solid navy panels with hard drops: the title panel top left, the score top right with the reach
+  readout under it, and the hand of cards and the month keys along the bottom. The type is Jersey
+  15 and 25, the title screen's pixel faces, which only this page loads. Keys sink 4px when pressed,
+  and a chosen month or list stays down. It's the second screen with its own look, after the title
+  screen ([site-design](../.github/instructions/site-design.instructions.md)).
+- **The rules are one line.** Under the title: "6 species · 1 place · 1 month · each one narrows
+  the map". How to play opens a panel over the map with three small looping pictures (a card
+  turning, rings closing in, the points going down from 6,000) and one short paragraph for the
+  rest: the rings, the month, one guess, a pin anywhere inside the place is spot on, and what the
+  two lists are. "Back to the map" closes it.
+- **The map is a pixel world.** It draws at a quarter of the screen's resolution on a laptop and
+  half on a phone, so each map pixel shows as a 4px or 2px square (`pixelScale`, shown with
+  `image-rendering: pixelated`). [day-list-map.ts](../src/lib/hobbies/day-list-map.ts) draws the
+  relief in plain grey and the borders in pure blue with no graticule (`ENCODED`), then
+  [day-list-pixel.ts](../src/lib/hobbies/day-list-pixel.ts) repaints every pixel in the day palette
+  or the night one: sea, a shallow edge round every coast, a sand-coloured coastline, five steps of
+  land from lowland to snow, the borders, and a dotted graticule over the sea. The rings, pin,
+  tokens, line and finder box go into the same pixels, between one `getImageData` and one
+  `putImageData`. Dark mode (`html.dark`) gets the night palette. The page has no header, so no
+  theme toggle: it follows what the visitor picked elsewhere on the site, or their device.
+- **Each species is a ring.** A species draws a ring round the pin as far out as half its sightings
+  are from the place, the same distance its card gives ("within 2,400 km"), so the rings shrink
+  from the first species to the last and show how much each one narrowed it down. The ring is a
+  real distance on the globe (`rasterRing`), so near the poles it stretches the way the map does.
+  Before there's a pin the rings follow the mouse a hair behind, like a hand lens, and on touch
+  they wait in the middle of the map. The newest ring is twice as thick with a faint tint inside,
+  a card under the mouse thickens its own ring, and the readout says "Half its sightings within
+  2,400 km" for the newest one. A ring too small to see at the current zoom shows as a 2-pixel dot.
+- **Ring colours come from the photos.** As a round opens, its six photos are read at 64px and
+  their strongest colours matched to a set of six saturated colours that read on both palettes and
+  stay clear of the sea, the land, the amber pin and the red finder (`RING_SET` in
+  [day-list-tints.ts](../src/lib/hobbies/day-list-tints.ts)). Each species takes the nearest colour
+  no other species has, so a list never repeats one, and its card, its thumb on the postcard and
+  its entry on the full list wear the same colour. A photo that can't be read keeps its slot's
+  colour. iNaturalist's photo bucket sends `Access-Control-Allow-Origin: *` but varies on `Origin`,
+  so every copy of a photo on the page loads with `crossorigin="anonymous"`: a cached copy without
+  the header would stop the canvas reading it. `static.inaturalist.org` sends no CORS header, so a
+  photo from there wouldn't load at all. The builder takes photos only from the open-data bucket,
+  and `day-list.test.ts` checks both sets.
+- **The hand and the stakes.** Six cards sit along the bottom, most widespread first. The first is
+  face up from the start, with its photo, name and reach. The next one is the key, "Show the next
+  one", with its price ("−600 points"), and the rest wait face down with a "?" and their number.
+  The score panel says "Up to 6,000 points", the most a perfect guess can still score
+  (`bestPossible`), so the trade shows before you make it. When a round opens the cards deal up
+  from below, 45ms apart, and the first ring opens out round the lens. Photographer names aren't on
+  the cards, because a name can give the place away (see the full list).
+- **Turning a card.** The key narrows to nothing in 70ms and the card's face opens out past full
+  width and settles. Its photo comes up in coarse squares that sharpen three times, 80ms apart,
+  before the photo itself shows.
+  The price pops off the card's top right corner in red pixel type, a size bigger for its first
+  frame, then rises and fades in whole 3px steps over 820ms (`pop`), while the score ticks down to
+  the new ceiling in steps like an arcade counter (`countTo`). Then the photo flies from the card
+  to its ring as a token. It arcs a different way each time, shrinks a map pixel at a time, turns
+  from square to round, and lands on the ring as the ring settles (`fly`, 400ms). The new ring
+  starts at the last ring's size and closes in to its own, with a small overshoot, over 460ms.
+  Every press is its own turn, so fast presses send a run of them.
+- **The pin and the month.** A tap that didn't move drops the pin, so a pan or pinch that starts on
+  the map never drops one. The pin is a pixel sprite on the motion
+  [pin-drop.ts](../src/lib/hobbies/pin-drop.ts) has always given it (`createPinMotion`, which hands
+  its poses over through `frame()`): it drops from 18 to 24px above the spot under a steady pull,
+  lands in 128 to 148ms, squashes for a frame and leaves a ring that spreads and fades. There's
+  only one pin: a tap somewhere else lifts the old one out while the new one drops, and every tap
+  leaves its own ring. A tap within 8px of the pin moves it without lifting it, so a double-tap to
+  zoom doesn't throw it about. Arrow keys slide the pin. The months are twelve keys in a radio
+  group. "Lock it in" can't be pressed until there's a pin and a month, and the line under it walks
+  you there ("Tap the map, pick a month", "Now pick a month"), then says what you're playing for
+  ("Up to 5,400 points").
+- **The answer lands in beats.** Lock it in slides the title panel up and the hand and the month
+  keys down, out of the way. The pin presses into the map as the camera frames the pin and the
+  place together (`CAMERA_MS`, 820ms). Then the whole bullseye slides from the pin to the middle
+  of the place, the wider rings a beat behind the tighter ones, with a dotted line marching out
+  behind it (480 to 980ms, by how far it goes). The line goes the short way round, so a pin in
+  Hawaii reaches Japan off one side of the map and back in at the other. The rings wobble as they
+  settle, the boundary inks in over 300ms, and the red finder box from the globe's opening scene
+  closes in on it over 620ms, pulses once as it locks on, and prints the place's coordinates a
+  character at a time. Only then does the place's name go up on the map. The verdict drops in from
+  the top ("Spot on", "Near enough", "Right part of the world", "Not quite", "Wrong side of the
+  planet", with "1,240 km off" under it), the score counts up from zero, and the postcard rises
+  from the bottom with the six species' thumbs dropping into it 55ms apart. The camera keeps the
+  answer inside the room the verdict and the postcard leave (`room()`), so nothing laid over the map
+  covers the pin, the line or the place.
+- **The postcard is the result.** It has the six species (the ones you didn't use greyed), the
+  place, its region and month, how many species you used, and where the points came from: the
+  distance, the month ("You said March", or "November, spot on") and the total. Today's list offers
+  "Play more lists" and "Copy result", which copies "Narrow nature list 25, November 15", a square
+  per species (a book for each one read), one for the distance and one for the month, the numbers,
   then `trumanbrown.com/hobbies/narrow-nature`. The list number is today's place in the daily set,
   so two people a time zone apart can tell they played the same list. On a phone the button says
-  "Share result" and opens the share sheet with the same text. The full list
-  with facts follows under the board, one written sentence per species (see the accuracy rules).
-  `tidyFact` still guards the page against a fact taken straight from Wikipedia: it trims a
-  bracketed Latin name or IPA pronunciation, shows only the first sentence, and shows no line for a
-  fact under 15 characters or cut off with "...". A species with no fact shows no fact line.
-- **The answer lands in one beat.** The map glides to frame the pin and the place together
-  (`CAMERA_MS`, 650ms, no closer than 48x). Over its last 80ms the pin presses into the map, a
-  fifth smaller with a heavier line. Then a dashed line runs from the pin to the nearest edge of
-  the place over 600ms (`LINE_MS`), the same point the distance is measured to, while the pin comes
-  back up over 130ms. The press fits inside the camera's and the line's time, so the reveal takes
-  no longer, and it only changes how the pin is drawn, never where the camera frames. The "km off"
-  figure and the total start counting with `rollTo` as soon as you lock in, and land as the line
-  arrives and the boundary closes. The line goes the short way round, so a pin in Hawaii reaches
-  Japan off one side of the map and back in the other, and the distance is written on it once it's
-  long enough to carry a label. Then the boundary strokes in (`BOX_MS`, 300ms), the place name
-  appears on the map, the verdict and the place fade into the panel over 200ms, and the species
-  still hidden fill in 70ms apart. The panel holds them back until then, because it used to print
-  the answer while the map was still moving. Under `prefers-reduced-motion`, and for
-  a finished round restored on load, everything is drawn at once. After locking in, the map scrolls
-  into view if it's off screen, so on a phone the line can be watched with the result right under
-  it.
-- **Native controls.** The months are radio inputs, so arrow keys and screen readers work with no
-  extra code. The lock button stays outlined until there's a pin and a month, then turns ink. A pin
-  drops on a tap that didn't move, so a scroll, pan or pinch that starts on the map never drops one.
-- **The pin drops in.** A tap drops the pin from 18 to 24px above the spot, up to 3px to one side,
-  under a steady pull, so it lands in 128 to 148ms. It squashes wide and flat for a frame as it
-  hits, and a 1px ink ring spreads from its circle (6px) to 22px and fades over 300ms. There's
-  only one pin: a tap somewhere else lifts the old one 8px as it fades over 140ms while the new
-  one drops, and a pin re-aimed mid-fall lifts out from wherever it got to. Every tap leaves its
-  own ring, so tapping around leaves a short trail. A tap within 8px of the pin moves it and rings
-  without lifting it, so a double-tap to zoom doesn't throw the pin about. Arrow keys slide the
-  pin with no drop, since a held arrow repeats about thirty times a second. The key that places
-  the first pin drops it like a tap. The pin, its rings and anything lifting out are drawn on the
-  map's canvas at their place on the globe, so they stay put if the map moves under them, and the
-  map only keeps redrawing while one of them moves ([pin-drop.ts](../src/lib/hobbies/pin-drop.ts):
-  `planDrop`, `dropPose`, `liftPose`, `ringPose`, `pressPose` and the `createPinMotion` driver).
-  Under reduced motion the pin appears where you tap, with no ring and no press.
-- **Keyboard and screen readers.** Revealing a species from the keyboard moves focus to the next
-  square, and a polite live region reads out the new species and the new ceiling. Locking in moves
-  focus to the result. A finished round restored on load doesn't move focus or replay anything.
+  "Share result" and opens the share sheet with the same text. More lists offers "Next list" and
+  "Today's list" instead. Both have "See the place" (its iNaturalist page) and "The full list".
+- **The full list is a sheet.** "The full list" opens a dialog over the map with every species: its
+  photo, names, "Introduced here" or "Found nowhere else" where one applies, how often it was seen
+  there that month and worldwide, links to Wikipedia and iNaturalist, and a one-sentence fact (see
+  the accuracy rules). Under them are a note on what the distances mean and where the data comes
+  from, and the photo credits in a closed `<details>`. The credits list only the photos you've seen
+  (`photoCredits`), which is all six once the answer is down. CC BY and CC BY-NC are still met,
+  since the credit is on the same page as the photo. `tidyFact` still
+  guards against a fact taken straight from Wikipedia: it trims a bracketed Latin name or IPA
+  pronunciation, shows only the first sentence, and shows no line for a fact under 15 characters or
+  cut off with "...". A species with no fact shows no fact line.
+- **Phones.** Under 760px wide the page is one screen with no scrolling. The map is as wide as the
+  phone and between 2:1 and 1.6:1, with the title over it and the hand and the keys under it. On a
+  short screen the cards get shorter (152px down to 112px) before the map goes under 2:1. After the
+  answer the postcard docks at the foot and the map takes the space between it and the verdict. It
+  keeps its 1.6:1 shape, so a taller map runs wider than the phone and only its middle shows
+  (`shownWidth`), and an answer that spans more of the world than that middle can hold gets a
+  shorter map, so the pin and the place both show.
+- **Laptops.** The map is the whole screen. A screen taller than 1.6:1 gets a 1.6:1 map with sea
+  under it, and one wider than 2:1 gets a 2:1 world with sea either side (`maxAspect`).
+- **Keyboard and screen readers.** Showing a species from the keyboard moves focus to the next
+  card's key, or to the map once all six are out, and a polite live region reads out the species,
+  its reach and the new ceiling. Locking in moves focus to the place's name on the postcard and
+  reads out the verdict, the place and the score. Holding Enter on the key doesn't spend all six.
+- **Reduced motion and saved rounds.** Under `prefers-reduced-motion` a card turns over at once,
+  its ring appears with no flight, its price shows for a moment without moving, and the answer is
+  drawn at once. A finished round restored on load is drawn at once too, and doesn't move focus or
+  count again.
 
-The layout takes its structure from the daily game Originle (a guess card with the stakes on it, and
-a reveal button that shows its cost) and redraws it in the archive's ink on paper.
+The board's structure, a hand that shows what the next species costs and a ceiling that drops as
+you spend, first came from the daily game Originle. The pixel world, rings and finder box came from
+the 2026-11-24 mocks.
 
 ### The map
 
@@ -619,23 +675,22 @@ boundary and the terrain line up with no reprojection. It's one canvas, drawn by
 [day-list-map.ts](../src/lib/hobbies/day-list-map.ts), with the borders from
 [day-list-borders.ts](../src/lib/hobbies/day-list-borders.ts) over the terrain.
 
-**Zooming.** Zoom runs from the whole world (1x) to 64x, where a pixel is about a kilometre on a
-laptop and the terrain is still sharp. All of these work:
+**Zooming.** Zoom runs from the whole world (1x) to 64x. All of these work:
 
-| Input                      | Does                                                                                                                                           |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| Pinch (touch)              | Zooms around the fingers, and two fingers pan                                                                                                  |
-| Double-tap or double-click | Zooms in 2x there (and drops the pin there, like any tap)                                                                                      |
-| `+` and `−` buttons        | Zoom 2x, toward the pin if there is one                                                                                                        |
-| Ctrl or ⌘ + scroll         | Zooms around the pointer. A trackpad pinch arrives this way, and Safari's as `gesture*` events                                                 |
-| Plain scroll               | Scrolls the page. If the mouse was just moved onto the map, a "Hold Ctrl and scroll to zoom" hint shows for a moment, the way embedded maps do |
-| Keys                       | `+`, `−` and `0` (whole world). Arrows move the pin, by less the further in you are; after the answer they pan instead                         |
+| Input                      | Does                                                                                                                                                                                            |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pinch (touch)              | Zooms around the fingers, and two fingers pan                                                                                                                                                   |
+| Double-tap or double-click | Zooms in 2x there (and drops the pin there, like any tap)                                                                                                                                       |
+| `+` and `−` buttons        | Zoom 2x, toward the pin if there is one                                                                                                                                                         |
+| Ctrl or ⌘ + scroll         | Zooms around the pointer. A trackpad pinch arrives this way, and Safari's as `gesture*` events                                                                                                  |
+| Plain scroll               | Zooms around the pointer too, since the game's screen doesn't scroll (`wheelZoom`). Without that option the map leaves plain scroll to the page and shows a "Hold Ctrl and scroll to zoom" hint |
+| Keys                       | `+`, `−` and `0` (whole world). Arrows move the pin, by less the further in you are; after the answer they pan instead                                                                          |
 
-On touch, one finger scrolls the page while the whole world is showing (`touch-action: pan-y`) and
-pans the map once you've zoomed in (`touch-action: none`), the same deal as the herp map. A scale
-bar shows from 1.5x, for the latitude in the middle of the view. "Whole world" zooms back out, and
+On touch, one finger pans the map once you've zoomed in (`touch-action: none`). At world view a
+one-finger drag is left to the browser (`touch-action: pan-y`), as on the herp map. There's no
+scale bar, since the rings and the readout give the distances. "Whole world" zooms back out, and
 after the answer "Back to your guess" reframes the pin and the place. On a phone the map runs edge
-to edge.
+to edge, and after the answer it can run past the screen's sides (see Phones above).
 
 **Terrain.** The tiles are Natural Earth's "Gray Earth with Shaded Relief, Hypsography, and Flat
 Water" at 1:10m (21600 × 10800, public domain), cut by
@@ -643,10 +698,12 @@ Water" at 1:10m (21600 × 10800, public domain), cut by
 256px WebP tiles: about 2,900 files and 7.6 MB, committed under `public/day-list/relief/v1/`. Tiles
 that would be all sea aren't written; the manifest says which exist and the map paints open water
 itself. A tile is one grey channel: 0 is water and 48-255 is the land's relief and height shading.
-The browser maps that grey through the page palette (`buildLut`), so one set of tiles serves light
-and dark mode and follows the theme toggle. Light mode keeps the archive's tan sea and paper land
-shaded toward ink. Dark mode turns it round, with a sea darker than the page under land lit a few
-steps toward ink, because relief shaded down from near-black has nowhere to go.
+The browser maps that grey through a palette (`buildLut`), so one set of tiles serves any palette.
+The game asks the map for plain grey with pure blue borders (`ENCODED`) and repaints them in its
+own day and night palettes (see "The map is a pixel world" above). Without its own colours the map
+keeps the archive's: in light mode a tan sea and paper land shaded toward ink, and in dark mode a
+sea darker than the page under land lit a few steps toward ink, because relief shaded down from
+near-black has nowhere to go.
 
 The map loads the coarsest level first and keeps it underneath, so a zoom never shows a blank, then
 sharpens with the level the zoom needs (and the one under it, which arrives four times faster).
@@ -710,10 +767,11 @@ Today's list (`day-list-v2`) now remembers a round in progress as well, so a rel
 many species you've seen. Older saves from before that, which were only ever written at lock-in,
 still read as finished.
 
-**Where it shows.** The board's title is a pair of underline tabs, "Today's list" and "More lists"
-(`initUnderlineTabs`, the Cult UI direction-aware-tabs port). The daily result offers "Play more
-lists", and each extra result offers "Next list" until the tenth, which shows the day's total
-instead. Extras have no share button, because the share string is about the daily list. A link to
+**Where it shows.** The title panel has two keys, "Today's list" and "More lists", in a radio
+group (`initUnderlineTabs` gives it the arrow keys), and the date line beside them says "List 3 of
+10 today" on More lists. They slide away with the title once the answer is up, so the postcard
+carries the way on: the daily one offers "Play more lists", and each extra one offers "Next list"
+until the tenth, which shows the day's total instead, and "Today's list". Extras have no share button, because the share string is about the daily list. A link to
 `/hobbies/narrow-nature/#more-lists` opens straight onto More lists.
 
 ### Accuracy rules
@@ -823,9 +881,10 @@ full build, write a fact for each species the build lists as missing, then run `
 photos load straight from the iNaturalist CDNs already allow-listed in `img-src`, so the island costs
 nothing per play and keeps working if the API is down.
 
-**Scoped styles.** The species squares, the result receipt and the full list are all
-built by the script at runtime, so Astro's scoped styles never reach them. The component uses
-`<style is:global>` with every selector namespaced under `dl-` instead.
+**Scoped styles.** The cards, the labels on the map, the postcard and the full list are all built
+by the script at runtime, so Astro's scoped styles never reach them. The component uses
+`<style is:global>` with every selector namespaced under `dl-` instead. The same block declares
+the title screen's Jersey 15 and 25 faces (`public/fonts/`) for this page.
 
 ---
 

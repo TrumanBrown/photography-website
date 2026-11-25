@@ -25,9 +25,10 @@ interface Props {
   /**
    * Top-level section. 'photography' (default) shows the sessions rail and
    * its phone bar; 'home' is the front door, the same frame with me in the
-   * rail; 'hobbies' swaps both for the header.
+   * rail; 'hobbies' swaps both for the header; 'game' is a game that takes
+   * the whole screen (Narrow nature), with no header or footer at all.
    */
-  section?: "photography" | "hobbies" | "home";
+  section?: "photography" | "hobbies" | "home" | "game";
 }
 
 const {
@@ -106,11 +107,21 @@ const ogImageAbsolute = previewImage
     <script is:inline set:html={landingBootstrap} />
   </head>
   <body class="min-h-screen">
-    <a class="skip-link" href="#main">Skip to content</a>
+    {
+      section !== "game" && (
+        <a class="skip-link" href="#main">
+          Skip to content
+        </a>
+      )
+    }
     {/* Anything a page lays over its shell (the title screen at /). */}
     <slot name="before" />
     {
-      section === "home" ? (
+      section === "game" ? (
+        <main id="main" tabindex="-1">
+          <slot />
+        </main>
+      ) : section === "home" ? (
         <div id="page-shell" class="archive-shell home-shell">
           <MeRail />
           <div id="page-content" class="archive-main">

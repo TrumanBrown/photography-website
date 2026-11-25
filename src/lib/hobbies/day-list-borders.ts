@@ -167,6 +167,8 @@ export interface BorderView {
   k: number;
   cu: number;
   cv: number;
+  /** The world's width in pixels at this zoom, when it isn't width × k. */
+  worldW?: number;
 }
 
 export interface Borders {
@@ -226,7 +228,7 @@ export function createBorders(onLoad: () => void): Borders {
 
   return {
     draw(ctx, view, style) {
-      const worldW = view.width * view.k;
+      const worldW = view.worldW ?? view.width * view.k;
       const worldH = view.height * view.k;
       const degPerPx = 360 / worldW;
       const zoom = borderZoom(worldW);

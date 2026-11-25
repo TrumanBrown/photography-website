@@ -54,168 +54,173 @@ const galleryItems = [
 ];
 const facts = hobbyFacts(entry);
 const slug = hobbySlug(entry);
+// Narrow nature is a game that takes the whole screen: no header, no footer,
+// and its own title panel holds the page's name (DayList.astro).
+const game = Boolean(dayList);
 // The link preview is the hobby's own stipple drawing (src/pages/og/[slug].jpg.ts).
-const hasPlate =
-  Object.keys(
-    import.meta.glob("/src/assets/plates/*-card.webp"),
-  ).includes(`/src/assets/plates/${slug}-card.webp`);
+const hasPlate = Object.keys(
+  import.meta.glob("/src/assets/plates/*-card.webp"),
+).includes(`/src/assets/plates/${slug}-card.webp`);
 ---
 
 <BaseLayout
   title={title}
   description={summary}
-  section="hobbies"
+  section={game ? "game" : "hobbies"}
   ogImage={hasPlate ? `/og/${slug}.jpg` : undefined}
   ogImageAlt={hasPlate ? `${title}, drawn in ink dots` : undefined}
 >
-  <article class="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-    <header class="hobby-head">
-      <a href="/hobbies/" class="hobby-back"
-        >← <span class="draw">Things to try</span></a
-      >
-      <h1>{title}</h1>
-      {facts && <p class="u-label hobby-facts">{facts}</p>}
-      {intro && <p class="hobby-intro">{intro}</p>}
-    </header>
+  {
+    dayList && (
+      <div class="toy" data-toy={slug}>
+        <DayList title={title} heading={dayList.heading} />
+      </div>
+    )
+  }
+  {
+    !game && (
+      <article class="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+        <header class="hobby-head">
+          <a href="/hobbies/" class="hobby-back">
+            ← <span class="draw">Things to try</span>
+          </a>
+          <h1>{title}</h1>
+          {facts && <p class="u-label hobby-facts">{facts}</p>}
+          {intro && <p class="hobby-intro">{intro}</p>}
+        </header>
 
-    {/* data-toy: the first press inside counts as playing (src/lib/analytics.ts). */}
-    <div class="toy" data-toy={slug}>
-      {interactive === "aquarium" && <AquariumTank moments={video?.moments} />}
-      {interactive === "tidepool" && <TidePool />}
-      {interactive === "fishing" && <Fishing />}
-      {interactive === "birding" && <Birding />}
-      {interactive === "roadcruise" && <HerpingNight />}
-      {interactive === "pixel-hike" && <PixelHike />}
+        {/* data-toy: the first press inside counts as playing (src/lib/analytics.ts). */}
+        <div class="toy" data-toy={slug}>
+          {interactive === "aquarium" && (
+            <AquariumTank moments={video?.moments} />
+          )}
+          {interactive === "tidepool" && <TidePool />}
+          {interactive === "fishing" && <Fishing />}
+          {interactive === "birding" && <Birding />}
+          {interactive === "roadcruise" && <HerpingNight />}
+          {interactive === "pixel-hike" && <PixelHike />}
+        </div>
 
-      {dayList && <DayList heading={dayList.heading} />}
-    </div>
+        {trails && (
+          <TrailsWalked heading={trails.heading} hikes={trails.hikes} />
+        )}
 
-    {trails && <TrailsWalked heading={trails.heading} hikes={trails.hikes} />}
+        {spark && (
+          <BirdingSpark
+            userId={spark.userId}
+            taxonId={spark.taxonId}
+            heading={spark.heading}
+            species={spark.species}
+            scientificName={spark.scientificName}
+            story={spark.story}
+          />
+        )}
 
-    {
-      spark && (
-        <BirdingSpark
-          userId={spark.userId}
-          taxonId={spark.taxonId}
-          heading={spark.heading}
-          species={spark.species}
-          scientificName={spark.scientificName}
-          story={spark.story}
-        />
-      )
-    }
+        {lifeList && (
+          <BirdingLifeList
+            userId={lifeList.userId}
+            url={lifeList.url}
+            heading={lifeList.heading}
+            blurb={lifeList.blurb}
+            iconicTaxa={lifeList.iconicTaxa}
+            featured={lifeList.featured}
+          />
+        )}
 
-    {
-      lifeList && (
-        <BirdingLifeList
-          userId={lifeList.userId}
-          url={lifeList.url}
-          heading={lifeList.heading}
-          blurb={lifeList.blurb}
-          iconicTaxa={lifeList.iconicTaxa}
-          featured={lifeList.featured}
-        />
-      )
-    }
-
-    {
-      (media?.hero || video) && (
-        <section class="mt-12" aria-label={mediaTitle ?? "Photos"}>
-          <div class="mb-4">
-            <div class="shead">
-              <h2>{mediaTitle ?? "Photos"}</h2>
-              {video && (
+        {(media?.hero || video) && (
+          <section class="mt-12" aria-label={mediaTitle ?? "Photos"}>
+            <div class="mb-4">
+              <div class="shead">
+                <h2>{mediaTitle ?? "Photos"}</h2>
+                {video && (
+                  <a
+                    href={`https://www.youtube.com/watch?v=${video.youtubeId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="shead-link"
+                  >
+                    <span class="draw">{video.linkText}</span> →
+                  </a>
+                )}
+              </div>
+              {video?.caption && <p class="shead-blurb">{video.caption}</p>}
+            </div>
+            {video && (
+              <HobbyVideo
+                youtubeId={video.youtubeId}
+                title={video.title}
+                lengthSeconds={video.lengthSeconds}
+                poster={
+                  media?.hero && {
+                    src: media.hero.display,
+                    width: media.hero.width,
+                    height: media.hero.height,
+                  }
+                }
+              />
+            )}
+            <div id="hobby-media">
+              {heroPhoto && (
                 <a
-                  href={`https://www.youtube.com/watch?v=${video.youtubeId}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="shead-link"
+                  href={heroPhoto.src}
+                  data-pswp-width={heroPhoto.width}
+                  data-pswp-height={heroPhoto.height}
+                  data-pswp-caption={heroPhoto.caption ?? ""}
+                  class="group block overflow-hidden border border-rule no-underline"
+                  aria-label={heroPhoto.caption || "Open full-resolution photo"}
                 >
-                  <span class="draw">{video.linkText}</span> →
+                  <img
+                    src={heroPhoto.display}
+                    alt={heroPhoto.caption ?? ""}
+                    width={heroPhoto.width}
+                    height={heroPhoto.height}
+                    loading="lazy"
+                    class="block max-h-[70vh] w-full bg-band object-cover transition-opacity duration-300 group-hover:opacity-95"
+                  />
                 </a>
               )}
+              {galleryItems.length > 0 && (
+                <ul class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                  {galleryItems.map((it) => (
+                    <li>
+                      <a
+                        href={it.src}
+                        data-pswp-width={it.width}
+                        data-pswp-height={it.height}
+                        data-pswp-caption={it.caption ?? ""}
+                        class="group block overflow-hidden bg-band no-underline"
+                        aria-label={it.caption || "Open full-resolution photo"}
+                      >
+                        <img
+                          src={it.display}
+                          alt={it.caption ?? ""}
+                          loading="lazy"
+                          class="aspect-square w-full object-cover transition-opacity duration-300 group-hover:opacity-90"
+                        />
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
-            {video?.caption && <p class="shead-blurb">{video.caption}</p>}
-          </div>
-          {video && (
-            <HobbyVideo
-              youtubeId={video.youtubeId}
-              title={video.title}
-              lengthSeconds={video.lengthSeconds}
-              poster={
-                media?.hero && {
-                  src: media.hero.display,
-                  width: media.hero.width,
-                  height: media.hero.height,
-                }
-              }
-            />
-          )}
-          <div id="hobby-media">
-            {heroPhoto && (
-              <a
-                href={heroPhoto.src}
-                data-pswp-width={heroPhoto.width}
-                data-pswp-height={heroPhoto.height}
-                data-pswp-caption={heroPhoto.caption ?? ""}
-                class="group block overflow-hidden border border-rule no-underline"
-                aria-label={heroPhoto.caption || "Open full-resolution photo"}
-              >
-                <img
-                  src={heroPhoto.display}
-                  alt={heroPhoto.caption ?? ""}
-                  width={heroPhoto.width}
-                  height={heroPhoto.height}
-                  loading="lazy"
-                  class="block max-h-[70vh] w-full bg-band object-cover transition-opacity duration-300 group-hover:opacity-95"
-                />
-              </a>
-            )}
-            {galleryItems.length > 0 && (
-              <ul class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                {galleryItems.map((it) => (
-                  <li>
-                    <a
-                      href={it.src}
-                      data-pswp-width={it.width}
-                      data-pswp-height={it.height}
-                      data-pswp-caption={it.caption ?? ""}
-                      class="group block overflow-hidden bg-band no-underline"
-                      aria-label={it.caption || "Open full-resolution photo"}
-                    >
-                      <img
-                        src={it.display}
-                        alt={it.caption ?? ""}
-                        loading="lazy"
-                        class="aspect-square w-full object-cover transition-opacity duration-300 group-hover:opacity-90"
-                      />
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-          <Lightbox gallerySelector="#hobby-media" />
-        </section>
-      )
-    }
+            <Lightbox gallerySelector="#hobby-media" />
+          </section>
+        )}
 
-    {
-      inaturalist && <INatObservations {...inaturalist} />
-    }
+        {inaturalist && <INatObservations {...inaturalist} />}
 
-    {
-      herpMap && (
-        <INatHerpMap
-          userId={herpMap.userId}
-          url={herpMap.url}
-          heading={herpMap.heading}
-          blurb={herpMap.blurb}
-          limit={herpMap.limit}
-        />
-      )
-    }
-  </article>
+        {herpMap && (
+          <INatHerpMap
+            userId={herpMap.userId}
+            url={herpMap.url}
+            heading={herpMap.heading}
+            blurb={herpMap.blurb}
+            limit={herpMap.limit}
+          />
+        )}
+      </article>
+    )
+  }
 </BaseLayout>
 
 <style>

@@ -66,10 +66,13 @@ rather than only writing it down here.
   - `Tide pooling quickly became one of my favorite hobbies after moving to WA.`
 - Hobby intros follow: personal history → what the toy does → one imperative on how to play.
   - `I keep returning to mountain trails, from the Cascades to China, Norway, and the Himalaya. Build a trail of your own, then turn it into a postcard.`
-- A game with rules to learn (Narrow nature) is the exception. Its intro is the premise in one or two
-  plain sentences, and the rules go in numbered "How to play" steps that use the same words as the
-  buttons. No backstory and no metaphors: people need to know what to do before why it exists.
-  - `Six species were all seen at the same place in the same month. Guess where and when.`
+- A game with rules to learn (Narrow nature) is the exception. Its card says the premise in one or
+  two plain sentences, and the game opens on one rules line. How to play shows the rest as small
+  pictures with a short paragraph that uses the same words as the buttons. No backstory and no
+  metaphors: people need to know what to do before why it exists. Keep words off the game screen
+  where a picture can say it: the page was "a wall of text" before (2026-11-24).
+  - `Six species, all seen at the same place in the same month. Guess where and when.`
+  - `6 species · 1 place · 1 month · each one narrows the map`
 - Undersell. Use honest hedges instead of hype.
   - `The bioload meter is just for fun, not necessarily entirely accurate.`
   - `A playful estimate, not trail guidance.`

@@ -1,30 +1,29 @@
 ---
 /**
- * Day list - a daily puzzle built on real iNaturalist records.
+ * Narrow nature, a daily puzzle built on iNaturalist records, as one pixel
+ * world that fills the screen (mock D, "Pixel lens", picked 2026-11-24).
  *
- * Six species were all recorded at one place in one month. The board shows
- * them one at a time, the most widespread first, so each one narrows the map
- * further. The visitor drops a pin, picks a month and locks it in once. Every
- * extra species lowers the most they can score, and the board shows that
- * number before they ask (the "Reveal next clue -750" idea from Originle).
+ * Six species were all recorded at one place in one month. The world map
+ * fills the screen at a quarter of its resolution, in a day palette and a
+ * night one, and everything written over it sits on a solid navy panel. Each
+ * species draws a ring round the pin of how far from the place half its
+ * sightings are, in a colour picked from its photo. Showing the next one
+ * costs points, and the most you can still score sits top right.
  *
- * The rules come first and are the largest text on the page, because the
- * premise is the part people got stuck on.
+ * Its own look, unlike the rest of the site (site-design.instructions.md):
+ * Jersey pixel type, navy panels with hard drops, keys that press, no site
+ * header or footer (BaseLayout's "game" section).
  *
- * Behaviour lives in @/lib/hobbies/day-list, bound via [data-daylist-*].
- * Photos load from the iNaturalist CDNs already allow-listed in the CSP.
+ * Behaviour lives in @/lib/hobbies/day-list, bound via [data-daylist-*]; the
+ * pixel drawing in ./day-list-pixel and the ring colours in ./day-list-tints.
+ * Photos load from the iNaturalist CDN already allow-listed in the CSP.
  */
 interface Props {
+  /** The page's name, which the title panel carries as its h1. */
+  title?: string;
   heading?: string;
 }
-const { heading = "Today's list" } = Astro.props;
-
-const STEPS = [
-  "You start with one species. It's the most widespread of the six, so it only gets you to the right part of the world.",
-  "If you're stuck, show the next one. Each is more local than the last and narrows things down, but it costs you points.",
-  "Whenever you have a hunch, tap the map where you think they were seen and pick a month.",
-  "Lock it in. You only get one guess, and a pin anywhere inside the place counts as spot on.",
-];
+const { title = "Narrow nature", heading = "Today's list" } = Astro.props;
 
 const MONTHS = [
   "January",
@@ -42,151 +41,217 @@ const MONTHS = [
 ];
 ---
 
-<div class="dl not-prose" data-daylist>
-  <section class="dl-how" aria-labelledby="dl-how-title">
-    <div class="shead">
-      <h2 id="dl-how-title">How to play</h2>
-    </div>
-    <ol class="dl-steps" role="list">
-      {STEPS.map((step) => <li>{step}</li>)}
-    </ol>
-    <p class="dl-how-note">
-      Today's list is the same for everyone and changes each day. More lists
-      gives you ten others a day, from places the daily list never uses.
-    </p>
-  </section>
-
-  <section class="dl-board" aria-labelledby="dl-board-title" data-daylist-board>
-    <h2 class="dl-sr" id="dl-board-title" data-daylist-title>{heading}</h2>
-    <div class="dl-boardhead">
-      <div
-        class="utabs dl-modes"
-        role="radiogroup"
-        aria-label="Which list"
-        data-daylist-modes
+<div class="dl" data-daylist>
+  {
+    /* Three layers in reading order: the title and the score over the map,
+       the map, then the hand and the guess over it. */
+  }
+  <div class="dl-ui">
+    <header class="dl-title dl-panel">
+      <a class="dl-key dl-key-small dl-back" href="/hobbies/"
+        ><span aria-hidden="true">←</span> Things to try</a
       >
+      <div class="dl-trow">
+        <h1 class="dl-px25">{title}</h1>
         <button
           type="button"
-          role="radio"
-          aria-checked="true"
-          data-value="daily">{heading}</button
-        >
-        <button
-          type="button"
-          role="radio"
-          aria-checked="false"
-          data-value="extra">More lists</button
+          class="dl-key dl-key-small dl-howkey"
+          data-daylist-how
+          aria-expanded="false"
+          aria-controls="dl-how">How to play</button
         >
       </div>
-      <p class="dl-date" data-daylist-meta></p>
-    </div>
-
-    <div class="dl-axis" aria-hidden="true">
-      <span>Widespread</span><i></i><span>Local</span>
-    </div>
-    <ol
-      class="dl-tray"
-      role="list"
-      aria-label="The six species, most widespread first"
-      data-daylist-clues
-    >
-    </ol>
-    <p class="dl-sr" aria-live="polite" data-daylist-announce></p>
-
-    <div class="dl-play" data-daylist-play>
-      <div class="dl-mapbox">
+      <p class="dl-rule dl-px25">
+        <span class="dl-r-a">6 species <i>·</i> 1 place <i>·</i> 1 month</span>
+        <i class="dl-r-mid">·</i>
+        <span class="dl-r-b">each one narrows the map</span>
+      </p>
+      <div class="dl-modes-row">
         <div
-          class="dl-mapwrap"
-          data-daylist-mapwrap
-          tabindex="0"
-          role="application"
-          aria-label="World map. Tap where you think the six species were seen. Arrow keys move the pin, plus and minus zoom."
+          class="dl-modes"
+          role="radiogroup"
+          aria-label="Which list"
+          data-daylist-modes
         >
-          <canvas data-daylist-map></canvas>
-        </div>
-        <p class="dl-maphint" aria-hidden="true">Tap the map to drop a pin</p>
-        <div class="dl-scale" data-daylist-scale aria-hidden="true" hidden>
-          <i></i><span></span>
-        </div>
-        <div class="dl-zoom" role="group" aria-label="Zoom">
-          <button type="button" data-daylist-zoom="in" aria-label="Zoom in"
-            >+</button
+          <button
+            type="button"
+            role="radio"
+            aria-checked="true"
+            class="dl-key dl-tab"
+            data-value="daily">{heading}</button
           >
           <button
             type="button"
-            data-daylist-zoom="out"
-            aria-label="Zoom out"
-            disabled>&minus;</button
+            role="radio"
+            aria-checked="false"
+            class="dl-key dl-tab"
+            data-value="extra">More lists</button
           >
         </div>
-        <button type="button" class="dl-mapbtn" data-daylist-view hidden
-          >Whole world</button
-        >
-        <p class="dl-wheelhint" data-daylist-wheelhint aria-hidden="true"></p>
+        <p class="dl-date dl-px15" data-daylist-meta></p>
       </div>
+    </header>
 
-      <div class="dl-panel">
-        <div class="dl-guess" data-daylist-guess>
-          <p class="dl-worth">
-            Up to <span class="dl-worth__n" data-daylist-worth>6,000</span> points
-          </p>
-
-          <fieldset class="dl-months">
-            <legend class="dl-legend">Which month?</legend>
-            <div class="dl-months__grid">
-              {
-                MONTHS.map((name, i) => (
-                  <label class="dl-month">
-                    <input
-                      type="radio"
-                      name="dl-month"
-                      value={i}
-                      autocomplete="off"
-                      data-daylist-month
-                    />
-                    <span class="dl-month__cell" aria-hidden="true">
-                      {name.slice(0, 3)}
-                    </span>
-                    <span class="dl-sr">{name}</span>
-                  </label>
-                ))
-              }
-            </div>
-          </fieldset>
-
-          <p class="dl-readout" aria-live="polite" data-daylist-readout>
-            Drop a pin, then pick a month.
-          </p>
-          <button
-            type="button"
-            class="btn btn-ink dl-lock"
-            data-daylist-lock
-            disabled>Lock it in</button
+    <div class="dl-how dl-panel" id="dl-how" data-daylist-howpanel hidden>
+      <ol class="dl-how-steps">
+        <li>
+          <span class="dl-how-art dl-art-card" aria-hidden="true"
+            ><i class="dl-hc-back"></i><i class="dl-hc-face"></i></span
           >
-        </div>
-
-        <div class="dl-result" data-daylist-result hidden></div>
-      </div>
+          <b class="dl-px15">Turn a card</b>
+        </li>
+        <li>
+          <span class="dl-how-art dl-art-ring" aria-hidden="true"
+            ><canvas data-daylist-howring width="40" height="24"></canvas></span
+          >
+          <b class="dl-px15">Rings close in</b>
+        </li>
+        <li>
+          <span class="dl-how-art dl-art-pts" aria-hidden="true"
+            ><i class="dl-hn-num dl-px25"
+              ><s>6,000</s><s>5,400</s><s>4,800</s></i
+            ></span
+          >
+          <b class="dl-px15">Fewer cards, more points</b>
+        </li>
+      </ol>
+      <p class="dl-how-note">
+        Each species draws a ring round your pin. Half its sightings are that
+        close to the spot. Pick the month too, then lock it in. You get one
+        guess, and a pin anywhere inside the place counts as spot on. Today's
+        list is the same for everyone. More lists gives you ten others a day.
+      </p>
+      <button type="button" class="dl-key dl-key-small" data-daylist-how-close
+        >Back to the map</button
+      >
     </div>
-  </section>
 
-  <div data-daylist-roll></div>
+    <div class="dl-stakes dl-panel" data-daylist-stakes>
+      <span class="dl-s-up dl-px15" data-daylist-stakes-up>Up to</span>
+      <span class="dl-s-num dl-px25" data-daylist-worth>6,000</span>
+      <span class="dl-s-unit dl-px15">points</span>
+    </div>
 
-  <p class="dl-foot">
-    Every species on a list was logged at that place in that month, and every
-    place has a published boundary. The distance under each species is how far
-    from the place half its sightings were logged, and sightings follow where
-    people go looking as much as where the animal lives. The full list flags
-    introduced and endemic species, because a kookaburra in Tasmania is a very
-    different clue once you know it was put there. Data from iNaturalist,
-    terrain and borders from Natural Earth. Photo credits are tucked away
-    below, since a photographer's name can give the place away.
-  </p>
+    <div class="dl-read dl-panel" data-daylist-reach-readout aria-hidden="true">
+      <span class="dl-r-head dl-px15">Half its sightings</span>
+      <span class="dl-r-line dl-px25"
+        ><span class="dl-r-w">within</span>
+        <b data-daylist-reach>?</b>
+        <span class="dl-r-km">km</span></span
+      >
+    </div>
+  </div>
 
-  <details class="dl-credits" data-daylist-credits>
-    <summary>Photo credits</summary>
-    <ol class="dl-credits__list" role="list" data-daylist-credit-list></ol>
-  </details>
+  <div
+    class="dl-map"
+    data-daylist-mapwrap
+    tabindex="0"
+    role="application"
+    aria-label="World map. Each species draws a ring round your pin, as far as half its sightings are from the spot. Tap where you think the six were seen. Arrow keys move the pin, plus and minus zoom."
+  >
+    <canvas data-daylist-map></canvas>
+    <div class="dl-labels" data-daylist-labels aria-hidden="true"></div>
+  </div>
+
+  <div class="dl-ui">
+    <div class="dl-zoom" role="group" aria-label="Zoom">
+      <button
+        type="button"
+        class="dl-key dl-key-small dl-viewkey"
+        data-daylist-view
+        hidden>Whole world</button
+      >
+      <button
+        type="button"
+        class="dl-key dl-zkey"
+        data-daylist-zoom="in"
+        aria-label="Zoom in">+</button
+      >
+      <button
+        type="button"
+        class="dl-key dl-zkey"
+        data-daylist-zoom="out"
+        aria-label="Zoom out">&minus;</button
+      >
+    </div>
+
+    <section class="dl-hand" aria-labelledby="dl-board-title" data-daylist-hand>
+      <h2 class="dl-sr" id="dl-board-title" data-daylist-title>{heading}</h2>
+      <ol
+        class="dl-tray"
+        aria-label="The six species, most widespread first"
+        data-daylist-clues
+      >
+      </ol>
+    </section>
+
+    <div class="dl-guess" data-daylist-guess>
+      <div
+        class="dl-months"
+        role="radiogroup"
+        aria-label="Which month?"
+        data-daylist-months
+      >
+        {
+          MONTHS.map((name, i) => (
+            <button
+              type="button"
+              class="dl-key"
+              role="radio"
+              aria-checked="false"
+              aria-label={name}
+              tabindex={i === 0 ? 0 : -1}
+              data-daylist-month={i}
+            >
+              {name.slice(0, 3)}
+            </button>
+          ))
+        }
+      </div>
+      <button
+        type="button"
+        class="dl-key dl-key-lock dl-key-amber"
+        data-daylist-lock
+        disabled
+      >
+        <span class="dl-lock-word">Lock it in</span>
+        <small data-daylist-hint>Tap the map, pick a month</small>
+      </button>
+    </div>
+
+    <section
+      class="dl-post"
+      data-daylist-result
+      hidden
+      aria-labelledby="dl-post-place"
+    >
+    </section>
+  </div>
+
+  <dialog class="dl-sheet" data-daylist-sheet aria-labelledby="dl-sheet-title">
+    <div class="dl-sheet-head">
+      <h2 class="dl-px25" id="dl-sheet-title">The full list</h2>
+      <button type="button" class="dl-key dl-key-small" data-daylist-sheet-close
+        >Back to the map</button
+      >
+    </div>
+    <div class="dl-sheet-body">
+      <ol class="dl-entries" data-daylist-roll></ol>
+      <p class="dl-sheet-foot">
+        Every species on a list was logged at that place in that month. The
+        distance on each card is how far from the place half its sightings were
+        logged, and sightings follow where people go looking as much as where
+        the animal lives. Data from iNaturalist, terrain and borders from
+        Natural Earth.
+      </p>
+      <details class="dl-credits" data-daylist-credits>
+        <summary>Photo credits</summary>
+        <ol class="dl-credits-list" data-daylist-credit-list></ol>
+      </details>
+    </div>
+  </dialog>
+
+  <p class="dl-sr" aria-live="polite" data-daylist-announce></p>
 </div>
 
 <script>
@@ -198,14 +263,122 @@ const MONTHS = [
 </script>
 
 <style is:global>
-  /* Global rather than scoped, and namespaced under .dl so nothing leaks.
-     Astro's scoped styles only reach markup present at build time, and the
-     species slots, result and full list are built by the script at runtime,
-     so scoping would silently miss them. Rules that adjust a shared class
-     (.btn, .shead) are prefixed with .dl so they win on specificity. */
+  /* Global rather than scoped, and namespaced under .dl so nothing leaks:
+     the cards, the labels on the map, the postcard and the full list are
+     built by the script at runtime, and Astro's scoped styles only reach
+     markup present at build time.
 
+     Mock D's look, which breaks the house style on purpose (picked
+     2026-11-24): a day and a night palette of its own, Jersey pixel type,
+     solid navy panels with hard drops behind everything over the map, and
+     keys that press. */
+
+  /* Jersey 15 and 25 (OFL, public/fonts/OFL-jersey.txt), the title screen's
+     pixel faces. Only .dl uses them, so no other page downloads them. */
+  @font-face {
+    font-family: "Jersey 25";
+    src: url("/fonts/jersey-25.woff2") format("woff2");
+    font-display: block;
+  }
+  @font-face {
+    font-family: "Jersey 15";
+    src: url("/fonts/jersey-15.woff2") format("woff2");
+    font-display: block;
+  }
+
+  .dl {
+    --slate: #122a5b;
+    --rim: #2d4f8f;
+    --drop: #0a1838;
+    --snow: #f5f8fc;
+    --dim: #b9c9de;
+    --amber: #ffb000;
+    --amber-hi: #ffd35c;
+    --amber-lo: #c77f00;
+    --red: #d8402c;
+    --sea: #3f7fcf;
+    --key: #f5f8fc;
+    --key-hi: #ffffff;
+    --key-lo: #b9c9de;
+    --card-paper: #f5f8fc;
+    --card-ink: #122a5b;
+    --card-ink-2: #2d4f8f;
+    --c1: #5577e0;
+    --c2: #24a9b5;
+    --c3: #4fae3c;
+    --c4: #e9b21b;
+    --c5: #ef7f22;
+    --c6: #dd3f37;
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    --card-w: 128px;
+    --edge: 15px;
+  }
+  html.dark .dl {
+    --slate: #071230;
+    --rim: #1f3a72;
+    --drop: #030918;
+    --snow: #e9eff8;
+    --dim: #8fa3c4;
+    --sea: #10224a;
+    --key: #2a3f6e;
+    --key-hi: #3d5690;
+    --key-lo: #16264a;
+    --card-paper: #dfe7f3;
+    --amber-lo: #b06f00;
+    --red: #f0604a;
+    --c1: #6f8cf0;
+    --c2: #2fc0c9;
+    --c3: #62c44c;
+    --c4: #f2c230;
+    --c5: #f59238;
+    --c6: #f0584f;
+  }
+
+  /* The game is the page: no scroll either way, and the sea behind it. */
+  html:has(.dl),
+  html:has(.dl) body {
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+  html:has(.dl) {
+    background: #3f7fcf;
+  }
+  html.dark:has(.dl) {
+    background: #10224a;
+  }
+  html:has(.dl) body {
+    background: transparent;
+  }
+
+  .dl {
+    position: fixed;
+    inset: 0;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+    background: var(--sea);
+    color: var(--snow);
+    font-family: "Libre Franklin", ui-sans-serif, system-ui, sans-serif;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    text-wrap-style: pretty;
+  }
+  .dl *,
+  .dl *::before,
+  .dl *::after {
+    box-sizing: border-box;
+  }
   .dl [hidden] {
     display: none !important;
+  }
+  .dl :focus-visible {
+    outline: 3px solid var(--amber);
+    outline-offset: 3px;
+    border-radius: 0;
+  }
+  .dl :focus-visible:not(.dl-key) {
+    box-shadow: none;
   }
   .dl-sr {
     position: absolute;
@@ -219,827 +392,1660 @@ const MONTHS = [
     border: 0;
   }
 
-  /* ---------------- how to play ----------------
-     The largest body text on the page. The numbers are a real sequence. */
-  .dl-how {
-    max-width: 46rem;
-  }
-  .dl-steps {
-    counter-reset: dl-step;
-    list-style: none;
-    margin: 16px 0 0;
-    padding: 0;
-    display: grid;
-    gap: 12px;
-  }
-  .dl-steps > li {
-    counter-increment: dl-step;
-    display: grid;
-    grid-template-columns: 2rem minmax(0, 1fr);
-    align-items: baseline;
-    font-size: 18px;
-    line-height: 1.5;
-    color: var(--ink);
-    text-wrap: pretty;
-  }
-  .dl-steps > li::before {
-    content: counter(dl-step);
-    font-weight: 300;
-    color: var(--ink-2);
+  /* ---------- Pixel type ---------- */
+
+  .dl-px25,
+  .dl-px15 {
+    font-weight: 400;
+    letter-spacing: 0;
     font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: none;
   }
-  .dl-how-note {
-    margin: 16px 0 0 2rem;
-    max-width: 60ch;
-    font-size: 14px;
-    line-height: 1.55;
-    color: var(--ink-3);
+  .dl-px25 {
+    font-family: "Jersey 25", ui-sans-serif, sans-serif;
+  }
+  .dl-px15 {
+    font-family: "Jersey 15", ui-sans-serif, sans-serif;
   }
 
-  /* ---------------- board ---------------- */
-  .dl-board {
-    margin-top: 44px;
-    padding-top: 18px;
-    border-top: 1px solid var(--rule);
-    scroll-margin-top: 16px;
-  }
-  .dl-boardhead {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 6px 16px;
-  }
-  /* The two modes are the board's title: Cult UI direction-aware-tabs at
-     heading size, one ink bar sliding between them (src/lib/motion.ts). */
-  .dl .dl-modes {
-    gap: 26px;
-  }
-  .dl .dl-modes > [role="radio"] {
-    min-height: 40px;
-    padding: 4px 0 8px;
-    font-size: 19px;
-    font-weight: 300;
-    line-height: 1.25;
-  }
-  .dl-date {
-    margin: 0 0 9px;
-    font-size: 12px;
-    color: var(--ink-2);
-    font-variant-numeric: tabular-nums;
+  /* A solid pixel panel: slate, a lit rim, a hard drop. Everything written
+     over the map sits on one, so the land never shows through small type. */
+  .dl-panel {
+    background: var(--slate);
+    color: var(--snow);
+    box-shadow:
+      inset 0 0 0 3px var(--rim),
+      0 0 0 3px var(--drop),
+      6px 6px 0 3px var(--drop);
   }
 
-  /* Says why the order matters, right where the order is. */
-  .dl-axis {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin: 18px 0 10px;
-    font-size: 11px;
-    color: var(--ink-2);
+  /* ---------- The scene ---------- */
+
+  .dl-map {
+    position: absolute;
+    left: 0;
+    top: 0;
+    cursor: crosshair;
+    touch-action: pan-y;
+    outline: none;
   }
-  .dl-axis i {
-    position: relative;
-    flex: 1;
-    height: 1px;
-    background: var(--rule);
+  .dl-map.is-zoomed {
+    cursor: grab;
   }
-  .dl-axis i::after {
+  .dl-map.is-panning {
+    cursor: grabbing;
+  }
+  .dl.is-done .dl-map:not(.is-zoomed) {
+    cursor: default;
+  }
+  .dl-map:focus-visible {
+    outline: none;
+  }
+  .dl-map:focus-visible::after {
     content: "";
     position: absolute;
-    right: 0;
-    top: -3px;
-    border-left: 6px solid var(--ink-2);
-    border-top: 3.5px solid transparent;
-    border-bottom: 3.5px solid transparent;
+    inset: 3px;
+    border: 3px solid var(--amber);
+    pointer-events: none;
+  }
+  .dl-map canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    image-rendering: pixelated;
+  }
+  .dl-ui {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+  }
+  .dl-ui > * {
+    pointer-events: auto;
   }
 
-  /* ---------------- the six species ---------------- */
-  /* Three to a row at every width, so the photos are big enough to read
-     (up to 360px across). On a laptop that puts the map below them. */
+  /* What the map puts down: each ring's km, the place's name, its
+     coordinates. */
+  .dl-labels {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  .dl-place {
+    position: absolute;
+    left: 0;
+    top: 0;
+    padding: 3px 8px 5px;
+    font-size: 24px;
+    line-height: 1;
+    white-space: nowrap;
+    background: var(--slate);
+    color: var(--snow);
+    box-shadow:
+      0 0 0 3px var(--red),
+      4px 4px 0 3px var(--drop);
+  }
+  .dl-rk,
+  .dl-rh {
+    position: absolute;
+    left: 0;
+    top: 0;
+    z-index: 1;
+    height: 24px;
+    padding: 0 7px;
+    font-size: 18px;
+    line-height: 23px;
+    white-space: nowrap;
+    background: var(--slate);
+    color: var(--snow);
+    box-shadow:
+      0 0 0 2px var(--drop),
+      3px 3px 0 2px var(--drop);
+  }
+  .dl-rk.is-hot {
+    background: var(--drop);
+    box-shadow:
+      0 0 0 2px currentColor,
+      3px 3px 0 2px var(--drop);
+  }
+  .dl-coords {
+    position: absolute;
+    left: 0;
+    top: 0;
+    z-index: 2;
+    padding: 2px 8px 4px;
+    font-size: 22px;
+    line-height: 1;
+    white-space: nowrap;
+    color: #ff7a5c;
+    background: var(--slate);
+    box-shadow:
+      0 0 0 2px var(--drop),
+      3px 3px 0 2px var(--drop);
+  }
+  .dl-coords .dl-c-off {
+    color: transparent;
+  }
+  /* A photo flying from its card to its ring, in whole map pixels. */
+  .dl-fly {
+    position: fixed;
+    left: 0;
+    top: 0;
+    z-index: 30;
+    image-rendering: pixelated;
+    pointer-events: none;
+  }
+
+  /* The verdict, dropped in from the top edge once the map has shown the
+     answer. */
+  .dl-banner {
+    position: absolute;
+    z-index: 5;
+    left: calc(var(--edge) + 3px);
+    top: 0;
+    display: grid;
+    justify-items: start;
+    gap: 4px;
+    padding: 22px 22px 12px;
+    background: var(--amber);
+    color: var(--slate);
+    white-space: nowrap;
+    box-shadow:
+      inset 0 -4px 0 var(--amber-lo),
+      0 0 0 3px var(--drop),
+      6px 6px 0 3px var(--drop);
+  }
+  html.dark .dl-banner {
+    color: #071230;
+  }
+  .dl-banner b {
+    font-size: 41px;
+    line-height: 0.85;
+    font-weight: 400;
+  }
+  .dl-banner span {
+    font-size: 22px;
+    line-height: 1;
+  }
+
+  /* ---------- The title panel ---------- */
+
+  .dl-title {
+    position: absolute;
+    left: var(--edge);
+    top: var(--edge);
+    display: grid;
+    justify-items: start;
+    padding: 10px 16px 12px;
+    transition: translate 220ms var(--ease-out);
+  }
+  .dl-trow {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    margin-top: 10px;
+  }
+  .dl-title h1 {
+    margin: 0;
+    font-size: 58px;
+    font-weight: 400;
+    line-height: 0.8;
+    letter-spacing: 0;
+    white-space: nowrap;
+    color: var(--snow);
+    text-shadow: 3px 3px 0 var(--drop);
+  }
+  .dl-rule {
+    margin: 9px 0 0 2px;
+    font-size: 21px;
+    line-height: 1;
+    white-space: nowrap;
+    color: var(--snow);
+  }
+  .dl-rule i {
+    font-style: normal;
+    color: var(--amber);
+    padding: 0 2px;
+  }
+  .dl-modes-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-top: 12px;
+  }
+  .dl-modes {
+    display: flex;
+    gap: 10px;
+  }
+  /* The tabs press like keys; the underline the shared tabs slide along has
+     no place here. */
+  .dl-modes > .utabs-bar {
+    display: none;
+  }
+  .dl-date {
+    margin: 0 0 4px;
+    font-size: 19px;
+    line-height: 1;
+    white-space: nowrap;
+    color: var(--dim);
+  }
+  .dl.is-done .dl-title {
+    translate: 0 calc(-100% - 40px);
+    visibility: hidden;
+    transition:
+      translate 220ms var(--ease-out),
+      visibility 0s linear 220ms;
+  }
+
+  /* ---------- Keys ---------- */
+  /* A square key with a dark outline, a lit top edge and a hard drop under
+     it. Pressed, it sits 4px down on its own drop. */
+  .dl-key {
+    --k-face: var(--key);
+    --k-hi: var(--key-hi);
+    --k-lo: var(--key-lo);
+    --k-ink: var(--drop);
+    --k-drop: 4px;
+    --k-text: var(--slate);
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin: 0 0 var(--k-drop);
+    padding: 0 12px;
+    border: 0;
+    border-radius: 0;
+    background: var(--k-face);
+    color: var(--k-text);
+    font-family: "Jersey 15", ui-sans-serif, sans-serif;
+    font-size: 24px;
+    font-weight: 400;
+    line-height: 1;
+    text-decoration: none;
+    cursor: pointer;
+    box-shadow:
+      inset 0 3px 0 var(--k-hi),
+      inset 0 -3px 0 var(--k-lo),
+      0 0 0 3px var(--k-ink),
+      0 calc(var(--k-drop) + 3px) 0 0 var(--k-ink);
+    transition:
+      transform 60ms var(--ease-out),
+      box-shadow 60ms var(--ease-out);
+    -webkit-font-smoothing: none;
+  }
+  a.dl-key:hover {
+    text-decoration: none;
+  }
+  html.dark .dl-key {
+    --k-text: var(--snow);
+  }
+  .dl-key:focus-visible {
+    outline: 3px solid var(--amber);
+    outline-offset: 5px;
+  }
+  .dl-key.is-down,
+  .dl-key[aria-checked="true"] {
+    transform: translateY(var(--k-drop));
+    box-shadow:
+      inset 0 3px 0 var(--k-lo),
+      inset 0 -3px 0 var(--k-hi),
+      0 0 0 3px var(--k-ink),
+      0 3px 0 0 var(--k-ink);
+  }
+  .dl-key:disabled {
+    cursor: default;
+  }
+  .dl-key-amber,
+  html.dark .dl-key-amber,
+  .dl-key[aria-expanded="true"],
+  .dl-key[aria-checked="true"],
+  html.dark .dl-key[aria-checked="true"] {
+    --k-face: var(--amber);
+    --k-hi: var(--amber-hi);
+    --k-lo: var(--amber-lo);
+    --k-text: var(--slate);
+  }
+  html.dark .dl-key-amber,
+  html.dark .dl-key[aria-checked="true"],
+  html.dark .dl-key[aria-expanded="true"] {
+    --k-text: #071230;
+  }
+  .dl-key-small {
+    height: 30px;
+    padding: 0 11px 2px;
+    font-size: 21px;
+    white-space: nowrap;
+  }
+  .dl-back {
+    height: 26px;
+    padding: 0 9px 2px;
+    font-size: 19px;
+  }
+  .dl-tab {
+    height: 30px;
+    padding: 0 11px 2px;
+    font-size: 20px;
+    white-space: nowrap;
+  }
+  .dl-zkey {
+    width: 42px;
+    height: 38px;
+    padding: 0 0 3px;
+    font-family: "Jersey 25", ui-sans-serif, sans-serif;
+    font-size: 41px;
+  }
+  .dl-zkey:disabled {
+    --k-text: var(--dim);
+  }
+  /* Thumb room on touch screens without moving the layout. */
+  @media (pointer: coarse) {
+    .dl-key::after {
+      content: "";
+      position: absolute;
+      inset: -6px -3px;
+    }
+  }
+
+  /* ---------- How to play ---------- */
+
+  .dl-how {
+    position: absolute;
+    left: var(--edge);
+    top: 230px;
+    z-index: 6;
+    width: 540px;
+    padding: 16px 16px 14px;
+  }
+  .dl-how-steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+  }
+  .dl-how-steps li {
+    display: grid;
+    gap: 8px;
+    justify-items: center;
+    text-align: center;
+  }
+  .dl-how-steps b {
+    font-weight: 400;
+    font-size: 22px;
+    line-height: 1;
+    color: var(--snow);
+  }
+  .dl-how-note {
+    margin: 14px 2px 12px;
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--dim);
+  }
+  .dl-how-art {
+    position: relative;
+    display: block;
+    width: 100%;
+    height: 96px;
+    background: var(--sea);
+    box-shadow: inset 0 0 0 3px var(--drop);
+    overflow: hidden;
+    image-rendering: pixelated;
+  }
+  /* A card turning: its "?" back folds away and its face comes round. */
+  .dl-art-card i {
+    position: absolute;
+    left: 50%;
+    top: 14px;
+    width: 48px;
+    height: 66px;
+    margin-left: -24px;
+    box-shadow: 0 0 0 3px var(--drop);
+  }
+  .dl-hc-back {
+    background:
+      linear-gradient(var(--c3), var(--c3)) 50% 26px / 6px 6px no-repeat,
+      linear-gradient(var(--c3), var(--c3)) 50% 40px / 6px 6px no-repeat,
+      linear-gradient(var(--c3), var(--c3)) 50% 14px / 18px 6px no-repeat,
+      linear-gradient(var(--c3), var(--c3)) 30px 20px / 6px 12px no-repeat,
+      var(--slate);
+    animation: dl-hc-back 2400ms steps(1, end) infinite;
+  }
+  .dl-hc-face {
+    background:
+      linear-gradient(var(--slate), var(--slate)) 50% 52px / 36px 6px no-repeat,
+      linear-gradient(#8a6a4a, #8a6a4a) 16px 18px / 18px 12px no-repeat,
+      linear-gradient(#cfd98a, #cfd98a) 6px 6px / 36px 36px no-repeat,
+      var(--c3);
+    transform: scaleX(0);
+    animation: dl-hc-face 2400ms steps(1, end) infinite;
+  }
+  @keyframes dl-hc-back {
+    0%,
+    30% {
+      transform: scaleX(1);
+    }
+    33% {
+      transform: scaleX(0.66);
+    }
+    36% {
+      transform: scaleX(0.33);
+    }
+    39%,
+    100% {
+      transform: scaleX(0);
+    }
+  }
+  @keyframes dl-hc-face {
+    0%,
+    38.9% {
+      transform: scaleX(0);
+    }
+    39% {
+      transform: scaleX(0.33);
+    }
+    42% {
+      transform: scaleX(0.66);
+    }
+    45% {
+      transform: scaleX(1.12);
+    }
+    48%,
+    100% {
+      transform: scaleX(1);
+    }
+  }
+  /* A ring tightening round a pin, drawn in the map's own pixels. */
+  .dl-art-ring {
+    display: grid;
+    place-items: center;
+  }
+  .dl-art-ring canvas {
+    display: block;
+    image-rendering: pixelated;
+  }
+  /* Points ticking down as cards turn. */
+  .dl-art-pts {
+    display: grid;
+    place-items: center;
+  }
+  .dl-hn-num {
+    position: relative;
+    display: block;
+    height: 44px;
+    width: 100%;
+    overflow: hidden;
+    font-style: normal;
+  }
+  .dl-hn-num s {
+    position: absolute;
+    inset: 0;
+    text-decoration: none;
+    text-align: center;
+    font-size: 50px;
+    line-height: 44px;
+    color: var(--amber);
+    text-shadow: 3px 3px 0 var(--drop);
+    opacity: 0;
+  }
+  .dl-hn-num s:nth-child(1) {
+    animation: dl-hn1 2400ms steps(1, end) infinite;
+  }
+  .dl-hn-num s:nth-child(2) {
+    animation: dl-hn2 2400ms steps(1, end) infinite;
+  }
+  .dl-hn-num s:nth-child(3) {
+    animation: dl-hn3 2400ms steps(1, end) infinite;
+  }
+  @keyframes dl-hn1 {
+    0%,
+    33% {
+      opacity: 1;
+      transform: none;
+    }
+    34%,
+    100% {
+      opacity: 0;
+    }
+  }
+  @keyframes dl-hn2 {
+    0%,
+    33% {
+      opacity: 0;
+    }
+    34% {
+      opacity: 1;
+      transform: translateY(-6px);
+    }
+    37%,
+    66% {
+      opacity: 1;
+      transform: none;
+    }
+    67%,
+    100% {
+      opacity: 0;
+    }
+  }
+  @keyframes dl-hn3 {
+    0%,
+    66% {
+      opacity: 0;
+    }
+    67% {
+      opacity: 1;
+      transform: translateY(-6px);
+    }
+    70%,
+    100% {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  /* ---------- Stakes, the newest reach, zoom ---------- */
+
+  .dl-stakes {
+    position: absolute;
+    right: var(--edge);
+    top: var(--edge);
+    display: grid;
+    grid-template-columns: auto auto;
+    grid-template-rows: auto auto;
+    align-items: center;
+    column-gap: 12px;
+    padding: 10px 16px 10px;
+    pointer-events: none;
+  }
+  .dl-s-up,
+  .dl-s-unit {
+    grid-column: 1;
+    font-size: 22px;
+    line-height: 1;
+    color: var(--dim);
+    text-align: right;
+    white-space: nowrap;
+  }
+  .dl-s-up {
+    align-self: end;
+  }
+  .dl-s-unit {
+    align-self: start;
+  }
+  .dl-s-num {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    display: block;
+    min-width: 4.6ch;
+    font-size: 72px;
+    line-height: 0.8;
+    font-weight: 400;
+    text-align: right;
+    color: var(--amber);
+    text-shadow: 3px 3px 0 var(--drop);
+  }
+
+  /* The newest ring's reach, a slim strip under the score. */
+  .dl-read {
+    position: absolute;
+    right: var(--edge);
+    top: 108px;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 6px 14px 8px;
+    pointer-events: none;
+    transition:
+      translate 260ms var(--ease-out),
+      opacity 200ms linear;
+  }
+  .dl-r-head {
+    font-size: 19px;
+    line-height: 1;
+    color: var(--dim);
+    white-space: nowrap;
+  }
+  .dl-r-line {
+    font-size: 30px;
+    line-height: 0.85;
+    white-space: nowrap;
+    color: var(--snow);
+  }
+  .dl-r-line b {
+    font-weight: 400;
+    color: var(--g-c, var(--snow));
+    text-shadow: 2px 2px 0 var(--drop);
+  }
+  .dl-r-w,
+  .dl-r-km {
+    font-family: "Jersey 15", ui-sans-serif, sans-serif;
+    font-size: 19px;
+    color: var(--dim);
+  }
+
+  .dl-zoom {
+    position: absolute;
+    top: 164px;
+    right: calc(var(--edge) + 3px);
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  /* On a screen wide enough the zoom keys sit in the top band beside the
+     score, over the Arctic, rather than under it over Japan and the Kurils,
+     where a pin's rings would run beneath them. After the answer they drop
+     to the corner the months left, beside the postcard. */
+  @media (min-width: 1200px) {
+    .dl:not(.is-phone) .dl-zoom {
+      top: calc(var(--edge) + 3px);
+      right: calc(var(--stakes-w, 260px) + var(--edge) + 22px);
+    }
+    .dl.is-done:not(.is-phone) .dl-zoom {
+      top: auto;
+      right: calc(var(--edge) + 3px);
+      bottom: calc(var(--edge) + 4px);
+    }
+  }
+  .dl-viewkey {
+    height: 38px;
+    font-size: 21px;
+  }
+
+  /* ---------- The hand ---------- */
+
+  .dl-hand {
+    position: absolute;
+    left: calc(var(--edge) + 3px);
+    bottom: calc(var(--edge) + 4px);
+    transition:
+      translate 260ms var(--ease-out),
+      opacity 200ms linear;
+  }
+  .dl-hand.is-waiting {
+    visibility: hidden;
+  }
   .dl-tray {
     list-style: none;
     margin: 0;
     padding: 0;
     display: grid;
-    gap: 16px 12px;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(6, var(--card-w));
+    gap: 14px;
   }
-  .dl-slot {
+  .dl-card {
+    --c: var(--c1);
     position: relative;
-    min-width: 0;
+    width: var(--card-w);
+    height: calc(var(--card-w) * 1.6);
   }
-  .dl-slot__fig {
-    margin: 0;
+  .dl-card:nth-child(2) {
+    --c: var(--c2);
   }
-  .dl-slot__pic {
+  .dl-card:nth-child(3) {
+    --c: var(--c3);
+  }
+  .dl-card:nth-child(4) {
+    --c: var(--c4);
+  }
+  .dl-card:nth-child(5) {
+    --c: var(--c5);
+  }
+  .dl-card:nth-child(6) {
+    --c: var(--c6);
+  }
+  .dl-card-face,
+  .dl-card-back {
+    position: absolute;
+    inset: 0;
+    background: var(--c);
+    box-shadow:
+      0 0 0 3px var(--drop),
+      5px 5px 0 3px var(--drop);
+  }
+  .dl-card-face {
+    display: flex;
+    flex-direction: column;
+    padding: 6px 6px 0;
+  }
+  .dl-card-pic {
     position: relative;
-    aspect-ratio: 1 / 1;
+    flex: none;
+    aspect-ratio: 1;
+    background: var(--slate);
+    box-shadow: 0 0 0 3px var(--drop);
     overflow: hidden;
-    background: var(--band);
   }
-  .dl-slot__pic img {
+  .dl-card-pic img,
+  .dl-card-pic canvas {
     position: absolute;
     inset: 0;
     width: 100%;
     height: 100%;
     object-fit: cover;
-    opacity: 0;
-    transition: opacity 320ms var(--ease);
   }
-  .dl-slot__pic img.is-loaded {
-    opacity: 1;
+  .dl-card-pic canvas {
+    image-rendering: pixelated;
   }
-  .dl-slot__body {
-    display: block;
-    padding-top: 10px;
-  }
-  .dl-slot__name {
-    display: block;
-    font-size: 14px;
+  .dl-card-name {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    margin: 3px 0 0;
+    padding: 3px 4px;
+    background: var(--card-paper);
+    box-shadow: 0 0 0 3px var(--drop);
+    font-size: 12.5px;
     font-weight: 500;
-    line-height: 1.3;
-    color: var(--ink);
+    line-height: 1.15;
+    color: var(--card-ink);
+    overflow: hidden;
     overflow-wrap: anywhere;
   }
-  .dl-slot__sci {
-    display: block;
-    margin-top: 2px;
-    font-size: 12px;
-    font-style: italic;
-    color: var(--ink-2);
-    overflow-wrap: anywhere;
+  .dl-card-name span {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
-  .dl-slot__count {
-    display: block;
-    margin-top: 6px;
-    font-size: 12px;
-    color: var(--ink-3);
-    font-variant-numeric: tabular-nums;
+  .dl-card-reach {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 4px;
+    margin: 6px -6px 0;
+    padding: 3px 4px 5px;
+    background: var(--slate);
+    color: var(--snow);
+    font-size: 22px;
+    line-height: 1;
+    white-space: nowrap;
   }
-  .dl-slot.is-new .dl-slot__body {
-    animation: dl-rise 320ms var(--ease) var(--dl-delay, 0ms) both;
+  .dl-card-reach small {
+    font-size: 15px;
+    color: var(--dim);
   }
-  .dl-slot.is-new .dl-slot__pic img {
-    transition-delay: var(--dl-delay, 0ms);
-  }
-  @keyframes dl-rise {
-    from {
-      opacity: 0;
-      transform: translateY(4px);
-    }
-  }
-
-  /* Still hidden: the same square, empty, with its place in the order. */
-  .dl-slot__blank {
+  .dl-card-n {
+    position: absolute;
+    left: -9px;
+    top: -11px;
+    z-index: 2;
+    width: 26px;
+    height: 26px;
     display: grid;
     place-items: center;
-    aspect-ratio: 1 / 1;
-    border: 1px solid var(--rule);
+    background: var(--drop);
+    color: var(--snow);
     font-size: 22px;
-    font-weight: 300;
-    color: var(--ink-2);
-    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .dl-card-back {
+    display: grid;
+    place-items: center;
+    background: var(--slate);
+  }
+  .dl-card-back::before {
+    content: "";
+    position: absolute;
+    inset: 8px;
+    border: 3px solid color-mix(in srgb, var(--c) 70%, var(--slate));
+  }
+  .dl-card-q {
+    font-size: 58px;
+    line-height: 1;
+    color: color-mix(in srgb, var(--c) 85%, var(--slate));
+  }
+  .dl-card .dl-key-next {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px 6px 10px;
+    text-align: center;
+    white-space: normal;
+    line-height: 0.95;
+    font-size: 22px;
+  }
+  .dl-price {
+    font-family: "Jersey 25", ui-sans-serif, sans-serif;
+    font-size: 41px;
+    line-height: 0.85;
+    color: var(--red);
+  }
+  html.dark .dl-price {
+    color: var(--amber);
+  }
+  .dl-price-unit {
+    font-size: 20px;
   }
 
-  /* The next square is the button, and says what it costs. */
-  .dl-slot__next {
+  /* The points a species cost, rising off its card's corner. */
+  .dl-pop {
+    position: absolute;
+    right: -14px;
+    top: -24px;
+    z-index: 5;
+    font-size: 41px;
+    line-height: 1;
+    color: #ff6a50;
+    white-space: nowrap;
+    pointer-events: none;
+    text-shadow:
+      -3px 0 0 var(--drop),
+      3px 0 0 var(--drop),
+      0 -3px 0 var(--drop),
+      0 3px 0 var(--drop),
+      -3px -3px 0 var(--drop),
+      3px -3px 0 var(--drop),
+      -3px 3px 0 var(--drop),
+      3px 3px 0 var(--drop),
+      5px 5px 0 var(--drop);
+  }
+
+  /* ---------- Months and Lock it in ---------- */
+
+  .dl-guess {
+    position: absolute;
+    right: calc(var(--edge) + 3px);
+    bottom: calc(var(--edge) + 4px);
+    width: 372px;
     display: grid;
-    place-content: center;
-    gap: 6px;
-    width: 100%;
-    aspect-ratio: 1 / 1;
-    padding: 10px;
-    border: 1px dashed var(--ink-2);
-    background: transparent;
-    color: var(--ink);
-    font: inherit;
-    font-size: 14px;
-    line-height: 1.3;
-    text-align: center;
-    cursor: pointer;
+    gap: 12px;
     transition:
-      background-color 150ms var(--ease),
-      border-color 150ms var(--ease);
+      translate 260ms var(--ease-out),
+      opacity 200ms linear;
   }
-  .dl-slot__next:hover {
-    background: var(--hover);
-    border-style: solid;
-    border-color: var(--ink);
+  .dl-months {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 10px;
+    margin: 0;
   }
-  .dl-slot__cta {
-    text-wrap: balance;
+  .dl-months .dl-key {
+    height: 34px;
+    padding: 0 0 2px;
+    font-size: 22px;
   }
-  .dl-slot__cost {
+  .dl-key-lock {
+    height: 66px;
+    flex-direction: column;
+    gap: 3px;
+    font-family: "Jersey 25", ui-sans-serif, sans-serif;
+    font-size: 41px;
+    --k-drop: 6px;
+  }
+  .dl-key-lock small {
+    font-family: "Jersey 15", ui-sans-serif, sans-serif;
+    font-size: 20px;
+    line-height: 0.8;
+  }
+  .dl-key-lock:disabled,
+  html.dark .dl-key-lock:disabled {
+    --k-face: var(--key);
+    --k-hi: var(--key-hi);
+    --k-lo: var(--key-lo);
+    --k-text: var(--slate);
+  }
+  html.dark .dl-key-lock:disabled {
+    --k-text: var(--snow);
+  }
+  .dl-key-lock:disabled .dl-lock-word {
+    opacity: 0.5;
+  }
+  .dl.is-done .dl-hand,
+  .dl.is-done .dl-guess {
+    translate: 0 calc(100% + 60px);
+    opacity: 0;
+    pointer-events: none;
+  }
+  .dl.is-done .dl-read {
+    translate: calc(100% + 60px) 0;
+    opacity: 0;
+  }
+
+  /* More lists loading: the board can't be played (it's inert), and looks it. */
+  .dl.is-loading .dl-hand,
+  .dl.is-loading .dl-guess {
+    opacity: 0.55;
+  }
+
+  /* ---------- The postcard ---------- */
+
+  .dl-post {
+    position: absolute;
+    left: calc(var(--edge) + 3px);
+    bottom: calc(var(--edge) + 4px);
+    z-index: 4;
+    width: min(900px, calc(100vw - 2 * var(--edge) - 12px));
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 14px 18px;
+    padding: 14px 16px 14px;
+    background: var(--card-paper);
+    color: var(--card-ink);
+    user-select: text;
+    -webkit-user-select: text;
+    box-shadow:
+      inset 0 0 0 3px var(--card-paper),
+      inset 0 0 0 6px var(--red),
+      inset 0 0 0 9px var(--card-paper),
+      inset 0 0 0 12px var(--c1),
+      0 0 0 3px var(--drop),
+      8px 8px 0 3px var(--drop);
+  }
+  .dl-post-thumbs {
+    list-style: none;
+    margin: 0;
+    padding: 6px 0 0 6px;
+    display: grid;
+    grid-template-columns: repeat(3, 62px);
+    gap: 8px;
+    align-content: start;
+  }
+  .dl-post-thumbs li {
+    position: relative;
+    width: 62px;
+    height: 62px;
+    background: var(--slate);
+    box-shadow: 0 0 0 3px var(--drop);
+  }
+  .dl-post-thumbs img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .dl-post-thumbs li.is-unused img {
+    filter: grayscale(1) contrast(0.8);
+    opacity: 0.55;
+  }
+  .dl-post-thumbs li span {
+    position: absolute;
+    left: -6px;
+    top: -8px;
+    width: 20px;
+    height: 20px;
+    display: grid;
+    place-items: center;
+    background: var(--c);
+    color: #122a5b;
+    box-shadow: 0 0 0 2px var(--drop);
+    font-size: 18px;
+    line-height: 1;
+  }
+  .dl-post-thumbs li.is-unused span {
+    background: var(--dim);
+  }
+  .dl-post-where {
+    min-width: 0;
+    padding-top: 6px;
+  }
+  .dl-post-where h2 {
+    margin: 0;
+    font-size: 50px;
+    line-height: 0.85;
+    font-weight: 400;
+    color: var(--card-ink);
+    overflow-wrap: anywhere;
+  }
+  .dl-post-where h2:focus,
+  .dl-post-where h2:focus-visible {
+    outline: none;
+  }
+  .dl-post-where p {
+    margin: 6px 0 0;
+    font-size: 22px;
+    line-height: 1;
+    color: var(--card-ink-2);
+  }
+  .dl-post-where .dl-post-used {
+    margin-top: 12px;
+    font-family: "Libre Franklin", ui-sans-serif, sans-serif;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+  .dl-post-pts {
+    display: grid;
+    grid-template-columns: auto auto;
+    align-content: start;
+    gap: 4px 16px;
+    margin: 0;
+    padding: 6px 6px 0 0;
+    font-size: 22px;
+    line-height: 1;
+  }
+  .dl-post-pts dt {
+    color: var(--card-ink-2);
+  }
+  .dl-post-pts dd {
+    margin: 0;
+    text-align: right;
+    color: var(--card-ink);
+  }
+  .dl-post-pts .dl-tot {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 3px solid var(--card-ink);
+    font-size: 30px;
+  }
+  .dl-post-pts dd.dl-tot {
+    color: #c77f00;
+  }
+  .dl-post-acts {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 14px 14px;
+    margin: 0 6px 4px 6px;
+  }
+  .dl-post-acts .dl-key {
+    height: 40px;
+    padding: 0 14px 3px;
+    font-size: 22px;
+  }
+  .dl-post-acts .dl-key-amber {
+    font-family: "Jersey 25", ui-sans-serif, sans-serif;
+    font-size: 28px;
+  }
+  .dl-post-note {
+    flex: 1 1 12rem;
+    margin: 0 0 4px;
+    text-align: right;
+    font-size: 19px;
+    line-height: 1.05;
+    color: var(--card-ink-2);
+  }
+
+  /* ---------- The full list ---------- */
+
+  .dl-sheet {
+    width: min(980px, calc(100vw - 32px));
+    max-width: none;
+    max-height: calc(100dvh - 48px);
+    margin: auto;
+    padding: 12px;
+    border: 0;
+    overflow: hidden;
+    background: var(--card-paper);
+    color: var(--card-ink);
+    user-select: text;
+    -webkit-user-select: text;
+    box-shadow:
+      inset 0 0 0 3px var(--card-paper),
+      inset 0 0 0 6px var(--red),
+      inset 0 0 0 9px var(--card-paper),
+      inset 0 0 0 12px var(--c1),
+      0 0 0 3px var(--drop),
+      8px 8px 0 3px var(--drop);
+  }
+  .dl-sheet[open] {
+    display: flex;
+    flex-direction: column;
+  }
+  .dl-sheet::backdrop {
+    background: rgb(3 9 24 / 0.6);
+  }
+  .dl-sheet-head {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 12px 14px 14px;
+  }
+  /* The list scrolls inside the sheet's frame, so the frame stays whole. */
+  .dl-sheet-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+  .dl-sheet-head h2 {
+    margin: 0;
+    font-size: 44px;
+    font-weight: 400;
+    line-height: 0.85;
+    color: var(--card-ink);
+  }
+  .dl-entries {
+    list-style: none;
+    margin: 0;
+    padding: 6px 14px 4px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 22px 26px;
+  }
+  .dl-entry {
+    --c: var(--c1);
+    display: grid;
+    grid-template-columns: 96px minmax(0, 1fr);
+    gap: 4px 14px;
+    align-items: start;
+  }
+  .dl-entry-pic {
+    grid-row: 1 / span 4;
+    position: relative;
+    width: 96px;
+    height: 96px;
+    margin: 3px 0 0 3px;
+    background: var(--slate);
+    box-shadow:
+      0 0 0 3px var(--c),
+      0 0 0 6px var(--drop);
+  }
+  .dl-entry-pic img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .dl-entry-pic span {
+    position: absolute;
+    left: -9px;
+    top: -10px;
+    width: 22px;
+    height: 22px;
+    display: grid;
+    place-items: center;
+    background: var(--c);
+    color: #122a5b;
+    box-shadow: 0 0 0 2px var(--drop);
+    font-size: 19px;
+    line-height: 1;
+  }
+  .dl-entry-name {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 500;
+    line-height: 1.3;
+    color: var(--card-ink);
+  }
+  .dl-entry-sci {
+    margin: 0;
     font-size: 12px;
-    color: var(--ink-2);
+    color: var(--card-ink-2);
+  }
+  .dl-entry-sci i {
+    font-style: italic;
+  }
+  .dl-entry-status {
+    color: var(--card-ink);
+  }
+  .dl-entry-meta {
+    margin: 2px 0 0;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--card-ink-2);
+    font-variant-numeric: tabular-nums;
+  }
+  .dl-entry-meta a,
+  .dl-credits a {
+    color: var(--card-ink);
+  }
+  .dl-entry-fact {
+    margin: 4px 0 0;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--card-ink);
+  }
+  .dl-sheet-foot {
+    margin: 22px 14px 0;
+    max-width: 72ch;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--card-ink-2);
+  }
+  /* CC BY and CC BY-NC both require the photographer to be named, but a name
+     can give the place away. So the credits wait here, closed. */
+  .dl-credits {
+    margin: 8px 14px 14px;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--card-ink-2);
+  }
+  .dl-credits > summary {
+    width: fit-content;
+    padding: 4px 0;
+    color: var(--card-ink);
+    cursor: pointer;
+  }
+  .dl-credits-list {
+    counter-reset: dl-credit;
+    list-style: none;
+    margin: 4px 0 0;
+    padding: 0;
+  }
+  .dl-credits-list > li {
+    counter-increment: dl-credit;
+    overflow-wrap: anywhere;
+  }
+  .dl-credits-list > li::before {
+    content: counter(dl-credit);
+    display: inline-block;
+    min-width: 1.4em;
     font-variant-numeric: tabular-nums;
   }
   .dl-nowrap {
     white-space: nowrap;
   }
 
-  /* ---------------- map and guess ---------------- */
-  /* More lists loading: the board can't be played (it's inert), and looks it. */
-  .dl-board.is-loading .dl-tray,
-  .dl-board.is-loading .dl-play {
-    opacity: 0.45;
+  /* ---------- Narrower and shorter laptops ---------- */
+
+  @media (max-width: 1240px) and (min-width: 760px) {
+    .dl {
+      --card-w: clamp(84px, calc((100vw - 500px) / 6 - 14px), 128px);
+    }
+    .dl-card-name {
+      font-size: 11.5px;
+    }
   }
-  .dl-play {
-    margin-top: 28px;
-    display: grid;
-    gap: 22px;
-  }
-  @media (min-width: 1024px) {
-    .dl-play {
-      grid-template-columns: minmax(0, 1fr) 18.5rem;
-      gap: 28px;
-      align-items: start;
+  @media (max-height: 760px) and (min-width: 760px) {
+    .dl {
+      --card-w: 104px;
+    }
+    .dl-title h1 {
+      font-size: 50px;
     }
   }
 
-  .dl-mapbox {
+  /* ---------- Phone ---------- */
+  /* One screen, top to bottom, with no scrolling at 390 x 844: the title and
+     the score, the map with the readout and the zoom keys in its corners,
+     the hand in two rows of three, then the months and Lock it in. At the
+     answer the verdict takes the title's place and the postcard the hand's,
+     and the map grows to fill the space between them (layoutAnswerPhone in
+     day-list.ts). */
+
+  .dl.is-phone {
+    display: flex;
+    flex-direction: column;
+    padding: 0 0 10px;
+    --edge: 8px;
+  }
+  .dl.is-phone .dl-ui {
+    display: contents;
+  }
+  .dl.is-phone .dl-ui > *,
+  .dl.is-phone .dl-map {
     position: relative;
+    left: auto;
+    right: auto;
+    top: auto;
+    bottom: auto;
   }
-  .dl-mapwrap {
-    position: relative;
-    aspect-ratio: 2 / 1;
-    border: 1px solid var(--rule);
-    cursor: crosshair;
-    /* The map module sets pan-y at world view and none once zoomed in. */
-    touch-action: pan-y;
-    user-select: none;
-    -webkit-user-select: none;
-    -webkit-tap-highlight-color: transparent;
+  .dl.is-phone .dl-title {
+    order: 1;
+    margin: 8px 8px 0;
+    padding: 8px 10px 9px;
   }
-  .dl-mapwrap.is-zoomed {
-    cursor: grab;
+  .dl.is-phone .dl-back {
+    height: 24px;
+    padding: 0 7px 2px;
+    font-size: 17px;
   }
-  .dl-mapwrap.is-done {
-    cursor: default;
-  }
-  .dl-mapwrap.is-done.is-zoomed {
-    cursor: grab;
-  }
-  .dl-mapwrap.is-panning,
-  .dl-mapwrap.is-done.is-panning {
-    cursor: grabbing;
-  }
-  .dl-mapwrap canvas {
+  .dl.is-phone .dl-trow {
     display: block;
-    width: 100%;
-    height: 100%;
+    margin-top: 8px;
   }
-  .dl-maphint {
+  .dl.is-phone .dl-title h1 {
+    font-size: 32px;
+  }
+  .dl.is-phone .dl-howkey {
+    position: absolute;
+    right: 10px;
+    bottom: 13px;
+    height: 26px;
+    padding: 0 8px 2px;
+    font-size: 17px;
+  }
+  .dl.is-phone .dl-rule {
+    margin: 6px 0 0;
+    font-size: 15px;
+    line-height: 1.05;
+    white-space: normal;
+  }
+  .dl.is-phone .dl-r-mid {
+    display: none;
+  }
+  .dl.is-phone .dl-r-a {
+    display: block;
+  }
+  .dl.is-phone .dl-r-b {
+    display: none;
+  }
+  .dl.is-phone .dl-modes-row {
+    gap: 9px;
+    margin-top: 9px;
+  }
+  .dl.is-phone .dl-modes {
+    gap: 8px;
+  }
+  .dl.is-phone .dl-tab {
+    height: 26px;
+    padding: 0 7px 2px;
+    font-size: 17px;
+  }
+  .dl.is-phone .dl-date {
+    font-size: 15px;
+    margin-right: 92px;
+    white-space: normal;
+  }
+  .dl.is-phone .dl-stakes {
+    position: absolute;
+    order: 0;
+    top: 19px;
+    right: 19px;
+    z-index: 2;
+    column-gap: 7px;
+    padding: 0;
+    box-shadow: none;
+    background: none;
+  }
+  .dl.is-phone .dl-s-num {
+    font-size: 34px;
+    min-width: 0;
+  }
+  .dl.is-phone .dl-s-up,
+  .dl.is-phone .dl-s-unit {
+    font-size: 14px;
+  }
+  .dl.is-phone .dl-how {
+    position: absolute;
+    top: 150px;
+    left: 8px;
+    right: 8px;
+    width: auto;
+    order: 2;
+  }
+  .dl.is-phone .dl-how-steps {
+    gap: 8px;
+  }
+  .dl.is-phone .dl-how-steps b {
+    font-size: 17px;
+  }
+  .dl.is-phone .dl-how-art {
+    height: 84px;
+  }
+  .dl.is-phone .dl-map {
+    order: 3;
+    margin-top: 12px;
+    flex: none;
+    overflow: hidden;
+  }
+  .dl.is-phone .dl-zoom {
+    position: absolute;
+    order: 3;
+    right: 10px;
+    top: var(--map-top, 140px);
+    z-index: 2;
+    gap: 8px;
+  }
+  .dl.is-phone .dl-zkey {
+    width: 36px;
+    height: 32px;
+    font-size: 34px;
+  }
+  .dl.is-phone .dl-viewkey {
+    height: 32px;
+    padding: 0 8px 2px;
+    font-size: 17px;
+  }
+  .dl.is-phone .dl-read {
+    position: absolute;
+    order: 3;
+    left: 10px;
+    right: auto;
+    top: var(--read-top, 100px);
+    z-index: 2;
+    display: block;
+    padding: 3px 8px 5px;
+    box-shadow:
+      inset 0 0 0 2px var(--rim),
+      0 0 0 2px var(--drop),
+      3px 3px 0 2px var(--drop);
+  }
+  .dl.is-phone .dl-r-head {
+    display: none;
+  }
+  .dl.is-phone .dl-r-line {
+    font-size: 25px;
+  }
+  .dl.is-phone .dl-r-w,
+  .dl.is-phone .dl-r-km {
+    font-size: 16px;
+  }
+  .dl.is-phone .dl-rk,
+  .dl.is-phone .dl-rh {
+    height: 20px;
+    padding: 0 5px;
+    font-size: 15px;
+    line-height: 19px;
+  }
+  .dl.is-phone .dl-coords {
+    font-size: 18px;
+  }
+  .dl.is-phone .dl-place {
+    font-size: 19px;
+  }
+  .dl.is-phone .dl-hand {
+    order: 5;
+    margin: 16px 12px 0;
+  }
+  .dl.is-phone .dl-tray {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px 12px;
+  }
+  .dl.is-phone .dl-card {
+    width: auto;
+    height: var(--card-h, 152px);
+  }
+  .dl.is-phone .dl-card-face {
+    padding: 5px 5px 0;
+  }
+  .dl.is-phone .dl-card-pic {
+    aspect-ratio: auto;
+    flex: 1 1 0;
+    min-height: 0;
+  }
+  .dl.is-phone .dl-card-name {
+    flex: none;
+    height: 34px;
+    margin-top: 3px;
+    padding: 2px 4px;
+    font-size: 10.5px;
+  }
+  .dl.is-phone .dl-card-reach {
+    margin: 5px -5px 0;
+    padding: 2px 3px 4px;
+    font-size: 18px;
+  }
+  .dl.is-phone .dl-card-reach small {
+    font-size: 13px;
+  }
+  .dl.is-phone .dl-card .dl-key-next {
+    gap: 3px;
+    padding: 6px 4px 8px;
+    font-size: 18px;
+  }
+  .dl.is-phone .dl-price {
+    font-size: 32px;
+  }
+  .dl.is-phone .dl-price-unit {
+    font-size: 17px;
+  }
+  .dl.is-phone .dl-card-q {
+    font-size: 46px;
+  }
+  .dl.is-phone .dl-card-n {
+    width: 22px;
+    height: 22px;
+    font-size: 19px;
+  }
+  .dl.is-phone .dl-pop {
+    top: -12px;
+    right: -6px;
+    font-size: 32px;
+  }
+  .dl.is-phone .dl-guess {
+    order: 6;
+    width: auto;
+    margin: 14px 12px 0;
+    gap: 10px;
+  }
+  .dl.is-phone .dl-months {
+    gap: 8px;
+  }
+  .dl.is-phone .dl-months .dl-key {
+    height: 30px;
+    font-size: 19px;
+  }
+  .dl.is-phone .dl-key-lock {
+    height: 54px;
+    font-size: 34px;
+  }
+  .dl.is-phone .dl-key-lock small {
+    font-size: 18px;
+  }
+  .dl.is-phone.is-done .dl-hand,
+  .dl.is-phone.is-done .dl-guess,
+  .dl.is-phone.is-done .dl-read,
+  .dl.is-phone.is-done .dl-stakes {
+    display: none;
+  }
+  /* The verdict takes the title's place, and the map starts under it. */
+  .dl.is-phone.is-done .dl-title {
+    display: none;
+  }
+  .dl.is-phone.is-done .dl-map {
+    margin-top: 100px;
+  }
+  .dl.is-phone .dl-banner {
     position: absolute;
     left: 8px;
-    bottom: 8px;
-    margin: 0;
-    padding: 4px 8px;
-    border: 1px solid var(--rule);
-    background: color-mix(in srgb, var(--paper) 88%, transparent);
-    font-size: 12px;
-    color: var(--ink-3);
-    pointer-events: none;
-    transition: opacity 250ms var(--ease);
-  }
-  .dl-mapwrap.is-placed ~ .dl-maphint,
-  .dl-mapwrap.is-zoomed ~ .dl-maphint,
-  .dl-mapwrap.is-done ~ .dl-maphint {
-    opacity: 0;
-  }
-
-  /* Map controls sit over the map but outside it, so pressing one is never a
-     tap on the map. */
-  .dl-zoom {
-    position: absolute;
-    top: 8px;
     right: 8px;
-    display: grid;
+    top: 8px;
+    padding: 12px 14px 10px;
   }
-  .dl-zoom button,
-  .dl-mapbtn {
-    border: 1px solid var(--rule);
-    background: color-mix(in srgb, var(--paper) 90%, transparent);
-    color: var(--ink);
-    font: inherit;
-    cursor: pointer;
-    transition:
-      background-color 150ms var(--ease),
-      border-color 150ms var(--ease);
+  .dl.is-phone .dl-banner b {
+    font-size: 32px;
   }
-  .dl-zoom button {
-    display: grid;
-    place-items: center;
-    width: 32px;
-    height: 32px;
-    padding: 0;
+  .dl.is-phone .dl-banner span {
+    font-size: 18px;
+  }
+  /* The postcard docks at the foot of the screen and the map grows down to
+     it. */
+  .dl.is-phone.is-done .dl-post {
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: 14px;
+    margin: 0;
+  }
+  .dl.is-phone .dl-post {
+    order: 7;
+    width: auto;
+    margin: 18px 12px 0;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px 14px;
+    padding: 16px 16px 14px;
+  }
+  .dl.is-phone .dl-post-thumbs {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 7px;
+  }
+  .dl.is-phone .dl-post-thumbs li {
+    width: auto;
+    height: auto;
+    aspect-ratio: 1;
+  }
+  .dl.is-phone .dl-post-where h2 {
+    font-size: 30px;
+    text-wrap: balance;
+  }
+  .dl.is-phone .dl-post-where p,
+  .dl.is-phone .dl-post-where .dl-post-used {
+    font-family: "Jersey 15", ui-sans-serif, sans-serif;
     font-size: 18px;
     line-height: 1;
   }
-  .dl-zoom button + button {
-    border-top: 0;
+  .dl.is-phone .dl-post-pts {
+    font-size: 18px;
+    gap: 3px 10px;
   }
-  .dl-zoom button:hover:not(:disabled),
-  .dl-mapbtn:hover {
-    background: var(--hover);
-    border-color: var(--ink-2);
+  .dl.is-phone .dl-post-pts .dl-tot {
+    font-size: 25px;
   }
-  .dl-zoom button:disabled {
-    color: var(--ink-2);
-    cursor: default;
+  .dl.is-phone .dl-post-acts {
+    gap: 12px 10px;
+    margin: 0 2px 2px;
   }
-  .dl-mapbtn {
-    position: absolute;
-    right: 8px;
-    bottom: 8px;
-    min-height: 32px;
-    padding: 4px 10px;
-    font-size: 12px;
-  }
-  @media (pointer: coarse) {
-    .dl-zoom button {
-      width: 40px;
-      height: 40px;
-    }
-    .dl-mapbtn {
-      min-height: 40px;
-    }
-  }
-  /* A phone's map is only ~195px tall, so the controls go flush to the edge
-     and stay small. 36px is still a comfortable thumb. */
-  @media (max-width: 639px) {
-    .dl-zoom {
-      top: 0;
-      right: 0;
-    }
-    .dl-zoom button {
-      width: 36px;
-      height: 36px;
-    }
-    .dl-mapbtn {
-      right: 0;
-      bottom: 0;
-      min-height: 36px;
-    }
-    .dl-scale,
-    .dl-maphint {
-      left: 6px;
-      bottom: 6px;
-    }
-  }
-
-  /* A scale bar for the latitude in the middle of the view: a hairline with
-     end ticks and a round distance under it. */
-  .dl-scale {
-    position: absolute;
-    left: 8px;
-    bottom: 8px;
-    display: grid;
-    gap: 3px;
-    padding: 4px 6px 3px;
-    background: color-mix(in srgb, var(--paper) 80%, transparent);
-    font-size: 11px;
-    line-height: 1;
-    color: var(--ink-3);
-    font-variant-numeric: tabular-nums;
-    pointer-events: none;
-  }
-  .dl-scale i {
-    display: block;
-    height: 5px;
-    border: 1px solid var(--ink-2);
-    border-top: 0;
-  }
-
-  .dl-wheelhint {
-    position: absolute;
-    inset: 0;
-    display: grid;
-    place-items: center;
-    margin: 0;
-    background: color-mix(in srgb, var(--paper) 60%, transparent);
-    font-size: 14px;
-    color: var(--ink);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 200ms var(--ease);
-  }
-  .dl-wheelhint.is-on {
-    opacity: 1;
-  }
-
-  .dl-guess,
-  .dl-result {
-    display: grid;
-    gap: 18px;
-  }
-  /* Under the map on narrower screens; a receipt the full page wide puts
-     each number too far from its label. */
-  .dl-panel {
-    max-width: 32rem;
-  }
-
-  .dl-worth {
-    margin: 0;
-    font-size: 14px;
-    color: var(--ink-3);
-  }
-  .dl-worth__n {
-    display: inline-block;
-    font-size: 28px;
-    font-weight: 300;
-    line-height: 1;
-    letter-spacing: -0.01em;
-    color: var(--ink);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .dl-months {
-    min-width: 0;
-    margin: 0;
-    padding: 0;
-    border: 0;
-  }
-  .dl-legend {
-    margin: 0 0 8px;
-    padding: 0;
-    font-size: 13px;
-    color: var(--ink);
-  }
-  .dl-months__grid {
-    display: grid;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
-    gap: 4px;
-  }
-  @media (min-width: 1024px) {
-    .dl-months__grid {
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-    }
-  }
-  .dl-month {
-    position: relative;
-    display: block;
-    cursor: pointer;
-  }
-  .dl-month input {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    margin: 0;
-    opacity: 0;
-    cursor: pointer;
-  }
-  .dl-month__cell {
-    display: grid;
-    place-items: center;
-    min-height: 40px;
-    border: 1px solid var(--rule);
-    font-size: 13px;
-    color: var(--ink-3);
-    transition:
-      background-color 150ms var(--ease),
-      border-color 150ms var(--ease),
-      color 150ms var(--ease);
-  }
-  .dl-month:hover .dl-month__cell {
-    background: var(--hover);
-    border-color: var(--ink-2);
-    color: var(--ink);
-  }
-  .dl-month input:checked + .dl-month__cell {
-    background: var(--ink);
-    border-color: var(--ink);
-    color: var(--paper);
-  }
-  .dl-month input:focus-visible + .dl-month__cell {
-    box-shadow:
-      0 0 0 2px var(--paper),
-      0 0 0 4px var(--ink);
-  }
-
-  .dl-readout {
-    margin: 0;
-    min-height: 2.9em;
-    font-size: 13px;
-    line-height: 1.45;
-    color: var(--ink-3);
-    font-variant-numeric: tabular-nums;
-  }
-  .dl .dl-lock {
-    width: 100%;
-    min-height: 44px;
-    font-size: 14px;
-  }
-  /* Outlined until there's a pin and a month, so turning ink means ready. */
-  .dl .dl-lock:disabled {
-    background: transparent;
-    border-color: var(--rule);
-    color: var(--ink-2);
-    opacity: 1;
-  }
-
-  /* ---------------- result ---------------- */
-  /* The verdict and the place wait for the boundary to land, then fade in
-     (is-held comes off in finish(), src/lib/hobbies/day-list.ts). */
-  .dl-result__head {
-    transition: opacity 200ms var(--ease);
-  }
-  .dl-result__head.is-held {
-    opacity: 0;
-  }
-  .dl-verdict {
-    margin: 0;
-    font-size: 13px;
-    color: var(--ink-2);
-  }
-  .dl-place {
-    margin: 4px 0 0;
-    font-size: 22px;
-    font-weight: 400;
-    line-height: 1.2;
-    color: var(--ink);
-    text-wrap: balance;
-  }
-  /* Focus lands here after "Lock it in" so the result is read out next. It
-     isn't a control, so it doesn't get the ring. */
-  .dl-place:focus,
-  .dl-place:focus-visible {
-    outline: none;
-    box-shadow: none;
-  }
-  .dl-region {
-    margin: 4px 0 0;
-    font-size: 13px;
-    color: var(--ink-3);
-  }
-
-  /* A receipt: where the points came from, so the scoring explains itself. */
-  .dl-receipt {
-    margin: 0;
-    border-top: 1px solid var(--rule);
-  }
-  .dl-receipt > div {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    column-gap: 12px;
-    padding: 10px 0;
-    border-bottom: 1px solid var(--rule-soft);
-  }
-  .dl-receipt dt {
-    font-size: 13px;
-    color: var(--ink);
-  }
-  .dl-receipt dd {
-    margin: 0;
-  }
-  .dl-receipt__pts {
-    font-size: 13px;
-    text-align: right;
-    color: var(--ink);
-    font-variant-numeric: tabular-nums;
-  }
-  .dl-receipt__why {
-    grid-column: 1 / -1;
-    margin-top: 2px;
-    font-size: 12px;
-    line-height: 1.45;
-    color: var(--ink-2);
-  }
-  /* A number that counts up in place (rollTo); a one-step change slides. */
-  .dl-num {
-    display: inline-block;
-    font-variant-numeric: tabular-nums;
-  }
-  .dl-receipt > .dl-receipt__total {
-    align-items: baseline;
-    border-bottom: 0;
-  }
-  .dl-score {
-    display: inline-block;
-    font-size: 28px;
-    font-weight: 300;
-    line-height: 1;
-    letter-spacing: -0.01em;
-  }
-
-  .dl-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-  .dl-next {
-    margin: 0;
-    font-size: 12px;
-    color: var(--ink-2);
-  }
-
-  /* ---------------- the full list ---------------- */
-  .dl-roll {
-    margin-top: 44px;
-    padding-top: 18px;
-    border-top: 1px solid var(--rule);
-  }
-  .dl-roll h3 {
-    margin: 0;
+  .dl.is-phone .dl-post-acts .dl-key {
+    height: 34px;
+    padding: 0 10px 2px;
     font-size: 19px;
-    font-weight: 300;
-    line-height: 1.25;
-    color: var(--ink);
   }
-  .dl-entries {
-    counter-reset: dl-entry;
-    list-style: none;
-    margin: 16px 0 0;
-    padding: 0;
-    display: grid;
-    gap: 22px 28px;
+  .dl.is-phone .dl-post-acts .dl-key-amber {
+    font-size: 23px;
   }
-  @media (min-width: 640px) {
-    .dl-entries {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
+  .dl.is-phone .dl-post-note {
+    flex-basis: 100%;
+    text-align: left;
+    font-size: 16px;
   }
-  @media (min-width: 1024px) {
-    .dl-entries {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
+  .dl.is-phone .dl-sheet {
+    width: calc(100vw - 16px);
+    max-height: calc(100dvh - 16px);
   }
-  .dl-entry {
-    counter-increment: dl-entry;
-    min-width: 0;
+  .dl.is-phone .dl-sheet .dl-sheet-head {
+    padding: 8px 8px 12px;
   }
-  .dl-entry__name {
-    margin: 0;
-    font-size: 15px;
-    font-weight: 500;
-    line-height: 1.3;
-    color: var(--ink);
+  .dl.is-phone .dl-sheet .dl-sheet-head h2 {
+    font-size: 32px;
   }
-  .dl-entry__name::before {
-    content: counter(dl-entry);
-    display: inline-block;
-    min-width: 1.4em;
-    font-weight: 300;
-    color: var(--ink-2);
-    font-variant-numeric: tabular-nums;
+  .dl.is-phone .dl-sheet .dl-entries {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 4px 8px 4px;
   }
-  .dl-entry__sci {
-    margin: 2px 0 0 1.4em;
-    font-size: 12px;
-    color: var(--ink-2);
+  .dl.is-phone .dl-sheet .dl-entry {
+    grid-template-columns: 72px minmax(0, 1fr);
   }
-  .dl-entry__sci i {
-    font-style: italic;
+  .dl.is-phone .dl-sheet .dl-entry-pic {
+    width: 72px;
+    height: 72px;
   }
-  .dl-entry__status {
-    color: var(--ink);
-  }
-  .dl-entry__fact {
-    margin: 8px 0 0 1.4em;
-    font-size: 13px;
-    line-height: 1.55;
-    color: var(--ink-3);
-  }
-  .dl-entry__meta {
-    margin: 6px 0 0 1.4em;
-    font-size: 12px;
-    line-height: 1.5;
-    color: var(--ink-2);
-    font-variant-numeric: tabular-nums;
-  }
-  .dl-entry__meta a {
-    color: var(--ink-3);
+  .dl.is-phone .dl-sheet .dl-sheet-foot,
+  .dl.is-phone .dl-sheet .dl-credits {
+    margin-left: 8px;
+    margin-right: 8px;
   }
 
-  .dl-foot {
-    margin: 40px 0 0;
-    max-width: 72ch;
-    font-size: 12px;
-    line-height: 1.6;
-    color: var(--ink-2);
-  }
-
-  /* CC BY and CC BY-NC both require the photographer to be named, but a name
-     can give the place away. So the credits wait here, closed, rather than
-     under each photo, and list only the photos on the board. */
-  .dl-credits {
-    margin: 10px 0 0;
-    max-width: 72ch;
-    font-size: 12px;
-    line-height: 1.6;
-    color: var(--ink-2);
-  }
-  .dl-credits > summary {
-    width: fit-content;
-    padding: 4px 0;
-    color: var(--ink-3);
-    cursor: pointer;
-  }
-  .dl-credits > summary::marker {
-    color: var(--ink-2);
-  }
-  .dl-credits > summary::-webkit-details-marker {
-    color: var(--ink-2);
-  }
-  .dl-credits__list {
-    counter-reset: dl-credit;
-    list-style: none;
-    margin: 4px 0 0;
-    padding: 0;
-  }
-  .dl-credits__list > li {
-    counter-increment: dl-credit;
-    overflow-wrap: anywhere;
-  }
-  .dl-credits__list > li::before {
-    content: counter(dl-credit);
-    display: inline-block;
-    min-width: 1.4em;
-    font-variant-numeric: tabular-nums;
-  }
-
-  @media (max-width: 639px) {
-    .dl-steps > li {
-      grid-template-columns: 1.6rem minmax(0, 1fr);
-      font-size: 16px;
-    }
-    .dl-tray {
-      gap: 14px 8px;
-    }
-    .dl-slot__name {
-      font-size: 13px;
-    }
-    .dl-slot__next {
-      font-size: 12px;
-      padding: 6px;
-    }
-    .dl-slot__cost {
-      font-size: 11px;
-    }
-    /* Edge to edge on a phone, where every pixel of width is more map. The
-       hobby page pads the article by 16px at this size (px-4). */
-    .dl-mapbox {
-      margin-inline: -16px;
-    }
-    .dl-mapwrap {
-      border-inline: 0;
-    }
-    .dl-how-note {
-      margin-left: 1.6rem;
-    }
-  }
+  /* ---------- Reduced motion ---------- */
 
   @media (prefers-reduced-motion: reduce) {
-    .dl-slot__pic img,
-    .dl-slot__next,
-    .dl-maphint,
-    .dl-month__cell,
-    .dl-zoom button,
-    .dl-mapbtn,
-    .dl-wheelhint,
-    .dl-result__head {
-      transition: none;
+    .dl *,
+    .dl *::before,
+    .dl *::after {
+      transition: none !important;
     }
-    .dl-slot.is-new .dl-slot__body {
-      animation: none;
+    .dl-hc-back,
+    .dl-hc-face,
+    .dl-hn-num s {
+      animation: none !important;
     }
-  }
-
-  /* The verdict, stamped on the map once the answer is down. finish() puts it
-     in the corner farthest from the pin, the line and the place
-     (planStamp); this top left is where it sits if that can't be worked out. */
-  .dl-mapbox > .dl-verdict-stamp {
-    top: 12px;
-    right: auto;
-    left: 12px;
-    z-index: 3;
-  }
-
-  /* On a phone a square is a third of the screen wide, so the stamp a reveal
-     puts down on it (stamp() in src/lib/motion.ts) is smaller too. */
-  @media (max-width: 520px) {
-    .dl-slot .stamp {
-      top: 5px;
-      right: 5px;
-      padding: 3px 5px;
-      border-width: 1.5px;
+    .dl-hc-back {
+      transform: scaleX(0);
     }
-    .dl-slot .stamp > b {
-      font-size: 12px;
+    .dl-hc-face {
+      transform: none;
     }
-    .dl-slot .stamp > i {
-      margin-top: 2px;
-      font-size: 7px;
-      letter-spacing: 0.14em;
-    }
-    .dl-mapbox > .dl-verdict-stamp {
-      top: 8px;
-      left: 8px;
-    }
-    .dl-mapbox > .dl-verdict-stamp > b {
-      font-size: 13px;
+    .dl-hn-num s:nth-child(3) {
+      opacity: 1;
     }
   }
 </style>

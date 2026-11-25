@@ -74,11 +74,13 @@ const UA = {
 const THROTTLE = 1150;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-/** Photo hosts allowed by the site's Content-Security-Policy. */
-const PHOTO_HOSTS = [
-  "https://inaturalist-open-data.s3.amazonaws.com/",
-  "https://static.inaturalist.org/",
-];
+/**
+ * Photo hosts to take clue photos from. The page reads each photo's pixels
+ * for its ring colour, so it loads them with CORS, and only the open-data
+ * bucket sends a CORS header: a photo from static.inaturalist.org (also in
+ * the CSP) wouldn't load at all.
+ */
+const PHOTO_HOSTS = ["https://inaturalist-open-data.s3.amazonaws.com/"];
 
 /** Licences that permit republication with credit. No rights-reserved photos. */
 const OPEN_LICENCES = new Map([
