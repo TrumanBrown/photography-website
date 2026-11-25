@@ -1,6 +1,6 @@
 ---
 name: design-mocks
-description: "Exploring designs, features and game ideas as throwaway mocks before anything is built: the gitignored mocks/ folder and scripts-local/ prep scripts, Truman's mock spec (usable, real content, desktop and a true phone view), the banned default-AI design signature, serving mocks from WSL so he can open them on Windows, presenting rounds with a short list of decisions, the sites he's saved as examples of clean UI, and what he kept or rejected in earlier rounds. Use when: he asks for mocks, mockups, prototypes, concepts, a redesign, layout options or design directions; he shares a site whose look he likes; brainstorming a new tool, game or feature for the site; something looks too AI, generic, templated, slop or vibe-coded; or turning an approved mock into real pages."
+description: "Exploring designs, features and game ideas as throwaway mocks before anything is built: the gitignored mocks/ folder and scripts-local/ prep scripts, Truman's mock spec (usable, real content, desktop and a true phone view), what still reads as default AI, serving mocks from WSL so he can open them on Windows, presenting rounds with a short list of decisions, the sites he's saved as examples of clean UI, and what he kept or rejected in earlier rounds. Use when: he asks for mocks, mockups, prototypes, concepts, a redesign, layout options or design directions; he shares a site whose look he likes; brainstorming a new tool, game or feature for the site; something looks too AI, generic, templated, slop or vibe-coded; or turning an approved mock into real pages."
 argument-hint: 'the question to explore, e.g. "three directions for the prints page"'
 ---
 
@@ -11,7 +11,7 @@ New directions get tried as mocks before they touch the site: self-contained HTM
 ## Truman's spec for a mock
 
 - **A mock is the real experience without the real plumbing**: one file "I can open in a browser and actually use", real-looking data, empty, loading and error states, and good enough that someone shown it for ten seconds would think it was the finished feature. His reaction to text sketches: "these mocs are horrible, unusuable. I want actual mocks of what the end user experience would be" (2026-09-27).
-- **Not default AI.** "NOT DEFAULT AI looking. This is so important... People automatically ignore websites if they have this" (2026-10-06). The list below is the spec.
+- **Not default AI.** "NOT DEFAULT AI looking. This is so important... People automatically ignore websites if they have this" (2026-10-06). He means the feel of the whole page. The section below, revised on 2026-11-24, has what still gives it away.
 - **Unique and useful.** "this is good but not unique, its the same idea as kriliion... inatguesser was unique and good" (2026-10-08). "are these really ones people would come back to?" (2026-09-28).
 - **A flagship needn't be a game or about nature.** "it needs to be unique, solves an interesting use case, and a clean, profession UX. more fleshed out than the mini games" (2026-09-28), and it "isn't super basic like some of the hobbies we have done". Geography is an interest the site doesn't show yet. Ones he points to: iNatGuessr, The Pudding's 3D city, Krillion, and Magnitudle's "Size it up" ("people will come back to and it is learning as well").
 - **Not held back by Azure cost.** Scope the idea at its best; the credit covers it (azure-ops).
@@ -21,12 +21,23 @@ New directions get tried as mocks before they touch the site: self-contained HTM
 - **Built from the current site**: "remember to buidl it from the current ux not the old" (2026-10-08).
 - **Some motion, not overboard**; the scroll-reveal era is over.
 
-### The banned default-AI signature
+### The default-AI feel
 
-From his 2026-10-06 brief. If a direction needs one of these, justify it in writing.
+His 2026-10-06 brief banned a list of parts. On 2026-11-24, after saving lightyear.ai as an example of a clean, well-made site, he opened the ones it uses back up: "i dont think i should've banned cenetered hero, huge headline, etc. let's keep those styles open for future mocks and potential redesigns of the site. I just wanted to avoid a clear "AI website' feel. I think lightyear utilized those elements tastefully." Judge the whole page by whether someone glancing at it would take it for an AI-made site.
 
-- Colour and surface: indigo-to-violet or blue-to-cyan gradients, gradient-filled headlines, glass (backdrop blur with faint white borders), a slate-900 dark mode with one glowing accent, blurred gradient blobs behind a hero, dot-grid, faint-grid or noise overlays, and opacity steps (`/80`, `/60`, `/40`) as the only contrast tool.
-- Layout: the centred hero with a pill badge, a huge headline, a one-line subhead and two buttons; three-column feature grids of tinted rounded icons; bento grids; the same wide section with an eyebrow, heading, subhead and three cards repeated down the page; a testimonial or call-to-action band at the bottom.
+Open again in mocks and redesigns, used the way lightyear.ai uses them (below):
+
+- Layout: a centred hero with a huge headline, a subhead and two buttons, one dark band, a logo wall and testimonials, and a closing band with the main action.
+- Type: heavy display headings in a face picked for the page, and a word or phrase picked out in a headline.
+- Surface: a faint grid or map lines behind a section, and a pale wash of a section's own colour.
+- Motion: demos that play through by themselves, given a pause and kept still under reduced motion, as site-design asks of anything that moves on its own.
+
+Pages built on today's site keep the house look in [site-design](../../instructions/site-design.instructions.md) until he approves a redesign.
+
+These still read as AI. If a direction needs one, justify it in writing:
+
+- Colour and surface: indigo-to-violet or blue-to-cyan gradients, gradient-filled headlines, glass (backdrop blur with faint white borders), a slate-900 dark mode with one glowing accent, blurred gradient blobs behind a hero, noise overlays, and opacity steps (`/80`, `/60`, `/40`) as the only contrast tool.
+- Layout: a pill badge over the headline; three-column feature grids of tinted rounded icons; bento grids; the same wide section with an eyebrow, heading, subhead and three cards repeated down the page.
 - Detail: one big rounded radius and a large shadow on everything; cards that lift or grow on hover; bold tight Inter or Geist for every heading; emoji in headings; sparkle and rocket icons; staggered fade-up on scroll; canvas or map text in bold system fonts, and dashboard maps with glowing heat blobs.
 - Copy: "Elevate", "Seamlessly", "Crafted with care", "Discover", "Journey", "Dive into".
 
@@ -36,18 +47,18 @@ The ideas he points to are in the spec above, and the Minecraft-style personal s
 
 - **lightyear.ai**, an enterprise telecom company's home page: "im saving this as an example of a website UI i think looks clean and well made" (2026-11-24). Screenshots from that day at desktop and phone width are in `mocks/notes/references/lightyear-2026-11-24/`, because the site will change and `web_fetch` gets a 403 from it.
   - The page is one ruled sheet. The content column sits between 1px rules that run its full height, and every section, stat row and logo wall is split by hairlines. Corners are square or close to it, and buttons are flat blocks, one filled and one outlined. The rules and square corners already match the house look.
-  - The product is the picture. Every picture is the real app rebuilt in HTML with believable data (a map of circuits, a quote table, an install timeline, a chat that types out a request), and it plays through once it's on screen. On a phone the hero's three tabs become the open one's name and an icon for each of the others.
+  - The product is the picture. Every picture is the real app rebuilt in HTML with believable data (a map of circuits, a quote table, an install timeline, a chat that types out a request), and it plays through once it's on screen. On this site that would be his photographs, the globe and the working toys. On a phone the hero's three tabs become the open one's name and an icon for each of the others.
   - Each product line keeps one colour everywhere it shows up: Procurement blue, Network Inventory orange and Expense green, in its tab, icon, button, panel tint and testimonial tile.
-  - Parts of it are on the banned list: the centred hero with a huge headline, a subhead and two buttons, one word picked out in each headline (italic "runs itself", blue "run telecom"), heavy tight headings (Hanken Grotesk 800), a navy band with a dot grid, soft gradient washes, the logo wall, the testimonial grid and the call-to-action band at the bottom. Its agent tabs also advance on a timer, and this site moves only in answer to the visitor (site-design). Borrow the ruled sheet, the real thing as the picture and one colour per section, and flag anything from the banned list before using it (lesson 7).
+  - How it uses the parts he opened back up: the hero is a four-word headline in Hanken Grotesk at 800 ("Telecom that runs itself"), a two-line subhead naming the three products, one filled and one outlined button, and the product playing right under them on the first screen. The headlines pick out the phrase that carries the claim, in italic or in the same light blue every time. A navy band with a faint dot grid holds the one section about something else, its AI agents. The quotes and logos are real customers set in the same ruled grid as everything else, and the page ends on one headline and the same two buttons. Its demos and agent tabs play through by themselves.
 
 ## Run a round
 
-1. If he asks, rewrite his prompt first and hand it back for him to edit (he did this on 2026-09-27 and 2026-10-06), with the banned list, the deliverables, the checks, and "state assumptions and keep working". Ask clarifying questions before writing it, hand back only the prompt and stop: "you're supposed to give me the refined prompt that I Will pass back to you... not immediately do the actual work" (2026-09-27). Ask again when he sends it back.
+1. If he asks, rewrite his prompt first and hand it back for him to edit (he did this on 2026-09-27 and 2026-10-06), with the default-AI list, the deliverables, the checks, and "state assumptions and keep working". Ask clarifying questions before writing it, hand back only the prompt and stop: "you're supposed to give me the refined prompt that I Will pass back to you... not immediately do the actual work" (2026-09-27). Ask again when he sends it back.
 2. Read the real site first (pages, components, tokens, copy rules, content) and write a five-to-eight-point critique of what's there. The critique drives the directions.
 3. Build in `mocks/<topic>/` and never touch `src/`. An `index.html` links each direction with a one-paragraph thesis and what it refuses. Use real content (session titles and photos, hobby JSON) and copy that follows the copy rules. Give every mock a desktop and phone toggle and a dark mode.
 4. Directions that should diverge get their own CSS. Mocks meant to look like the live site copy the tokens from `src/styles/global.css` and self-host Libre Franklin, as `mocks/things-to-try/mock.css` does. Game mocks make no network calls: data comes from `scripts-local/prep-*.mjs` and assets are inlined.
 5. For each direction, say what it took from where, what it left out, and the trade-off. End with two or three decisions for him and your recommendation. In a brainstorm, add "a much much longer list of less / to no mocks but technically feasible other ideas" (2026-09-28), and for each top idea a 1-to-10 confidence that you can build it, naming any external data, new service, key, rate limit, licence or re-architecture it needs.
-6. Check it yourself: serve it, open every page, no console errors or failed requests, screenshots at desktop and phone width, and a reread against the banned list naming anything that slipped through.
+6. Check it yourself: serve it, open every page, no console errors or failed requests, screenshots at desktop and phone width, and a reread against the default-AI list naming anything that slipped through.
 7. Present it the way he can open it from Windows: `cd mocks && python3 -m http.server <free port> --bind 127.0.0.1` as a background service, then `http://localhost:<port>/<path>` links, plus the `\\wsl.localhost\Ubuntu\...` path as a fallback (ship-and-ci). Keep earlier rounds collapsed at the bottom of the index.
 8. Iterate on his verdicts. When he approves one, port it into `src/` ("port the look, not the mock's file structure"); helpers working in parallel should each own separate files. From there the normal ship rules apply.
 
