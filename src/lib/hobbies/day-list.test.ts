@@ -48,7 +48,7 @@ describe("the two puzzle sets", () => {
   // Ordered by worldwide record count, the first four were Mallards and
   // House Sparrows that ruled nothing out (2026-11-24).
   it("run from the most widespread species to the most local", () => {
-    const unordered = daily.filter((round) =>
+    const unordered = [...daily, ...extra].filter((round) =>
       round.clues.some(
         (c, i) =>
           typeof c.reach !== "number" ||

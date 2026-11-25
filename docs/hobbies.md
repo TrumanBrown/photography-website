@@ -695,7 +695,7 @@ restarts.
 ### More lists
 
 **Ten a day, from their own places.** More lists deals from
-[day-list-extra.json](../src/lib/hobbies/day-list-extra.json), 63 places that the daily rotation
+[day-list-extra.json](../src/lib/hobbies/day-list-extra.json), 68 places that the daily rotation
 never uses, so playing extras can't spoil a future daily list. The builder refuses to write if the
 two sets share a place, and a test checks it too. The cap is ten a browser a day (`EXTRA_PER_DAY`):
 the pool is finite, so without one a keen player would run through it in an afternoon and start
@@ -704,7 +704,7 @@ lists is opened.
 
 **What it remembers.** `localStorage` key `day-list-extra-v1` holds today's played places and
 scores, every place this browser has ever started (`seen`), and the round in progress. A new list
-is a place not yet seen. Once all 63 have been played it goes back to the one started longest ago.
+is a place not yet seen. Once all 68 have been played it goes back to the one started longest ago.
 The count resets at the date change; a list left half-played carries over as the next day's first.
 Today's list (`day-list-v2`) now remembers a round in progress as well, so a reload can't wipe how
 many species you've seen. Older saves from before that, which were only ever written at lock-in,
@@ -812,10 +812,12 @@ of when rather than if. It refuses to write a set with fewer than ten rounds. Re
 set changes the rounds people are partway through, so do it near midnight. A daily place marked
 `hold: true` is skipped: the four the old 120,000-record rule left out (Sinharaja, Kinabalu,
 Crocker Range, Komodo) would build now, and a new daily round moves everyone's today, so they join
-in a rebuild that ships close to midnight. `--retag` keeps every round's species and only relabels
-native, introduced and endemic, so it's safe to run any time (about ten minutes for both sets). `--facts` does the same
-for the facts and their links, from `day-list-facts.json`. After a full build, write a fact for each
-species the build lists as missing, then run `--facts`.
+in a rebuild that ships close to midnight. The five More lists places that rule left out (Yasuní,
+Bwindi, Taman Negara, Bako and the Daintree) went straight in, since a More list is dealt at random
+and nobody's today depends on the set's size. `--retag` keeps every round's species and only
+relabels native, introduced and endemic, so it's safe to run any time (about ten minutes for both
+sets). `--facts` does the same for the facts and their links, from `day-list-facts.json`. After a
+full build, write a fact for each species the build lists as missing, then run `--facts`.
 
 **No runtime API calls.** Puzzle data ships as JSON, the terrain ships as same-origin tiles, and
 photos load straight from the iNaturalist CDNs already allow-listed in `img-src`, so the island costs
