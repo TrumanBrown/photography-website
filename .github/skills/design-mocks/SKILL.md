@@ -1,6 +1,6 @@
 ---
 name: design-mocks
-description: "Exploring designs, features and game ideas as throwaway mocks before anything is built: the gitignored mocks/ folder and scripts-local/ prep scripts, Truman's mock spec (usable, real content, desktop and a true phone view), the banned default-AI design signature, serving mocks from WSL so he can open them on Windows, presenting rounds with a short list of decisions, and what he kept or rejected in earlier rounds. Use when: he asks for mocks, mockups, prototypes, concepts, a redesign, layout options or design directions; brainstorming a new tool, game or feature for the site; something looks too AI, generic, templated, slop or vibe-coded; or turning an approved mock into real pages."
+description: "Exploring designs, features and game ideas as throwaway mocks before anything is built: the gitignored mocks/ folder and scripts-local/ prep scripts, Truman's mock spec (usable, real content, desktop and a true phone view), the banned default-AI design signature, serving mocks from WSL so he can open them on Windows, presenting rounds with a short list of decisions, the sites he's saved as examples of clean UI, and what he kept or rejected in earlier rounds. Use when: he asks for mocks, mockups, prototypes, concepts, a redesign, layout options or design directions; he shares a site whose look he likes; brainstorming a new tool, game or feature for the site; something looks too AI, generic, templated, slop or vibe-coded; or turning an approved mock into real pages."
 argument-hint: 'the question to explore, e.g. "three directions for the prints page"'
 ---
 
@@ -29,6 +29,16 @@ From his 2026-10-06 brief. If a direction needs one of these, justify it in writ
 - Layout: the centred hero with a pill badge, a huge headline, a one-line subhead and two buttons; three-column feature grids of tinted rounded icons; bento grids; the same wide section with an eyebrow, heading, subhead and three cards repeated down the page; a testimonial or call-to-action band at the bottom.
 - Detail: one big rounded radius and a large shadow on everything; cards that lift or grow on hover; bold tight Inter or Geist for every heading; emoji in headings; sparkle and rocket icons; staggered fade-up on scroll; canvas or map text in bold system fonts, and dashboard maps with glowing heat blobs.
 - Copy: "Elevate", "Seamlessly", "Crafted with care", "Discover", "Journey", "Dive into".
+
+### Sites he's saved as examples
+
+The ideas he points to are in the spec above, and the Minecraft-style personal site behind the welcome page is in the rounds below. These he saved for how they look.
+
+- **lightyear.ai**, an enterprise telecom company's home page: "im saving this as an example of a website UI i think looks clean and well made" (2026-11-24). Screenshots from that day at desktop and phone width are in `mocks/notes/references/lightyear-2026-11-24/`, because the site will change and `web_fetch` gets a 403 from it.
+  - The page is one ruled sheet. The content column sits between 1px rules that run its full height, and every section, stat row and logo wall is split by hairlines. Corners are square or close to it, and buttons are flat blocks, one filled and one outlined. The rules and square corners already match the house look.
+  - The product is the picture. Every picture is the real app rebuilt in HTML with believable data (a map of circuits, a quote table, an install timeline, a chat that types out a request), and it plays through once it's on screen. On a phone the hero's three tabs become the open one's name and an icon for each of the others.
+  - Each product line keeps one colour everywhere it shows up: Procurement blue, Network Inventory orange and Expense green, in its tab, icon, button, panel tint and testimonial tile.
+  - Parts of it are on the banned list: the centred hero with a huge headline, a subhead and two buttons, one word picked out in each headline (italic "runs itself", blue "run telecom"), heavy tight headings (Hanken Grotesk 800), a navy band with a dot grid, soft gradient washes, the logo wall, the testimonial grid and the call-to-action band at the bottom. Its agent tabs also advance on a timer, and this site moves only in answer to the visitor (site-design). Borrow the ruled sheet, the real thing as the picture and one colour per section, and flag anything from the banned list before using it (lesson 7).
 
 ## Run a round
 
