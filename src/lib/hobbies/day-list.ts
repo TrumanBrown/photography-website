@@ -786,6 +786,17 @@ const DOT = 2.5;
 const MAX_ASPECT = 2;
 /** Laptops and up; under this the phone layout. */
 const PHONE_BELOW = 760;
+/**
+ * Under this width the hand and the months only fit beside each other with
+ * the hand in two rows, which needs some height: a screen this narrow and
+ * shorter than PHONE_SHORT (a phone on its side, a small window) gets the
+ * phone layout too.
+ */
+const NARROW_BELOW = 1010;
+const PHONE_SHORT = 600;
+/** A phone's cards, two rows of three photos: their height range, px. */
+const CARD_MIN = 60;
+const CARD_MAX = 180;
 
 const meets = (a: Rect, b: Rect) =>
   a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
@@ -809,6 +820,7 @@ export function initDayList(root: HTMLElement): void {
   const stakesUp = q<HTMLElement>("[data-daylist-stakes-up]");
   const readout = q<HTMLElement>("[data-daylist-reach-readout]");
   const reachEl = q<HTMLElement>("[data-daylist-reach]");
+  const pickEl = q<HTMLElement>("[data-daylist-pick]");
   const titlePanel = q<HTMLElement>(".dl-title");
   const zoomBox = q<HTMLElement>(".dl-zoom");
   const monthBox = q<HTMLElement>("[data-daylist-months]");
@@ -902,8 +914,8 @@ export function initDayList(root: HTMLElement): void {
    * except on a phone after the answer, when it runs past both sides.
    */
   let vis: { x0: number; y0: number; x1: number; y1: number } | null = null;
-  /** The map's height while playing on a phone, which the answer never goes under. */
-  let playH = 0;
+  /** The species a phone's strip names: the one last tapped, or the newest. */
+  let picked: number | null = null;
   /** A token's photo in map pixels, odd so it has a middle; the mock's 9 read as a blob of colour. */
   const TOK = 11;
 
@@ -1865,7 +1877,7 @@ export function initDayList(root: HTMLElement): void {
     const vw = document.documentElement.clientWidth || innerWidth;
     const vh = root.clientHeight || innerHeight;
     const wasPhone = phone;
-    phone = vw < PHONE_BELOW;
+    phone = vw < PHONE_BELOW || (vw < NARROW_BELOW && vh < PHONE_SHORT);
     root.classList.toggle("is-phone", phone);
     for (const el of [canvas!, labels!]) {
       el.style.left = "";
@@ -1875,6 +1887,7 @@ export function initDayList(root: HTMLElement): void {
     surface!.style.marginTop = "";
     vis = null;
     root.style.removeProperty("--post-h");
+    root.classList.remove("is-post-flow");
     if (phone && done) {
       layoutAnswerPhone();
       return;
@@ -1882,25 +1895,36 @@ export function initDayList(root: HTMLElement): void {
     let w: number;
     let h: number;
     if (phone) {
-      // As wide as the phone, with the hand and the keys under it all on one
-      // screen: the map takes what's left, between 2:1 and 1.6:1, and the
-      // cards get shorter on a short screen before the map goes under 2:1.
+      // As wide as the phone, with everything on one screen: the map shows
+      // the whole world at 1.6:1 if there's room (2:1 at the least), and the
+      // cards take what's left between CARD_MIN and CARD_MAX. When even the
+      // smallest cards and a 2:1 map don't fit, the page scrolls.
       w = Math.floor(vw / 4) * 4;
-      const minH = Math.round(w / 2 / 4) * 4;
-      root.style.removeProperty("--card-h");
-      const rest = () =>
+      const flat = Math.round(w / 2 / 4) * 4;
+      const tall = Math.round(w / 1.6 / 4) * 4;
+      root.style.setProperty("--card-h", `${CARD_MIN}px`);
+      // Everything but the map, with the smallest cards. The hand's top
+      // margin is left out: it takes whatever room is over.
+      const px = (el: Element, prop: "marginTop" | "paddingBottom") =>
+        parseFloat(getComputedStyle(el)[prop]) || 0;
+      const rest =
+        titlePanel!.offsetTop +
         titlePanel!.offsetHeight +
+        px(surface!, "marginTop") +
         hand!.offsetHeight +
+        px(guessPanel!, "marginTop") +
         guessPanel!.offsetHeight +
-        68;
-      let free = vh - rest();
-      if (free < minH) {
-        const cardH = clamp(152 - Math.ceil((minH - free) / 2), 112, 152);
-        root.style.setProperty("--card-h", `${cardH}px`);
-        free = vh - rest();
-      }
-      h = clamp(Math.floor(free / 4) * 4, minH, Math.round(w / 1.6 / 4) * 4);
-      playH = h;
+        px(root, "paddingBottom");
+      let free = vh - rest;
+      h = clamp(Math.floor(free / 4) * 4, flat, tall);
+      free -= h;
+      const cardH =
+        CARD_MIN + clamp(Math.floor(free / 2), 0, CARD_MAX - CARD_MIN);
+      root.style.setProperty("--card-h", `${cardH}px`);
+      root.style.setProperty(
+        "--how-top",
+        `${titlePanel!.offsetTop + titlePanel!.offsetHeight + 6}px`,
+      );
       surface!.style.left = "";
       surface!.style.top = "";
       surface!.style.marginLeft = `${Math.floor((vw - w) / 2)}px`;
@@ -1911,6 +1935,7 @@ export function initDayList(root: HTMLElement): void {
       h = vw / vh < 1.6 ? vw / 1.6 : vh;
       w = Math.ceil(w / 4) * 4;
       h = Math.ceil(h / 4) * 4;
+      root.style.removeProperty("--card-h");
       surface!.style.left = `${Math.floor((vw - w) / 2)}px`;
       surface!.style.top = "0px";
       surface!.style.marginLeft = "";
@@ -1919,10 +1944,9 @@ export function initDayList(root: HTMLElement): void {
     surface!.style.height = `${h}px`;
     root.style.setProperty("--stakes-w", `${stakes!.offsetWidth}px`);
     if (phone) {
-      // The zoom keys sit in the map's bottom right corner, the readout top left.
+      // The zoom keys sit in the map's bottom right corner.
       const top = surface!.offsetTop;
       root.style.setProperty("--map-top", `${top + h - 34 - 4 - 10}px`);
-      root.style.setProperty("--read-top", `${top + 8}px`);
     }
     blockVersion++;
     if (wasPhone !== phone && !done) void m.reset(false);
@@ -1954,8 +1978,12 @@ export function initDayList(root: HTMLElement): void {
     root.style.setProperty("--post-h", `${postH}px`);
     surface!.style.marginTop = "";
     const top = surface!.offsetTop;
-    const least = playH || Math.round(w / 1.6 / 4) * 4;
+    // The map fills the room over the postcard, but no shorter than a 2.4:1
+    // strip: with less room than that the postcard follows the map instead
+    // of covering it, and the page scrolls.
+    const least = Math.round(w / 2.4 / 4) * 4;
     const avail = Math.floor((vh - top - postH - 30) / 4) * 4;
+    root.classList.toggle("is-post-flow", avail < least);
     let h = Math.max(least, avail);
     const b = answerBox();
     const across = (b.e - b.w) / 360;
@@ -2114,6 +2142,7 @@ export function initDayList(root: HTMLElement): void {
     li.style.setProperty("--c", tintOf(i).hex);
     if (i < lines || done) {
       li.classList.add("is-shown");
+      li.classList.toggle("is-picked", i === (picked ?? lines - 1));
       li.innerHTML = cardFace(i);
     } else if (i === lines) {
       const cost = bestPossible(lines) - bestPossible(lines + 1);
@@ -2132,6 +2161,25 @@ export function initDayList(root: HTMLElement): void {
       }, not shown yet</span></div><span class="dl-card-n dl-px15" aria-hidden="true">${i + 1}</span>`;
     }
     li.append(...pops);
+  }
+
+  /** A phone's strip over the cards: the picked species, or the newest. */
+  function syncPick(): void {
+    if (!pickEl) return;
+    const i = picked ?? lines - 1;
+    const clue = round.clues[i];
+    if (!clue) return;
+    pickEl.style.setProperty("--c", tintOf(i).hex);
+    const reach = clue.reach
+      ? `within ${count(reachKm(clue.reach))} km`
+      : `${count(clue.global)} seen`;
+    pickEl.innerHTML = `<i></i><b>${escapeHtml(speciesName(clue.name))}</b><span>${reach}</span>`;
+    Array.from(tray!.children).forEach((li, j) =>
+      li.classList.toggle(
+        "is-picked",
+        j === i && li.classList.contains("is-shown"),
+      ),
+    );
   }
 
   /** The colours from the photos are in: every card, thumb and entry takes its own. */
@@ -2709,6 +2757,8 @@ export function initDayList(root: HTMLElement): void {
     const mine = generation;
     const cost = bestPossible(lines) - bestPossible(lines + 1);
     lines += 1;
+    picked = null;
+    if (phone) hot = null;
     const k = lines - 1;
     ringIn(k, mine);
     void turn(k);
@@ -2718,6 +2768,7 @@ export function initDayList(root: HTMLElement): void {
     syncLock();
     persist();
     paintCredits();
+    syncPick();
     const clue = round.clues[k];
     if (announce) {
       announce.textContent =
@@ -2736,10 +2787,19 @@ export function initDayList(root: HTMLElement): void {
   }
 
   tray.addEventListener("click", (event) => {
-    if (!(event.target as Element | null)?.closest("[data-daylist-more]"))
+    const target = event.target as Element | null;
+    if (target?.closest("[data-daylist-more]")) {
+      // A click fired by Enter or Space has no pointer, so detail is 0.
+      reveal(event.detail === 0);
       return;
-    // A click fired by Enter or Space has no pointer, so detail is 0.
-    reveal(event.detail === 0);
+    }
+    // A species tapped is named in a phone's strip, and its ring thickens.
+    const li = target?.closest<HTMLElement>(".dl-card.is-shown");
+    if (!li || done) return;
+    picked = Number(li.dataset.i);
+    hot = picked;
+    syncPick();
+    m.redraw();
   });
   // Holding Enter on Show the next one shouldn't spend all six.
   root.addEventListener(
@@ -3362,6 +3422,7 @@ export function initDayList(root: HTMLElement): void {
     pinfo = [];
     ready = false;
     hot = null;
+    picked = null;
     breath = null;
     restAt = null;
     centre = null;
@@ -3376,7 +3437,7 @@ export function initDayList(root: HTMLElement): void {
       landed: k < lines ? 1 : 0,
     }));
 
-    root.classList.remove("is-done");
+    root.classList.remove("is-done", "is-post-flow");
     surface!.classList.remove("is-done");
     titlePanel!.inert = false;
     hand!.inert = false;
@@ -3398,6 +3459,7 @@ export function initDayList(root: HTMLElement): void {
     for (const c of round.clues) photo(c.photo);
     tray!.innerHTML = round.clues.map(() => "<li></li>").join("");
     round.clues.forEach((_, j) => slot(j));
+    syncPick();
     hand!.classList.add("is-waiting");
     if (phone) layout();
     // A new round's ceiling is set, not counted down from the last one's.
@@ -3422,6 +3484,7 @@ export function initDayList(root: HTMLElement): void {
         pinfo = list;
         tints = assignTints(list.map((x) => x.hues));
         paintTints();
+        syncPick();
         m.redraw();
       },
     );

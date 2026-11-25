@@ -573,7 +573,8 @@ for the answer.
   Before there's a pin the rings follow the mouse a hair behind, like a hand lens, and on touch
   they wait in the middle of the map. The newest ring is twice as thick with a faint tint inside,
   a card under the mouse thickens its own ring, and the readout says "Half its sightings within
-  2,400 km" for the newest one. A ring too small to see at the current zoom shows as a 2-pixel dot.
+  2,400 km" for the newest one (on a phone, the strip over the cards). A ring too small to see at
+  the current zoom shows as a 2-pixel dot.
 - **Ring colours come from the photos.** As a round opens, its six photos are read at 64px and
   their strongest colours matched to a set of six saturated colours that read on both palettes and
   stay clear of the sea, the land, the amber pin and the red finder (`RING_SET` in
@@ -591,7 +592,8 @@ for the answer.
   The score panel says "Up to 6,000 points", the most a perfect guess can still score
   (`bestPossible`), so the trade shows before you make it. When a round opens the cards deal up
   from below, 45ms apart, and the first ring opens out round the lens. Photographer names aren't on
-  the cards, because a name can give the place away (see the full list).
+  the cards, because a name can give the place away (see the full list). On a phone the cards are
+  photos only (Phones, below).
 - **Turning a card.** The key narrows to nothing in 70ms and the card's face opens out past full
   width and settles. Its photo comes up in coarse squares that sharpen three times, 80ms apart,
   before the photo itself shows.
@@ -646,15 +648,28 @@ for the answer.
   guards against a fact taken straight from Wikipedia: it trims a bracketed Latin name or IPA
   pronunciation, shows only the first sentence, and shows no line for a fact under 15 characters or
   cut off with "...". A species with no fact shows no fact line.
-- **Phones.** Under 760px wide the page is one screen with no scrolling. The map is as wide as the
-  phone and between 2:1 and 1.6:1, with the title over it and the hand and the keys under it. On a
-  short screen the cards get shorter (152px down to 112px) before the map goes under 2:1. After the
-  answer the postcard docks at the foot and the map takes the space between it and the verdict. It
-  keeps its 1.6:1 shape, so a taller map runs wider than the phone and only its middle shows
-  (`shownWidth`), and an answer that spans more of the world than that middle can hold gets a
-  shorter map, so the pin and the place both show.
-- **Laptops.** The map is the whole screen. A screen taller than 1.6:1 gets a 1.6:1 map with sea
-  under it, and one wider than 2:1 gets a 2:1 world with sea either side (`maxAspect`).
+- **Phones.** Under 760px wide, or under 1,010px wide and 600px tall (a phone on its side), the
+  page is one column sized to what the browser leaves of the screen (`layout`): Safari's bars leave
+  an iPhone 14 about 390x664, not its full 390x844. The title is two short rows, a back arrow with
+  the name and the score, then the two lists and How to play. The rules line and the date wait in
+  How to play. The map is as wide as the phone and shows the whole world at 1.6:1 when there's
+  room, never flatter than 2:1. The map's readout gives way to a strip over the cards that names
+  the picked species and its reach: the newest, or the last one tapped, whose ring thickens. The
+  cards are photos only, three to a row, and take the height the map leaves, from 60 to 180px, so
+  a tall phone gets playing-card shapes. The months are a 6 by 2 keypad with Lock it in beside
+  them. When even the smallest cards and a 2:1 map don't fit (a phone on its side), the page
+  scrolls, so Lock it in is never cut off. After the answer the verdict is one line, the postcard
+  docks at the foot with its keys two by two, and the map takes the space between them. It keeps
+  its 1.6:1 shape, so a taller map runs wider than the phone and only its middle shows
+  (`shownWidth`), and it shrinks as far as a 2.4:1 strip to make room for the postcard. With less
+  room than that the postcard follows the map and the page scrolls (`is-post-flow`).
+- **Laptops and tablets.** The map is the whole screen. A screen taller than 1.6:1 gets a 1.6:1 map
+  with sea under it, and one wider than 2:1 gets a 2:1 world with sea either side (`maxAspect`).
+  The cards are as wide as the row beside the 372px months allows, 84 to 128px (104px at most on a
+  screen under 760px tall). A card under 112px wide switches to a compact face through a container
+  query: a shorter photo, and the name, the reach and the price a size smaller. From 760 to 1,009px
+  wide (a tablet, a small window) six cards can't sit beside the months, so they go in two rows of
+  three, and the rules line and the readout drop the words a phone drops.
 - **Keyboard and screen readers.** Showing a species from the keyboard moves focus to the next
   card's key, or to the map once all six are out, and a polite live region reads out the species,
   its reach and the new ceiling. Locking in moves focus to the place's name on the postcard and

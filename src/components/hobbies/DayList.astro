@@ -49,7 +49,8 @@ const MONTHS = [
   <div class="dl-ui">
     <header class="dl-title dl-panel">
       <a class="dl-key dl-key-small dl-back" href="/hobbies/"
-        ><span aria-hidden="true">←</span> Things to try</a
+        ><span aria-hidden="true">←</span>
+        <span class="dl-back-word">Things to try</span></a
       >
       <div class="dl-trow">
         <h1 class="dl-px25">{title}</h1>
@@ -177,6 +178,11 @@ const MONTHS = [
 
     <section class="dl-hand" aria-labelledby="dl-board-title" data-daylist-hand>
       <h2 class="dl-sr" id="dl-board-title" data-daylist-title>{heading}</h2>
+      {
+        /* A phone's cards are photos only: the one picked (the newest, or the
+          last tapped) is named here. Screen readers get each card's name. */
+      }
+      <p class="dl-pick dl-panel" data-daylist-pick aria-hidden="true"></p>
       <ol
         class="dl-tray"
         aria-label="The six species, most widespread first"
@@ -310,7 +316,10 @@ const MONTHS = [
     --c5: #ef7f22;
     --c6: #dd3f37;
     --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
-    --card-w: 128px;
+    /* Six cards in a row beside the months: the hand starts 18px in, with
+       five 14px gaps, then a 22px gap and the 372px months 18px from the
+       right edge. */
+    --card-w: clamp(84px, calc((100vw - 500px) / 6), 128px);
     --edge: 15px;
   }
   html.dark .dl {
@@ -1222,6 +1231,39 @@ const MONTHS = [
   .dl-price-unit {
     font-size: 20px;
   }
+  /* A narrow card (a small laptop or a tablet) keeps its words inside it: a
+     shorter photo leaves the name two lines, and the reach, the name and
+     the price go down a size, as on a phone. */
+  .dl-card {
+    container-type: inline-size;
+  }
+  @container (max-width: 111px) {
+    .dl:not(.is-phone) .dl-card-pic {
+      aspect-ratio: 1.25;
+    }
+    .dl:not(.is-phone) .dl-card-name {
+      font-size: 10.5px;
+      line-height: 1.1;
+    }
+    .dl:not(.is-phone) .dl-card-reach {
+      gap: 3px;
+      font-size: 18px;
+    }
+    .dl:not(.is-phone) .dl-card-reach small {
+      font-size: 13px;
+    }
+    .dl:not(.is-phone) .dl-card .dl-key-next {
+      gap: 4px;
+      padding: 6px 4px 8px;
+      font-size: 18px;
+    }
+    .dl:not(.is-phone) .dl-price {
+      font-size: 33px;
+    }
+    .dl:not(.is-phone) .dl-price-unit {
+      font-size: 17px;
+    }
+  }
 
   /* The points a species cost, rising off its card's corner. */
   .dl-pop {
@@ -1637,34 +1679,64 @@ const MONTHS = [
   /* ---------- Narrower and shorter laptops ---------- */
 
   @media (max-width: 1240px) and (min-width: 760px) {
-    .dl {
-      --card-w: clamp(84px, calc((100vw - 500px) / 6 - 14px), 128px);
-    }
     .dl-card-name {
       font-size: 11.5px;
     }
   }
   @media (max-height: 760px) and (min-width: 760px) {
     .dl {
-      --card-w: 104px;
+      /* Shorter cards, but never wider than the row beside the months allows. */
+      --card-w: clamp(84px, calc((100vw - 500px) / 6), 104px);
     }
     .dl-title h1 {
       font-size: 50px;
     }
   }
+  /* Too narrow for six cards in a row beside the months (tablets and small
+     windows; a short one gets the phone layout, day-list.ts): the hand goes
+     to two rows of three, as on a phone, sized to leave some map above it.
+     The rules line and the readout drop the words the phone drops, so the
+     title, the score and the readout keep clear of each other. */
+  @media (max-width: 1009px) and (min-width: 760px) {
+    .dl {
+      --card-w: clamp(
+        84px,
+        min(calc((100vw - 460px) / 3), calc((100vh - 310px) / 3.2)),
+        116px
+      );
+    }
+    .dl-tray {
+      grid-template-columns: repeat(3, var(--card-w));
+      gap: 18px 14px;
+    }
+    .dl-title h1 {
+      font-size: 50px;
+    }
+    .dl-r-mid,
+    .dl-r-b,
+    .dl-r-head {
+      display: none;
+    }
+  }
 
   /* ---------- Phone ---------- */
-  /* One screen, top to bottom, with no scrolling at 390 x 844: the title and
-     the score, the map with the readout and the zoom keys in its corners,
-     the hand in two rows of three, then the months and Lock it in. At the
-     answer the verdict takes the title's place and the postcard the hand's,
-     and the map grows to fill the space between them (layoutAnswerPhone in
-     day-list.ts). */
+  /* One screen, top to bottom, sized for what Safari leaves of an iPhone
+     (390 x 664 on an iPhone 14): a two-row title with the score, the whole
+     world at 1.6:1 with the zoom keys in its corner, the picked species'
+     name, the cards in two rows of three (photos only), then the months
+     with Lock it in beside them. The cards take what the map leaves
+     (layout in day-list.ts). On a screen too short even for the smallest
+     cards and a 2:1 map, it scrolls, so Lock it in is never cut off. At
+     the answer the verdict takes the title's place and the postcard the
+     hand's, and the map grows to fill the space between them
+     (layoutAnswerPhone). */
 
   .dl.is-phone {
     display: flex;
     flex-direction: column;
-    padding: 0 0 10px;
+    padding: 0 0 8px;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
     --edge: 8px;
   }
   .dl.is-phone .dl-ui {
@@ -1678,85 +1750,92 @@ const MONTHS = [
     top: auto;
     bottom: auto;
   }
+  /* The title in two short rows: back, name and the score, then the lists
+     and How to play. The rules line and the date wait in How to play. */
   .dl.is-phone .dl-title {
     order: 1;
-    margin: 8px 8px 0;
-    padding: 8px 10px 9px;
+    margin: 6px 6px 0;
+    padding: 7px 10px 8px;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    column-gap: 9px;
   }
   .dl.is-phone .dl-back {
-    height: 24px;
-    padding: 0 7px 2px;
-    font-size: 17px;
+    grid-row: 1;
+    grid-column: 1;
+    height: 26px;
+    margin-bottom: 3px;
+    padding: 0 8px 2px;
+    font-size: 19px;
+    --k-drop: 3px;
+  }
+  .dl.is-phone .dl-back-word {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
   }
   .dl.is-phone .dl-trow {
+    grid-row: 1;
+    grid-column: 2;
     display: block;
-    margin-top: 8px;
+    margin: 0;
   }
   .dl.is-phone .dl-title h1 {
-    font-size: 32px;
+    font-size: clamp(22px, 7.2vw, 28px);
   }
   .dl.is-phone .dl-howkey {
     position: absolute;
     right: 10px;
-    bottom: 13px;
-    height: 26px;
+    bottom: 11px;
+    height: 24px;
     padding: 0 8px 2px;
-    font-size: 17px;
+    font-size: 16px;
+    --k-drop: 3px;
   }
-  .dl.is-phone .dl-rule {
-    margin: 6px 0 0;
-    font-size: 15px;
-    line-height: 1.05;
-    white-space: normal;
-  }
-  .dl.is-phone .dl-r-mid {
-    display: none;
-  }
-  .dl.is-phone .dl-r-a {
-    display: block;
-  }
-  .dl.is-phone .dl-r-b {
+  .dl.is-phone .dl-rule,
+  .dl.is-phone .dl-date {
     display: none;
   }
   .dl.is-phone .dl-modes-row {
-    gap: 9px;
-    margin-top: 9px;
+    grid-row: 2;
+    grid-column: 1 / -1;
+    gap: 8px;
+    margin-top: 8px;
   }
   .dl.is-phone .dl-modes {
     gap: 8px;
   }
   .dl.is-phone .dl-tab {
-    height: 26px;
+    height: 24px;
     padding: 0 7px 2px;
-    font-size: 17px;
-  }
-  .dl.is-phone .dl-date {
-    font-size: 15px;
-    margin-right: 92px;
-    white-space: normal;
+    font-size: 16px;
+    --k-drop: 3px;
   }
   .dl.is-phone .dl-stakes {
     position: absolute;
     order: 0;
-    top: 19px;
-    right: 19px;
+    top: 12px;
+    right: 15px;
     z-index: 2;
-    column-gap: 7px;
+    column-gap: 6px;
     padding: 0;
     box-shadow: none;
     background: none;
   }
   .dl.is-phone .dl-s-num {
-    font-size: 34px;
+    font-size: clamp(24px, 7.7vw, 30px);
     min-width: 0;
   }
   .dl.is-phone .dl-s-up,
   .dl.is-phone .dl-s-unit {
-    font-size: 14px;
+    font-size: 12px;
   }
   .dl.is-phone .dl-how {
     position: absolute;
-    top: 150px;
+    top: var(--how-top, 92px);
     left: 8px;
     right: 8px;
     width: auto;
@@ -1773,7 +1852,7 @@ const MONTHS = [
   }
   .dl.is-phone .dl-map {
     order: 3;
-    margin-top: 12px;
+    margin-top: 8px;
     flex: none;
     overflow: hidden;
   }
@@ -1795,6 +1874,10 @@ const MONTHS = [
     padding: 0 8px 2px;
     font-size: 17px;
   }
+  /* The strip over the cards says the reach, so the map keeps its corner. */
+  .dl.is-phone .dl-read {
+    display: none;
+  }
   .dl.is-phone .dl-read {
     position: absolute;
     order: 3;
@@ -1802,7 +1885,6 @@ const MONTHS = [
     right: auto;
     top: var(--read-top, 100px);
     z-index: 2;
-    display: block;
     padding: 3px 8px 5px;
     box-shadow:
       inset 0 0 0 2px var(--rim),
@@ -1832,54 +1914,97 @@ const MONTHS = [
   .dl.is-phone .dl-place {
     font-size: 19px;
   }
+  /* The hand sits at the foot with the months, whatever room is left over
+     going above it. */
   .dl.is-phone .dl-hand {
     order: 5;
-    margin: 16px 12px 0;
+    margin: auto 10px 0;
+    padding-top: 10px;
+  }
+  .dl-pick {
+    display: none;
+  }
+  .dl.is-phone .dl-pick {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 26px;
+    margin: 0 2px 14px;
+    padding: 0 9px;
+    white-space: nowrap;
+    box-shadow:
+      inset 0 0 0 2px var(--rim),
+      0 0 0 2px var(--drop),
+      3px 3px 0 2px var(--drop);
+  }
+  .dl.is-phone .dl-pick i {
+    flex: none;
+    width: 10px;
+    height: 10px;
+    background: var(--c, var(--c1));
+    box-shadow: 0 0 0 2px var(--drop);
+  }
+  .dl.is-phone .dl-pick b {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 14px;
+    font-weight: 500;
+  }
+  .dl.is-phone .dl-pick span {
+    flex: none;
+    margin-left: auto;
+    font-family: "Jersey 15", ui-sans-serif, sans-serif;
+    font-size: 18px;
+    line-height: 1;
+    color: var(--c, var(--c1));
   }
   .dl.is-phone .dl-tray {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 16px 12px;
+    gap: 12px 10px;
   }
   .dl.is-phone .dl-card {
     width: auto;
-    height: var(--card-h, 152px);
+    height: var(--card-h, 96px);
   }
   .dl.is-phone .dl-card-face {
-    padding: 5px 5px 0;
+    padding: 4px;
   }
   .dl.is-phone .dl-card-pic {
     aspect-ratio: auto;
     flex: 1 1 0;
     min-height: 0;
   }
-  .dl.is-phone .dl-card-name {
-    flex: none;
-    height: 34px;
-    margin-top: 3px;
-    padding: 2px 4px;
-    font-size: 10.5px;
-  }
+  /* Photos only: the name and the reach are in the strip, and still on the
+     card for screen readers. */
+  .dl.is-phone .dl-card-name,
   .dl.is-phone .dl-card-reach {
-    margin: 5px -5px 0;
-    padding: 2px 3px 4px;
-    font-size: 18px;
-  }
-  .dl.is-phone .dl-card-reach small {
-    font-size: 13px;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
   }
   .dl.is-phone .dl-card .dl-key-next {
-    gap: 3px;
-    padding: 6px 4px 8px;
-    font-size: 18px;
+    gap: 2px;
+    padding: 4px 3px 6px;
+    font-size: clamp(13px, calc(var(--card-h, 96px) * 0.17), 17px);
   }
   .dl.is-phone .dl-price {
-    font-size: 32px;
+    font-size: clamp(20px, calc(var(--card-h, 96px) * 0.3), 30px);
   }
   .dl.is-phone .dl-price-unit {
-    font-size: 17px;
+    display: none;
   }
   .dl.is-phone .dl-card-q {
-    font-size: 46px;
+    font-size: clamp(28px, calc(var(--card-h, 96px) * 0.42), 46px);
+  }
+  .dl.is-phone .dl-card.is-picked .dl-card-n {
+    background: var(--c);
+    color: var(--slate);
   }
   .dl.is-phone .dl-card-n {
     width: 22px;
@@ -1894,22 +2019,31 @@ const MONTHS = [
   .dl.is-phone .dl-guess {
     order: 6;
     width: auto;
-    margin: 14px 12px 0;
+    margin: 12px 10px 0;
+    grid-template-columns: minmax(0, 1fr) 118px;
+    align-items: stretch;
     gap: 10px;
   }
   .dl.is-phone .dl-months {
-    gap: 8px;
+    gap: 6px 5px;
   }
   .dl.is-phone .dl-months .dl-key {
     height: 30px;
-    font-size: 19px;
+    padding: 0 0 2px;
+    font-size: 17px;
+    --k-drop: 3px;
   }
   .dl.is-phone .dl-key-lock {
-    height: 54px;
-    font-size: 34px;
+    height: auto;
+    gap: 4px;
+    padding: 4px 6px 6px;
+    font-size: 27px;
+    --k-drop: 3px;
   }
   .dl.is-phone .dl-key-lock small {
-    font-size: 18px;
+    font-size: 14px;
+    line-height: 0.95;
+    text-align: center;
   }
   .dl.is-phone.is-done .dl-hand,
   .dl.is-phone.is-done .dl-guess,
@@ -1922,42 +2056,56 @@ const MONTHS = [
     display: none;
   }
   .dl.is-phone.is-done .dl-map {
-    margin-top: 100px;
+    margin-top: 62px;
   }
   .dl.is-phone .dl-banner {
     position: absolute;
     left: 8px;
     right: 8px;
     top: 8px;
-    padding: 12px 14px 10px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 9px 12px 9px;
   }
   .dl.is-phone .dl-banner b {
-    font-size: 32px;
+    font-size: clamp(18px, 6.4vw, 26px);
   }
   .dl.is-phone .dl-banner span {
-    font-size: 18px;
+    flex: none;
+    font-size: clamp(13px, 4.2vw, 17px);
   }
   /* The postcard docks at the foot of the screen and the map grows down to
      it. */
   .dl.is-phone.is-done .dl-post {
     position: absolute;
-    left: 12px;
-    right: 12px;
-    bottom: 14px;
+    left: 10px;
+    right: 10px;
+    bottom: 12px;
     margin: 0;
+  }
+  /* Too little room for the postcard beside a usable map: it follows the
+     map and the page scrolls (layoutAnswerPhone). */
+  .dl.is-phone.is-done.is-post-flow .dl-post {
+    position: relative;
+    left: auto;
+    right: auto;
+    bottom: auto;
+    margin: 12px 10px 0;
   }
   .dl.is-phone .dl-post {
     order: 7;
     width: auto;
     margin: 18px 12px 0;
     grid-template-columns: minmax(0, 1fr) auto;
-    gap: 12px 14px;
-    padding: 16px 16px 14px;
+    gap: 9px 12px;
+    padding: 12px 12px 10px;
   }
   .dl.is-phone .dl-post-thumbs {
     grid-column: 1 / -1;
     grid-template-columns: repeat(6, 1fr);
-    gap: 7px;
+    gap: 6px;
   }
   .dl.is-phone .dl-post-thumbs li {
     width: auto;
@@ -1965,38 +2113,44 @@ const MONTHS = [
     aspect-ratio: 1;
   }
   .dl.is-phone .dl-post-where h2 {
-    font-size: 30px;
+    font-size: clamp(22px, 6.6vw, 28px);
     text-wrap: balance;
   }
   .dl.is-phone .dl-post-where p,
   .dl.is-phone .dl-post-where .dl-post-used {
     font-family: "Jersey 15", ui-sans-serif, sans-serif;
-    font-size: 18px;
+    font-size: 16px;
     line-height: 1;
   }
   .dl.is-phone .dl-post-pts {
-    font-size: 18px;
-    gap: 3px 10px;
+    font-size: 16px;
+    gap: 2px 10px;
   }
   .dl.is-phone .dl-post-pts .dl-tot {
-    font-size: 25px;
+    font-size: 22px;
   }
+  /* The four keys in a two by two grid, the note under them. */
   .dl.is-phone .dl-post-acts {
-    gap: 12px 10px;
-    margin: 0 2px 2px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px 8px;
+    margin: 2px 2px 0;
   }
   .dl.is-phone .dl-post-acts .dl-key {
-    height: 34px;
-    padding: 0 10px 2px;
-    font-size: 19px;
+    height: 30px;
+    margin-bottom: 3px;
+    padding: 0 6px 2px;
+    font-size: 17px;
+    --k-drop: 3px;
   }
   .dl.is-phone .dl-post-acts .dl-key-amber {
-    font-size: 23px;
+    font-size: 19px;
   }
   .dl.is-phone .dl-post-note {
-    flex-basis: 100%;
+    grid-column: 1 / -1;
+    margin: 0;
     text-align: left;
-    font-size: 16px;
+    font-size: 14px;
   }
   .dl.is-phone .dl-sheet {
     width: calc(100vw - 16px);
