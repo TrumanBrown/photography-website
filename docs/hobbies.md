@@ -665,11 +665,19 @@ for the answer.
   room than that the postcard follows the map and the page scrolls (`is-post-flow`).
 - **Laptops and tablets.** The map is the whole screen. A screen taller than 1.6:1 gets a 1.6:1 map
   with sea under it, and one wider than 2:1 gets a 2:1 world with sea either side (`maxAspect`).
-  The cards are as wide as the row beside the 372px months allows, 84 to 128px (104px at most on a
-  screen under 760px tall). A card under 112px wide switches to a compact face through a container
-  query: a shorter photo, and the name, the reach and the price a size smaller. From 760 to 1,009px
-  wide (a tablet, a small window) six cards can't sit beside the months, so they go in two rows of
-  three, and the rules line and the readout drop the words a phone drops.
+  The hand, the months, Lock it in and the postcard are drawn for a 1440x900 screen and grow with a
+  bigger one (`--hud-b`: the smaller of the width over 1440 and the height over 900, from 1 to 1.6),
+  so a big laptop screen shows them at the same share of the screen. A 1985x1148 window draws them
+  1.27 times as big. The cards are 205px tall at that scale, the band along the bottom where the
+  world map has least land, and never taller. They take any spare width beside the 372px months,
+  up to 1.25 times as wide as tall, and the photo takes whatever the name and the reach leave: 145
+  by 120px at 1440x900 and 194 by 153px at 1985x1148, where it used to be 116px square at both.
+  At the whole-world view the cards still cover Torres del Paine and Tierra del Fuego, so those
+  need a zoom. A screen under 760px tall keeps the tall card, up to 104px wide and 1.6 times as
+  tall. A card under 112px wide switches to a compact face through a container query, with the
+  name, the reach and the price a size smaller. From 760 to 1,009px wide (a tablet, a small window)
+  six cards can't sit beside the months, so they go in two rows of three, and the rules line and
+  the readout drop the words a phone drops.
 - **Keyboard and screen readers.** Showing a species from the keyboard moves focus to the next
   card's key, or to the map once all six are out, and a polite live region reads out the species,
   its reach and the new ceiling. Locking in moves focus to the place's name on the postcard and

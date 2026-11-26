@@ -316,10 +316,22 @@ const MONTHS = [
     --c5: #ef7f22;
     --c6: #dd3f37;
     --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    /* The hand, the months and the postcard are drawn for a 1440 x 900
+       screen and grow with a bigger one, so a big laptop screen shows them
+       the same share of the screen (--hud-b, one of their pixels). */
+    --hud-b: clamp(1px, min(calc(100vw / 1440), calc(100vh / 900)), 1.6px);
+    --b: 1px;
     /* Six cards in a row beside the months: the hand starts 18px in, with
        five 14px gaps, then a 22px gap and the 372px months 18px from the
-       right edge. */
-    --card-w: clamp(84px, calc((100vw - 500px) / 6), 128px);
+       right edge. They're as tall as the band under the map allows and
+       take any spare width, up to 1.25 times as wide as tall, as a wider
+       photo, so the cards never cover more of the map's southern edge. */
+    --card-w: clamp(
+      84px,
+      calc((100vw - 500 * var(--hud-b)) / 6),
+      calc(164 * var(--hud-b))
+    );
+    --card-hd: calc(205 * var(--hud-b));
     --edge: 15px;
   }
   html.dark .dl {
@@ -657,30 +669,30 @@ const MONTHS = [
     --k-hi: var(--key-hi);
     --k-lo: var(--key-lo);
     --k-ink: var(--drop);
-    --k-drop: 4px;
+    --k-drop: calc(4 * var(--b));
     --k-text: var(--slate);
     position: relative;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
+    gap: calc(6 * var(--b));
     margin: 0 0 var(--k-drop);
-    padding: 0 12px;
+    padding: 0 calc(12 * var(--b));
     border: 0;
     border-radius: 0;
     background: var(--k-face);
     color: var(--k-text);
     font-family: "Jersey 15", ui-sans-serif, sans-serif;
-    font-size: 24px;
+    font-size: calc(24 * var(--b));
     font-weight: 400;
     line-height: 1;
     text-decoration: none;
     cursor: pointer;
     box-shadow:
-      inset 0 3px 0 var(--k-hi),
-      inset 0 -3px 0 var(--k-lo),
-      0 0 0 3px var(--k-ink),
-      0 calc(var(--k-drop) + 3px) 0 0 var(--k-ink);
+      inset 0 calc(3 * var(--b)) 0 var(--k-hi),
+      inset 0 calc(-3 * var(--b)) 0 var(--k-lo),
+      0 0 0 calc(3 * var(--b)) var(--k-ink),
+      0 calc(var(--k-drop) + 3 * var(--b)) 0 0 var(--k-ink);
     transition:
       transform 60ms var(--ease-out),
       box-shadow 60ms var(--ease-out);
@@ -693,17 +705,17 @@ const MONTHS = [
     --k-text: var(--snow);
   }
   .dl-key:focus-visible {
-    outline: 3px solid var(--amber);
-    outline-offset: 5px;
+    outline: calc(3 * var(--b)) solid var(--amber);
+    outline-offset: calc(5 * var(--b));
   }
   .dl-key.is-down,
   .dl-key[aria-checked="true"] {
     transform: translateY(var(--k-drop));
     box-shadow:
-      inset 0 3px 0 var(--k-lo),
-      inset 0 -3px 0 var(--k-hi),
-      0 0 0 3px var(--k-ink),
-      0 3px 0 0 var(--k-ink);
+      inset 0 calc(3 * var(--b)) 0 var(--k-lo),
+      inset 0 calc(-3 * var(--b)) 0 var(--k-hi),
+      0 0 0 calc(3 * var(--b)) var(--k-ink),
+      0 calc(3 * var(--b)) 0 0 var(--k-ink);
   }
   .dl-key:disabled {
     cursor: default;
@@ -1066,10 +1078,15 @@ const MONTHS = [
 
   /* ---------- The hand ---------- */
 
+  .dl-hand,
+  .dl-guess,
+  .dl-post {
+    --b: var(--hud-b);
+  }
   .dl-hand {
     position: absolute;
-    left: calc(var(--edge) + 3px);
-    bottom: calc(var(--edge) + 4px);
+    left: calc(18 * var(--b));
+    bottom: calc(19 * var(--b));
     transition:
       translate 260ms var(--ease-out),
       opacity 200ms linear;
@@ -1083,13 +1100,13 @@ const MONTHS = [
     padding: 0;
     display: grid;
     grid-template-columns: repeat(6, var(--card-w));
-    gap: 14px;
+    gap: calc(14 * var(--b));
   }
   .dl-card {
     --c: var(--c1);
     position: relative;
     width: var(--card-w);
-    height: calc(var(--card-w) * 1.6);
+    height: var(--card-hd);
   }
   .dl-card:nth-child(2) {
     --c: var(--c2);
@@ -1112,20 +1129,21 @@ const MONTHS = [
     inset: 0;
     background: var(--c);
     box-shadow:
-      0 0 0 3px var(--drop),
-      5px 5px 0 3px var(--drop);
+      0 0 0 calc(3 * var(--b)) var(--drop),
+      calc(5 * var(--b)) calc(5 * var(--b)) 0 calc(3 * var(--b)) var(--drop);
   }
   .dl-card-face {
     display: flex;
     flex-direction: column;
-    padding: 6px 6px 0;
+    padding: calc(6 * var(--b)) calc(6 * var(--b)) 0;
   }
+  /* The photo takes whatever the name and the reach leave. */
   .dl-card-pic {
     position: relative;
-    flex: none;
-    aspect-ratio: 1;
+    flex: 1 1 0;
+    min-height: 0;
     background: var(--slate);
-    box-shadow: 0 0 0 3px var(--drop);
+    box-shadow: 0 0 0 calc(3 * var(--b)) var(--drop);
     overflow: hidden;
   }
   .dl-card-pic img,
@@ -1140,14 +1158,15 @@ const MONTHS = [
     image-rendering: pixelated;
   }
   .dl-card-name {
-    flex: 1;
+    flex: none;
+    height: calc(40 * var(--b));
     display: flex;
     align-items: center;
-    margin: 3px 0 0;
-    padding: 3px 4px;
+    margin: calc(3 * var(--b)) 0 0;
+    padding: calc(3 * var(--b)) calc(4 * var(--b));
     background: var(--card-paper);
-    box-shadow: 0 0 0 3px var(--drop);
-    font-size: 12.5px;
+    box-shadow: 0 0 0 calc(3 * var(--b)) var(--drop);
+    font-size: calc(12.5 * var(--b));
     font-weight: 500;
     line-height: 1.15;
     color: var(--card-ink);
@@ -1161,34 +1180,35 @@ const MONTHS = [
     overflow: hidden;
   }
   .dl-card-reach {
+    flex: none;
     display: flex;
     align-items: baseline;
     justify-content: center;
-    gap: 4px;
-    margin: 6px -6px 0;
-    padding: 3px 4px 5px;
+    gap: calc(4 * var(--b));
+    margin: calc(6 * var(--b)) calc(-6 * var(--b)) 0;
+    padding: calc(3 * var(--b)) calc(4 * var(--b)) calc(5 * var(--b));
     background: var(--slate);
     color: var(--snow);
-    font-size: 22px;
+    font-size: calc(22 * var(--b));
     line-height: 1;
     white-space: nowrap;
   }
   .dl-card-reach small {
-    font-size: 15px;
+    font-size: calc(15 * var(--b));
     color: var(--dim);
   }
   .dl-card-n {
     position: absolute;
-    left: -9px;
-    top: -11px;
+    left: calc(-9 * var(--b));
+    top: calc(-11 * var(--b));
     z-index: 2;
-    width: 26px;
-    height: 26px;
+    width: calc(26 * var(--b));
+    height: calc(26 * var(--b));
     display: grid;
     place-items: center;
     background: var(--drop);
     color: var(--snow);
-    font-size: 22px;
+    font-size: calc(22 * var(--b));
     line-height: 1;
   }
   .dl-card-back {
@@ -1199,11 +1219,12 @@ const MONTHS = [
   .dl-card-back::before {
     content: "";
     position: absolute;
-    inset: 8px;
-    border: 3px solid color-mix(in srgb, var(--c) 70%, var(--slate));
+    inset: calc(8 * var(--b));
+    border: calc(3 * var(--b)) solid
+      color-mix(in srgb, var(--c) 70%, var(--slate));
   }
   .dl-card-q {
-    font-size: 58px;
+    font-size: calc(58 * var(--b));
     line-height: 1;
     color: color-mix(in srgb, var(--c) 85%, var(--slate));
   }
@@ -1212,16 +1233,16 @@ const MONTHS = [
     inset: 0;
     margin: 0;
     flex-direction: column;
-    gap: 6px;
-    padding: 8px 6px 10px;
+    gap: calc(6 * var(--b));
+    padding: calc(8 * var(--b)) calc(6 * var(--b)) calc(10 * var(--b));
     text-align: center;
     white-space: normal;
     line-height: 0.95;
-    font-size: 22px;
+    font-size: calc(22 * var(--b));
   }
   .dl-price {
     font-family: "Jersey 25", ui-sans-serif, sans-serif;
-    font-size: 41px;
+    font-size: calc(41 * var(--b));
     line-height: 0.85;
     color: var(--red);
   }
@@ -1229,19 +1250,16 @@ const MONTHS = [
     color: var(--amber);
   }
   .dl-price-unit {
-    font-size: 20px;
+    font-size: calc(20 * var(--b));
   }
-  /* A narrow card (a small laptop or a tablet) keeps its words inside it: a
-     shorter photo leaves the name two lines, and the reach, the name and
-     the price go down a size, as on a phone. */
+  /* A narrow card (a small laptop or a tablet) keeps its words inside it:
+     the reach, the name and the price go down a size, as on a phone. */
   .dl-card {
     container-type: inline-size;
   }
   @container (max-width: 111px) {
-    .dl:not(.is-phone) .dl-card-pic {
-      aspect-ratio: 1.25;
-    }
     .dl:not(.is-phone) .dl-card-name {
+      height: 30px;
       font-size: 10.5px;
       line-height: 1.1;
     }
@@ -1267,36 +1285,37 @@ const MONTHS = [
 
   /* The points a species cost, rising off its card's corner. */
   .dl-pop {
+    --p: calc(3 * var(--b));
     position: absolute;
-    right: -14px;
-    top: -24px;
+    right: calc(-14 * var(--b));
+    top: calc(-24 * var(--b));
     z-index: 5;
-    font-size: 41px;
+    font-size: calc(41 * var(--b));
     line-height: 1;
     color: #ff6a50;
     white-space: nowrap;
     pointer-events: none;
     text-shadow:
-      -3px 0 0 var(--drop),
-      3px 0 0 var(--drop),
-      0 -3px 0 var(--drop),
-      0 3px 0 var(--drop),
-      -3px -3px 0 var(--drop),
-      3px -3px 0 var(--drop),
-      -3px 3px 0 var(--drop),
-      3px 3px 0 var(--drop),
-      5px 5px 0 var(--drop);
+      calc(-1 * var(--p)) 0 0 var(--drop),
+      var(--p) 0 0 var(--drop),
+      0 calc(-1 * var(--p)) 0 var(--drop),
+      0 var(--p) 0 var(--drop),
+      calc(-1 * var(--p)) calc(-1 * var(--p)) 0 var(--drop),
+      var(--p) calc(-1 * var(--p)) 0 var(--drop),
+      calc(-1 * var(--p)) var(--p) 0 var(--drop),
+      var(--p) var(--p) 0 var(--drop),
+      calc(5 * var(--b)) calc(5 * var(--b)) 0 var(--drop);
   }
 
   /* ---------- Months and Lock it in ---------- */
 
   .dl-guess {
     position: absolute;
-    right: calc(var(--edge) + 3px);
-    bottom: calc(var(--edge) + 4px);
-    width: 372px;
+    right: calc(18 * var(--b));
+    bottom: calc(19 * var(--b));
+    width: calc(372 * var(--b));
     display: grid;
-    gap: 12px;
+    gap: calc(12 * var(--b));
     transition:
       translate 260ms var(--ease-out),
       opacity 200ms linear;
@@ -1304,25 +1323,25 @@ const MONTHS = [
   .dl-months {
     display: grid;
     grid-template-columns: repeat(6, 1fr);
-    gap: 10px;
+    gap: calc(10 * var(--b));
     margin: 0;
   }
   .dl-months .dl-key {
-    height: 34px;
-    padding: 0 0 2px;
-    font-size: 22px;
+    height: calc(34 * var(--b));
+    padding: 0 0 calc(2 * var(--b));
+    font-size: calc(22 * var(--b));
   }
   .dl-key-lock {
-    height: 66px;
+    height: calc(66 * var(--b));
     flex-direction: column;
-    gap: 3px;
+    gap: calc(3 * var(--b));
     font-family: "Jersey 25", ui-sans-serif, sans-serif;
-    font-size: 41px;
-    --k-drop: 6px;
+    font-size: calc(41 * var(--b));
+    --k-drop: calc(6 * var(--b));
   }
   .dl-key-lock small {
     font-family: "Jersey 15", ui-sans-serif, sans-serif;
-    font-size: 20px;
+    font-size: calc(20 * var(--b));
     line-height: 0.8;
   }
   .dl-key-lock:disabled,
@@ -1359,41 +1378,41 @@ const MONTHS = [
 
   .dl-post {
     position: absolute;
-    left: calc(var(--edge) + 3px);
-    bottom: calc(var(--edge) + 4px);
+    left: calc(18 * var(--b));
+    bottom: calc(19 * var(--b));
     z-index: 4;
-    width: min(900px, calc(100vw - 2 * var(--edge) - 12px));
+    width: min(calc(900 * var(--b)), calc(100vw - 2 * var(--edge) - 12px));
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
-    gap: 14px 18px;
-    padding: 14px 16px 14px;
+    gap: calc(14 * var(--b)) calc(18 * var(--b));
+    padding: calc(14 * var(--b)) calc(16 * var(--b));
     background: var(--card-paper);
     color: var(--card-ink);
     user-select: text;
     -webkit-user-select: text;
     box-shadow:
-      inset 0 0 0 3px var(--card-paper),
-      inset 0 0 0 6px var(--red),
-      inset 0 0 0 9px var(--card-paper),
-      inset 0 0 0 12px var(--c1),
-      0 0 0 3px var(--drop),
-      8px 8px 0 3px var(--drop);
+      inset 0 0 0 calc(3 * var(--b)) var(--card-paper),
+      inset 0 0 0 calc(6 * var(--b)) var(--red),
+      inset 0 0 0 calc(9 * var(--b)) var(--card-paper),
+      inset 0 0 0 calc(12 * var(--b)) var(--c1),
+      0 0 0 calc(3 * var(--b)) var(--drop),
+      calc(8 * var(--b)) calc(8 * var(--b)) 0 calc(3 * var(--b)) var(--drop);
   }
   .dl-post-thumbs {
     list-style: none;
     margin: 0;
-    padding: 6px 0 0 6px;
+    padding: calc(6 * var(--b)) 0 0 calc(6 * var(--b));
     display: grid;
-    grid-template-columns: repeat(3, 62px);
-    gap: 8px;
+    grid-template-columns: repeat(3, calc(62 * var(--b)));
+    gap: calc(8 * var(--b));
     align-content: start;
   }
   .dl-post-thumbs li {
     position: relative;
-    width: 62px;
-    height: 62px;
+    width: calc(62 * var(--b));
+    height: calc(62 * var(--b));
     background: var(--slate);
-    box-shadow: 0 0 0 3px var(--drop);
+    box-shadow: 0 0 0 calc(3 * var(--b)) var(--drop);
   }
   .dl-post-thumbs img {
     display: block;
@@ -1407,16 +1426,16 @@ const MONTHS = [
   }
   .dl-post-thumbs li span {
     position: absolute;
-    left: -6px;
-    top: -8px;
-    width: 20px;
-    height: 20px;
+    left: calc(-6 * var(--b));
+    top: calc(-8 * var(--b));
+    width: calc(20 * var(--b));
+    height: calc(20 * var(--b));
     display: grid;
     place-items: center;
     background: var(--c);
     color: #122a5b;
-    box-shadow: 0 0 0 2px var(--drop);
-    font-size: 18px;
+    box-shadow: 0 0 0 calc(2 * var(--b)) var(--drop);
+    font-size: calc(18 * var(--b));
     line-height: 1;
   }
   .dl-post-thumbs li.is-unused span {
@@ -1424,11 +1443,11 @@ const MONTHS = [
   }
   .dl-post-where {
     min-width: 0;
-    padding-top: 6px;
+    padding-top: calc(6 * var(--b));
   }
   .dl-post-where h2 {
     margin: 0;
-    font-size: 50px;
+    font-size: calc(50 * var(--b));
     line-height: 0.85;
     font-weight: 400;
     color: var(--card-ink);
@@ -1439,25 +1458,25 @@ const MONTHS = [
     outline: none;
   }
   .dl-post-where p {
-    margin: 6px 0 0;
-    font-size: 22px;
+    margin: calc(6 * var(--b)) 0 0;
+    font-size: calc(22 * var(--b));
     line-height: 1;
     color: var(--card-ink-2);
   }
   .dl-post-where .dl-post-used {
-    margin-top: 12px;
+    margin-top: calc(12 * var(--b));
     font-family: "Libre Franklin", ui-sans-serif, sans-serif;
-    font-size: 13px;
+    font-size: calc(13 * var(--b));
     line-height: 1.4;
   }
   .dl-post-pts {
     display: grid;
     grid-template-columns: auto auto;
     align-content: start;
-    gap: 4px 16px;
+    gap: calc(4 * var(--b)) calc(16 * var(--b));
     margin: 0;
-    padding: 6px 6px 0 0;
-    font-size: 22px;
+    padding: calc(6 * var(--b)) calc(6 * var(--b)) 0 0;
+    font-size: calc(22 * var(--b));
     line-height: 1;
   }
   .dl-post-pts dt {
@@ -1469,10 +1488,10 @@ const MONTHS = [
     color: var(--card-ink);
   }
   .dl-post-pts .dl-tot {
-    margin-top: 6px;
-    padding-top: 6px;
-    border-top: 3px solid var(--card-ink);
-    font-size: 30px;
+    margin-top: calc(6 * var(--b));
+    padding-top: calc(6 * var(--b));
+    border-top: calc(3 * var(--b)) solid var(--card-ink);
+    font-size: calc(30 * var(--b));
   }
   .dl-post-pts dd.dl-tot {
     color: #c77f00;
@@ -1482,23 +1501,23 @@ const MONTHS = [
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 14px 14px;
-    margin: 0 6px 4px 6px;
+    gap: calc(14 * var(--b));
+    margin: 0 calc(6 * var(--b)) calc(4 * var(--b));
   }
   .dl-post-acts .dl-key {
-    height: 40px;
-    padding: 0 14px 3px;
-    font-size: 22px;
+    height: calc(40 * var(--b));
+    padding: 0 calc(14 * var(--b)) calc(3 * var(--b));
+    font-size: calc(22 * var(--b));
   }
   .dl-post-acts .dl-key-amber {
     font-family: "Jersey 25", ui-sans-serif, sans-serif;
-    font-size: 28px;
+    font-size: calc(28 * var(--b));
   }
   .dl-post-note {
-    flex: 1 1 12rem;
-    margin: 0 0 4px;
+    flex: 1 1 calc(192 * var(--b));
+    margin: 0 0 calc(4 * var(--b));
     text-align: right;
-    font-size: 19px;
+    font-size: calc(19 * var(--b));
     line-height: 1.05;
     color: var(--card-ink-2);
   }
@@ -1687,6 +1706,7 @@ const MONTHS = [
     .dl {
       /* Shorter cards, but never wider than the row beside the months allows. */
       --card-w: clamp(84px, calc((100vw - 500px) / 6), 104px);
+      --card-hd: calc(var(--card-w) * 1.6);
     }
     .dl-title h1 {
       font-size: 50px;
@@ -1704,6 +1724,7 @@ const MONTHS = [
         min(calc((100vw - 460px) / 3), calc((100vh - 310px) / 3.2)),
         116px
       );
+      --card-hd: calc(var(--card-w) * 1.6);
     }
     .dl-tray {
       grid-template-columns: repeat(3, var(--card-w));
