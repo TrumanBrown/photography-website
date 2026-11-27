@@ -57,6 +57,8 @@ const CLICKS: Record<string, string> = {
   "title:linkedin": "LinkedIn on the title screen",
   "title:github": "GitHub on the title screen",
   "title:photo": "the title screen's photo in its session",
+  "projects:prev": "the side projects' back arrow",
+  "projects:next": "the side projects' next arrow",
 };
 
 const PROJECT_PARTS: Record<string, string> = {

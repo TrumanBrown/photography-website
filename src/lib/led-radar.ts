@@ -12,6 +12,10 @@
  * stops when it's off screen, the tab is hidden or someone presses Pause.
  * Under reduced motion there's no sweep: the planes are drawn still and
  * redrawn when new data arrives.
+ *
+ * It never shows an empty panel. Until the feed answers, when it fails, and
+ * whenever it has no planes in range, the panel flies the sample in radar.ts
+ * (`sampleSnapshot`), and the line under it says "Sample" instead of "Live".
  */
 import { prefersReducedMotion } from "./motion";
 import {
@@ -29,6 +33,7 @@ import {
   radarPoint,
   readRadar,
   readSnapshot,
+  sampleSnapshot,
   type Reading,
   type Rgb,
   type Snapshot,
@@ -46,6 +51,8 @@ import {
 const POLL_MS = 20_000;
 const TRAIL_EVERY_MS = 3_000;
 const FRAME_MS = 50;
+/** Where the sample starts, a moment with a plane close to the centre. */
+const SAMPLE_START_S = 40;
 /** Within this, the distance shows in the panel's "overhead" orange. */
 const OVERHEAD_NM = 1;
 const LED_OFF = "#1a1917";
@@ -64,7 +71,6 @@ function frame(
   reading: Reading | null,
   rangeNm: number,
   state: {
-    message: string | null;
     stale: boolean;
     sweep: number | null;
     seconds: number;
@@ -73,9 +79,9 @@ function frame(
 ): Pixels {
   const px: Pixels = new Map();
   const near = reading?.nearest ?? null;
-  const label = state.message ?? near?.label ?? "NO PLANES";
+  const label = near?.label ?? "NO PLANES";
   const l = layout(label);
-  const textColor = state.stale || state.message ? COLORS.stale : COLORS.text;
+  const textColor = state.stale ? COLORS.stale : COLORS.text;
   for (const [x, y] of textPixels(
     fitText(label, PANEL - 2, l.labelScale),
     1,
@@ -165,13 +171,15 @@ function frame(
 export function initLedRadar(root: HTMLElement): void {
   const canvas = root.querySelector<HTMLCanvasElement>("canvas");
   const says = root.querySelector<HTMLElement>("[data-radar-says]");
+  const badge = root.querySelector<HTMLElement>("[data-radar-state]");
   const pause = root.querySelector<HTMLButtonElement>("[data-radar-pause]");
   const ctx = canvas?.getContext("2d");
   if (!canvas || !ctx) return;
 
   let snapshot: Snapshot | null = null;
-  let failed = false;
   let paused = false;
+  let sampleSeconds = 0;
+  let shownSample: boolean | null = null;
   let onScreen = false;
   let raf = 0;
   let poller = 0;
@@ -211,22 +219,29 @@ export function initLedRadar(root: HTMLElement): void {
     return px;
   }
 
-  function reading(): Reading | null {
-    if (!snapshot) return null;
-    const ahead = prefersReducedMotion()
-      ? 0
-      : (Date.now() - snapshot.at) / 1000;
-    return readRadar(
-      snapshot,
-      snapshot.flights.map((f) => advance(f, ahead)),
-    );
+  /** The live planes, or the sample when the feed has none in range. */
+  function reading(): { r: Reading; rangeNm: number; sample: boolean } {
+    if (snapshot) {
+      const ahead = prefersReducedMotion()
+        ? 0
+        : (Date.now() - snapshot.at) / 1000;
+      const live = readRadar(
+        snapshot,
+        snapshot.flights.map((f) => advance(f, ahead)),
+      );
+      if (live.nearest)
+        return { r: live, rangeNm: snapshot.rangeNm, sample: false };
+    }
+    const sample = sampleSnapshot(SAMPLE_START_S + sampleSeconds);
+    return { r: readRadar(sample), rangeNm: sample.rangeNm, sample: true };
   }
 
   function draw(still: boolean): void {
     const px = resize();
     const cell = px / PANEL;
-    const r = reading();
-    const near = r?.nearest ?? null;
+    const { r, rangeNm, sample } = reading();
+    if (sample !== shownSample) tell();
+    const near = r.nearest;
     if (near && near.label !== trailFor) {
       trail = [];
       trailFor = near.label;
@@ -236,10 +251,8 @@ export function initLedRadar(root: HTMLElement): void {
       trail = trail.slice(0, TRAIL_POINTS);
       lastTrail = performance.now();
     }
-    const message = snapshot ? null : failed ? "NO DATA" : "LOADING";
-    const lit = frame(r, snapshot?.rangeNm ?? 16, {
-      message,
-      stale: failed || snapshot?.status === "degraded",
+    const lit = frame(r, rangeNm, {
+      stale: !sample && snapshot?.status === "degraded",
       sweep: still ? null : sweep,
       seconds,
       trail: still ? [] : trail.slice(1),
@@ -256,13 +269,11 @@ export function initLedRadar(root: HTMLElement): void {
   }
 
   function tell(): void {
-    const r = reading();
-    const text = snapshot
-      ? describe(r!, snapshot.rangeNm)
-      : failed
-        ? "No flight data right now. The panel tries again in a moment."
-        : "Looking for planes over Seattle...";
+    const { r, rangeNm, sample } = reading();
+    const text = describe(r, rangeNm, sample);
     if (says) says.textContent = text;
+    if (badge) badge.textContent = sample ? "Sample" : "Live";
+    shownSample = sample;
     canvas!.setAttribute(
       "aria-label",
       `A 64 by 64 LED radar of the planes over Seattle. ${text}`,
@@ -277,9 +288,8 @@ export function initLedRadar(root: HTMLElement): void {
       });
       if (!res.ok) throw new Error(String(res.status));
       snapshot = readSnapshot(await res.json());
-      failed = false;
     } catch {
-      failed = true;
+      snapshot = null;
     }
     tell();
     if (prefersReducedMotion() || paused) draw(true);
@@ -290,6 +300,7 @@ export function initLedRadar(root: HTMLElement): void {
     last = now;
     sweep = (sweep + SWEEP_DEG_PER_S * dt) % 360;
     seconds += dt;
+    sampleSeconds += dt;
     if (now - lastDraw >= FRAME_MS) {
       draw(false);
       lastDraw = now;

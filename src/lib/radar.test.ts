@@ -17,6 +17,8 @@ import {
   rangeAndBearing,
   readRadar,
   readSnapshot,
+  SAMPLE_FLIGHTS,
+  sampleSnapshot,
   textPixels,
   textWidth,
   trendText,
@@ -205,6 +207,48 @@ describe("readRadar", () => {
     );
     expect(describeReading(readRadar({ ...snap, flights: [] }), 16)).toBe(
       "No planes within 16 nautical miles of Seattle right now.",
+    );
+  });
+});
+
+describe("the sample", () => {
+  it("always has planes in range, so the panel is never empty", () => {
+    for (let t = 0; t <= 3 * 3600; t += 2) {
+      const reading = readRadar(sampleSnapshot(t));
+      expect(reading.nearest).not.toBeNull();
+      expect(reading.contacts.length).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  it("moves each plane at its own speed and never jumps where it can be seen", () => {
+    const at = (t: number) =>
+      sampleSnapshot(t).flights.map((f) => ({
+        f,
+        seen: rangeAndBearing(CENTER, f).distanceNm <= 16,
+      }));
+    for (let t = 0; t < 1800; t++) {
+      const now = at(t);
+      const next = at(t + 1);
+      now.forEach(({ f, seen }, i) => {
+        if (!seen || !next[i].seen) return;
+        const moved = rangeAndBearing(f, next[i].f).distanceNm;
+        expect(moved).toBeLessThan(SAMPLE_FLIGHTS[i].speedKnots / 3600 + 0.01);
+      });
+    }
+  });
+
+  it("only uses what the panel can print, at believable heights", () => {
+    for (const f of sampleSnapshot(0).flights) {
+      expect(matrixText(f.label)).toBe(f.label);
+      expect(f.altitudeFeet).toBeGreaterThanOrEqual(800);
+      expect(f.onGround).toBe(false);
+    }
+  });
+
+  it("says it's a sample", () => {
+    const reading = readRadar(sampleSnapshot(40));
+    expect(describeReading(reading, 16, true)).toMatch(
+      /^Sample flights, shown while the live feed has no planes near Seattle: \d planes within 16 nautical miles\. Nearest is /,
     );
   });
 });

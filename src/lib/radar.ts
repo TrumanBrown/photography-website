@@ -431,13 +431,155 @@ export function dim(color: Rgb, k: number): Rgb {
   ];
 }
 
+/* ------------------------------------------------------------- the sample */
+
+/** A plane in the sample, crossing the radar on a straight line. */
+export interface SampleFlight {
+  label: string;
+  type: string;
+  /** Feet where its line passes closest to the centre. */
+  altitudeFeet: number;
+  speedKnots: number;
+  headingDegrees: number;
+  verticalRateFpm: number;
+  /** How far its line passes from the centre, to the right of its heading. */
+  offsetNm: number;
+  /** Where along its line it starts, 0 to 1. */
+  phase: number;
+}
+
+/**
+ * What the panel flies when the feed has no planes in range: Seattle's sky on
+ * a normal day, with arrivals coming down over the city toward Sea-Tac,
+ * departures climbing out, a Cessna over Lake Washington and an overflight.
+ * Real airline codes, made-up flight numbers.
+ */
+export const SAMPLE_FLIGHTS: readonly SampleFlight[] = [
+  {
+    label: "ASA1083",
+    type: "B39M",
+    altitudeFeet: 4600,
+    speedKnots: 190,
+    headingDegrees: 166,
+    verticalRateFpm: -900,
+    offsetNm: -1.2,
+    phase: 0.42,
+  },
+  {
+    label: "QXE2367",
+    type: "E75L",
+    altitudeFeet: 7200,
+    speedKnots: 230,
+    headingDegrees: 170,
+    verticalRateFpm: -1100,
+    offsetNm: 2.6,
+    phase: 0.08,
+  },
+  {
+    label: "UAL1922",
+    type: "B739",
+    altitudeFeet: 3400,
+    speedKnots: 175,
+    headingDegrees: 163,
+    verticalRateFpm: -800,
+    offsetNm: -0.4,
+    phase: 0.86,
+  },
+  {
+    label: "DAL1471",
+    type: "A321",
+    altitudeFeet: 9800,
+    speedKnots: 280,
+    headingDegrees: 345,
+    verticalRateFpm: 2200,
+    offsetNm: 6.5,
+    phase: 0.27,
+  },
+  {
+    label: "SWA2840",
+    type: "B38M",
+    altitudeFeet: 12000,
+    speedKnots: 300,
+    headingDegrees: 20,
+    verticalRateFpm: 1800,
+    offsetNm: -7,
+    phase: 0.63,
+  },
+  {
+    label: "N512KW",
+    type: "C172",
+    altitudeFeet: 1500,
+    speedKnots: 95,
+    headingDegrees: 95,
+    verticalRateFpm: 0,
+    offsetNm: 3.8,
+    phase: 0.5,
+  },
+  {
+    label: "AAL2390",
+    type: "A21N",
+    altitudeFeet: 15000,
+    speedKnots: 320,
+    headingDegrees: 250,
+    verticalRateFpm: 0,
+    offsetNm: -10,
+    phase: 0.15,
+  },
+];
+
+/** How far past the range a sample plane flies before it comes back round. */
+const SAMPLE_REACH = 1.15;
+
+/**
+ * The sample `seconds` in. Each plane flies its line at its own speed, leaves
+ * past the range and comes back in from the other side, so it never jumps
+ * where it can be seen.
+ */
+export function sampleSnapshot(
+  seconds: number,
+  center = DEFAULT_CENTER,
+  rangeNm = DEFAULT_RANGE_NM,
+): Snapshot {
+  const reach = rangeNm * SAMPLE_REACH;
+  const flights: Flight[] = SAMPLE_FLIGHTS.map((s) => {
+    const half = Math.sqrt(Math.max(0, reach ** 2 - s.offsetNm ** 2));
+    const length = 2 * half;
+    const travelled = s.phase * length + (s.speedKnots * seconds) / 3600;
+    const along = (((travelled % length) + length) % length) - half;
+    const h = rad(s.headingDegrees);
+    const north = along * Math.cos(h) - s.offsetNm * Math.sin(h);
+    const east = along * Math.sin(h) + s.offsetNm * Math.cos(h);
+    const minutes = (along / s.speedKnots) * 60;
+    const feet = s.altitudeFeet + s.verticalRateFpm * minutes;
+    return {
+      label: s.label,
+      type: s.type,
+      latitude: center.latitude + north / 60,
+      longitude:
+        center.longitude + east / (60 * Math.cos(rad(center.latitude))),
+      altitudeFeet: Math.max(800, Math.round(feet / 25) * 25),
+      speedKnots: s.speedKnots,
+      headingDegrees: s.headingDegrees,
+      verticalRateFpm: s.verticalRateFpm,
+      onGround: false,
+    };
+  });
+  return { center, rangeNm, flights, status: "sample", at: 0 };
+}
+
 /** The sentence under the panel, which is also what a screen reader hears. */
-export function describe(reading: Reading, rangeNm: number): string {
+export function describe(
+  reading: Reading,
+  rangeNm: number,
+  sample = false,
+): string {
   const n = reading.contacts.length;
-  const count =
-    n === 0
+  const planes = `${n} plane${n === 1 ? "" : "s"} within ${rangeNm} nautical miles`;
+  const count = sample
+    ? `Sample flights, shown while the live feed has no planes near Seattle: ${planes}.`
+    : n === 0
       ? `No planes within ${rangeNm} nautical miles of Seattle right now.`
-      : `${n} plane${n === 1 ? "" : "s"} within ${rangeNm} nautical miles of Seattle right now.`;
+      : `${planes} of Seattle right now.`;
   const near = reading.nearest;
   if (!near) return count;
   const f = near.flight;

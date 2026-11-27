@@ -154,7 +154,7 @@ export const PROJECTS: Project[] = [
     since: "2026-06",
     media: "site",
     blurb:
-      "This site. Under the photographs, a pipeline drafts every caption, checks the species against my iNaturalist and plans the Instagram posts. Astro on Azure Static Web Apps, with Blob Storage, Functions, Bicep and keyless GitHub Actions deploys.",
+      "I wanted a place to share my photos at full res with friends and family, and to get coding again. It also pulls the species from my iNaturalist and runs my Instagram posts.",
   },
   {
     name: "cozy-vibe-vids",
@@ -163,7 +163,7 @@ export const PROJECTS: Project[] = [
     since: "2026-10",
     media: "video",
     blurb:
-      "Ten-hour cozy ambience videos for YouTube. Each scene starts as one key-art image, and everything that moves in it, from the rain to the steam off the soup, is animated in code.",
+      "I put cozy videos on the TV while I work from home, so I started making my own, exactly the way I like them. Each one is 10 hours of one calm place, animated in code.",
   },
   {
     name: "balcFlights-LED",
@@ -172,7 +172,7 @@ export const PROJECTS: Project[] = [
     since: "2026-08",
     media: "radar",
     blurb:
-      "The planes flying over Seattle, on a 64×64 LED panel run by a Raspberry Pi 4. It pulls from a friend's flight API for Seattle and draws a radar with the nearest plane's callsign, type and altitude. The panel here is the same radar, drawn live in your browser.",
+      "A 64×64 LED panel that shows the planes flying over Seattle. The radar here is the same one, running in your browser.",
   },
 ];
 
