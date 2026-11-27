@@ -65,7 +65,7 @@ rather than only writing it down here.
   - `I grew up fishing various lakes and streams in Minnesota.`
   - `Tide pooling quickly became one of my favorite hobbies after moving to WA.`
 - Hobby intros follow: personal history → what the toy does → one imperative on how to play.
-  - `I keep returning to mountain trails, from the Cascades to China, Norway, and the Himalaya. Build a trail of your own, then turn it into a postcard.`
+  - `I've hiked a lot of the Cascades, and a few trails in Norway, China and Tibet too. Build a trail of your own, then turn it into a postcard.`
 - A game with rules to learn (Narrow nature) is the exception. Its card says the premise in one or
   two plain sentences, and the game opens on one rules line. How to play shows the rest as small
   pictures with a short paragraph that uses the same words as the buttons. No backstory and no
