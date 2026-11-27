@@ -21,6 +21,7 @@ import { speciesName } from "../species-name";
 import puzzles from "./day-list.json";
 import extras from "./day-list-extra.json";
 import facts from "./day-list-facts.json";
+import photos from "./day-list-photos.json";
 
 const daily = puzzles.rounds as Round[];
 const extra = extras.rounds as Round[];
@@ -73,6 +74,18 @@ describe("the two puzzle sets", () => {
         ),
     );
     expect(elsewhere).toEqual([]);
+  });
+
+  // A name or a caption on a photo can give the place away, as a credit line
+  // can: the Oriental turtle-dove carried its Chinese name (2026-11-26).
+  it("use no photo listed in day-list-photos.json", () => {
+    const skip = photos.skip as Record<string, string>;
+    const used = [...daily, ...extra].flatMap((round) =>
+      round.clues
+        .filter((c) => skip[/\/photos\/(\d+)\//.exec(c.photo)?.[1] ?? ""])
+        .map((c) => `${c.name} (${round.name})`),
+    );
+    expect(used).toEqual([]);
   });
 });
 

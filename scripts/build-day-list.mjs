@@ -28,7 +28,8 @@
  *    and the build lists it so a fact gets written.
  *  - Photos are openly licensed only, and the licence and photographer travel
  *    with the photo so the UI can credit them. CC BY and CC BY-NC both require
- *    attribution.
+ *    attribution. Photos in day-list-photos.json are never used: mostly ones
+ *    with a name or a caption written on them.
  *  - Clue ordering uses each species' reach: the distance from the place
  *    that holds half of its research-grade records worldwide (see reachOf).
  *    Worldwide record counts used to order them, but a count measures how
@@ -45,6 +46,8 @@
  *                                               labels only, same species
  *   npm run build:day-list -- --facts [--extra] refresh the facts and their
  *                                               links only, same species
+ *   npm run build:day-list -- --photos [--extra] swap any photo listed in
+ *                                               day-list-photos.json, same species
  */
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -54,6 +57,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const EXTRA = process.argv.includes("--extra");
 const RETAG = process.argv.includes("--retag");
 const FACTS = process.argv.includes("--facts");
+const PHOTOS = process.argv.includes("--photos");
 const OUT = join(
   root,
   EXTRA
@@ -64,6 +68,16 @@ const OUT = join(
 const WRITTEN = JSON.parse(
   readFileSync(join(root, "src/lib/hobbies/day-list-facts.json"), "utf8"),
 ).facts;
+/**
+ * Photos never to use, by iNaturalist photo id, each with why: mostly a
+ * photographer's name, a web address or a caption written on the photo,
+ * which can give the place away as a credit line can (2026-11-26).
+ */
+const SKIPPED = JSON.parse(
+  readFileSync(join(root, "src/lib/hobbies/day-list-photos.json"), "utf8"),
+).skip;
+/** "https://.../photos/64197228/medium.jpg" -> "64197228". */
+const photoId = (url) => (/\/photos\/(\d+)\//.exec(url) || [])[1] || "";
 
 const UA = {
   "User-Agent": "trumanbrown.com day-list builder (+https://trumanbrown.com)",
@@ -701,6 +715,7 @@ function usablePhoto(taxon) {
 
   for (const photo of candidates) {
     if (!photo.url) continue;
+    if (SKIPPED[String(photo.id)]) continue;
     const licence = OPEN_LICENCES.get(
       String(photo.license_code || "").toLowerCase(),
     );
@@ -1189,6 +1204,58 @@ if (FACTS) {
   writeFileSync(OUT, `${JSON.stringify(set, null, 2)}\n`);
   console.log(`Refreshed ${changed} facts in ${OUT}.`);
   reportUnwritten(set.rounds);
+  process.exit(0);
+}
+
+/**
+ * --photos: keep every round's species, and give any clue whose photo is in
+ * day-list-photos.json the next usable one, with its credit. Safe to run on
+ * the live set any time, like --retag: the species and their order stay.
+ */
+if (PHOTOS) {
+  const set = JSON.parse(readFileSync(OUT, "utf8"));
+  let changed = 0;
+  const stuck = [];
+  const picked = new Map();
+  for (const round of set.rounds) {
+    for (const clue of round.clues) {
+      if (!SKIPPED[photoId(clue.photo)]) continue;
+      let photo = picked.get(clue.id);
+      if (photo === undefined) {
+        let taxon = null;
+        try {
+          const data = await api(`taxa/${clue.id}`, { locale: "en" });
+          taxon = (data.results || [])[0] || null;
+        } catch {
+          taxon = null;
+        }
+        await sleep(THROTTLE);
+        photo = taxon ? usablePhoto(taxon) : null;
+        picked.set(clue.id, photo);
+      }
+      if (!photo) {
+        stuck.push(`${round.name}: ${clue.name}`);
+        continue;
+      }
+      console.log(
+        `${round.name}: ${clue.name} ${photoId(clue.photo)} -> ${photoId(photo.url)}`,
+      );
+      Object.assign(clue, {
+        photo: photo.url,
+        by: photo.by,
+        licence: photo.licence,
+        photoSource: photo.source,
+      });
+      changed++;
+    }
+  }
+  writeFileSync(OUT, `${JSON.stringify(set, null, 2)}\n`);
+  console.log(`\nSwapped ${changed} photos in ${OUT}.`);
+  if (stuck.length) {
+    console.log(
+      `\nNo other usable photo, so these keep a skipped one:\n  ${stuck.join("\n  ")}`,
+    );
+  }
   process.exit(0);
 }
 

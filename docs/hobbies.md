@@ -855,8 +855,19 @@ The puzzle is aimed at people who know the species, so the builder is strict abo
   resolve, so the builder normalises them.
 - **Photos are openly licensed only.** The builder walks `default_photo` then `taxon_photos` until it
   finds an acceptable licence, because the best-known species often have an all-rights-reserved lead
-  image. The photographer and licence travel with the photo and are rendered under it on the
-  board, since CC BY and CC BY-NC require attribution.
+  image. The photographer and licence travel with the photo and are credited in the full list's
+  closed "Photo credits", since CC BY and CC BY-NC require attribution.
+- **No writing on the photos.** A photographer's name, a web address or a caption on a photo can
+  give the place away as a credit line can: the Oriental turtle-dove, Hokkaido's free first card,
+  carried its Chinese name, and the Jeju salamander a Korean caption. In November 2026, 58 of the 568
+  photos had writing on them, nearly all a name in a corner, and the next photo of the same species
+  often did too. [day-list-photos.json](../src/lib/hobbies/day-list-photos.json) lists photos never
+  to use, each with why (90 so far, a few for a blur or for a scene that points somewhere, like a
+  city skyline or a white Kermode bear). The builder skips them, and
+  `npm run build:day-list -- --photos [--extra]` swaps any a list still uses for the species' next
+  usable photo, keeping the species. A test fails if a list uses one. Checking takes eyes:
+  OCR (Tesseract) on the top and bottom fifths of each photo found the clear watermarks and seven
+  that looking had missed, but no script signatures.
 - **Clue order uses reach, not record counts.** A species' reach is the distance from the place
   that holds half of its research-grade records worldwide. The builder counts every candidate's
   records inside 17 rings around the place, 25 to 6,400 km and about √2 apart, with one
