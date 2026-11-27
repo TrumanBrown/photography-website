@@ -493,6 +493,8 @@ More lists deals up to ten more a day per browser, from a separate set of places
   line and finder box into the same pixels.
 - [src/lib/hobbies/day-list-tints.ts](../src/lib/hobbies/day-list-tints.ts), the ring colours,
   picked from each species' photo.
+- [src/lib/hobbies/day-list-names.ts](../src/lib/hobbies/day-list-names.ts), the places in species
+  names, hidden until the answer.
 - [src/lib/hobbies/day-list-map.ts](../src/lib/hobbies/day-list-map.ts), the map: zoom and pan,
   gestures, the terrain tiles and their palette, the graticule, and the camera moves the reveal uses.
 - [src/lib/hobbies/pin-drop.ts](../src/lib/hobbies/pin-drop.ts), how the pin drops, lifts and
@@ -594,6 +596,17 @@ for the answer.
   from below, 45ms apart, and the first ring opens out round the lens. Photographer names aren't on
   the cards, because a name can give the place away (see the full list). On a phone the cards are
   photos only (Phones, below).
+- **Places in names stay hidden until the answer.** A quarter of the species had a place in their
+  name, from the continent ("American robin", the free first card at Olympic) to the answer itself
+  ("Yosemite toad" at Yosemite), so some lists gave themselves away (2026-11-26). The cards and the
+  phone's strip show the rest of the name around a bar in the text's colour, the same width for
+  every word, so its length doesn't help either. A screen reader hears "place hidden". The full
+  list after the answer has the whole name. Compass words ("Eastern"), habitats ("Alpine",
+  "Island") and people ("Steller's") stay, and so does the last word, the kind of animal, even when
+  it's a place too, like an amazon parrot (`nameParts` in
+  [day-list-names.ts](../src/lib/hobbies/day-list-names.ts)). `day-list.test.ts` fails on a place
+  word the file doesn't know, and on any word of a list's own place left showing in its species, so
+  a rebuild can't bring one back unnoticed. Add the word to the file.
 - **Turning a card.** The key narrows to nothing in 70ms and the card's face opens out past full
   width and settles. Its photo comes up in coarse squares that sharpen three times, 80ms apart,
   before the photo itself shows.

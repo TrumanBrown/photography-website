@@ -16,6 +16,8 @@ import {
   verdictFor,
   type Round,
 } from "./day-list";
+import { nameParts } from "./day-list-names";
+import { speciesName } from "../species-name";
 import puzzles from "./day-list.json";
 import extras from "./day-list-extra.json";
 import facts from "./day-list-facts.json";
@@ -71,6 +73,97 @@ describe("the two puzzle sets", () => {
         ),
     );
     expect(elsewhere).toEqual([]);
+  });
+});
+
+// A quarter of the cards named a place: "American robin" on the free first
+// card, "Yosemite toad" on Yosemite's last (2026-11-26).
+describe("place names in species names", () => {
+  const shown = (name: string) =>
+    nameParts(name)
+      .map((p) => (p.hidden ? "#" : p.text))
+      .join("");
+
+  it("hides the place and keeps the kind of animal", () => {
+    expect(shown("Australian magpie")).toBe("# magpie");
+    expect(shown("South American coati")).toBe("# coati");
+    expect(shown("Death Valley pupfish")).toBe("# pupfish");
+    expect(shown("Indo-Pacific bottlenose dolphin")).toBe(
+      "# bottlenose dolphin",
+    );
+    expect(shown("Cape robin-chat")).toBe("# robin-chat");
+    expect(shown("Western Australian magpie")).toBe("Western # magpie");
+  });
+
+  it("leaves people, compass words, habitats and the animal's own name", () => {
+    for (const name of [
+      "Steller's jay",
+      "Eastern spot-billed duck",
+      "Austral thrush",
+      "Island canary",
+      "Alpine coral-fern",
+      "Blue-fronted Amazon",
+      "Common Mormon swallowtail",
+      "Gharial",
+    ]) {
+      expect(shown(name)).toBe(name);
+    }
+  });
+
+  // A rebuild can bring in a species named for a place this list doesn't
+  // know. Add the word to day-list-names.ts.
+  it("leaves no place showing on any card in either list", () => {
+    const left: string[] = [];
+    for (const round of [...daily, ...extra]) {
+      for (const clue of round.clues) {
+        const words = nameParts(speciesName(clue.name, { midSentence: true }))
+          .filter((p) => !p.hidden)
+          .flatMap((p) => p.text.trim().split(" "));
+        // Still capitalised mid-sentence and not someone's name: a place.
+        for (const w of words) {
+          if (/^\p{Lu}/u.test(w) && !/['\u2019]s?$/.test(w) && w !== "Mormon") {
+            left.push(`${clue.name} (${round.name})`);
+          }
+        }
+      }
+    }
+    expect(left).toEqual([]);
+  });
+
+  it("leaves no word of the list's own place showing", () => {
+    // Words a place's name shares with species names without naming it: the
+    // canary of the Canary Islands, a kangaroo on Kangaroo Island.
+    const GENERIC = new Set(
+      (
+        "park national provincial united states forest island islands mount mountain " +
+        "mountains valley lake delta point great northern southern western eastern " +
+        "north south west east central territory canary kangaroo"
+      ).split(" "),
+    );
+    const fold = (w: string) =>
+      w
+        .normalize("NFKD")
+        .replace(/[^\p{L}]/gu, "")
+        .toLowerCase();
+    const left: string[] = [];
+    for (const round of [...daily, ...extra]) {
+      const own = new Set(
+        `${round.name} ${round.region}`
+          .split(/[\s,()/–-]+/)
+          .map(fold)
+          .filter((w) => w.length >= 4 && !GENERIC.has(w)),
+      );
+      for (const clue of round.clues) {
+        const words = nameParts(speciesName(clue.name))
+          .filter((p) => !p.hidden)
+          .flatMap((p) => p.text.trim().split(/[\s-]+/))
+          .map(fold);
+        if (words.some((w) => own.has(w))) {
+          left.push(`${clue.name} (${round.name})`);
+        }
+      }
+    }
+    expect(left).toEqual([]);
   });
 });
 

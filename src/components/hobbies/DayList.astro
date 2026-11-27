@@ -118,9 +118,10 @@ const MONTHS = [
       </ol>
       <p class="dl-how-note">
         Each species draws a ring round your pin. Half its sightings are that
-        close to the spot. Pick the month too, then lock it in. You get one
-        guess, and a pin anywhere inside the place counts as spot on. Today's
-        list is the same for everyone. More lists gives you ten others a day.
+        close to the spot. Any place in a species' name stays hidden until you
+        guess. Pick the month too, then lock it in. You get one guess, and a pin
+        anywhere inside the place counts as spot on. Today's list is the same
+        for everyone. More lists gives you ten others a day.
       </p>
       <button type="button" class="dl-key dl-key-small" data-daylist-how-close
         >Back to the map</button
@@ -1173,12 +1174,23 @@ const MONTHS = [
     overflow: hidden;
     overflow-wrap: anywhere;
   }
-  .dl-card-name span {
+  .dl-card-name > span {
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
+  /* A place in a species' name, hidden until the answer (day-list-names.ts):
+     a bar in the text's colour, like a word blacked out, the same width
+     whatever the word, so its length gives nothing away. */
+  .dl .dl-hide {
+    display: inline-block;
+    width: 2.4em;
+    height: 0.74em;
+    vertical-align: -0.05em;
+    background: currentColor;
+  }
+
   .dl-card-reach {
     flex: none;
     display: flex;
@@ -1972,7 +1984,7 @@ const MONTHS = [
     font-size: 14px;
     font-weight: 500;
   }
-  .dl.is-phone .dl-pick span {
+  .dl.is-phone .dl-pick > span {
     flex: none;
     margin-left: auto;
     font-family: "Jersey 15", ui-sans-serif, sans-serif;

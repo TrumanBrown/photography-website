@@ -46,6 +46,9 @@ describe("speciesName", () => {
       "Australo-Papuan babblers",
     );
     expect(speciesName("Cape May Warbler")).toBe("Cape May warbler");
+    expect(speciesName("Death Valley Pupfish")).toBe("Death Valley pupfish");
+    expect(speciesName("Salish Sea Sandpirate")).toBe("Salish Sea sandpirate");
+    expect(speciesName("Banff Springs Snail")).toBe("Banff Springs snail");
     expect(speciesName("Cape Protea Chafer")).toBe("Cape protea chafer");
   });
 

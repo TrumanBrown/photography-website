@@ -76,6 +76,9 @@ const PROPER_PHRASE = Object.fromEntries(
     "West Indian",
     "Old World",
     "Cape May",
+    "Death Valley",
+    "Salish Sea",
+    "Banff Springs",
   ].map((p) => [p.toLowerCase(), p]),
 );
 const PROPER_PHRASES = new RegExp(

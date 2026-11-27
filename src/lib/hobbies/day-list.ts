@@ -75,6 +75,7 @@ import {
   type Tint,
 } from "./day-list-tints";
 import puzzles from "./day-list.json";
+import { nameParts } from "./day-list-names";
 import { speciesName } from "../species-name";
 import { siteConfig } from "../../../site.config";
 
@@ -525,6 +526,30 @@ function escapeHtml(value: string): string {
         c
       ] as string,
   );
+}
+
+/**
+ * A species' name as a card shows it before the answer, any place in it a
+ * bar (day-list-names.ts). Screen readers hear "place hidden" instead.
+ */
+function hiddenNameHtml(name: string): string {
+  return (
+    nameParts(speciesName(name))
+      // The space beside a bar is a fixed one, which the card's line clamp
+      // can't drop.
+      .map((p) =>
+        p.hidden
+          ? `<span class="dl-hide" title="Hidden until you guess"><span class="dl-sr">place hidden</span></span>`
+          : escapeHtml(p.text).replace(/^ | $/g, "&nbsp;"),
+      )
+      .join("")
+  );
+}
+
+function hiddenNameText(name: string): string {
+  return nameParts(speciesName(name))
+    .map((p) => (p.hidden ? "place hidden" : p.text))
+    .join("");
 }
 
 /**
@@ -2122,7 +2147,7 @@ export function initDayList(root: HTMLElement): void {
         <div class="dl-card-pic"><img src="${escapeHtml(
           clue.photo,
         )}" alt="" width="500" height="500" decoding="async" crossorigin="anonymous"></div>
-        <p class="dl-card-name"><span>${escapeHtml(speciesName(clue.name))}</span></p>
+        <p class="dl-card-name"><span>${hiddenNameHtml(clue.name)}</span></p>
         ${reachBit(clue)}
       </div>
       <span class="dl-card-n dl-px15" aria-hidden="true">${i + 1}</span>`;
@@ -2173,7 +2198,7 @@ export function initDayList(root: HTMLElement): void {
     const reach = clue.reach
       ? `within ${count(reachKm(clue.reach))} km`
       : `${count(clue.global)} seen`;
-    pickEl.innerHTML = `<i></i><b>${escapeHtml(speciesName(clue.name))}</b><span>${reach}</span>`;
+    pickEl.innerHTML = `<i></i><b>${hiddenNameHtml(clue.name)}</b><span>${reach}</span>`;
     Array.from(tray!.children).forEach((li, j) =>
       li.classList.toggle(
         "is-picked",
@@ -2772,7 +2797,7 @@ export function initDayList(root: HTMLElement): void {
     const clue = round.clues[k];
     if (announce) {
       announce.textContent =
-        `Species ${lines} of ${round.clues.length}: ${speciesName(clue.name)}. ` +
+        `Species ${lines} of ${round.clues.length}: ${hiddenNameText(clue.name)}. ` +
         `${reachLine(clue)}. Up to ${count(bestPossible(lines))} points now.`;
     }
     // The key that was pressed is going, so focus follows to the next one
