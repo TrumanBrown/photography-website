@@ -32,7 +32,7 @@ import {
   ungroundedNames,
   unverifiedSpecies,
 } from "./text.mjs";
-import { stockIn, unbackedClaim } from "./claims.mjs";
+import { OPINION, stockIn, unbackedClaim } from "./claims.mjs";
 
 /** Screen readers and image search both favour alt text around this length. */
 export const CAPTION_MAX = 125;
@@ -757,10 +757,10 @@ const monthYear = (date) => {
  * so sixty descriptions don't all walk the same steps.
  */
 export const SHAPES = [
-  "One sentence: the place and the main subjects.",
-  "Two sentences: the place and the main subjects, then the one thing that stood out.",
-  "Two sentences: what the place was like (the landmark, the season, the weather), then the animal or sight that stood out.",
-  'A short fragment naming the place and the main subject ("Mount Baker and tarns at Yellow Aster Butte."), then one short sentence.',
+  "Two sentences: the place and the main subjects, then one thing he'd point out about them, said his way.",
+  "One sentence: the place and the main subject, then his short reaction after a comma.",
+  "Two sentences: the place and what it was like (the landmark, the season, the fog), then his take on the animal or sight that stood out.",
+  'A short fragment naming the place and the main subject ("Mount Baker and the tarns at Yellow Aster Butte."), then one short sentence in his words.',
 ];
 
 export function shapeFor(slug) {
@@ -835,7 +835,7 @@ export function descriptionPrompt({
       : "",
   ].filter(Boolean);
 
-  return `Write the short paragraph at the top of one trip's page on Truman's photography site. It's also the page's search snippet, and Google reads it to decide which searches the page and its photos show up for, so it has to say clearly what and where: the place, the landmarks and the main animals by name. Write it plainly, the way Truman would tell someone what the trip was, not like a brochure or an AI summary.${heading ? ` The page shows "${heading}" right above it.` : ""}
+  return `Write the short paragraph at the top of one trip's page on Truman's photography site. It's also the page's search snippet, and Google reads it to decide which searches the page and its photos show up for, so it has to say clearly what and where: the place, the landmarks and the main animals by name. Then it says one thing the way Truman would tell a friend about the trip. Not like a brochure, alt text or an AI summary.${heading ? ` The page shows "${heading}" right above it.` : ""}
 
 What he photographed (${digest.photos} photos), as captioned:
 ${digest.captions.map((c) => `- ${c}`).join("\n")}
@@ -855,8 +855,11 @@ How to write it:
 - ${shapeFor(session.slug)} Don't walk through the photos one by one.
 - Start with the place or the animals, the way a search result reads, not with what he did ("Saw", "Spotted", "Found", "Visited", "I photographed", "Got to see", "I love"). Swapping one of those for another on every page reads as generated.${notes ? " His notes can open it when they say what he did." : ""}
 - Name two or three animals at most: the ones there were the most of, or the one that stood out. Never a list of everything, and no "There were also..." or "along with..." tacked on the end.
-- Never say where an animal sat or what it was on or in ("perched on branches", "clung to leaves", "rested in hands", "in clear containers"). That's the picture, not the trip.${notes ? "\n- His notes are the best second sentence. Keep close to his words." : ""}
-- Plain and natural, in the words people search with ("tarn" for a small mountain lake, "fall colors", "wildflowers", "tide pools"). First person is fine but not needed. At most one short reaction of his ("such a cool spot", "it's crazy how blue the water is"), never a quip, wordplay or a punchline. No "lol" on the website.
+- Never say where an animal sat or what it was on or in ("perched on branches", "clung to leaves", "rested in hands", "in clear containers"). That's the picture, not the trip.${notes ? "\n- His notes are the description: keep almost his exact words, and add the place if they don't name it." : ""}
+- Then one thing he'd point out, said his way: what's cool or crazy about an animal or the place, from the captions ("the tapir is such a unique looking animal", "I love how the peaks still showed up in the tarns", "the cliffs go straight up from the river, crazy"). His repeated words are fine ("such a", "so", "I love", "almost looks like") as long as they're about something specific. Never a quip, wordplay or a punchline, never "beautiful", and no "lol" on the website.
+- No sentence that only reports the scenery or the weather ("Low clouds hid the upper slopes", "The castle rises above rocky slopes covered in shrubs"). That's alt text. If the weather matters, say it as part of the trip ("mostly in fog").
+- Plain words people search with ("tarn" for a small mountain lake, "fall colors", "wildflowers", "tide pools"). First person is fine.
+- Never mention a person in the photos ("a hiker", "people on the trail", "a street performer"). It might be him.
 - Don't talk about photos as photos: no "these photos", "this session", "frames", "shots", "images", "the rest". Never describe a picture: not the background, the blur, the framing, which way something faces, poses ("with its bill raised"), the flash or the light.
 - Common names only, no scientific names in brackets (the caption under each photo has those). Mid-sentence they're lowercase except proper nouns: "a turquoise-browed motmot", "an Ecuadorian hermit crab". Name species only from the identified list. Anything else gets plain words ("a heron", "a small toad").
 - One paragraph. No place line at the end like an Instagram post.
@@ -873,8 +876,8 @@ ${
 }
 
 Two examples of the shape, from made-up trips (don't copy their wording):
-- "Red-eyed tree frogs and glass frogs along a rainforest stream at night in Guayacán. Such a cool spot for frogs."
-- "Granite spires and tarns at Gunn Peak in the Central Cascades, with snow still in the gullies in June."
+- "Red-eyed tree frogs and glass frogs along a rainforest stream in Guayacán. The glass frogs are so cool, you can see right through them."
+- "Granite spires and tarns at Gunn Peak in the Central Cascades, with snow still in the gullies in June. I love how blue the tarns get up there."
 
 ${voiceGuide ? `How Truman writes (follow it):\n${voiceGuide}\n\n` : ""}${voiceRules ? `The site's copy rules (follow them too):\n${voiceRules}\n\n` : ""}Reply with JSON only: { ${shape.join(", ")} }${feedback ? `\n\nYour previous draft was rejected: ${feedback} Fix that.` : ""}`;
 }
@@ -893,6 +896,7 @@ const HABITS_ACROSS = [
   [/\balmost looks? like\b/i, 0.2, "almost looks like"],
   [/\blittle\b/i, 0.25, "little"],
   [/\b(?:can'?t|couldn'?t) get over\b/i, 0.1, "can't get over"],
+  [/\bcrazy\b/i, 0.2, "crazy"],
   [/\btoo\.(?:\s|$)/i, 0.25, "...too."],
 ];
 
@@ -907,6 +911,10 @@ const EXTRA_BANNED =
 // "Saw", "Spotted", "Got to see", "I came across", "Had a look at".
 const DID_OPENER =
   /^(?:i\s+)?(?:saw|spotted|found|came across|ran into|checked out|visited|went|got to \w+|got a (?:close )?look at|had a look at|photographed|captured|noticed|loved|love|was at|could see|took|shot|caught|enjoyed)\b/i;
+
+// Someone in the photo, who might be Truman himself.
+const PERSON =
+  /\b(?:an?|the|one|two|some)\s+(?:(?:lone|street)\s+)?(?:hikers?|climbers?|man|woman|men|women|person|people|tourists?|kids?|child|children|boy|girl|fisherm[ae]n|photographers?|performers?|crowds?)\b/i;
 
 // The end of an inventory: "There were also...", "along with a starry flounder".
 const TACKED_ON = /\bthere (?:was|were|are|is) also\b|\balong with\b/i;
@@ -958,6 +966,25 @@ export function descriptionProblems(
     problems.push(
       `It tacks on a list ("${tacked}"). Name two or three animals and stop.`,
     );
+  const person = PERSON.exec(text)?.[0];
+  if (person)
+    problems.push(
+      `It mentions someone in the photos ("${person}"). It might be Truman himself, so leave them out and talk about the place.`,
+    );
+  // His voice after the search part: the second sentence is his take, not a
+  // report of the weather or the scenery. His notes are his voice already.
+  if (!notes && text.length >= 60) {
+    const sentences = text.split(/(?<=[.?!])\s+/).filter(Boolean);
+    const flat = sentences.slice(1).find((x) => !OPINION.test(x));
+    if (flat)
+      problems.push(
+        `"${flat}" only reports the scenery or the weather, which reads like alt text. Say what he thought of something specific instead, the way he would, or leave it out.`,
+      );
+    else if (!OPINION.test(text))
+      problems.push(
+        `There's nothing of Truman in it. After the place and the main animal, add one thing he'd point out, the way he says it ("such a", "so", "I love how", "almost looks like").`,
+      );
+  }
   const handled = HANDLED.exec(text)?.[0];
   if (handled)
     problems.push(

@@ -24,7 +24,7 @@ State is private in Blob under `metadata/photos/` (`catalog.json`, `inat-index.j
 - **iNaturalist is the source of truth** for anything alive (2026-10-10). Never name a species by hand in copy: the pipeline rejects species names nobody verified, and a hand edit would skip that check. A wrong or missing ID gets fixed on his iNaturalist, by him.
 - **Look once.** "don't run this openAI analysis twice for every image. create a master known info for each image" (2026-10-10). Everything is written from the one record.
 - **Never make things up.** No guessed behaviour ("you cant infer they are breeding and releasing", 2026-10-07), no names you aren't sure of. `claims.mjs` checks what voice text may claim.
-- **The website is written for search; his full voice is for Instagram.** "I care more about instagram human like... the website, the first party voice isn't as important" (2026-10-13). Alt text stays precise and names the place.
+- **Captions are written for search, session descriptions are search first and then his voice, and his full voice is for Instagram.** "I care more about instagram human like... the website, the first party voice isn't as important" (2026-10-13). Alt text stays precise and names the place. Descriptions changed on 2026-11-27 (verdicts below).
 - **Show drafts before changing what it writes, and never pause posting**: "don't pause any image posting, i just want to see the drafts for the final version of captions you have before you update the pipeline going forward" (2026-10-13).
 - **His edits win.** Anything changed in /admin is never rewritten. Clearing the field hands it back to the pipeline.
 - **Repeatable**: a new session must get its captions and description with nothing done by hand (2026-10-10).
@@ -88,6 +88,8 @@ A run handles 300 photos by default (`limit`); the archive was about 1,250 in Oc
 - 2026-10-13: Kauai photos "not pulling the actual species names. I put them on inaturalist", and "make sure instagram caption pipeline doesn't have this same issue."
 - 2026-10-13: website copy search-first, Instagram in his voice (`1ccb015`); "Looks good deploy those changes" after reviewing drafts (2026-10-14).
 - 2026-11-09, after an audit of what read as AI: captions "yes make a good balance for captions, but use animal species name when available" (the visible caption is the name and place plus real behavior, the long line moved to `alt`); descriptions "no, just cut to more natural sounding, shorter descriptions" instead of writing trip notes (one or two sentences, `DESCRIPTION_VERSION` 8). The first held draft still opened 20 of 65 with a rotating "Saw", "Got to see", "I came across", so a description now opens on the place or the animals unless his notes say what he did.
+
+- 2026-11-27, of the search-only descriptions: "the blcok of tex tfor each hobby still reads like AI, not like my voice. same with session descriptions." All 68 were one template, the animals "in" the place and then a sentence of weather or scenery ("Low clouds hid the upper mountain slopes"), and one named "a hiker" who might have been him. From mocks of ten (`mocks/side-projects/sessions/`, design-mocks) he picked his voice with the place and main animal still up front, over his full voice. The prompt now asks for one thing he'd point out after the place, rejects a scenery-only second sentence, a description with nothing of his in it, and anyone in the photos, and uses his notes nearly word for word (`DESCRIPTION_VERSION` 9). Only 2 of the 68 trips had notes.
 
 ## Hard-won lessons
 

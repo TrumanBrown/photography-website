@@ -166,7 +166,7 @@ Where the two would say the same thing, only `caption` is written. The site fall
 
 ## Session descriptions
 
-The paragraph at the top of each session page is also its search snippet, and the text Google reads to decide which searches the page and its photos show up for. So it says what and where first: the place, the landmarks and the main animals by name, in plain words. It can have a light touch of your voice (one short reaction, first person optional), but being specific comes first. Your full voice is for Instagram ([docs/social.md](social.md)).
+The paragraph at the top of each session page is also its search snippet, and the text Google reads to decide which searches the page and its photos show up for. So it says what and where first: the place, the landmarks and the main animals by name, in plain words. Then it says one thing the way you would ("The tapir is such a unique looking animal", "I love the colored bands in the mountains"). Until November 2026 it was search only, and all 68 descriptions came out as one template ("Goats and a winding river around Åndalsnes in Romsdal, Norway. Low clouds hid the upper mountain slopes."). Your full voice, with "lol" and emoji, is still only for Instagram ([docs/social.md](social.md)).
 
 One text-only call per session ([website.mjs](../scripts/photos/website.mjs)) gets:
 
@@ -178,7 +178,7 @@ One text-only call per session ([website.mjs](../scripts/photos/website.mjs)) ge
 - how you write (the truman-voice skill) and the site's voice rules from [site-copy.instructions.md](../.github/instructions/site-copy.instructions.md)
 - the other sessions' descriptions written so far, so it doesn't echo them
 
-It writes one or two short sentences, under about 240 characters, with the place and the main subjects first (that's what search results show), in searchable words ("tarn", "fall colors", "tide pools"). The captions already name everything in the photos, so the description names two or three animals at most and never lists the rest. Your notes, when there are any, make the second sentence. Each session is given one of four shapes, picked from its folder name (one sentence, or the place and subjects then one standout, or what the place was like then the standout, or a short fragment then one sentence), so the archive doesn't read as one template sixty times. Until November 2026 descriptions ran two to four sentences and turned into an inventory of every photo ("A ruby-throated hummingbird perched on a feeder, and northern leopard frogs rested in hands. There were also..."). Before a description is used, it has to pass these checks (`descriptionProblems`):
+It writes one or two short sentences, under about 240 characters, with the place and the main subjects first (that's what search results show), in searchable words ("tarn", "fall colors", "tide pools"), then one thing you'd point out, in your words. The captions already name everything in the photos, so the description names two or three animals at most and never lists the rest. Your notes, when there are any, are the description, almost word for word, with the place added if they don't name it. They're the only way it can say what you did, so a one-line note on a trip you remember something about makes the biggest difference. Each session is given one of four shapes, picked from its folder name (the place and subjects then your take on them, one sentence ending in your reaction, what the place was like then your take on what stood out, or a short fragment then one sentence in your words), so the archive doesn't read as one template sixty times. Until November 2026 descriptions ran two to four sentences and turned into an inventory of every photo ("A ruby-throated hummingbird perched on a feeder, and northern leopard frogs rested in hands. There were also..."). Before a description is used, it has to pass these checks (`descriptionProblems`):
 
 - no em dashes, emoji, exclamation marks, questions (a hedging "(?)" is fine), or banned marketing words
 - nothing that describes the photo rather than the moment: the background, the blur, the framing, a pose, which way something faces, the flash ("against a dark background", "facing left", "its tail curled beside its body")
@@ -195,6 +195,9 @@ It writes one or two short sentences, under about 240 characters, with the place
 - no more than three of the session's animals named, and no "There were also..." or "along with..." tacked on
 - not opening on what you did ("Saw", "Spotted", "Got to see", "I came across", "I love") unless your notes say what you did: the model swapped one of those for another on every page, which read as generated
 - nothing about how an animal was shown to the camera ("rested in hands", "in clear containers", "on a thumbnail")
+- something of yours in it, an opinion, a hedge or one of your words ("such a", "so", "I love", "crazy", "almost"), and no sentence after the first that only reports the scenery or the weather ("Low clouds hid the upper slopes"), unless your notes are the description
+- nobody in the photos ("a hiker", "people", "a street performer"): it might be you
+- "crazy" on a fifth of the pages at most, like "so cool"
 - under 320 characters
 
 A draft that fails goes back with the reasons, up to three times. If it still fails, the old description stays and `npm run photos -- status` says why.

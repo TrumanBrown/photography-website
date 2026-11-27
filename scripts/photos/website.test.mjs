@@ -607,18 +607,59 @@ describe("session descriptions", () => {
   const check = (description, extra = {}) =>
     descriptionProblems({ description }, { session: crarc, digest, ...extra });
 
-  it("passes a plain, grounded description that says what and where", () => {
+  it("passes a grounded description that says what and where, then one thing in his words", () => {
     expect(
       check(
         "Sylvia's tree frogs at night in Guayacán, and a heron by the canal. Such a cool spot for frogs.",
       ),
     ).toEqual([]);
-    // No reaction needed on the website: being specific matters more.
+    expect(
+      check(
+        "Sylvia's tree frogs at night in Guayacán, so bright on those thin twigs above the stream.",
+      ),
+    ).toEqual([]);
+  });
+
+  it("sounds like him after the search part, not like alt text", () => {
+    // All search and no Truman (2026-11-27: "still reads like AI").
     expect(
       check(
         "Sylvia's tree frogs at night in Guayacán, on thin twigs above the stream, and a heron by the canal.",
+      ).join(" "),
+    ).toMatch(/nothing of Truman/);
+    expect(
+      check(
+        "Sylvia's tree frogs and a heron in Guayacán. Low clouds hid the trees above the stream.",
+      ).join(" "),
+    ).toMatch(/"Low clouds hid the trees above the stream\." only reports/);
+    // His notes are his voice already.
+    expect(
+      check(
+        "Drove out to Guayacán at night for the Sylvia's tree frogs. Waited by the stream for a heron.",
+        {
+          notes:
+            "Drove out at night for the frogs. Waited by the stream for a heron.",
+        },
       ),
     ).toEqual([]);
+  });
+
+  it("never mentions someone in the photos, who might be him", () => {
+    for (const [text, said] of [
+      [
+        "Sylvia's tree frogs in Guayacán and a hiker on the trail, so cool.",
+        "a hiker",
+      ],
+      [
+        "A heron by the canal in Guayacán, with a street performer nearby, so cool.",
+        "a street performer",
+      ],
+      [
+        "Sylvia's tree frogs in Guayacán, such a cool spot with two people watching.",
+        "two people",
+      ],
+    ])
+      expect(check(text).join(" ")).toContain(`("${said}")`);
   });
 
   it("names the place, since search results show this paragraph", () => {
@@ -694,7 +735,7 @@ describe("session descriptions", () => {
       descriptionProblems(
         {
           description:
-            "Boat-billed herons and green ibises along the canals in Guayacán, and one anhinga.",
+            "Boat-billed herons and green ibises along the canals in Guayacán, and one anhinga. Such a cool mix of birds.",
         },
         { session: crarc, digest: many },
       ),
@@ -728,7 +769,7 @@ describe("session descriptions", () => {
 
   it("keeps it about the trip, not the pictures, and in plain punctuation", () => {
     const plain =
-      "A Sylvia's tree frog on a twig at night in Guayacán, and a heron by the canal.";
+      "A Sylvia's tree frog on a twig at night in Guayacán, and a heron by the canal, so cool.";
     expect(check(plain)).toEqual([]);
     expect(check(`${plain} These photos are mostly frogs.`).join(" ")).toMatch(
       /talks about the photos/,
@@ -903,7 +944,7 @@ describe("session descriptions", () => {
   it("doesn't count a shared species name as copied wording", () => {
     expect(
       check(
-        "A Sylvia's tree frog on a thin twig at night in Guayacán, and a heron by the canal.",
+        "A Sylvia's tree frog on a thin twig at night in Guayacán, and a heron by the canal. Such a cool spot.",
         {
           others: [
             "Elsewhere there was a Sylvia's tree frog on a thin twig after dark.",
