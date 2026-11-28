@@ -152,6 +152,43 @@ export function placeLabel(session) {
   return fromTitle || first(session.location);
 }
 
+// "Western Washington" is Washington, and "Portland area" is Portland, for
+// telling whether a session's spot is finer than its location.
+const PLACE_REACH =
+  /^(?:north|south|east|west|northern|southern|eastern|western|central|near)\s+|\s+(?:area|region)$/g;
+
+/**
+ * The session as a photo of an observation iNaturalist obscured may name it:
+ * its location only (the broad place the globe pin uses), never the title's
+ * spot or the folder name. "Tapir Valley, Costa Rica" with location "Bijagua,
+ * Costa Rica" becomes "Bijagua, Costa Rica". Null when the session names
+ * nothing finer than its location ("Nagqu, Tibet" in Nagqu), so it's used as
+ * it is. Truman's rule, 2026-10-10.
+ */
+export function broadSession(session) {
+  const parts = (text) =>
+    String(text ?? "")
+      .split(",")
+      .map((p) => p.trim())
+      .filter(Boolean);
+  const title = hasRealTitle(session)
+    ? parts(String(session.title).replace(MONTH_TAIL, ""))
+    : [];
+  const location = parts(session.location).length
+    ? parts(session.location)
+    : title.slice(1);
+  const spot = placeLabel(session);
+  const reach = (p) => norm(p).replace(PLACE_REACH, "").trim();
+  if (
+    !spot ||
+    HABITAT.test(spot) ||
+    location.some((p) => reach(p) === reach(spot))
+  )
+    return null;
+  const broad = location.join(", ");
+  return { ...session, title: broad, location: broad, slug: "" };
+}
+
 const NUMBER_WORDS = [
   "",
   "one",

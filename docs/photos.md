@@ -118,6 +118,8 @@ Two extra guards:
 
 iNaturalist place names are never used. An observation's place can be a street address, so captions only use place names you wrote yourself.
 
+**An observation iNaturalist hides keeps its place broad.** iNaturalist obscures where some observations were made: every observation of a sensitive species (Baird's tapir, the Tapir Valley tree frog, the Salt Creek pupfish), and any you set to obscured yourself. A photo matched to one never names a place finer than its session's `location`, the broad place the globe pin uses: "Baird's tapir (Tapirus bairdii), Bijagua" rather than "..., Tapir Valley". Its alt text, first line, Instagram opening, place line and hashtags all see only that location, a fact about the place is never used for it, its post never gets a location tag, and the session description leaves the species out. A session titled no finer than its location (Nagqu, Eastern Washington) is left as it is. The rule is `broadSession` in [website.mjs](../scripts/photos/website.mjs), applied through `sessionFor` in [catalog.mjs](../scripts/photos/catalog.mjs). Session titles are yours and don't change.
+
 ## Captions
 
 Built by code in [website.mjs](../scripts/photos/website.mjs):

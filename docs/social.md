@@ -542,7 +542,7 @@ The code supports both setups.
 - `linkLine` replaces the caption's last line before the hashtags.
 - `hubHashtags` puts a feature account's hashtag in the genre slot for that kind of subject.
 - `hubAccounts` tags up to two feature accounts in the photo, which is how many curators find work. Facebook Login only.
-- `locations` maps a session to a location's Facebook Page id. Facebook Login only.
+- `locations` maps a session to a location's Facebook Page id. Facebook Login only. A photo of an observation iNaturalist obscured is never tagged with it ([photos.md](photos.md#identifications-come-from-inaturalist)).
 
 These live in private storage because they're strategy, not code.
 

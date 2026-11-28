@@ -28,7 +28,7 @@ State is private in Blob under `metadata/photos/` (`catalog.json`, `inat-index.j
 - **Show drafts before changing what it writes, and never pause posting**: "don't pause any image posting, i just want to see the drafts for the final version of captions you have before you update the pipeline going forward" (2026-10-13).
 - **His edits win.** Anything changed in /admin is never rewritten. Clearing the field hands it back to the pipeline.
 - **Repeatable**: a new session must get its captions and description with nothing done by hand (2026-10-10).
-- **Never name a precise place for an observation iNaturalist has obscured.** He approved this on 2026-10-10 ("this looks good") to protect sensitive herps. It isn't enforced yet (see Gotchas).
+- **Never name a precise place for an observation iNaturalist has obscured.** He approved this on 2026-10-10 ("this looks good") to protect sensitive herps, and it was built on 2026-11-27: such a photo names only its session's `location`, everywhere (`broadSession`, docs/photos.md).
 
 ## Commands
 
@@ -90,6 +90,7 @@ A run handles 300 photos by default (`limit`); the archive was about 1,250 in Oc
 - 2026-11-09, after an audit of what read as AI: captions "yes make a good balance for captions, but use animal species name when available" (the visible caption is the name and place plus real behavior, the long line moved to `alt`); descriptions "no, just cut to more natural sounding, shorter descriptions" instead of writing trip notes (one or two sentences, `DESCRIPTION_VERSION` 8). The first held draft still opened 20 of 65 with a rotating "Saw", "Got to see", "I came across", so a description now opens on the place or the animals unless his notes say what he did.
 
 - 2026-11-27, of the search-only descriptions: "the blcok of tex tfor each hobby still reads like AI, not like my voice. same with session descriptions." All 68 were one template, the animals "in" the place and then a sentence of weather or scenery ("Low clouds hid the upper mountain slopes"), and one named "a hiker" who might have been him. From mocks of ten (`mocks/side-projects/sessions/`, design-mocks) he picked his voice with the place and main animal still up front, over his full voice. The prompt now asks for one thing he'd point out after the place, rejects a scenery-only second sentence, a description with nothing of his in it, and anyone in the photos, and uses his notes nearly word for word (`DESCRIPTION_VERSION` 9). Only 2 of the 68 trips had notes.
+- 2026-11-27, on the drafts for observations iNaturalist hides (the site review's F-01): he chose "Ship it: sensitive species and the ones I obscured myself" over sensitive species only, so the 39 photos from observations he obscured himself get the broad place too, along with the 16 sensitive ones.
 
 ## Hard-won lessons
 
@@ -116,7 +117,7 @@ A run handles 300 photos by default (`limit`); the archive was about 1,250 in Oc
 - `redo` also redoes the session description. A trip note (`npm run social -- note`) rewrites the description and planned openings too.
 - A caption edited in /admin never updates again, even when the iNaturalist ID changes. Clear it to hand it back.
 - A new session is invisible to the pipeline until a build has written `metadata/admin-index.json`.
-- iNaturalist hides the exact location of some species. The record stores an `obscured` flag but nothing uses it yet, and a post has named a trail for one such species. The rule is settled (Truman's rules above); the code that applies it hasn't been written.
+- iNaturalist's `obscured` covers two cases: a sensitive species, hidden for everyone, and an observation he set to obscured himself (in November 2026, 26 and 81 of the matched photos). The record keeps one flag for both, and the rule treats them alike. Anything that writes about a photo goes through `sessionFor(s, session)` in catalog.mjs, never `sessionOf` directly, or the spot comes back. A photo can sit in two sessions, so the website passes the session it's writing (a trial run showed four captions taking the other session's place).
 - Rate limits: the model at 50K tokens a minute (backfills slow down, and two at once share it), iNaturalist about one request a second, Wikipedia one per 1.2 s.
 - Azure's image filter refuses some harmless photos on their own, and a `redo` gets the same answer: a vole in snow (`minnesota-wildlife-dec-2025/DSC01932.JPG`) and a person crouched under a palm (`costa-rica-el-zota-biological-station-sept-2026/IMG_0200.JPEG`), checked 2026-11-18. Those need a caption written in /admin.
 

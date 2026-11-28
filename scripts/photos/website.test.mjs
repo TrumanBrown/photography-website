@@ -3,6 +3,7 @@ import {
   allowedNames,
   backdropIn,
   beforeScene,
+  broadSession,
   captionFor,
   descriptionProblems,
   doingOf,
@@ -542,6 +543,47 @@ describe("website captions", () => {
         location: "Portland area, Oregon",
       }),
     ).toBe("Portland");
+  });
+
+  it("names only the broad place for an observation iNaturalist obscured", () => {
+    const tapirValley = {
+      slug: "costa-rica-tapir-valley-august-2026",
+      title: "Tapir Valley, Costa Rica, August 2026",
+      location: "Bijagua, Costa Rica",
+    };
+    const written = {
+      analysis: look(),
+      taxon: frog,
+      lexicon: compileLexicon([]),
+      line: { action: "on a leaf by the trail at Tapir Valley" },
+    };
+    expect(captionFor({ ...written, session: tapirValley })).toContain(
+      "Tapir Valley",
+    );
+    const broad = captionFor({
+      ...written,
+      session: broadSession(tapirValley),
+    });
+    expect(broad).toMatch(/, Bijagua$/);
+    expect(broad).not.toContain("Tapir Valley");
+  });
+
+  it("leaves a session alone when it names nothing finer than its location", () => {
+    expect(
+      broadSession({
+        slug: "nagqu-may-2026",
+        title: "Nagqu, Tibet, May 2026",
+        location: "Nagqu, Tibet, China",
+      }),
+    ).toBeNull();
+    expect(
+      broadSession({
+        slug: "late-winter-washington-hikes-and-birds-2026",
+        title: "Western Washington, March 2026",
+        location: "Washington",
+      }),
+    ).toBeNull();
+    expect(broadSession(baker)?.location).toBe("North Cascades, Washington");
   });
 });
 

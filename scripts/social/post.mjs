@@ -142,7 +142,11 @@ async function nextShot(store, photos, settings, busy) {
     key,
     shot,
     file: { ...catalog.files[shot.pick], id: shot.pick },
-    locationId: config.locations?.[shot.session] ?? null,
+    // A photo whose place stays broad (catalog.mjs, hidesPlace) is never tagged
+    // with the session's location either.
+    locationId: shot.post?.hidesPlace
+      ? null
+      : (config.locations?.[shot.session] ?? null),
     userTags: userTagsFor(config, shot),
   };
 }

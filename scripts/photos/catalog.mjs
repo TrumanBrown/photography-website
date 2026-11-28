@@ -76,6 +76,7 @@ import {
 import {
   allowedNames,
   backdropIn,
+  broadSession,
   captionFor,
   descriptionProblems,
   descriptionPrompt,
@@ -449,6 +450,18 @@ async function main() {
       location: "",
       description: "",
     };
+  // A photo of an observation iNaturalist obscured (a sensitive species, or
+  // Truman's own setting) never names a place finer than its session's
+  // location, so everything written about it sees the broad session instead
+  // (broadSession in website.mjs; his rule of 2026-10-10). A photo can sit in
+  // more than one session, so the website passes the one it's writing.
+  const broadFor = (s, session = sessionOf(s.session)) =>
+    s.inat && index?.observations?.[s.inat.obs]?.obscured
+      ? broadSession(session)
+      : null;
+  const hidesPlace = (s, session) => Boolean(broadFor(s, session));
+  const sessionFor = (s, session = sessionOf(s.session)) =>
+    broadFor(s, session) ?? session;
   // A photo the model refuses (its content filter) or that failed three runs
   // in a row isn't tried again until someone asks (npm run photos -- redo).
   const gaveUp = (s) =>
@@ -526,7 +539,6 @@ async function main() {
 
   async function analyseShot(s) {
     const file = catalog.files[s.pick];
-    const session = sessionOf(s.session);
     const buf = await readPhoto({
       ...(photoById.get(s.pick) ?? {}),
       url: file.url,
@@ -593,11 +605,11 @@ async function main() {
       provider,
       model,
       prompt: analysisPrompt({
-        session,
+        session: sessionFor(s),
         clock: s.clock,
         taxon,
         quality: s.inat?.quality ?? null,
-        allowedNames: allowedNames(session),
+        allowedNames: allowedNames(sessionFor(s)),
       }),
       images: [photo64],
       mock: mockAnalysis,
@@ -627,6 +639,7 @@ async function main() {
     s.analysis &&
     (s.line?.v !== LINE_VERSION ||
       s.line?.at !== s.analysis.at ||
+      Boolean(s.line?.hidden) !== hidesPlace(s) ||
       redrafting(s, s.line?.written));
   // The name the model writes after, for an identified organism; "" otherwise.
   const namedFor = (s) => {
@@ -646,7 +659,7 @@ async function main() {
     conditions: s.analysis.conditions,
     landmark: s.analysis.landmark,
     description: s.analysis.description,
-    place: allowedNames(sessionOf(s.session)).join(", "),
+    place: allowedNames(sessionFor(s)).join(", "),
   });
   const lineQueue = Object.values(shots).filter(
     (s) => inScope(s.session) && needsLine(s),
@@ -695,6 +708,7 @@ async function main() {
             v: LINE_VERSION,
             at: s.analysis.at,
             written: new Date().toISOString(),
+            ...(hidesPlace(s) ? { hidden: true } : {}),
             ...(got ?? { failed: true }),
           };
           if (got) linesWritten++;
@@ -739,18 +753,22 @@ async function main() {
     const captions = new Map();
     const alts = new Map();
     const sessionShots = new Map();
+    // Photos whose place stays broad aren't put to the description, which
+    // names the session's own spot.
+    const hiddenFiles = new Set();
     for (const p of session.photos) {
       const key = fileShot.get(p.id);
       const s = key ? shots[key] : null;
       if (!s) continue;
       sessionShots.set(key, s);
+      if (hidesPlace(s, session)) hiddenFiles.add(p.file);
       const taxon = taxonOf(s);
       if (!s.analysis && !(gaveUp(s) && idLevel(taxon) === "species")) continue;
       const look = {
         // A photo the model never saw can still be named by its iNaturalist ID.
         analysis: s.analysis ?? { group: "other", count: 1, idCheck: "fits" },
         taxon,
-        session,
+        session: sessionFor(s, session),
         lexicon,
         line: s.line,
       };
@@ -766,9 +784,10 @@ async function main() {
     const digest = complete
       ? sessionDigest({
           session,
-          shots: list,
+          shots: list.filter((s) => !hidesPlace(s, session)),
           taxa,
           captions: session.photos
+            .filter((p) => !hiddenFiles.has(p.file))
             .map((p) => captions.get(p.file))
             .filter(Boolean),
         })
@@ -788,6 +807,8 @@ async function main() {
               s.analysis?.at ?? null,
               s.inat?.taxon ?? null,
               s.analysis?.idCheck ?? null,
+              // Only when true, so other sessions' descriptions stay as they are.
+              ...(hidesPlace(s, session) ? ["hidden"] : []),
             ])
             .sort((x, y) => String(x[0]).localeCompare(String(y[0]))),
         })
@@ -1050,17 +1071,17 @@ async function main() {
       [notesFile.trips?.[s.session], notesFile.photos?.[key]]
         .filter(Boolean)
         .join(" ");
-    const tripName = (slug) => {
-      const session = sessionOf(slug);
-      return hasRealTitle(session) ? session.title : humanize(slug);
+    const tripName = (s) => {
+      const session = sessionFor(s);
+      return hasRealTitle(session) ? session.title : humanize(s.session);
     };
     // Everything the opening's "what he was doing" may lean on besides his notes.
     const groundingFor = (s) => {
-      const session = sessionOf(s.session);
+      const session = sessionFor(s);
       return [
         session.title,
         session.location,
-        s.session.replace(/-/g, " "),
+        hidesPlace(s) ? "" : s.session.replace(/-/g, " "),
         s.analysis.subject,
         s.analysis.scene,
         s.analysis.setting,
@@ -1094,7 +1115,8 @@ async function main() {
     const voicedFor = (s) =>
       s.voice?.v === VOICE_VERSION &&
       s.voice.text &&
-      Boolean(s.voice.named) === Boolean(namedFor(s))
+      Boolean(s.voice.named) === Boolean(namedFor(s)) &&
+      Boolean(s.voice.hidden) === hidesPlace(s)
         ? s.voice
         : null;
     // The opening as it'll be posted: his own words when he's written them
@@ -1128,7 +1150,7 @@ async function main() {
     // waits for it rather than going out sounding like a machine.
     const partsFor = (s) => {
       const file = catalog.files[s.pick];
-      const session = sessionOf(s.session);
+      const session = sessionFor(s);
       const taxon = taxonOf(s);
       const level = levelOf(s);
       const opening = openingOf(s);
@@ -1240,10 +1262,15 @@ async function main() {
         ...(level
           ? [factKey({ taxon: taxonOf(s), level, slug: s.session })]
           : []),
-        ...(s.analysis.landmark
-          ? [factKey({ landmark: s.analysis.landmark, slug: s.session })]
-          : []),
-        factKey({ slug: s.session }),
+        // A fact about the spot would name it.
+        ...(hidesPlace(s)
+          ? []
+          : [
+              ...(s.analysis.landmark
+                ? [factKey({ landmark: s.analysis.landmark, slug: s.session })]
+                : []),
+              factKey({ slug: s.session }),
+            ]),
       ];
     };
     const usable = (key) => {
@@ -1409,6 +1436,7 @@ async function main() {
         d.s.voice?.at !== d.s.analysis.at ||
         d.s.voice?.notes !== sha(notesOf(d.s, d.key)) ||
         Boolean(d.s.voice?.named) !== Boolean(namedFor(d.s)) ||
+        Boolean(d.s.voice?.hidden) !== hidesPlace(d.s) ||
         (!d.s.voice?.text && (d.s.voice?.tries ?? 0) < 6) ||
         redrafting(d.s, d.s.voice?.written));
     const voiceQueue = drafts.filter(needsVoice);
@@ -1502,8 +1530,8 @@ async function main() {
               : "",
             landmark: d.s.analysis.landmark,
             description: withoutBackdrop(d.s.analysis.description),
-            place: allowedNames(sessionOf(d.s.session)).join(", "),
-            trip: tripName(d.s.session),
+            place: allowedNames(sessionFor(d.s)).join(", "),
+            trip: tripName(d.s),
             notes: notesOf(d.s, d.key),
             fact: d.fact,
           }));
@@ -1529,7 +1557,7 @@ async function main() {
                 plural: notes[i].count > 1,
                 fact: d.fact,
                 lexicon,
-                allowed: allowedNames(sessionOf(d.s.session)).join(" "),
+                allowed: allowedNames(sessionFor(d.s)).join(" "),
                 taxonText: taxon
                   ? `${taxon.name} ${taxon.common ?? ""} ${notes[i].named}`
                   : "",
@@ -1553,6 +1581,7 @@ async function main() {
                 written: new Date().toISOString(),
                 notes: sha(notes[i].notes),
                 named: Boolean(notes[i].named),
+                ...(hidesPlace(d.s) ? { hidden: true } : {}),
                 ...(got.text
                   ? { ...got, shape: plan.shape }
                   : {
@@ -1594,6 +1623,7 @@ async function main() {
         story: parts.story,
         emoji: parts.emoji,
         ...(parts.mine ? { own: true } : {}),
+        ...(hidesPlace(s) ? { hidesPlace: true } : {}),
         place: parts.place,
         hashtags: parts.hashtags,
         gear: parts.gear,
@@ -1627,7 +1657,18 @@ async function main() {
       }
       s.post = {
         caption,
-        alt: tidy(s.analysis.description).slice(0, 1000),
+        // The model's description can name the spot; a photo whose place
+        // stays broad gets its website alt text instead.
+        alt: hidesPlace(s)
+          ? captionFor({
+              analysis: s.analysis,
+              taxon: parts.level ? parts.taxon : null,
+              session: parts.session,
+              lexicon,
+              line: s.line,
+            })
+          : tidy(s.analysis.description).slice(0, 1000),
+        ...(hidesPlace(s) ? { hidesPlace: true } : {}),
         story: parts.story,
         emoji: parts.emoji,
         shape: parts.shape,
