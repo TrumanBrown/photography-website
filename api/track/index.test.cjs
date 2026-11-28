@@ -110,7 +110,7 @@ beforeEach(() => {
   sent.length = 0;
 });
 
-async function beacon(body) {
+async function beacon(body, headers = {}) {
   const context = { log: Object.assign(() => {}, { warn: () => {} }) };
   await track(context, {
     method: "POST",
@@ -118,6 +118,7 @@ async function beacon(body) {
       "user-agent": BROWSER,
       host: "trumanbrown.com",
       "x-forwarded-for": "203.0.113.10:4321",
+      ...headers,
     },
     body,
   });
@@ -205,5 +206,23 @@ describe("/api/track resume alerts", () => {
     const emails = sent.map(whole).join("\n");
     expect(emails).toContain("So far: clicked 1 link");
     expect(emails).not.toMatch(/evil-example|555-0100/);
+  });
+
+  it("records nothing another site's page sends through its readers' browsers", async () => {
+    place = { org: "Contoso Ltd", orgKind: "org", city: "Redmond" };
+    const crossSite = { "sec-fetch-site": "cross-site" };
+    await beacon({ type: "pv", sid: "s4", pvid: "pv4", path: "/" }, crossSite);
+    await beacon(
+      {
+        type: "ev",
+        sid: "s4",
+        pvid: "pv4",
+        events: [{ k: "click", v: "a", t: 900 }],
+      },
+      crossSite,
+    );
+
+    expect(tables.get("pageviews")?.size ?? 0).toBe(0);
+    expect(sent).toHaveLength(0);
   });
 });

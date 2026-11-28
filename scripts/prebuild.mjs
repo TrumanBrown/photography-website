@@ -657,6 +657,7 @@ async function processRawBlob({ blob, originalsClient, derivativesClient, slug, 
 
   const { default: sharp } = await import('sharp');
   await sharp(generatedTiff).keepExif().jpeg(DERIVATIVE_JPEG).toFile(localPath);
+  await stripBeforeUpload(localPath);
 
   // Upload to derivatives/ with source-etag metadata.
   const upload = derivativesClient.getBlockBlobClient(derivBlobName);
@@ -721,6 +722,7 @@ async function processConvertBlob({ blob, originalsClient, derivativesClient, sl
     // TIFF and friends: sharp handles natively.
     await sharp(tmpSrc).rotate().keepExif().jpeg(DERIVATIVE_JPEG).toFile(localPath);
   }
+  await stripBeforeUpload(localPath);
 
   const upload = derivativesClient.getBlockBlobClient(derivBlobName);
   const data = await readFile(localPath);
@@ -738,6 +740,16 @@ async function processConvertBlob({ blob, originalsClient, derivativesClient, sl
 }
 
 const realLocationTools = { exiftoolVersion, filesWithLocation, stripLocation };
+
+/**
+ * A RAW or TIFF derivative keeps its source's EXIF, GPS included, and
+ * `derivatives` is public from the moment it's uploaded. keepLocationsPrivate
+ * would clean it later in the same build, but a build that stopped in between
+ * would leave it public with the position, so it's removed before the upload.
+ */
+export async function stripBeforeUpload(path, tools = realLocationTools) {
+  if ((await tools.filesWithLocation([path])).size > 0) await tools.stripLocation(path);
+}
 
 /**
  * Publish what the upload scripts left in the private `incoming` container.

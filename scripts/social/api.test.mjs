@@ -243,6 +243,14 @@ describe("seal", () => {
     ).toThrow();
     expect(() => keyFromBase64("short")).toThrow(/32 random bytes/);
   });
+
+  it("refuses a shortened tag", () => {
+    const box = seal({ token: TOKEN }, key);
+    const short = Buffer.from(box.tag, "base64").subarray(0, 4);
+    expect(() =>
+      unseal({ ...box, tag: short.toString("base64") }, key),
+    ).toThrow(/Unrecognised/);
+  });
 });
 
 describe("store + token", () => {

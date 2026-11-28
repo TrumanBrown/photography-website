@@ -53,6 +53,15 @@ function alreadyHas(req) {
     );
 }
 
+// Someone opening the PDF loads it as a page. Another site's hidden frame,
+// image or script tag pointing here would otherwise count its own readers as
+// resume opens, with their companies. Requests without the header (chat
+// apps, mail scanners, older browsers) are counted as before.
+function opensAsPage(req) {
+  const dest = (req.headers || {})["sec-fetch-dest"];
+  return dest === undefined || dest === "document";
+}
+
 async function record(req, log) {
   const headers = req.headers || {};
   const ua = headers["user-agent"] || "";
@@ -93,7 +102,7 @@ module.exports = async function (context, req) {
     };
     return;
   }
-  if (req.method === "GET") {
+  if (req.method === "GET" && opensAsPage(req)) {
     // Counting must never stand between someone and the resume. It waits a
     // second after the response is handed back, so nothing heavy runs in the
     // process while the file is still going out. The first count on a process
@@ -111,7 +120,13 @@ module.exports = async function (context, req) {
     // on a slow connection notices.
     "Cache-Control": "no-cache",
     ETag: etag,
+    // Static Web Apps' globalHeaders don't reach a function's response, so
+    // the PDF repeats the ones it had as a static file: no other site can
+    // show it in a frame.
     "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Content-Security-Policy": "frame-ancestors 'none'",
+    "Cross-Origin-Resource-Policy": "same-site",
   };
   if (alreadyHas(req)) {
     context.res = { status: 304, headers };

@@ -38,13 +38,25 @@ jobs:
           deploymentName: photography-${{ inputs.environment }}-${{ github.run_id }}
           failOnStdErr: false
 
+      # This repo's run logs are public, and a later step's env: block prints
+      # its values. Masked here, the build identity's client id and the email
+      # sender's id show as *** in every step after this one.
+      - name: Keep ids out of the log
+        env:
+          DEPLOYMENT: photography-${{ inputs.environment }}-${{ github.run_id }}
+        run: |
+          for output in managedIdentityClientId contactEmailSender; do
+            value=$(az deployment sub show --name "$DEPLOYMENT" \
+              --query "properties.outputs.${output}.value" -o tsv 2>/dev/null || true)
+            if [[ -n "$value" ]]; then echo "::add-mask::$value"; fi
+          done
+
       - name: Surface outputs
         run: |
           echo "Resource group: ${{ steps.deploy.outputs.resourceGroupName }}"
           echo "Storage account: ${{ steps.deploy.outputs.storageAccountName }}"
           echo "Blob endpoint: ${{ steps.deploy.outputs.blobEndpoint }}"
           echo "SWA hostname: ${{ steps.deploy.outputs.swaDefaultHostname }}"
-          echo "MI client id: ${{ steps.deploy.outputs.managedIdentityClientId }}"
           echo "Describe endpoint (repo variable AZURE_OPENAI_ENDPOINT): ${{ steps.deploy.outputs.describeEndpoint }}"
           echo "Describe deployment (repo variable AZURE_OPENAI_DEPLOYMENT): ${{ steps.deploy.outputs.describeDeployment }}"
 

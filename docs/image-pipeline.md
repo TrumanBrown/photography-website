@@ -193,7 +193,7 @@ the difference is far smaller than moving Astro's WebP from quality 80 to 75.
    - `-q 3` = highest-quality demosaicing (AHD)
    - `-T` = TIFF output
    - `-o 1` = sRGB color space
-3. Pipe the TIFF through `sharp(...).keepExif().jpeg({ quality: 95, mozjpeg: true, chromaSubsampling: '4:4:4' })` → a full-resolution JPEG with the camera's EXIF. The TIFF is lossless, so this is the only lossy step, at a quality and with full colour resolution that are visually identical (a GPS position, if any, was removed before upload or is removed before it's published).
+3. Pipe the TIFF through `sharp(...).keepExif().jpeg({ quality: 95, mozjpeg: true, chromaSubsampling: '4:4:4' })` → a full-resolution JPEG with the camera's EXIF. The TIFF is lossless, so this is the only lossy step, at a quality and with full colour resolution that are visually identical (a GPS position, if any, was removed before upload, and `stripBeforeUpload` checks the JPEG again before it goes into the public `derivatives` container).
 4. Upload that JPEG to `derivatives/<session>/<base>.jpg` with:
    - `Content-Type: image/jpeg`
    - `Cache-Control: public, max-age=31536000, immutable`

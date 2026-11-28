@@ -2,6 +2,7 @@ const DAY_MS = 86400000;
 const REVERSE_TIMESTAMP_MAX = 9999999999999;
 const { canonicalHost } = require('../shared/referrer');
 const { sourceName } = require('../shared/hiring-system');
+const { cleanPage, hasUnsafePathChars } = require('../shared/rows');
 const insights = require('./insights');
 
 function isoDay(now, offset = 0) {
@@ -22,8 +23,13 @@ function analyticsDayKeys(days, now = Date.now()) {
   return { current, previous };
 }
 
+// Paths come from visitors' beacons and /admin shows them as links, so one
+// that could leave the site becomes "/" (hasUnsafePathChars in shared/rows.js).
 function normalizePath(value) {
-  let path = typeof value === 'string' && value.startsWith('/') ? value : '/';
+  let path =
+    typeof value === 'string' && value.startsWith('/') && !hasUnsafePathChars(value)
+      ? value
+      : '/';
   path = path.split(/[?#]/, 1)[0].replace(/\/{2,}/g, '/');
   if (path !== '/') path = path.replace(/\/+$/, '') + '/';
   return path.slice(0, 300);
@@ -350,6 +356,7 @@ function buildAnalytics(entities, options) {
       const day = String(entity.partitionKey || '').replace(/^pv-/, '');
       (entity.type === 'share' ? shareRows : pdfRows).push({
         ...entity,
+        ...(entity.type === 'share' ? { page: cleanPage(entity.page) } : {}),
         day,
         timestamp: rowTimestamp(entity.rowKey),
       });

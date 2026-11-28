@@ -2,10 +2,10 @@ const { randomUUID } = require('node:crypto');
 const { TableClient } = require('@azure/data-tables');
 const { visitorHash } = require('../shared/visitor-hash');
 const { clientIp } = require('../shared/client-ip');
-const { consumeRateLimit } = require('./rate-limit');
-const { notify, cleanPage } = require('./notify');
+const { fromOtherSite } = require('../shared/cross-site');
+const { consumeRateLimit, rateLimitAddress } = require('./rate-limit');
+const { notify, cleanPage, isEmail } = require('./notify');
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_NAME = 200;
 const MAX_EMAIL = 254;
 const MAX_MESSAGE = 5000;
@@ -23,7 +23,7 @@ const RL_SALT = process.env.ANALYTICS_SALT || process.env.AZURE_STORAGE_CONNECTI
 async function isRateLimited(connectionString, req) {
   try {
     const hourBucket = new Date().toISOString().slice(0, 13); // YYYY-MM-DDTHH
-    const ipHash = visitorHash(clientIp(req), '', 'contact', RL_SALT);
+    const ipHash = visitorHash(rateLimitAddress(clientIp(req)), '', 'contact', RL_SALT);
     const rl = TableClient.fromConnectionString(connectionString, RL_TABLE);
     await rl.createTable();
 
@@ -53,6 +53,16 @@ function notifyLimit(connectionString) {
 }
 
 module.exports = async function (context, req) {
+  // Only the form on the site itself (api/shared/cross-site.js).
+  if (fromOtherSite(req)) {
+    context.res = {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+      body: { ok: false, errors: ['Send your message from the form on trumanbrown.com.'] },
+    };
+    return;
+  }
+
   // --- Honeypot: hidden "website" field. Humans never fill it; bots do. ---
   if (req.body && req.body.website) {
     // Return fake success so the bot thinks it worked.
@@ -74,7 +84,7 @@ module.exports = async function (context, req) {
   if (!name) errors.push('Name is required.');
   if (name.length > MAX_NAME) errors.push(`Name must be under ${MAX_NAME} characters.`);
   if (!email) errors.push('Email is required.');
-  if (email && !EMAIL_RE.test(email)) errors.push('Email address looks invalid.');
+  if (email && !isEmail(email)) errors.push('Email address looks invalid.');
   if (email.length > MAX_EMAIL) errors.push(`Email must be under ${MAX_EMAIL} characters.`);
   if (!message) errors.push('Message is required.');
   if (message.length > MAX_MESSAGE) errors.push(`Message must be under ${MAX_MESSAGE} characters.`);

@@ -1,6 +1,7 @@
 let BlobServiceClient;
 let TableClient;
 const { allowedUsers, principalUserId } = require('./auth');
+const { fromOtherSite } = require('../shared/cross-site');
 const { captionsFromImages, fullUrls, keepAlts, normalizeSessionImages } = require('./session-images');
 const { analyticsDayKeys, buildAnalytics } = require('./analytics');
 
@@ -394,7 +395,9 @@ async function handlePost(context) {
 module.exports = async function (context, req) {
   try {
     var userId = principalUserId(req.headers['x-ms-client-principal']);
-    if (!ALLOWED_USERS.has(userId)) {
+    // A save or a rebuild only from /admin itself, never a form on another
+    // site riding the sign-in cookie (api/shared/cross-site.js).
+    if (!ALLOWED_USERS.has(userId) || (req.method !== 'GET' && fromOtherSite(req))) {
       context.res = { status: 403, headers: json(), body: { ok: false, error: 'Not authorized.' } };
       return;
     }
@@ -421,8 +424,16 @@ module.exports = async function (context, req) {
   }
 };
 
+// Static Web Apps' globalHeaders reach static files only, never a function's
+// response, so the admin data sets its own: contact messages and analytics
+// are never kept in a browser or proxy cache.
 function json() {
-  return { 'Content-Type': 'application/json' };
+  return {
+    'Content-Type': 'application/json',
+    'Cache-Control': 'no-store',
+    'X-Content-Type-Options': 'nosniff',
+    'Cross-Origin-Resource-Policy': 'same-origin',
+  };
 }
 
 function humanize(slug) {

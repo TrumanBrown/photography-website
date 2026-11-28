@@ -51,4 +51,26 @@ async function consumeRateLimit(client, options) {
   return true;
 }
 
-module.exports = { consumeRateLimit, hasStatus };
+// The address a visitor is limited by. An IPv6 home or phone connection gets
+// a whole /64 and can pick a new address in it for every message, so IPv6
+// counts by its first four groups. IPv4, and IPv4 written as IPv6, stay whole.
+function rateLimitAddress(ip) {
+  const value = String(ip ?? "")
+    .trim()
+    .toLowerCase();
+  if (!value.includes(":")) return value;
+  const mapped = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/.exec(value);
+  if (mapped) return mapped[1];
+  const halves = value.split("::");
+  if (halves.length > 2) return value;
+  const left = halves[0] ? halves[0].split(":") : [];
+  const right = halves[1] ? halves[1].split(":") : [];
+  const fill = halves.length === 2 ? 8 - left.length - right.length : 0;
+  const groups = [...left, ...Array(Math.max(fill, 0)).fill("0"), ...right];
+  const prefix = groups
+    .slice(0, 4)
+    .map((group) => group.replace(/^0+(?=.)/, ""));
+  return `${prefix.join(":")}::/64`;
+}
+
+module.exports = { consumeRateLimit, hasStatus, rateLimitAddress };

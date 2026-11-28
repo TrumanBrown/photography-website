@@ -16,6 +16,7 @@ const { describeAgent } = require("../shared/user-agent");
 const { lookupPlace, warmGeo } = require("../shared/geo-service");
 const { maybeAlert } = require("../shared/alert");
 const { isBot } = require("../shared/bots");
+const { fromOtherSite } = require("../shared/cross-site");
 const {
   cleanEvents,
   cleanTheme,
@@ -54,6 +55,8 @@ module.exports = async function (context, req) {
     context.res = { status: 204, headers: { "Cache-Control": "no-store" } };
     return;
   }
+
+  if (fromOtherSite(req)) return;
 
   try {
     const ua = req.headers['user-agent'] || '';

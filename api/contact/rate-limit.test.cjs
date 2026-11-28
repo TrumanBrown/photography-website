@@ -1,4 +1,4 @@
-const { consumeRateLimit } = require("./rate-limit");
+const { consumeRateLimit, rateLimitAddress } = require("./rate-limit");
 
 function storageError(statusCode) {
   return Object.assign(new Error(`Storage returned ${statusCode}`), {
@@ -69,5 +69,21 @@ describe("consumeRateLimit", () => {
       },
     };
     await expect(consume(client)).rejects.toMatchObject({ statusCode: 503 });
+  });
+});
+
+describe("rateLimitAddress", () => {
+  it("counts every address in one IPv6 /64 together", () => {
+    const home = rateLimitAddress("2001:db8:85a3:12:aaaa::1");
+    expect(rateLimitAddress("2001:0db8:85a3:0012:bbbb:cccc:dddd:eeee")).toBe(
+      home,
+    );
+    expect(rateLimitAddress("2001:db8:85a3:13::1")).not.toBe(home);
+    expect(rateLimitAddress("2001:db8::1")).toBe("2001:db8:0:0::/64");
+  });
+
+  it("keeps IPv4 whole, including when it's written as IPv6", () => {
+    expect(rateLimitAddress("203.0.113.10")).toBe("203.0.113.10");
+    expect(rateLimitAddress("::ffff:203.0.113.10")).toBe("203.0.113.10");
   });
 });

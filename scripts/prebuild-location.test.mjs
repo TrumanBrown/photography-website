@@ -7,6 +7,7 @@ import {
   hashKey,
   keepLocationsPrivate,
   publishIncoming,
+  stripBeforeUpload,
 } from "./prebuild.mjs";
 
 // Stand-ins for the Azure containers: they keep each blob's bytes, headers and
@@ -651,6 +652,22 @@ describe("publishIncoming", () => {
 
     expect(originals.blobs["trip/IMG_1.JPG"].data.toString()).toBe("first");
     expect(Object.keys(incoming.blobs)).toEqual(["originals/trip/IMG_1.JPG"]);
+  });
+});
+
+describe("stripBeforeUpload", () => {
+  it("removes a RAW derivative's position before it reaches the public container", async () => {
+    const tools = fakeTools();
+    const located = join(dir, "located.jpg");
+    const clean = join(dir, "clean.jpg");
+    await writeFile(located, "jpeg GPS 47.6,-122.3");
+    await writeFile(clean, "jpeg");
+
+    await stripBeforeUpload(located, tools);
+    await stripBeforeUpload(clean, tools);
+
+    expect(await readFile(located, "utf8")).not.toContain("GPS");
+    expect(tools.stripped).toEqual([located]);
   });
 });
 

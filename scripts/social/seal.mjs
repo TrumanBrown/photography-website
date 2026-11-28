@@ -38,12 +38,17 @@ export function seal(value, key) {
 
 export function unseal(box, key) {
   if (!box || box.v !== 1) throw new Error("Unrecognised sealed value.");
-  const decipher = createDecipheriv(
-    "aes-256-gcm",
-    key,
-    Buffer.from(box.iv, "base64"),
-  );
-  decipher.setAuthTag(Buffer.from(box.tag, "base64"));
+  const iv = Buffer.from(box.iv, "base64");
+  const tag = Buffer.from(box.tag, "base64");
+  // seal() always writes a 12-byte IV and a 16-byte tag. A shorter tag is far
+  // easier to forge, and Node only refuses one when told the length.
+  if (iv.length !== 12 || tag.length !== 16) {
+    throw new Error("Unrecognised sealed value.");
+  }
+  const decipher = createDecipheriv("aes-256-gcm", key, iv, {
+    authTagLength: 16,
+  });
+  decipher.setAuthTag(tag);
   const text = Buffer.concat([
     decipher.update(Buffer.from(box.data, "base64")),
     decipher.final(),

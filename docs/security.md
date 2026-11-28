@@ -13,7 +13,7 @@ surface is intentionally narrow but not zero. What we focus on:
 - Lock down the storage account so attackers can't enumerate or modify it.
 - Never publish where a photo was taken: GPS is stripped from every photo before it's public, and the globe and maps only use coarse, hand-picked points. See [Photo locations](#photo-locations).
 - Send strong HTTP security headers so visitors' browsers refuse to be misused.
-- Gate every admin API operation with a fail-closed GitHub-principal allowlist.
+- Gate every admin API operation with a fail-closed GitHub-principal allowlist, and refuse a save or rebuild that another website started.
 - Use short-lived OIDC credentials for CI, with a least-privilege identity for everything that runs third-party code, and isolate the unavoidable runtime connection string in SWA app settings. See [GitHub Actions and Azure identities](#github-actions-and-azure-identities).
 - Collect analytics **without retaining raw IPs or cookie identifiers**, see [docs/analytics.md](analytics.md).
 - Be honest about what's worth defending vs. what would just inflate the bill.
@@ -24,6 +24,7 @@ surface is intentionally narrow but not zero. What we focus on:
 - **No raw network identifier stored.** Unique visitors are counted via a daily-salted `sha256(ip + ua + date + salt)` hash; the raw IP and user-agent are never persisted. No cookies or persistent client identifiers.
 - **Input is bounded and sanitized** (path/referrer length caps, duration sanity range, bot-UA filtering). Referrers are reduced to hostname only.
 - **Fails silently**: the function always returns 204 and never surfaces errors to the page, so analytics can't break the site.
+- **Only from the site's own pages.** Any website can make its readers' browsers send a beacon here (a no-cors `fetch` or `sendBeacon` sends `text/plain`, and the Functions still parse that body as JSON), and the beacon would carry each reader's address and so their company. A beacon whose browser says `Sec-Fetch-Site: cross-site` is dropped ([api/shared/cross-site.js](../api/shared/cross-site.js)), so another site can't plant pageviews or resume alerts from its readers' networks. A page can't set that header. Requests without it (curl, older browsers) are treated as before, and those come from the sender's own address.
 - Worst-case abuse is a flood of fake pageview rows in the `pageviews` table (cosmetic, cheap to clear). No data exposure, no write access to anything else.
 - **Event batches are checked field by field** ([api/track/payload.js](../api/track/payload.js)): known kinds only, names matched against a short pattern, numbers capped, at most 20 events a batch. The only free text kept is up to 100 characters copied from the page and browser error messages cut to 200 characters with addresses reduced to their path. The admin panel escapes all of it.
 - **Resume alerts can't be used to spam the inbox**: one per network and city a day, four an hour, ten a day, and never more than six of the hour's shared email count, so the contact form keeps its room ([api/shared/alert.js](../api/shared/alert.js)).
@@ -32,6 +33,10 @@ surface is intentionally narrow but not zero. What we focus on:
 ### Preview images and the resume PDF
 
 `/api/og` and `/api/resume` are anonymous GET endpoints. `/api/og` only redirects to an image path on the site or to the site's own Blob account, so it isn't an open redirect, and it writes one small `share` row per fetch. `/api/resume` serves one fixed file bundled with the function and writes one `pdf` row per open. Neither stores an IP address. A flood of requests costs table rows, the same as `/api/track`.
+
+The resume counts an open only when the browser loads it as a page (`Sec-Fetch-Dest: document`, or no such header, as from chat apps and mail scanners). Another site's hidden frame or image tag pointing at the PDF would otherwise log its own readers' companies as resume opens. The PDF also sends `X-Frame-Options: DENY` and `frame-ancestors 'none'`, the headers it had as a static file, so no other site can show it in a frame.
+
+Paths in `share` rows and pageviews come from requests anyone can send, and `/admin` shows them as links. A path with a backslash, a space or a control character becomes `/` ([api/shared/rows.js](../api/shared/rows.js), `normalizePath` in [api/sessionmgr/analytics.js](../api/sessionmgr/analytics.js)), because a browser reads `/\evil.example` as `//evil.example`, another site.
 
 ---
 
@@ -48,7 +53,7 @@ surface is intentionally narrow but not zero. What we focus on:
 
 ### HTTP security headers
 
-Delivered via [staticwebapp.config.json](../staticwebapp.config.json) `globalHeaders` block, applied to every response.
+Delivered via [staticwebapp.config.json](../staticwebapp.config.json) `globalHeaders` block, applied to every static file. Static Web Apps doesn't add them to a function's response (checked with `curl` on 2026-11-27), so the functions set their own: `/api/sessionmgr` sends `Cache-Control: no-store`, `nosniff` and `Cross-Origin-Resource-Policy: same-origin`, so contact messages and analytics are never kept in a browser or proxy cache, and `/api/resume` sends the frame headers below.
 
 | Header | Value | Why |
 |---|---|---|
@@ -119,9 +124,10 @@ a title or caption containing `</script>` can't end the block and inject markup.
 The public contact endpoint (`api/contact`) has layered protection:
 
 - **Honeypot field.** A hidden `website` input that humans never see. Bots that fill it get a fake success and are silently dropped.
-- **Server-side validation.** Name, email, and message are length-checked and the email is format-checked before anything is stored.
+- **Only from the site's own form.** A message whose browser says `Sec-Fetch-Site: cross-site` gets a 403, so another website can't send messages through its readers' browsers and addresses, around the per-IP limit ([api/shared/cross-site.js](../api/shared/cross-site.js)).
+- **Server-side validation.** Name, email, and message are length-checked and the email is format-checked before anything is stored. An address with `?`, `&`, `,` or similar is refused, since `/admin` shows it as a `mailto:` link, where `?cc=` would quietly add a recipient to the reply.
 - **The email copy can't be steered.** Each saved message is emailed to the owner through Azure Communication Services ([api/contact/notify.js](../api/contact/notify.js)). The recipient is fixed by the `CONTACT_NOTIFY_TO` app setting, so a visitor can only ever reach that one inbox. The sender's name is flattened to one line with control characters removed before it goes in the subject, so it can't add headers, and their address goes only in Reply-To. Across all visitors, at most ten emails go out an hour, so a flood can't run up the bill. Anything over that is still saved in the table.
-- **Per-IP rate limit.** Each client is capped at five messages per hour. The limiter stores only a secret-salted, truncated hash of the IP, never the raw IP, in a `contactratelimit` table. ETag-conditional updates prevent parallel requests from overwriting the count. It fails open on a storage outage so a legitimate message is not rejected solely because the limiter is unavailable.
+- **Per-IP rate limit.** Each client is capped at five messages per hour. An IPv6 connection gets a whole `/64` and can switch addresses inside it, so IPv6 is limited by its first four groups. The limiter stores only a secret-salted, truncated hash of the IP, never the raw IP, in a `contactratelimit` table. ETag-conditional updates prevent parallel requests from overwriting the count. It fails open on a storage outage so a legitimate message is not rejected solely because the limiter is unavailable.
 - **Where the client IP comes from.** Static Web Apps passes on any client IP header a browser makes up. A forged `X-Forwarded-For` stays at the front of the list, and `X-Azure-ClientIP`, `X-Client-IP`, `X-Real-IP` and `Forwarded` arrive exactly as sent, since SWA sets none of them. Its edge appends the address it saw to `X-Forwarded-For`, then App Service's front end appends the edge's own address and puts it in `Client-IP`, replacing any the browser sent. [api/shared/client-ip.js](../api/shared/client-ip.js) takes the last entry once the edge's is dropped, so a visitor can't choose the address the limit, the visitor hash and the network lookup use. This was checked on a pull request preview on 2026-11-12 (the custom domain and the preview resolve to the same edge) and is pinned by [client-ip.test.cjs](../api/shared/client-ip.test.cjs). Someone with many addresses, such as a VPN, still gets five messages per address.
 
 ### Blob storage access controls
@@ -251,7 +257,7 @@ Other guards in the workflows:
 - **Packages install before any sign-in**, and Build and Deploy signs out of Azure while `astro build` runs Astro, Vite and their plugins, signing in again only to upload the variants. Social post signs out before `npm ci` for the same reason.
 - **Least-privilege `GITHUB_TOKEN`**: each workflow declares `permissions:`; the one job that can push (Social post's keepalive commit) runs no packages.
 - **No secrets for untrusted code**: fork and Dependabot pull requests build from fixtures with no Azure access; nothing uses `pull_request_target`; no event text is interpolated into `run:` scripts.
-- **Masked outputs**: the storage connection string, analytics salt and deploy token are masked before use; the photo and posting pipelines log counts only, through [redact.mjs](../scripts/photos/redact.mjs).
+- **Masked outputs**: the storage connection string, analytics salt and deploy token are masked before use, and Infra masks the build identity's client id and the email sender's id right after the deploy, since a later step's `env:` block prints its values and this repository's run logs are public. The photo and posting pipelines log counts only, through [redact.mjs](../scripts/photos/redact.mjs).
 
 Moving an existing setup onto this model (one-time): run the Infra workflow with `GH_PAT_FOR_SECRETS` set, or `./scripts/bootstrap-swa-token.sh`, to create the `AZURE_DEPLOY_CLIENT_ID` secret; let one build pass; then re-run `./scripts/setup-federated-credential.sh`, which prints the commands that remove the bootstrap identity's old `main`/pull-request trust and its User Access Administrator role. Details in [cicd.md](cicd.md#two-identities-least-privilege-by-job).
 
@@ -262,7 +268,7 @@ Moving an existing setup onto this model (one-time): run the Infra workflow with
 | Malicious npm package | `npm ci` against committed `package-lock.json`; Dependabot alerts and security updates; no autopilot updates. In CI, packages install and the site builds without Azure credentials, and the credential the build does hold reaches blobs only. |
 | Compromised GitHub Action version | Every action is pinned to a full commit SHA with the version in a comment, and Dependabot bumps both ([cicd.md](cicd.md#how-the-workflows-pin-their-actions)). CodeQL's `actions` queries flag any that slip back to a tag. |
 | Compromised npm registry mirror | Currently we trust the public registry; nothing avoids this at this scale. |
-| Image tools installed in CI | `libraw-bin` and `exiftool` come from Ubuntu's apt archive on a pinned `ubuntu-24.04` runner; `pillow` and `pillow-heif` from PyPI, unpinned, before any sign-in. |
+| Image tools installed in CI | `libraw-bin` and `exiftool` come from Ubuntu's apt archive on a pinned `ubuntu-24.04` runner. `pillow` and `pillow-heif` come from PyPI at pinned versions (`PYTHON_WHEELS` in [.github/actions/image-tools/action.yml](../.github/actions/image-tools/action.yml)), installed before any sign-in but imported by the prebuild while it's signed in, so a new release only arrives when the pins change. |
 
 #### Dependency advisory checks
 

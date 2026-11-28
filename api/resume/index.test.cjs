@@ -123,4 +123,18 @@ describe("/api/resume", () => {
     release();
     await vi.waitFor(() => expect(rows).toHaveLength(2));
   });
+
+  it("serves another site's frame or image tag but doesn't count it as an open", async () => {
+    for (const dest of ["iframe", "image"]) {
+      const { context, done } = open({
+        "sec-fetch-dest": dest,
+        "sec-fetch-site": "cross-site",
+      });
+      await done;
+      expect(context.res.status).toBe(200);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1300));
+    expect(lookups).toHaveLength(0);
+    expect(rows).toHaveLength(0);
+  });
 });

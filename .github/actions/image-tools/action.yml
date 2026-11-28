@@ -9,7 +9,10 @@ description: >-
   The old cache of /var/cache/apt/archives never saved (its lock file and
   partial/ are root-only), and a mirror outage stopped the build on
   2026-08-29, 2026-10-01 and 2026-11-11. Downloads, when needed, try five
-  times over about five minutes. Bump the key to pick up newer versions.
+  times over about five minutes. The Python wheels are pinned (PYTHON_WHEELS),
+  because prebuild imports them in a job signed in to Azure: a new release
+  only arrives when someone changes the pins. Bump the key with them, and to
+  pick up newer apt packages.
 
 runs:
   using: composite
@@ -24,6 +27,7 @@ runs:
       shell: bash
       env:
         CACHE_HIT: ${{ steps.restore.outputs.cache-hit }}
+        PYTHON_WHEELS: pillow==13.0.0 pillow-heif==1.8.1
       run: |
         tools="$HOME/.cache/image-tools"
         shopt -s nullglob
@@ -48,7 +52,7 @@ runs:
               -o Dir::State::Lists="$no_lists/" "${debs[@]}" || return 1
           fi
           sudo pip install --break-system-packages --quiet --no-index \
-            --find-links "$tools/wheels" pillow pillow-heif &&
+            --find-links "$tools/wheels" $PYTHON_WHEELS &&
             tools_work
         }
 
@@ -62,7 +66,7 @@ runs:
             sudo apt-get install -y --no-install-recommends --download-only \
               -o Dir::Cache::Archives="$tools/debs/" \
               libraw-bin libimage-exiftool-perl python3-pip &&
-            sudo pip download --quiet --dest "$tools/wheels" pillow pillow-heif
+            sudo pip download --quiet --dest "$tools/wheels" $PYTHON_WHEELS
         }
 
         if [ "$CACHE_HIT" = true ] && install_from_folder; then

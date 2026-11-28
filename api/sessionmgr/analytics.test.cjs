@@ -91,4 +91,14 @@ describe('analytics normalization', () => {
     expect(normalizePath('/hobbies')).toBe('/hobbies/');
     expect(normalizePath('/hobbies//birding/?x=1')).toBe('/hobbies/birding/');
   });
+
+  it('keeps paths from a beacon or share on the site when /admin links them', () => {
+    expect(normalizePath('/\\evil.example/login')).toBe('/');
+    expect(normalizePath('/\t/evil.example/login')).toBe('/');
+    const { shares } = buildAnalytics(
+      [{ partitionKey: 'pv-2026-07-13', rowKey: '0', type: 'share', app: 'Slack', page: '/\\evil.example/' }],
+      { dayKeys: analyticsDayKeys(1, Date.parse('2026-07-13T12:00:00Z')), ownHost: 'trumanbrown.com' },
+    );
+    expect(shares.rows.map((row) => row.page)).toEqual(['/']);
+  });
 });

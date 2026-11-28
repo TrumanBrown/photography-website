@@ -14,11 +14,23 @@ function rowKey(type, now = Date.now()) {
   return `${String(9999999999999 - now).padStart(13, "0")}-${random}-${type}`;
 }
 
+// A path that stays on this site when /admin makes it a link. A browser reads
+// "\" as "/" and drops tabs and newlines in a URL, so "/\evil.com" or "/<tab>/evil.com"
+// would point at another site.
+function hasUnsafePathChars(value) {
+  for (const char of value) {
+    const code = char.charCodeAt(0);
+    if (char === "\\" || code <= 32 || code === 127) return true;
+  }
+  return false;
+}
+
 function cleanPage(value) {
   if (
     typeof value !== "string" ||
     !value.startsWith("/") ||
-    value.startsWith("//")
+    value.startsWith("//") ||
+    hasUnsafePathChars(value)
   )
     return "/";
   return value.split(/[?#]/, 1)[0].slice(0, 300) || "/";
@@ -64,4 +76,10 @@ async function writeRow(type, fields, log) {
   }
 }
 
-module.exports = { cleanPage, partitionKey, rowKey, writeRow };
+module.exports = {
+  cleanPage,
+  hasUnsafePathChars,
+  partitionKey,
+  rowKey,
+  writeRow,
+};

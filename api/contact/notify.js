@@ -34,6 +34,14 @@ function cleanPage(page) {
   return /^\/[\w\-./#%~]*$/.test(value) && value.length <= 300 ? value : "";
 }
 
+/** A plain address. Nothing that would add a recipient or a header when it's
+    used as a mailto: link in /admin or as this email's reply-to. */
+function isEmail(value) {
+  return /^[^\s@?&,;:<>()[\]"\\]+@[^\s@?&,;:<>()[\]"\\]+\.[^\s@?&,;:<>()[\]"\\]+$/.test(
+    String(value ?? ""),
+  );
+}
+
 /** The email for one message: to me, with the visitor as the reply-to. */
 function buildNotification(
   { name, email, message, page, submittedAt },
@@ -127,6 +135,7 @@ module.exports = {
   readSettings,
   getClient,
   cleanPage,
+  isEmail,
   oneLine,
   MAX_PER_HOUR,
   SEND_TIMEOUT_MS,

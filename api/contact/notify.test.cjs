@@ -3,6 +3,7 @@ const {
   buildNotification,
   readSettings,
   cleanPage,
+  isEmail,
   oneLine,
   MAX_PER_HOUR,
 } = require("./notify");
@@ -87,6 +88,16 @@ describe("cleanPage and oneLine", () => {
   it("flattens whitespace and control characters", () => {
     expect(oneLine("  a\n\tb  ", 20)).toBe("a b");
     expect(oneLine("abcdefghij", 8)).toBe("abcde...");
+  });
+});
+
+describe("isEmail", () => {
+  it("refuses an address that would add a recipient as a mailto: link", () => {
+    expect(isEmail("ada@example.com")).toBe(true);
+    expect(isEmail("ada+prints@mail.example.co.uk")).toBe(true);
+    expect(isEmail("ada@example.com?cc=someone@evil.example")).toBe(false);
+    expect(isEmail("ada@example.com,someone@evil.example")).toBe(false);
+    expect(isEmail("ada@example")).toBe(false);
   });
 });
 
