@@ -491,6 +491,9 @@ More lists deals up to ten more a day per browser, from a separate set of places
 - [src/lib/hobbies/day-list-pixel.ts](../src/lib/hobbies/day-list-pixel.ts), the pixel world: the
   day and night palettes, repainting the map's pixels in them, and drawing the rings, pin, tokens,
   line and finder box into the same pixels.
+- [src/lib/hobbies/day-list-reveal.ts](../src/lib/hobbies/day-list-reveal.ts), how the answer is
+  paced by how close the guess was: the five verdict tiers, how long the line runs and how hard it
+  slows, the hold, the flash and the ripples, all as functions of time.
 - [src/lib/hobbies/day-list-tints.ts](../src/lib/hobbies/day-list-tints.ts), the ring colours,
   picked from each species' photo.
 - [src/lib/hobbies/day-list-names.ts](../src/lib/hobbies/day-list-names.ts), the places in species
@@ -628,20 +631,33 @@ for the answer.
   group. "Lock it in" can't be pressed until there's a pin and a month, and the line under it walks
   you there ("Tap the map, pick a month", "Now pick a month"), then says what you're playing for
   ("Up to 5,400 points").
-- **The answer lands in beats.** Lock it in slides the title panel up and the hand and the month
-  keys down, out of the way. The pin presses into the map as the camera frames the pin and the
-  place together (`CAMERA_MS`, 820ms). Then the whole bullseye slides from the pin to the middle
-  of the place, the wider rings a beat behind the tighter ones, with a dotted line marching out
-  behind it (480 to 980ms, by how far it goes). The line goes the short way round, so a pin in
-  Hawaii reaches Japan off one side of the map and back in at the other. The rings wobble as they
-  settle, the boundary inks in over 300ms, and the red finder box from the globe's opening scene
-  closes in on it over 620ms, pulses once as it locks on, and prints the place's coordinates a
-  character at a time. Only then does the place's name go up on the map. The verdict drops in from
-  the top ("Spot on", "Near enough", "Right part of the world", "Not quite", "Wrong side of the
-  planet", with "1,240 km off" under it), the score counts up from zero, and the postcard rises
-  from the bottom with the six species' thumbs dropping into it 55ms apart. The camera keeps the
-  answer inside the room the verdict and the postcard leave (`room()`), so nothing laid over the map
-  covers the pin, the line or the place.
+- **The answer lands in beats, and the closer the guess the bigger they get.** Lock it in slides
+  the title panel up and the hand and the month keys down, out of the way. The pin presses into the
+  map as the camera frames the pin and the place together (`CAMERA_MS`, 820ms). Then a dotted line
+  runs out from the pin towards the place with the distance ticking up in a small tag at its head,
+  and the rings ride its head, the wider ones a beat behind. The line runs quickly at first and
+  slows into its end, so you don't know where it stops until it does: on a guess under 400 km the
+  last tenth of the way takes more than a third of its 1.5s, and the tag crawls through its last
+  few km. The line goes the short way round, so a pin in Hawaii reaches Japan off one side of the
+  map and back in at the other. A close guess then gets a held beat (0.7s, or 1.15s from inside the
+  place): the world darkens towards the map's ink in three stepped bands round a pool of light on
+  the pin and the place, the rings drift into the place's middle, and the boundary inks in from
+  where the line touched it. The red finder box from the globe's opening scene slams in, and as it
+  locks on the map flashes in the result's colour, ripples run out from the pin, the rings shudder,
+  the pin gives, the tag turns the result's colour and the coordinates print a character at a time.
+  Only then does the place's name go up on the map and the verdict come down from the top in its
+  colour ("Spot on" amber, "Near enough" green, "Right part of the world" yellow, "Not quite"
+  orange, "Wrong side of the planet" red, the same bands as the share squares, with "1,240 km off"
+  under it). On a close guess the verdict's words land on the banner like a stamp. The score
+  counts up from zero, most of it at once and the last digits slowly, never passing its total, and
+  the postcard rises from the bottom with the six species' thumbs dropping into it 55ms apart. A
+  guess further than 1,500 km gets no hold and no flash: the line runs, the rings settle, the
+  boundary inks in and the finder closes in. All the timings are in `revealPlan`
+  ([day-list-reveal.ts](../src/lib/hobbies/day-list-reveal.ts)), taken from how Krillion slows its
+  depth counter into the last few metres, Farflung holds and flashes the map in a rarity's colour,
+  and Plain's climb eases into its number (2026-11-27). The camera keeps the answer inside the room
+  the verdict and the postcard leave (`room()`), so nothing laid over the map covers the pin, the
+  line or the place. Taps on the map do nothing while it plays.
 - **The postcard is the result.** It has the six species (the ones you didn't use greyed), the
   place, its region and month, how many species you used, and where the points came from: the
   distance, the month ("You said March", or "November, spot on") and the total. Today's list offers

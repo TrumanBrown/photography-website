@@ -67,6 +67,7 @@ import {
 } from "./day-list-pixel";
 import {
   assignTints,
+  hexRgb,
   photoHues,
   punch,
   ringFor,
@@ -74,6 +75,21 @@ import {
   type RGB,
   type Tint,
 } from "./day-list-tints";
+import {
+  VERDICTS,
+  countEase,
+  flashAt,
+  headAt,
+  hitEnds,
+  revealPlan,
+  ripplesAt,
+  settledAt,
+  shadeAt,
+  tapeKm,
+  tierFor,
+  type RevealPlan,
+  type Tier,
+} from "./day-list-reveal";
 import puzzles from "./day-list.json";
 import { nameParts } from "./day-list-names";
 import { speciesName } from "../species-name";
@@ -203,15 +219,7 @@ export function reachLine(clue: Pick<Clue, "reach" | "global">): string {
 
 /** What the banner says for a guess `km` from the place. */
 export function verdictFor(km: number): string {
-  return km === 0
-    ? "Spot on"
-    : km < 400
-      ? "Near enough"
-      : km < 1500
-        ? "Right part of the world"
-        : km < 5000
-          ? "Not quite"
-          : "Wrong side of the planet";
+  return VERDICTS[tierFor(km)];
 }
 
 const degrees = (v: number, pos: string, neg: string) =>
@@ -428,16 +436,14 @@ export function shareText(result: {
   const { km, off, used, total, score } = result;
   let read = "";
   for (let i = 0; i < total; i++) read += i < used ? "\u{1F4D6}" : "\u2B1C";
-  const distance =
-    km === 0
-      ? "\u{1F3AF}"
-      : km < 400
-        ? "\u{1F7E9}"
-        : km < 1500
-          ? "\u{1F7E8}"
-          : km < 5000
-            ? "\u{1F7E7}"
-            : "\u{1F7E5}";
+  // The same tiers and colours as the verdict banner (./day-list-reveal).
+  const distance = [
+    "\u{1F7E5}",
+    "\u{1F7E7}",
+    "\u{1F7E8}",
+    "\u{1F7E9}",
+    "\u{1F3AF}",
+  ][tierFor(km)];
   const season =
     off === 0
       ? "\u{1F7E9}"
@@ -747,21 +753,27 @@ interface RingState {
   landed: number;
 }
 
-/** The answer as it plays: the slide, the line, the boundary, the finder. */
+/**
+ * The answer as it plays: the line running out, the hold, the boundary, the
+ * finder and the hit, paced by `plan` (./day-list-reveal).
+ */
 interface Answer {
   pin: LonLat;
   to: LonLat;
   /** How far along the line from the pin the boundary is. */
   frac: number;
+  plan: RevealPlan;
   t0: number;
-  d: number;
   /** Each wider ring follows this far behind the last. */
   lag: number;
   settle: number;
-  march: number;
   boxT: number;
   findT: number;
   lockT: number;
+  /** How far the hold has darkened the world round the answer, 0 to 1. */
+  dim: number;
+  /** When the finder locked on, for the flash and the ripples (0 not yet). */
+  hitAt: number;
   /** The finder's box in CSS pixels, once it's drawn. */
   finder: Rect | null;
 }
@@ -803,6 +815,15 @@ interface MapFrame extends Frame {
 
 /** The camera's move to the answer. */
 const CAMERA_MS = 820;
+/**
+ * Each result's colour on the map, by tier, matching the share squares: red
+ * a world away, orange, yellow, green near, and the game's amber inside.
+ * The verdict banner uses the same ones (DayList.astro).
+ */
+const TIER_RGB: Record<"day" | "night", RGB[]> = {
+  day: ["#c8352c", "#ef7f22", "#f0d43a", "#4fae3c", "#ffb000"].map(hexRgb),
+  night: ["#f0584f", "#f59238", "#f5dc4a", "#62c44c", "#ffb000"].map(hexRgb),
+};
 /** Each species' bearing round its ring, for its token. */
 const BEARINGS = [-48, 30, -120, 120, -10, 70];
 /** Under this radius, in map pixels, a ring shows as a dot. */
@@ -933,6 +954,8 @@ export function initDayList(root: HTMLElement): void {
   let breath: { t0: number; d: number } | null = null;
   let ans: Answer | null = null;
   let answerShown = false;
+  /** The distance riding the line's head as it runs out to the place. */
+  let tapeEl: HTMLElement | null = null;
   let lay: (Lay | undefined)[] = [];
   /**
    * The part of the map's canvas on screen, in its CSS pixels: all of it,
@@ -986,7 +1009,11 @@ export function initDayList(root: HTMLElement): void {
     const f: MapFrame = { d: img.data, W, H, P, s };
     recolour(f, classes, wm.project(0, -90).y * s, gridFor(wm, W, H, s));
     frame = f;
-    const busy = drawGame(wm);
+    // The hold darkens the map alone, so the pin, the line and the rings
+    // stay lit; the flash goes over everything.
+    if (ans && ans.dim > 0) darken(f, ans);
+    let busy = drawGame(wm);
+    if (ans && ans.hitAt) busy = flash(f, ans) || busy;
     ctx.putImageData(img, 0, 0);
     frame = null;
     if (busy) wm.redraw();
@@ -1102,16 +1129,20 @@ export function initDayList(root: HTMLElement): void {
     if (restAt) return restAt;
     return wm.unproject(wm.width / 2, wm.height / 2);
   }
-  /** During the answer each ring slides from the pin to the place, the wider ones a beat behind. */
+  /**
+   * During the answer each ring rides the line's head from the pin, then
+   * drifts on into the place's middle, the wider ones a beat behind.
+   */
   function slideCentre(rank: number, t: number): LonLat {
     const a = ans!;
-    const p = a.d ? easeInOut((t - a.t0 - rank * a.lag) / a.d) : 1;
+    const p = headAt(a.plan, a.frac, t - a.t0 - rank * a.lag);
     return {
       lon: lerp(a.pin.lon, a.to.lon, p),
       lat: lerp(a.pin.lat, a.to.lat, p),
     };
   }
-  const slidingUntil = () => (ans ? ans.t0 + ans.d + 5 * ans.lag : 0);
+  const slidingUntil = () =>
+    ans ? ans.t0 + settledAt(ans.plan, ans.frac) + 5 * ans.lag : 0;
 
   function drawGame(wm: WorldMap): boolean {
     const f = frame!;
@@ -1218,6 +1249,7 @@ export function initDayList(root: HTMLElement): void {
     if (ans) busy = drawAnswerUnder(t) || busy;
     busy = placeTokens(items, t) || busy;
     if (ans) drawFinder();
+    if (ans?.hitAt) busy = drawRipples(t) || busy;
     if (drawPin()) busy = true;
 
     // With no pin and no mouse on the map, a small cross marks the lens's middle.
@@ -1231,6 +1263,7 @@ export function initDayList(root: HTMLElement): void {
     }
 
     placeDom(items, newest, dotAt);
+    if (tapeEl) placeTape(t);
     return busy;
   }
 
@@ -1605,15 +1638,16 @@ export function initDayList(root: HTMLElement): void {
     const f = frame!;
     const a = ans!;
     const P = f.P;
-    let busy = false;
-    const slideP = a.d ? easeInOut((t - a.t0) / a.d) : 1;
-    if (slideP < 1) busy = true;
+    const ms = t - a.t0;
+    const busy = t < slidingUntil();
+    const head = headAt(a.plan, a.frac, ms);
     if (a.frac > 0 && pin) {
-      const k = Math.min(slideP, a.frac);
+      const k = Math.min(head, a.frac);
       const from = at(a.pin.lon, a.pin.lat);
       const to = at(lerp(a.pin.lon, a.to.lon, k), lerp(a.pin.lat, a.to.lat, k));
       const pts = line(from.x, from.y, to.x, to.y);
-      const phase = Math.floor(a.march / 90) % 4;
+      const march = Math.min(ms, settledAt(a.plan, a.frac));
+      const phase = Math.floor(Math.max(0, march) / 90) % 4;
       // The short way round leaves one side of the map and comes back in at
       // the other, so the line is drawn a world over each way too.
       const world = Math.round(360 / Math.abs(geo!.dlon));
@@ -1634,16 +1668,108 @@ export function initDayList(root: HTMLElement): void {
       for (let x = x1 - 1; x >= x0; x--) per.push([x, y1]);
       for (let y = y1 - 1; y > y0; y--) per.push([x0, y]);
       const n = Math.round(per.length * Math.min(1, a.boxT));
-      // It inks in from the top middle, both ways round at once.
-      const mid = Math.floor((x1 - x0) / 2);
+      // It inks in both ways round from where the line touched it, or from
+      // the side nearest the pin when the pin is inside.
+      const touch = at(
+        lerp(a.pin.lon, a.to.lon, a.frac),
+        lerp(a.pin.lat, a.to.lat, a.frac),
+      );
+      let start = 0;
+      let best = Infinity;
+      per.forEach(([x, y], i) => {
+        const d = (x - touch.x) ** 2 + (y - touch.y) ** 2;
+        if (d < best) {
+          best = d;
+          start = i;
+        }
+      });
       const shown: [number, number][] = [];
       for (let k = 0; k < Math.ceil(n / 2); k++) {
-        shown.push(per[(mid + k) % per.length]);
-        shown.push(per[(mid - k + per.length * 2) % per.length]);
+        shown.push(per[(start + k) % per.length]);
+        shown.push(per[(start - k + per.length * 2) % per.length]);
       }
-      outlined(f, shown, P.bound);
+      // On a close guess it inks in the result's colour as the finder
+      // locks on, then settles to white.
+      const hot = a.hitAt && a.plan.flash && now() - a.hitAt < 420;
+      outlined(f, shown, hot ? tierRgb(a.plan.tier) : P.bound);
     }
     return busy;
+  }
+
+  /** A result's colour on the map, the same bands as the share squares. */
+  function tierRgb(tier: Tier): RGB {
+    return TIER_RGB[isDark() ? "night" : "day"][tier];
+  }
+
+  /**
+   * The hold: the world darkens towards the map's ink in three steps round
+   * a pool of light on the pin and the place, so the eye has nowhere else
+   * to go.
+   */
+  function darken(f: MapFrame, a: Answer): void {
+    const p = at(a.pin.lon, a.pin.lat);
+    const q = at(a.to.lon, a.to.lat);
+    const b = boxPx();
+    const cx = (p.x + q.x) / 2;
+    const cy = (p.y + q.y) / 2;
+    const inner =
+      Math.hypot(q.x - p.x, q.y - p.y) / 2 +
+      Math.hypot(b.x1 - b.x0, b.y1 - b.y0) * 0.3 +
+      5;
+    const outer = inner + Math.max(f.W, f.H) * 0.2;
+    const [ir, ig, ib] = f.P.ink;
+    const d = f.d;
+    for (let y = 0; y < f.H; y++) {
+      const dy = (y - cy) ** 2;
+      for (let x = 0; x < f.W; x++) {
+        const k = shadeAt(Math.sqrt((x - cx) ** 2 + dy), inner, outer, a.dim);
+        if (!k) continue;
+        const i = (y * f.W + x) * 4;
+        d[i] += (ir - d[i]) * k;
+        d[i + 1] += (ig - d[i + 1]) * k;
+        d[i + 2] += (ib - d[i + 2]) * k;
+      }
+    }
+  }
+
+  /** The flash in the result's colour as the finder locks on. */
+  function flash(f: MapFrame, a: Answer): boolean {
+    const ms = now() - a.hitAt;
+    const k = flashAt(a.plan, ms);
+    if (k > 0) {
+      const [r, g, b] = tierRgb(a.plan.tier);
+      const d = f.d;
+      for (let i = 0; i < d.length; i += 4) {
+        d[i] += (r - d[i]) * k;
+        d[i + 1] += (g - d[i + 1]) * k;
+        d[i + 2] += (b - d[i + 2]) * k;
+      }
+    }
+    return ms < hitEnds(a.plan);
+  }
+
+  /** Ripples running out from the pin as the finder locks on. */
+  function drawRipples(t: number): boolean {
+    const f = frame!;
+    const a = ans!;
+    const ms = t - a.hitAt;
+    const runs = ripplesAt(a.plan, ms);
+    if (!runs.length) return ms < hitEnds(a.plan);
+    const p = at(a.pin.lon, a.pin.lat);
+    const reach = Math.max(
+      12,
+      Math.min(f.W, f.H) * (a.plan.tier === 4 ? 0.26 : 0.2),
+    );
+    const col = tierRgb(a.plan.tier);
+    for (const q of runs) {
+      const r = Math.round(3 + (reach - 3) * easeOut(q));
+      const dotted = q > 0.55;
+      // Ink either side, so the colour reads on land of the same colour.
+      circle(f, p.x, p.y, r + 1, f.P.ink, dotted);
+      circle(f, p.x, p.y, r - 1, f.P.ink, dotted);
+      circle(f, p.x, p.y, r, col, dotted);
+    }
+    return true;
   }
 
   /** The red finder: four brackets close in, pulse as they lock, grow ticks. */
@@ -1657,9 +1783,10 @@ export function initDayList(root: HTMLElement): void {
     const tw = Math.max(4, (x1 - x0) / 2 + 3);
     const th = Math.max(4, (y1 - y0) / 2 + 3);
     const start = Math.max(f.W, f.H) * 0.62;
-    const k = easeOutBack(a.findT, 1.1);
+    const k = easeOutBack(a.findT, a.plan.overshoot);
     const pulse = Math.round(
-      Math.sin(Math.PI * a.lockT) * Math.max(1, Math.min(tw, th) * 0.18),
+      Math.sin(Math.PI * a.lockT) *
+        Math.max(1, Math.min(tw, th) * (a.plan.stamp ? 0.3 : 0.18)),
     );
     // The snap past the place is two pixels at most, so it never swallows it.
     const hw = Math.round(Math.max(tw - 2, lerp(start, tw, k))) - pulse;
@@ -2348,13 +2475,18 @@ export function initDayList(root: HTMLElement): void {
     run.oncancel = () => el.remove();
   }
 
-  /** The big counter in whole steps, like an arcade score. */
+  /**
+   * The big counter in whole steps, like an arcade score. `ease` shapes the
+   * count: the answer's runs most of the way at once, then slows into its
+   * last digits.
+   */
   const countRuns = new WeakMap<HTMLElement, number>();
   function countTo(
     el: HTMLElement,
     to: number,
     ms = 360,
     from: number | null = null,
+    ease: (k: number) => number = (k) => k,
   ): Promise<void> {
     const start = from ?? Number(el.dataset.value ?? to);
     el.dataset.value = String(to);
@@ -2369,8 +2501,10 @@ export function initDayList(root: HTMLElement): void {
       ms,
       (k) => {
         if (id !== countRuns.get(el)) return;
-        const v = start + (to - start) * k;
-        el.textContent = count(k >= 1 ? to : Math.round(v / 10) * 10);
+        const v = start + (to - start) * ease(k);
+        // Whole tens on the way, never past where it's going.
+        const tens = to > start ? Math.floor(v / 10) : Math.ceil(v / 10);
+        el.textContent = count(k >= 1 ? to : tens * 10);
       },
       (k) => Math.round(k * steps) / steps,
     );
@@ -2956,6 +3090,85 @@ export function initDayList(root: HTMLElement): void {
     });
   }
 
+  /** The distance at the line's head, ticking up as it runs. */
+  function showTape(): void {
+    const el = document.createElement("span");
+    el.className = "dl-tape dl-px15";
+    el.setAttribute("aria-hidden", "true");
+    el.textContent = "0 km";
+    labels!.append(el);
+    tapeEl = el;
+  }
+  /**
+   * Keep the tape by the line's head, to the side of the line away from the
+   * pin's head, inside the part of the map on screen, in whole map pixels.
+   */
+  function placeTape(t: number): void {
+    const a = ans;
+    const el = tapeEl;
+    if (!a || !el || !result) return;
+    const head = Math.min(headAt(a.plan, a.frac, t - a.t0), a.frac);
+    const text = `${count(tapeKm(result.km, head, a.frac))} km`;
+    if (el.textContent !== text) el.textContent = text;
+    const p = m.project(
+      lerp(a.pin.lon, a.to.lon, head),
+      lerp(a.pin.lat, a.to.lat, head),
+    );
+    const o = m.project(a.pin.lon, a.pin.lat);
+    const q = m.project(a.to.lon, a.to.lat);
+    const len = Math.hypot(q.x - o.x, q.y - o.y) || 1;
+    const dx = (q.x - o.x) / len;
+    const dy = (q.y - o.y) / len;
+    // Square to the line, on its lower side: the pin stands up off its
+    // point, so below the line is always clear of it. Its far end stops at
+    // the head, so it never covers where the line meets the boundary.
+    let nx = -dy;
+    let ny = dx;
+    if (ny < 0) {
+      nx = -nx;
+      ny = -ny;
+    }
+    const w = el.offsetWidth;
+    const h = el.offsetHeight;
+    const across = Math.abs(nx) * (w / 2) + Math.abs(ny) * (h / 2);
+    const along = Math.abs(dx) * (w / 2) + Math.abs(dy) * (h / 2);
+    const gap = 8;
+    const V = visNow();
+    const u = 1 / (frame?.s ?? 0.25);
+    const x = clamp(
+      p.x + nx * (gap + across) - dx * along - w / 2,
+      V.x0 + 4,
+      V.x1 - 4 - w,
+    );
+    const y = clamp(
+      p.y + ny * (gap + across) - dy * along - h / 2,
+      V.y0 + 4,
+      V.y1 - 4 - h,
+    );
+    el.style.transform = `translate(${snapTo(x, u)}px, ${snapTo(y, u)}px)`;
+  }
+  /** The tape takes the result's colour as the finder locks on. */
+  function hitTape(tier: Tier): void {
+    if (tapeEl) tapeEl.dataset.tier = String(tier);
+  }
+  /** The banner says the distance now, so the tape goes. */
+  function dropTape(): void {
+    const el = tapeEl;
+    tapeEl = null;
+    if (!el) return;
+    if (reduced() || typeof el.animate !== "function") {
+      el.remove();
+      return;
+    }
+    const run = el.animate([{ opacity: 1 }, { opacity: 0 }], {
+      duration: 160,
+      easing: "steps(2, end)",
+      fill: "forwards",
+    });
+    run.onfinish = () => el.remove();
+    run.oncancel = () => el.remove();
+  }
+
   /** The coordinates under the finder, printed a character at a time in red. */
   function showCoords(): void {
     let el = labels!.querySelector<HTMLElement>(".dl-coords");
@@ -3008,20 +3221,46 @@ export function initDayList(root: HTMLElement): void {
       el.setAttribute("aria-hidden", "true");
       ui!.append(el);
     }
+    const plan = revealPlan(r.km);
+    el.dataset.tier = String(plan.tier);
     el.innerHTML = `<b class="dl-px25">${verdictFor(r.km)}</b><span class="dl-px15">${verdictLine(
       r,
     )}</span>`;
     blockVersion++;
     if (!animate || reduced()) return;
+    if (!plan.stamp) {
+      el.animate(
+        [
+          { transform: "translateY(-110%)" },
+          { transform: "translateY(-55%)", offset: 0.3 },
+          { transform: "translateY(12px)", offset: 0.62 },
+          { transform: "translateY(-3px)", offset: 0.82 },
+          { transform: "translateY(0)" },
+        ],
+        { duration: 320, easing: "steps(8, end)", fill: "backwards" },
+      );
+      return;
+    }
+    // A close one slams down harder, and the verdict itself lands on it
+    // like a stamp, a beat later.
     el.animate(
       [
         { transform: "translateY(-110%)" },
-        { transform: "translateY(-55%)", offset: 0.3 },
-        { transform: "translateY(12px)", offset: 0.62 },
-        { transform: "translateY(-3px)", offset: 0.82 },
+        { transform: "translateY(16px)", offset: 0.4 },
+        { transform: "translateY(-5px)", offset: 0.62 },
+        { transform: "translateY(2px)", offset: 0.82 },
         { transform: "translateY(0)" },
       ],
-      { duration: 320, easing: "steps(8, end)", fill: "backwards" },
+      { duration: 300, easing: "steps(8, end)", fill: "backwards" },
+    );
+    el.querySelector("b")?.animate(
+      [
+        { transform: "scale(1.7)", opacity: 0 },
+        { transform: "scale(0.9)", opacity: 1, offset: 0.5 },
+        { transform: "scale(1.06)", opacity: 1, offset: 0.75 },
+        { transform: "none", opacity: 1 },
+      ],
+      { duration: 240, delay: 140, easing: "steps(6, end)", fill: "backwards" },
     );
   }
 
@@ -3046,14 +3285,15 @@ export function initDayList(root: HTMLElement): void {
       pin: pinAt,
       to,
       frac: (result?.km ?? 0) > 0 ? entryFraction(pinAt, to, box) : 0,
+      plan: revealPlan(result?.km ?? 0),
       t0: -1e9,
-      d: 0,
       lag: 0,
       settle: 0,
-      march: 0,
       boxT: 1,
       findT: 1,
       lockT: 1,
+      dim: 0,
+      hitAt: 0,
       finder: null,
     };
   }
@@ -3144,6 +3384,9 @@ export function initDayList(root: HTMLElement): void {
 
     revealing = true;
     syncMapControls(m);
+    // How it plays depends on how close the guess was: a near one builds up
+    // and lands harder (./day-list-reveal).
+    const plan = revealPlan(r.km);
     // The pin presses into the map as the camera settles on it, and the
     // bullseye leaves as it comes back up.
     pins.press(220 + CAMERA_MS - PRESS_DOWN_MS);
@@ -3158,59 +3401,94 @@ export function initDayList(root: HTMLElement): void {
     });
     if (mine !== generation) return;
 
-    // The whole bullseye slides from the pin to the place's middle, the
-    // dotted line marching out behind it.
+    // The dotted line runs out from the pin with the distance ticking up at
+    // its head, slowing into the last few km on a close guess. The rings
+    // ride its head, then drift on into the place's middle.
     const a = settledAnswer();
-    const from = m.project(a.pin.lon, a.pin.lat);
-    const to = m.project(a.to.lon, a.to.lat);
-    const span = Math.hypot(to.x - from.x, to.y - from.y);
+    a.plan = plan;
     a.t0 = now();
-    a.d = clamp(420 + span * 0.8, 480, 980);
     a.lag = 34;
     a.boxT = 0;
     a.findT = 0;
     a.lockT = 0;
     ans = a;
-    const t0 = now();
-    const slideFor = a.d + 5 * a.lag;
-    await new Promise<void>((resolve) => {
-      const step = () => {
-        if (mine !== generation) return resolve();
-        a.march = now() - t0;
-        m.redraw();
-        if (now() - t0 < slideFor) requestAnimationFrame(step);
-        else resolve();
-      };
-      requestAnimationFrame(step);
-    });
+    if (a.frac > 0) {
+      showTape();
+      placeTape(now());
+    }
+    m.redraw();
+    await wait(a.frac > 0 ? plan.run : 0);
     if (mine !== generation) return;
 
-    // The rings settle round the place, the boundary inks in at their
-    // middle, and the finder closes in on it in whole pixels.
-    a.settle = now();
-    await Promise.all([
+    const inkIn = (ms: number) =>
       tween(
-        300,
+        ms,
         (k) => {
           a.boxT = k;
           m.redraw();
         },
         (k) => Math.round(k * 12) / 12,
-      ),
+      );
+    const closeIn = () =>
       tween(
-        620,
+        plan.slam,
         (k) => {
           a.findT = k;
           m.redraw();
         },
         (k) => k,
-      ),
-    ]);
+      );
+    if (plan.hold > 0) {
+      // Close: a held beat. The world darkens round the pin and the place
+      // while the rings drift in, the boundary inks in from where the line
+      // touched it, then the finder slams in.
+      const ink = Math.min(320, plan.hold);
+      await Promise.all([
+        tween(
+          plan.hold,
+          (k) => {
+            a.dim = plan.dim * k;
+            m.redraw();
+          },
+          (k) => k * k,
+        ),
+        wait(plan.hold - ink).then(() =>
+          mine === generation ? inkIn(ink) : undefined,
+        ),
+      ]);
+      if (mine !== generation) return;
+      await closeIn();
+    } else {
+      // Further off: the rings settle round the place, the boundary inks in
+      // and the finder closes in on it in whole pixels.
+      await wait(plan.glide + 5 * a.lag);
+      if (mine !== generation) return;
+      a.settle = now();
+      await Promise.all([inkIn(300), closeIn()]);
+    }
     if (mine !== generation) return;
-    // It locks on: one pulse, the ticks grow, the coordinates print.
+
+    // It locks on: one pulse, the ticks grow, the coordinates print. On a
+    // close guess the map flashes in the result's colour, ripples run out
+    // from the pin, the rings shudder and the pin gives under it.
+    a.hitAt = now();
+    if (plan.flash) hitTape(plan.tier);
+    if (plan.hold > 0) {
+      a.settle = a.hitAt;
+      pins.press(0);
+      void tween(
+        320,
+        (k) => {
+          a.dim = plan.dim * (1 - k);
+          m.redraw();
+        },
+        (k) => Math.round(k * 4) / 4,
+      );
+    }
+    m.redraw();
     showCoords();
     await tween(
-      220,
+      plan.stamp ? 280 : 220,
       (k) => {
         a.lockT = k;
         typeCoords(k);
@@ -3224,14 +3502,18 @@ export function initDayList(root: HTMLElement): void {
     // Now the map has said where, its name goes up, and the verdict drops in.
     showName(true);
     showBanner(r, true);
+    dropTape();
     blockVersion++;
     m.redraw();
     landed();
     await wait(160);
     if (mine !== generation) return;
     stakesUp!.textContent = "Your score";
-    const ms = Math.min(1100, 300 + r.score / 8);
-    const counting = countTo(worthEl!, r.score, ms, 0);
+    // Most of the score at once, then the last digits slowly, longer for a
+    // bigger score and a closer guess.
+    const ms = Math.min(plan.count, 500 + r.score / 4);
+    const ease = (k: number) => countEase(plan, k);
+    const counting = countTo(worthEl!, r.score, ms, 0, ease);
     worthEl!.animate(
       [{ transform: "scale(1.12)" }, { transform: "scale(1)" }],
       {
@@ -3243,7 +3525,7 @@ export function initDayList(root: HTMLElement): void {
     const total = resultSlot!.querySelector<HTMLElement>(
       "[data-daylist-score]",
     );
-    if (total) void countTo(total, r.score, ms, 0);
+    if (total) void countTo(total, r.score, ms, 0, ease);
     revealing = false;
     syncMapControls(m);
     resultSlot!
@@ -3254,8 +3536,17 @@ export function initDayList(root: HTMLElement): void {
     blockVersion++;
     m.redraw();
     worthEl!.animate(
-      [{ transform: "translateY(-6px) scale(1.12)" }, { transform: "none" }],
-      { duration: 200, easing: "steps(3, end)" },
+      plan.stamp
+        ? [
+            { transform: "translateY(-10px) scale(1.22)", color: "#ffffff" },
+            { transform: "translateY(2px) scale(0.98)", offset: 0.6 },
+            { transform: "none" },
+          ]
+        : [
+            { transform: "translateY(-6px) scale(1.12)" },
+            { transform: "none" },
+          ],
+      { duration: plan.stamp ? 280 : 200, easing: "steps(4, end)" },
     );
   }
 
@@ -3474,6 +3765,7 @@ export function initDayList(root: HTMLElement): void {
     ui!.querySelector(":scope > .dl-banner")?.remove();
     labels!.innerHTML = "";
     labelEls.length = 0;
+    tapeEl = null;
     hintEl = null;
     if (sheet?.open) sheet.close();
     if (rollSlot) rollSlot.innerHTML = "";

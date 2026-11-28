@@ -551,6 +551,27 @@ const MONTHS = [
   .dl-coords .dl-c-off {
     color: transparent;
   }
+  /* The distance ticking up at the line's head as it runs to the place,
+     taking the result's colour as the finder locks on. */
+  .dl-tape {
+    position: absolute;
+    left: 0;
+    top: 0;
+    z-index: 2;
+    padding: 2px 8px 4px;
+    font-size: 22px;
+    line-height: 1;
+    white-space: nowrap;
+    color: var(--snow);
+    background: var(--slate);
+    box-shadow:
+      0 0 0 2px var(--drop),
+      3px 3px 0 2px var(--drop);
+  }
+  .dl-tape[data-tier] {
+    color: #122a5b;
+    background: var(--tier);
+  }
   /* A photo flying from its card to its ring, in whole map pixels. */
   .dl-fly {
     position: fixed;
@@ -572,21 +593,61 @@ const MONTHS = [
     justify-items: start;
     gap: 4px;
     padding: 22px 22px 12px;
-    background: var(--amber);
+    background: var(--tier);
     color: var(--slate);
     white-space: nowrap;
     box-shadow:
-      inset 0 -4px 0 var(--amber-lo),
+      inset 0 -4px 0 var(--tier-lo),
       0 0 0 3px var(--drop),
       6px 6px 0 3px var(--drop);
   }
   html.dark .dl-banner {
     color: #071230;
   }
+  /* Each result in its own colour, the same bands as the share squares:
+     the game's amber inside the place, then green, yellow, orange and red
+     the further off (TIER_RGB in day-list.ts). */
+  .dl {
+    --tier: var(--amber);
+    --tier-lo: var(--amber-lo);
+  }
+  .dl [data-tier="3"] {
+    --tier: #4fae3c;
+    --tier-lo: #2f7a27;
+  }
+  .dl [data-tier="2"] {
+    --tier: #f0d43a;
+    --tier-lo: #b89a12;
+  }
+  .dl [data-tier="1"] {
+    --tier: #ef7f22;
+    --tier-lo: #b3570c;
+  }
+  .dl [data-tier="0"] {
+    --tier: #c8352c;
+    --tier-lo: #8e2018;
+  }
+  html.dark .dl [data-tier="3"] {
+    --tier: #62c44c;
+  }
+  html.dark .dl [data-tier="2"] {
+    --tier: #f5dc4a;
+  }
+  html.dark .dl [data-tier="1"] {
+    --tier: #f59238;
+  }
+  html.dark .dl [data-tier="0"] {
+    --tier: #f0584f;
+  }
+  .dl-banner[data-tier="0"],
+  html.dark .dl-banner[data-tier="0"] {
+    color: #fff;
+  }
   .dl-banner b {
     font-size: 41px;
     line-height: 0.85;
     font-weight: 400;
+    transform-origin: 0 60%;
   }
   .dl-banner span {
     font-size: 22px;
@@ -1943,6 +2004,9 @@ const MONTHS = [
   }
   .dl.is-phone .dl-coords {
     font-size: 18px;
+  }
+  .dl.is-phone .dl-tape {
+    font-size: 17px;
   }
   .dl.is-phone .dl-place {
     font-size: 19px;
